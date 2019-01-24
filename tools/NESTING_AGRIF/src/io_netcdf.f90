@@ -200,20 +200,28 @@ CONTAINS
        WRITE(*,*)"unable to open netcdf file : ",file
        STOP
     ENDIF
+    write(*,*) 'file opened'
     !     
     status = nf90_inq_varid(ncid,varname,varid)
     status=nf90_inquire_variable(ncid,varid,dimids=dimIDS)
     status=nf90_inquire_dimension(ncid,dimIDS(1),len=dim1)
     status=nf90_inquire_dimension(ncid,dimIDS(2),len=dim2)
+     write(*,*) 'file read', dim1,dim2
+
     !                
     IF(.NOT. ASSOCIATED(tabvar)) THEN
+        write(*,*) 'test1'
        ALLOCATE(tabvar(dim1,dim2))  
     ELSE
-       IF( ANY(SHAPE(tabvar)/=(/dim1,dim2/)) ) THEN	   
+         write(*,*) 'test2'
+      IF( ANY(SHAPE(tabvar)/=(/dim1,dim2/)) ) THEN
+         write(*,*) 'test2.2'
           DEALLOCATE(tabvar)   
-          ALLOCATE(tabvar(dim1,dim2))      
+          write(*,*) 'test2.3'
+         ALLOCATE(tabvar(dim1,dim2))      
        ENDIF
     ENDIF
+    write(*,*) 'apres allocate'
     !       
     status=nf90_get_var(ncid,varid,tabvar)     
     !     
