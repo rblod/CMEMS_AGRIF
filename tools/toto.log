@@ -1,0 +1,216 @@
+Build command started on Wed Sep  5 10:46:35 2018.
+->Parse configuration: start
+Config file (bld): /Users/rblod/201809_Agrif/dev_r10077_Agrif/mk/conv.cfg
+Config file (bld): /Users/rblod/201809_Agrif/dev_r10077_Agrif/mk/arch_nemo.fcm
+->Parse configuration: 0 second
+->Setup destination: start
+Destination: rblod@wificampus-028077.grenet.fr:/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/AGRIFLIB
+->Setup destination: 0 second
+->Setup build: start
+->Setup build: 0 second
+->Pre-process: start
+->Pre-process: 0 second
+->Scan dependency: start
+->Scan dependency: 0 second
+->Generate Fortran interface: start
+->Generate Fortran interface: 0 second
+->Make: start
+make: Nothing to be done for `all'.
+->Make: 0 second
+->TOTAL: 0 second
+Build command finished on Wed Sep  5 10:46:35 2018.
+Build command started on Wed Sep  5 10:46:35 2018.
+->Parse configuration: start
+Config file (bld): /Users/rblod/201809_Agrif/dev_r10077_Agrif/mk/bld_preproagr_tools.cfg
+Config file (bld): /Users/rblod/201809_Agrif/dev_r10077_Agrif/mk/arch_nemo.fcm
+Config file (bld): /Users/rblod/201809_Agrif/dev_r10077_Agrif/mk/cpp.fcm
+->Parse configuration: 0 second
+->Setup destination: start
+Destination: rblod@wificampus-028077.grenet.fr:/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/NEMOFILES
+Make directory: /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/NEMOFILES/cfg
+->Setup destination: 0 second
+->Setup build: start
+->Setup build: 0 second
+->Pre-process: start
+No. of files scanned for PP dependency: 8
+No. of pre-processed files: 8
+->Pre-process: 0 second
+->Scan dependency: start
+No. of files scanned for dependency: 9
+/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/NEMOFILES/Makefile: updated
+->Scan dependency: 0 second
+->Generate Fortran interface: start
+->Generate Fortran interface: 0 second
+->Make: start
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/NEMOFILES/flags/FC.flags
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/NEMOFILES/flags/FFLAGS.flags
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/NEMOFILES/flags/FFLAGS__nemo.flags
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/NEMOFILES/flags/FFLAGS__nemo__agrif_user.flags
+fcm_internal compile:F nemo /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/NEMOFILES/ppsrc/nemo/agrif_user.f90 agrif_user.f90
+/Users/rblod/201809_Agrif/dev_r10077_Agrif/mk/agrifpp_2.sh  agrif_user.f90 /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/NEMOFILES/inc  /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/NEMOFILES/ppsrc/nemo/agrif_user.f90
+agrif_user.f90
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/NEMOFILES/flags/FFLAGS__nemo__agrif2model.flags
+fcm_internal compile:F nemo /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/src/agrif2model.F90 agrif2model.f90
+/Users/rblod/201809_Agrif/dev_r10077_Agrif/mk/agrifpp_2.sh  agrif2model.f90 /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/NEMOFILES/inc  /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/src/agrif2model.F90
+agrif2model.f90
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/NEMOFILES/flags/FFLAGS__nemo__create_coordinate.flags
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/NEMOFILES/flags/FFLAGS__nemo__par_oce.flags
+fcm_internal compile:F nemo /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/NEMOFILES/ppsrc/nemo/par_oce.f90 par_oce.f90
+/Users/rblod/201809_Agrif/dev_r10077_Agrif/mk/agrifpp_2.sh  par_oce.f90 /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/NEMOFILES/inc  /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/NEMOFILES/ppsrc/nemo/par_oce.f90
+par_oce.f90
+fcm_internal compile:F nemo /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/NEMOFILES/ppsrc/nemo/create_coordinate.f90 create_coordinate.f90
+/Users/rblod/201809_Agrif/dev_r10077_Agrif/mk/agrifpp_2.sh  create_coordinate.f90 /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/NEMOFILES/inc  /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/NEMOFILES/ppsrc/nemo/create_coordinate.f90
+create_coordinate.f90
+->Make: 0 second
+->TOTAL: 0 second
+Build command finished on Wed Sep  5 10:46:35 2018.
+Build command started on Wed Sep  5 10:46:35 2018.
+->Parse configuration: start
+Config file (bld): /Users/rblod/201809_Agrif/dev_r10077_Agrif/mk/bld_nesting.cfg
+Config file (bld): /Users/rblod/201809_Agrif/dev_r10077_Agrif/mk/arch_tools.fcm
+->Parse configuration: 0 second
+->Setup destination: start
+Destination: rblod@wificampus-028077.grenet.fr:/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD
+Make directory: /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/cfg
+->Setup destination: 0 second
+->Setup build: start
+->Setup build: 0 second
+->Pre-process: start
+No. of files scanned for PP dependency: 30
+No. of pre-processed files: 30
+->Pre-process: 1 second
+->Scan dependency: start
+No. of files scanned for dependency: 30
+/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/Makefile: updated
+->Scan dependency: 0 second
+->Generate Fortran interface: start
+->Generate Fortran interface: 0 second
+->Make: start
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FC.flags
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS.flags
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__nemo.flags
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__nemo__agrif_create_coordinates.flags
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__agrif.flags
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__agrif__modutil.flags
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__agrif__modbcfunction.flags
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__agrif__modbc.flags
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__agrif__modinterp.flags
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__agrif__modarrays.flags
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__agrif__modgrids.flags
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__agrif__modtypes.flags
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__agrif__modprocs.flags
+fcm_internal compile:F agrif /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modprocs.f90 agrif_procs.o
+mpif90 -o agrif_procs.o -I/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/inc -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none -I/Users/rblod/xios-2.5/inc -I/not/defined/build/lib/mct -I/not/defined/build/lib/psmile.MPI1 -I/usr/local/include -I/usr/local/include -c /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modprocs.f90
+fcm_internal compile:F agrif /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modtypes.f90 agrif_types.o
+mpif90 -o agrif_types.o -I/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/inc -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none -I/Users/rblod/xios-2.5/inc -I/not/defined/build/lib/mct -I/not/defined/build/lib/psmile.MPI1 -I/usr/local/include -I/usr/local/include -c /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modtypes.f90
+fcm_internal compile:F agrif /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modgrids.f90 agrif_grids.o
+mpif90 -o agrif_grids.o -I/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/inc -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none -I/Users/rblod/xios-2.5/inc -I/not/defined/build/lib/mct -I/not/defined/build/lib/psmile.MPI1 -I/usr/local/include -I/usr/local/include -c /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modgrids.f90
+fcm_internal compile:F agrif /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modarrays.f90 agrif_arrays.o
+mpif90 -o agrif_arrays.o -I/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/inc -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none -I/Users/rblod/xios-2.5/inc -I/not/defined/build/lib/mct -I/not/defined/build/lib/psmile.MPI1 -I/usr/local/include -I/usr/local/include -c /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modarrays.f90
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__agrif__modcurgridfunctions.flags
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__agrif__modinit.flags
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__agrif__modlinktomodel.flags
+fcm_internal compile:F agrif /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modlinktomodel.f90 agrif_link.o
+mpif90 -o agrif_link.o -I/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/inc -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none -I/Users/rblod/xios-2.5/inc -I/not/defined/build/lib/mct -I/not/defined/build/lib/psmile.MPI1 -I/usr/local/include -I/usr/local/include -c /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modlinktomodel.f90
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__agrif__modmpp.flags
+fcm_internal compile:F agrif /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modmpp.f90 agrif_mpp.o
+mpif90 -o agrif_mpp.o -I/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/inc -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none -I/Users/rblod/xios-2.5/inc -I/not/defined/build/lib/mct -I/not/defined/build/lib/psmile.MPI1 -I/usr/local/include -I/usr/local/include -c /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modmpp.f90
+fcm_internal compile:F agrif /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modinit.f90 agrif_init.o
+mpif90 -o agrif_init.o -I/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/inc -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none -I/Users/rblod/xios-2.5/inc -I/not/defined/build/lib/mct -I/not/defined/build/lib/psmile.MPI1 -I/usr/local/include -I/usr/local/include -c /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modinit.f90
+fcm_internal compile:F agrif /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modcurgridfunctions.f90 agrif_curgridfunctions.o
+mpif90 -o agrif_curgridfunctions.o -I/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/inc -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none -I/Users/rblod/xios-2.5/inc -I/not/defined/build/lib/mct -I/not/defined/build/lib/psmile.MPI1 -I/usr/local/include -I/usr/local/include -c /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modcurgridfunctions.f90
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__agrif__modinterpbasic.flags
+fcm_internal compile:F agrif /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modinterpbasic.f90 agrif_interpbasic.o
+mpif90 -o agrif_interpbasic.o -I/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/inc -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none -I/Users/rblod/xios-2.5/inc -I/not/defined/build/lib/mct -I/not/defined/build/lib/psmile.MPI1 -I/usr/local/include -I/usr/local/include -c /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modinterpbasic.f90
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__agrif__modmask.flags
+fcm_internal compile:F agrif /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modmask.f90 agrif_mask.o
+mpif90 -o agrif_mask.o -I/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/inc -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none -I/Users/rblod/xios-2.5/inc -I/not/defined/build/lib/mct -I/not/defined/build/lib/psmile.MPI1 -I/usr/local/include -I/usr/local/include -c /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modmask.f90
+fcm_internal compile:F agrif /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modinterp.f90 agrif_interpolation.o
+mpif90 -o agrif_interpolation.o -I/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/inc -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none -I/Users/rblod/xios-2.5/inc -I/not/defined/build/lib/mct -I/not/defined/build/lib/psmile.MPI1 -I/usr/local/include -I/usr/local/include -c /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modinterp.f90
+fcm_internal compile:F agrif /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modbc.f90 agrif_boundary.o
+mpif90 -o agrif_boundary.o -I/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/inc -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none -I/Users/rblod/xios-2.5/inc -I/not/defined/build/lib/mct -I/not/defined/build/lib/psmile.MPI1 -I/usr/local/include -I/usr/local/include -c /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modbc.f90
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__agrif__modsauv.flags
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__agrif__modvariables.flags
+fcm_internal compile:F agrif /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modvariables.f90 agrif_variables.o
+mpif90 -o agrif_variables.o -I/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/inc -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none -I/Users/rblod/xios-2.5/inc -I/not/defined/build/lib/mct -I/not/defined/build/lib/psmile.MPI1 -I/usr/local/include -I/usr/local/include -c /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modvariables.f90
+fcm_internal compile:F agrif /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modsauv.f90 agrif_save.o
+mpif90 -o agrif_save.o -I/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/inc -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none -I/Users/rblod/xios-2.5/inc -I/not/defined/build/lib/mct -I/not/defined/build/lib/psmile.MPI1 -I/usr/local/include -I/usr/local/include -c /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modsauv.f90
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__agrif__modupdate.flags
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__agrif__modupdatebasic.flags
+fcm_internal compile:F agrif /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modupdatebasic.f90 agrif_updatebasic.o
+mpif90 -o agrif_updatebasic.o -I/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/inc -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none -I/Users/rblod/xios-2.5/inc -I/not/defined/build/lib/mct -I/not/defined/build/lib/psmile.MPI1 -I/usr/local/include -I/usr/local/include -c /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modupdatebasic.f90
+fcm_internal compile:F agrif /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modupdate.f90 agrif_update.o
+mpif90 -o agrif_update.o -I/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/inc -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none -I/Users/rblod/xios-2.5/inc -I/not/defined/build/lib/mct -I/not/defined/build/lib/psmile.MPI1 -I/usr/local/include -I/usr/local/include -c /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modupdate.f90
+fcm_internal compile:F agrif /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modbcfunction.f90 agrif_bcfunction.o
+mpif90 -o agrif_bcfunction.o -I/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/inc -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none -I/Users/rblod/xios-2.5/inc -I/not/defined/build/lib/mct -I/not/defined/build/lib/psmile.MPI1 -I/usr/local/include -I/usr/local/include -c /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modbcfunction.f90
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__agrif__modcluster.flags
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__agrif__modinitvars.flags
+fcm_internal compile:F agrif /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modinitvars.f90 agrif_init_vars.o
+mpif90 -o agrif_init_vars.o -I/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/inc -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none -I/Users/rblod/xios-2.5/inc -I/not/defined/build/lib/mct -I/not/defined/build/lib/psmile.MPI1 -I/usr/local/include -I/usr/local/include -c /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modinitvars.f90
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__agrif__modseq.flags
+fcm_internal compile:F agrif /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modseq.f90 agrif_seq.o
+mpif90 -o agrif_seq.o -I/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/inc -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none -I/Users/rblod/xios-2.5/inc -I/not/defined/build/lib/mct -I/not/defined/build/lib/psmile.MPI1 -I/usr/local/include -I/usr/local/include -c /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modseq.f90
+fcm_internal compile:F agrif /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modcluster.f90 agrif_clustering.o
+mpif90 -o agrif_clustering.o -I/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/inc -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none -I/Users/rblod/xios-2.5/inc -I/not/defined/build/lib/mct -I/not/defined/build/lib/psmile.MPI1 -I/usr/local/include -I/usr/local/include -c /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modcluster.f90
+fcm_internal compile:F agrif /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modutil.f90 agrif_util.o
+mpif90 -o agrif_util.o -I/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/inc -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none -I/Users/rblod/xios-2.5/inc -I/not/defined/build/lib/mct -I/not/defined/build/lib/psmile.MPI1 -I/usr/local/include -I/usr/local/include -c /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/agrif/modutil.f90
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__nemo__io_netcdf.flags
+fcm_internal compile:F nemo /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/nemo/io_netcdf.f90 io_netcdf.o
+mpif90 -o io_netcdf.o -I/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/inc -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none -I/Users/rblod/xios-2.5/inc -I/not/defined/build/lib/mct -I/not/defined/build/lib/psmile.MPI1 -I/usr/local/include -I/usr/local/include -c /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/nemo/io_netcdf.f90
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__nemo__par_oce.flags
+fcm_internal compile:F nemo /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/nemo/par_oce.f90 par_oce.o
+mpif90 -o par_oce.o -I/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/inc -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none -I/Users/rblod/xios-2.5/inc -I/not/defined/build/lib/mct -I/not/defined/build/lib/psmile.MPI1 -I/usr/local/include -I/usr/local/include -c /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/nemo/par_oce.f90
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__nemo__allocate_arrays.flags
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__nemo__variables.flags
+fcm_internal compile:F nemo /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/nemo/variables.f90 variables.o
+mpif90 -o variables.o -I/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/inc -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none -I/Users/rblod/xios-2.5/inc -I/not/defined/build/lib/mct -I/not/defined/build/lib/psmile.MPI1 -I/usr/local/include -I/usr/local/include -c /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/nemo/variables.f90
+fcm_internal compile:F nemo /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/nemo/allocate_arrays.f90 user_allocate.o
+mpif90 -o user_allocate.o -I/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/inc -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none -I/Users/rblod/xios-2.5/inc -I/not/defined/build/lib/mct -I/not/defined/build/lib/psmile.MPI1 -I/usr/local/include -I/usr/local/include -c /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/nemo/allocate_arrays.f90
+fcm_internal compile:F nemo /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/nemo/agrif_create_coordinates.f90 create_coordinates.o
+mpif90 -o create_coordinates.o -I/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/inc -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none -I/Users/rblod/xios-2.5/inc -I/not/defined/build/lib/mct -I/not/defined/build/lib/psmile.MPI1 -I/usr/local/include -I/usr/local/include -c /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/nemo/agrif_create_coordinates.f90
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/LD.flags
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/LD__nemo.flags
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/LD__nemo__agrif_create_coordinates.flags
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/LDFLAGS.flags
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/LDFLAGS__nemo.flags
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/LDFLAGS__nemo__agrif_create_coordinates.flags
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__nemo__agrif2model.flags
+fcm_internal compile:F nemo /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/nemo/agrif2model.f90 agrif2model.o
+mpif90 -o agrif2model.o -I/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/inc -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none -I/Users/rblod/xios-2.5/inc -I/not/defined/build/lib/mct -I/not/defined/build/lib/psmile.MPI1 -I/usr/local/include -I/usr/local/include -c /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/nemo/agrif2model.f90
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__nemo__agrif_user.flags
+fcm_internal compile:F nemo /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/nemo/agrif_user.f90 agrif_user.o
+mpif90 -o agrif_user.o -I/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/inc -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none -I/Users/rblod/xios-2.5/inc -I/not/defined/build/lib/mct -I/not/defined/build/lib/psmile.MPI1 -I/usr/local/include -I/usr/local/include -c /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/nemo/agrif_user.f90
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/flags/FFLAGS__nemo__par_kind.flags
+fcm_internal compile:F nemo /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/nemo/par_kind.f90 par_kind.o
+mpif90 -o par_kind.o -I/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/inc -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none -I/Users/rblod/xios-2.5/inc -I/not/defined/build/lib/mct -I/not/defined/build/lib/psmile.MPI1 -I/usr/local/include -I/usr/local/include -c /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/ppsrc/nemo/par_kind.f90
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/done/agrif_procs.done
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/done/agrif_types.done
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/done/agrif_grids.done
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/done/agrif_arrays.done
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/done/agrif_link.done
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/done/agrif_mpp.done
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/done/agrif_init.done
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/done/agrif_curgridfunctions.done
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/done/agrif_interpbasic.done
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/done/agrif_mask.done
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/done/agrif_interpolation.done
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/done/agrif_boundary.done
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/done/agrif_variables.done
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/done/agrif_save.done
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/done/agrif_updatebasic.done
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/done/agrif_update.done
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/done/agrif_bcfunction.done
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/done/agrif_init_vars.done
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/done/agrif_seq.done
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/done/agrif_clustering.done
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/done/agrif_util.done
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/done/io_netcdf.done
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/done/par_oce.done
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/done/variables.done
+touch /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/done/user_allocate.done
+fcm_internal load:F nemo create_coordinates.o agrif_create_coordinates.exe
+mpif90 -o agrif_create_coordinates.exe /Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/obj/create_coordinates.o -L/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF/BLD/lib -l__fcm__agrif_create_coordinates -L/Users/rblod/xios-2.5/lib  -lstdc++ -L/not/defined/lib -L/usr/local/lib -lnetcdff -lnetcdf
+->Make: 17 seconds
+->TOTAL: 18 seconds
+/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools
+/Users/rblod/201809_Agrif/dev_r10077_Agrif/tools/NESTING_AGRIF

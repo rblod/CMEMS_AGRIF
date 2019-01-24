@@ -1,0 +1,9 @@
+DEP::nemo__agrif2model.F90              agrif2model
+DEP::nemo__agrif_create_coordinates.f90 create_coordinates::io_netcdf::USE::par_oce::USE::user_allocate::USE::variables::USE
+DEP::nemo__agrif_user.f90               agrif_user
+DEP::nemo__allocate_arrays.f90          user_allocate::variables::USE
+DEP::nemo__create_coordinate.f90        create_coordinate::par_oce::USE
+DEP::nemo__io_netcdf.f90                io_netcdf
+DEP::nemo__par_kind.F90                 par_kind
+DEP::nemo__par_oce.F90                  par_oce
+DEP::nemo__variables.f90                variables

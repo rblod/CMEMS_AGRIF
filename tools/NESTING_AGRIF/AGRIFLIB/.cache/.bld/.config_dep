@@ -1,0 +1,24 @@
+DEP::convsrc__DiversListe.c                      ::decl.h::H
+DEP::convsrc__SubLoopCreation.c                  ::decl.h::H
+DEP::convsrc__UtilAgrif.c                        ::decl.h::H
+DEP::convsrc__UtilCharacter.c                    ::decl.h::H
+DEP::convsrc__UtilFile.c                         ::decl.h::H
+DEP::convsrc__UtilFortran.c                      ::decl.h::H
+DEP::convsrc__UtilListe.c                        ::decl.h::H
+DEP::convsrc__UtilNotGridDep.c                   ::decl.h::H
+DEP::convsrc__WorkWithAllocatelist.c             ::decl.h::H
+DEP::convsrc__WorkWithParameterlist.c            ::decl.h::H
+DEP::convsrc__WorkWithglobliste.c                ::decl.h::H
+DEP::convsrc__WorkWithlistdatavariable.c         ::decl.h::H
+DEP::convsrc__WorkWithlistmoduleinfile.c         ::decl.h::H
+DEP::convsrc__WorkWithlistofcoupled.c            ::decl.h::H
+DEP::convsrc__WorkWithlistofmodulebysubroutine.c ::decl.h::H
+DEP::convsrc__WorkWithlistvarindoloop.c          ::decl.h::H
+DEP::convsrc__WorkWithvarofsubroutineliste.c     ::decl.h::H
+DEP::convsrc__WriteInFile.c                      ::decl.h::H
+DEP::convsrc__Writedeclarations.c                ::decl.h::H
+DEP::convsrc__decl.h                             
+DEP::convsrc__dependfile.c                       ::decl.h::H
+DEP::convsrc__fortran.c                          ::decl.h::H
+DEP::convsrc__main.c                             ::decl.h::H
+DEP::convsrc__toamr.c                            ::decl.h::H
