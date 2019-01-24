@@ -1,4 +1,4 @@
-FC=gfortran
+FC=mpif90
 FFLAGS=  -O0 -fdefault-real-8  -ffree-line-length-none -I$(NCDF_ROOT)/include
 FFLAGS_SPEC= -J$(DIR_OBJS) -fbounds-check  -fbacktrace -g 
 #-fbounds-check  -fbacktrace -g -fcheck=all -Wall
@@ -21,6 +21,4 @@ LIBS =$(LIB_NETCDF)
 #
 F77FLG =  -ffixed-form # -Mfixed
 F90FLG =  -ffree-form -ffree-line-length-0 # -Mfree
-
-MPI = NO
 

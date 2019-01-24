@@ -15,7 +15,6 @@ MODULE stpctl
    !!----------------------------------------------------------------------
    USE oce             ! ocean dynamics and tracers variables
    USE dom_oce         ! ocean space and time domain variables 
-   USE c1d             ! 1D vertical configuration
    !
    USE in_out_manager  ! I/O manager
    USE lbclnk          ! ocean lateral boundary conditions (or mpp link)
@@ -137,7 +136,6 @@ CONTAINS
 9500  FORMAT (' kt=',i6,' min SSS: ',1pg11.4,', i j: ',2i5)
       !
       !
-      IF( lk_c1d )  RETURN          ! No log file in case of 1D vertical configuration
 
       ! log file (ssh statistics)
       ! --------                                   !* ssh statistics (and others...)

@@ -19,14 +19,11 @@ MODULE restart
    !!----------------------------------------------------------------------
    USE oce             ! ocean dynamics and tracers 
    USE dom_oce         ! ocean space and time domain
-   USE sbc_ice         ! only lk_lim3 
    USE phycst          ! physical constants
    USE eosbn2          ! equation of state            (eos bn2 routine)
-   USE trdmxl_oce      ! ocean active mixed layer tracers trends variables
    !
    USE in_out_manager  ! I/O manager
    USE iom             ! I/O module
-   USE diurnal_bulk
    
    IMPLICIT NONE
    PRIVATE
@@ -135,34 +132,6 @@ CONTAINS
 
                      CALL iom_rstput( kt, nitrst, numrow, 'rdt'    , rdt       )   ! dynamics and tracer time step
 
-      IF ( .NOT. ln_diurnal_only ) THEN
-                     CALL iom_rstput( kt, nitrst, numrow, 'ub'     , ub        )     ! before fields
-                     CALL iom_rstput( kt, nitrst, numrow, 'vb'     , vb        )
-                     CALL iom_rstput( kt, nitrst, numrow, 'tb'     , tsb(:,:,:,jp_tem) )
-                     CALL iom_rstput( kt, nitrst, numrow, 'sb'     , tsb(:,:,:,jp_sal) )
-                     CALL iom_rstput( kt, nitrst, numrow, 'sshb'   , sshb      )
-                     !
-                     CALL iom_rstput( kt, nitrst, numrow, 'un'     , un        )     ! now fields
-                     CALL iom_rstput( kt, nitrst, numrow, 'vn'     , vn        )
-                     CALL iom_rstput( kt, nitrst, numrow, 'tn'     , tsn(:,:,:,jp_tem) )
-                     CALL iom_rstput( kt, nitrst, numrow, 'sn'     , tsn(:,:,:,jp_sal) )
-                     CALL iom_rstput( kt, nitrst, numrow, 'sshn'   , sshn      )
-                     CALL iom_rstput( kt, nitrst, numrow, 'rhop'   , rhop      )
-
-                  ! extra variable needed for the ice sheet coupling
-                  IF ( ln_iscpl ) THEN 
-                     CALL iom_rstput( kt, nitrst, numrow, 'tmask'  , tmask     ) ! need to extrapolate T/S
-                     CALL iom_rstput( kt, nitrst, numrow, 'umask'  , umask     ) ! need to correct barotropic velocity
-                     CALL iom_rstput( kt, nitrst, numrow, 'vmask'  , vmask     ) ! need to correct barotropic velocity
-                     CALL iom_rstput( kt, nitrst, numrow, 'smask'  , ssmask    ) ! need to correct barotropic velocity
-                     CALL iom_rstput( kt, nitrst, numrow, 'e3t_n', e3t_n(:,:,:) )   ! need to compute temperature correction
-                     CALL iom_rstput( kt, nitrst, numrow, 'e3u_n', e3u_n(:,:,:) )   ! need to compute bt conservation
-                     CALL iom_rstput( kt, nitrst, numrow, 'e3v_n', e3v_n(:,:,:) )   ! need to compute bt conservation
-                     CALL iom_rstput( kt, nitrst, numrow, 'gdepw_n', gdepw_n(:,:,:) ) ! need to compute extrapolation if vvl
-                  END IF
-      ENDIF
-      
-      IF (ln_diurnal) CALL iom_rstput( kt, nitrst, numrow, 'Dsst', x_dsst    )  
 
       IF( kt == nitrst ) THEN
          CALL iom_close( numrow )     ! close the restart file (only at last time step)
@@ -231,14 +200,6 @@ CONTAINS
       ENDIF
 
       ! Diurnal DSST 
-      IF( ln_diurnal ) CALL iom_get( numror, jpdom_autoglo, 'Dsst' , x_dsst  ) 
-      IF ( ln_diurnal_only ) THEN 
-         IF(lwp) WRITE( numout, * ) &
-         &   "rst_read:- ln_diurnal_only set, setting rhop=rau0" 
-         rhop = rau0
-         CALL iom_get( numror, jpdom_autoglo, 'tn'     , tsn(:,:,1,jp_tem) ) 
-         RETURN 
-      ENDIF  
       
       IF( iom_varid( numror, 'ub', ldstop = .FALSE. ) > 0 ) THEN
          CALL iom_get( numror, jpdom_autoglo, 'ub'     , ub      )   ! before fields

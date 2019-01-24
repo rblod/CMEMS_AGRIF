@@ -37,9 +37,6 @@ obj/domwri.o: obj/lib_mpp.o obj/phycst.o obj/timing.o obj/wrk_nemo.o
 obj/domzgr.o: obj/closea.o obj/dom_oce.o obj/in_out_manager.o obj/iom.o
 obj/domzgr.o: obj/lbclnk.o obj/lib_mpp.o obj/oce.o obj/timing.o obj/wrk_nemo.o
 
-obj/dtatsd.o: obj/dom_oce.o obj/in_out_manager.o obj/lib_mpp.o obj/oce.o
-obj/dtatsd.o: obj/phycst.o obj/timing.o obj/wrk_nemo.o
-
 obj/eosbn2.o: obj/dom_oce.o obj/in_out_manager.o obj/lbclnk.o obj/lib_fortran.o
 obj/eosbn2.o: obj/lib_mpp.o obj/phycst.o obj/prtctl.o obj/timing.o
 obj/eosbn2.o: obj/wrk_nemo.o
@@ -67,23 +64,6 @@ obj/iom_def.o: obj/par_kind.o
 
 obj/iom_nf90.o: obj/dom_oce.o obj/in_out_manager.o obj/iom_def.o obj/lbclnk.o
 obj/iom_nf90.o: obj/lib_mpp.o
-
-obj/iscplhsb.o: obj/dom_oce.o obj/domngb.o obj/domwri.o obj/in_out_manager.o
-obj/iscplhsb.o: obj/iscplini.o obj/lbclnk.o obj/lib_fortran.o obj/lib_mpp.o
-obj/iscplhsb.o: obj/oce.o obj/phycst.o obj/wrk_nemo.o
-
-obj/iscplini.o: obj/dom_oce.o obj/in_out_manager.o obj/lib_fortran.o
-obj/iscplini.o: obj/lib_mpp.o obj/oce.o
-
-obj/iscplrst.o: obj/dom_oce.o obj/domvvl.o obj/domwri.o obj/in_out_manager.o
-obj/iscplrst.o: obj/iom.o obj/iscplhsb.o obj/iscplini.o obj/lbclnk.o
-obj/iscplrst.o: obj/lib_fortran.o obj/lib_mpp.o obj/oce.o obj/phycst.o
-obj/iscplrst.o: obj/wrk_nemo.o
-
-obj/istate.o: obj/daymod.o obj/dom_oce.o obj/domvvl.o obj/dtatsd.o obj/eosbn2.o
-obj/istate.o: obj/in_out_manager.o obj/iom.o obj/iscplrst.o obj/lbclnk.o
-obj/istate.o: obj/lib_mpp.o obj/oce.o obj/phycst.o obj/restart.o obj/timing.o
-obj/istate.o: obj/wrk_nemo.o
 
 obj/lbclnk.o: obj/lib_mpp.o
 

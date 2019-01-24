@@ -56,7 +56,6 @@ CONTAINS
       !!----------------------------------------------------------------------
       ierr(:) = 0
                      ALLOCATE( etot3 (jpi,jpj,jpk), STAT=ierr(1) )
-      IF( lk_degrad) ALLOCATE( facvol(jpi,jpj,jpk), STAT=ierr(2) )
       trc_oce_alloc  = MAXVAL( ierr )
       !
       IF( trc_oce_alloc /= 0 )   CALL ctl_warn('trc_oce_alloc: failed to allocate etot3 array')
