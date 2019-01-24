@@ -38,6 +38,7 @@
 %x parameter
 %s character
 %x donottreat
+%x donottreat_interface
 %x includestate
 %s fortran77style
 %s fortran90style
@@ -66,7 +67,7 @@ int count_newlines(const char* str_in)
     return i;
 }
 
-#define PRINT_LINE_NUM()    // { fprintf(stderr,"== Parsing l.%4d...\n", line_num_input); }
+#define PRINT_LINE_NUM()   //  { fprintf(stderr,"== Parsing l.%4d...\n", line_num_input); }
 #define INCREMENT_LINE_NUM() { line_num_input+=count_newlines(fortran_text) ; PRINT_LINE_NUM(); }
 #define YY_USER_ACTION       { if (increment_nbtokens !=0) token_since_endofstmt++; increment_nbtokens = 1; if (token_since_endofstmt>=1) lastwasendofstmt=0; /*printf("VALLIJSDFLSD = %d %d %s \n",lastwasendofstmt,token_since_endofstmt,fortran_text); */ if (firstpass) { strcpy(linebuf1, linebuf2); strncpy(linebuf2, fortran_text,80);} \
                                else {my_position_before=setposcur();/*printf("muposition = %d\n",my_position_before);*/ECHO;} }
@@ -325,8 +326,9 @@ backspace                   { return TOK_BACKSPACE; }
                   }
 ((\')[^']*(\'))+               { strcpy(yylval.na,fortran_text);return TOK_CHAR_CONSTANT; }
 ((\")[^"]*(\"))+               { strcpy(yylval.na,fortran_text);return TOK_CHAR_MESSAGE; }
-{BEG_INTERFACE}             { BEGIN(donottreat); }
-<donottreat>{END_INTERFACE} { out_of_donottreat(); return '\n'; }
+{BEG_INTERFACE}             { BEGIN(donottreat_interface); }
+<donottreat_interface>{END_INTERFACE} { out_of_donottreat(); return '\n'; }
+<donottreat_interface>.*\n            {INCREMENT_LINE_NUM() ; }
 <fortran77style>{NAME}{NEXTLINEF77}[a-zA-Z0-9\_]+ {strcpy(yylval.na,fortran_text); removenewline(yylval.na);
                             return TOK_NAME; }
 {NAME}                      { strcpy(yylval.na,fortran_text); return TOK_NAME; }
