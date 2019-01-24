@@ -12,6 +12,9 @@ MODULE par_oce
    IMPLICIT NONE
    PUBLIC
 
+
+   INTEGER, PUBLIC            ::   nbcellsx   ! = jpiglo - 2 - 2*nbghostcells   !: number of cells in i-direction
+   INTEGER, PUBLIC            ::   nbcellsy   ! = jpjglo - 2 - 2*nbghostcells
    !!----------------------------------------------------------------------
    !!   Domain decomposition
    !!----------------------------------------------------------------------

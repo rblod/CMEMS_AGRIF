@@ -296,13 +296,18 @@ CONTAINS
    !!----------------------------------------------------------------------
    !! NOT 'key_agrif'      dummy function                     No AGRIF zoom
    !!----------------------------------------------------------------------
+#if ! defined key_agrif
+   !!----------------------------------------------------------------------
+   !! NOT 'key_agrif'      dummy function                     No AGRIF zoom
+   !!----------------------------------------------------------------------
    LOGICAL FUNCTION Agrif_Root()
       Agrif_Root = .TRUE.
    END FUNCTION Agrif_Root
 
    CHARACTER(len=3) FUNCTION Agrif_CFixed()
-      Agrif_CFixed = '0' 
+      Agrif_CFixed = '0'
    END FUNCTION Agrif_CFixed
+#endif
 
 
    INTEGER FUNCTION dom_oce_alloc()

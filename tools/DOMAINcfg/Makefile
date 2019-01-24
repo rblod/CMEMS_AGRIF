@@ -1,5 +1,5 @@
 SHELL = /bin/bash
-AGRIF=NO
+AGRIF=YES
 
 include make.inc
 
