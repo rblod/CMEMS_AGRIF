@@ -1,5 +1,5 @@
 !
-! $Id: modarrays.F90 5656 2015-07-31 08:55:56Z timgraham $
+! $Id: modarrays.F 662 2007-05-25 15:58:52Z opalod $
 !
 !     AGRIF (Adaptive Grid Refinement In Fortran)
 !
@@ -54,12 +54,14 @@ subroutine Agrif_Childbounds ( nbdim,           &
                                lb_tab, ub_tab,  &
                                proc_id,         &
                                coords,          &
-                               lb_tab_true, ub_tab_true, memberin )
+                               lb_tab_true, ub_tab_true, memberin,  &
+                               indminglob3,indmaxglob3)
 !---------------------------------------------------------------------------------------------------
     integer,                   intent(in)  :: nbdim         !< Number of dimensions
     integer, dimension(nbdim), intent(in)  :: lb_var        !< Local lower boundary on the current processor
     integer, dimension(nbdim), intent(in)  :: ub_var        !< Local upper boundary on the current processor
     integer, dimension(nbdim), intent(in)  :: lb_tab        !< Global lower boundary of the variable
+    integer, dimension(nbdim),OPTIONAL     :: indminglob3,indmaxglob3 !< True bounds for MPI USE
     integer, dimension(nbdim), intent(in)  :: ub_tab        !< Global upper boundary of the variable
     integer,                   intent(in)  :: proc_id       !< Current processor
     integer, dimension(nbdim), intent(in)  :: coords
@@ -77,12 +79,17 @@ subroutine Agrif_Childbounds ( nbdim,           &
 #if defined AGRIF_MPI
         call Agrif_InvLoc( lb_var(i), proc_id, coord_i, lb_glob_index )
         call Agrif_InvLoc( ub_var(i), proc_id, coord_i, ub_glob_index )
+        if (present(indminglob3)) then
+          indminglob3(i)=lb_glob_index
+          indmaxglob3(i)=ub_glob_index
+        endif
 #else
         lb_glob_index = lb_var(i)
         ub_glob_index = ub_var(i)
 #endif
         lb_tab_true(i) = max(lb_tab(i), lb_glob_index)
         ub_tab_true(i) = min(ub_tab(i), ub_glob_index)
+
     enddo
 !
     memberin = .true.
@@ -122,7 +129,8 @@ subroutine Agrif_get_var_global_bounds( var, lubglob, nbdim )
     enddo
 !
     iminmaxg(1:nbdim,2) = - iminmaxg(1:nbdim,2)
-    call MPI_ALLREDUCE(iminmaxg, lubglob, 2*nbdim, MPI_INTEGER, MPI_MIN, Agrif_mpi_comm, code)
+    call MPI_ALLREDUCE(iminmaxg, lubglob, 2*nbdim, MPI_INTEGER, MPI_MIN, &
+                       Agrif_mpi_comm, code)
     lubglob(1:nbdim,2)  = - lubglob(1:nbdim,2)
 #endif
 !---------------------------------------------------------------------------------------------------
@@ -802,6 +810,13 @@ subroutine Agrif_GlobalToLocalBounds ( locbounds, lb_var, ub_var, lb_glob, ub_gl
 !
     do i = 1,nbdim
 !
+     if (coords(i) == 0) then
+       nbloc(i) = 1
+       locbounds(i,1,1) = lb_glob(i)
+       locbounds(i,2,1) = ub_glob(i)
+       locbounds(i,1,2) = lb_glob(i)
+       locbounds(i,2,2) = ub_glob(i)
+     else
         call Agrif_InvLoc(lb_var(i), rank, coords(i), i1)
 !
         do k = lb_glob(i)+lb_var(i)-i1,ub_glob(i)+lb_var(i)-i1
@@ -815,6 +830,7 @@ subroutine Agrif_GlobalToLocalBounds ( locbounds, lb_var, ub_var, lb_glob, ub_gl
                 locbounds(i,2,2) = max(locbounds(i,2,2),k)
             endif
         enddo
+     endif
     enddo
 
     member = ( sum(nbloc) == nbdim )

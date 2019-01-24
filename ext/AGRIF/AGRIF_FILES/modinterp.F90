@@ -1,5 +1,5 @@
 !
-! $Id: modinterp.F90 7752 2017-03-02 12:58:45Z jchanut $
+! $Id: modinterp.F 779 2007-12-22 17:04:17Z rblod $
 !
 !     AGRIF (Adaptive Grid Refinement In Fortran)
 !
@@ -131,6 +131,7 @@ subroutine Agrif_InterpnD ( type_interp, parent, child, pttab, petab, pttab_Chil
     INTEGER, DIMENSION(nbdim)     :: indminglob, indmaxglob
 #if defined AGRIF_MPI
     INTEGER, DIMENSION(nbdim)     :: indminglob2,indmaxglob2
+    INTEGER, DIMENSION(nbdim)     :: indminglob3,indmaxglob3
 #endif
     LOGICAL, DIMENSION(nbdim)     :: noraftab
     REAL   , DIMENSION(nbdim)     :: s_Child_temp,s_Parent_temp
@@ -147,6 +148,9 @@ subroutine Agrif_InterpnD ( type_interp, parent, child, pttab, petab, pttab_Chil
     INTEGER, DIMENSION(nbdim,4)                     :: tab3
     INTEGER, DIMENSION(nbdim,4,0:Agrif_Nbprocs-1)   :: tab4
     INTEGER, DIMENSION(nbdim,0:Agrif_Nbprocs-1,8)   :: tab4t
+    INTEGER,DIMENSION(nbdim,2) :: tab5
+    INTEGER,DIMENSION(nbdim,2,0:Agrif_Nbprocs-1) :: tab6
+    INTEGER,DIMENSION(nbdim,0:Agrif_Nbprocs-1,2) :: tab5t
     LOGICAL, DIMENSION(0:Agrif_Nbprocs-1)           :: memberinall
     LOGICAL, DIMENSION(0:Agrif_Nbprocs-1)           :: sendtoproc1, recvfromproc1
     LOGICAL, DIMENSION(1)                           :: memberin1
@@ -204,7 +208,8 @@ subroutine Agrif_InterpnD ( type_interp, parent, child, pttab, petab, pttab_Chil
 !
         call Agrif_Childbounds(nbdim,lowerbound,upperbound,                 &
                                indminglob,indmaxglob, local_proc, coords,   &
-                               indminglob2,indmaxglob2,member)
+                               indminglob2,indmaxglob2,member,              &
+                               indminglob3,indmaxglob3)
 !
         if (member) then
             call Agrif_GlobalToLocalBounds(parentarray,                     &
@@ -223,6 +228,17 @@ subroutine Agrif_InterpnD ( type_interp, parent, child, pttab, petab, pttab_Chil
         indmax = indmaxglob
         member = .TRUE.
 #endif
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Correct for non refined directions
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        do i=1,nbdim
+          if (coords(i) == 0) then
+             indmin(i) = indminglob(i)
+             indmax(i) = indmaxglob(i)
+             pttruetab(i) = indminglob(i)
+             cetruetab(i) = indmaxglob(i)
+          endif
+        enddo
 
     else
 
@@ -297,9 +313,11 @@ subroutine Agrif_InterpnD ( type_interp, parent, child, pttab, petab, pttab_Chil
         tab3(:,2) = indmaxglob2(:)
         tab3(:,3) = indmin(:)
         tab3(:,4) = indmax(:)
+        tab5(:,1) = indminglob3(:)
+        tab5(:,2) = indmaxglob3(:)
 !
         call MPI_ALLGATHER(tab3,4*nbdim,MPI_INTEGER,tab4,4*nbdim,MPI_INTEGER,Agrif_mpi_comm,code)
-
+        call MPI_ALLGATHER(tab5,2*nbdim,MPI_INTEGER,tab6,2*nbdim,MPI_INTEGER,Agrif_mpi_comm,code)
         if (.not.associated(tempPextend))   allocate(tempPextend)
 
         do k=0,Agrif_Nbprocs-1
@@ -310,6 +328,14 @@ subroutine Agrif_InterpnD ( type_interp, parent, child, pttab, petab, pttab_Chil
             enddo
         enddo
 
+        do k=0,Agrif_Nbprocs-1
+          do j=1,2
+            do i=1,nbdim
+               tab5t(i,k,j) = tab6(i,j,k)
+            enddo
+          enddo
+        enddo
+      
         memberin1(1) = memberin
         call MPI_ALLGATHER(memberin1,1,MPI_LOGICAL,memberinall,1,MPI_LOGICAL,Agrif_mpi_comm,code)
 
@@ -318,7 +344,8 @@ subroutine Agrif_InterpnD ( type_interp, parent, child, pttab, petab, pttab_Chil
                                      nbdim,memberinall, coords,         &
                                      sendtoproc1,recvfromproc1,         &
                                      tab4t(:,:,5),tab4t(:,:,6),         &
-                                     tab4t(:,:,7),tab4t(:,:,8) )
+                                     tab4t(:,:,7),tab4t(:,:,8),         &
+                                     tab5t(:,:,1),tab5t(:,:,2))
     endif
 
     call ExchangeSameLevel(sendtoproc1,recvfromproc1,nbdim,         &
@@ -773,29 +800,10 @@ subroutine Agrif_Parentbounds ( type_interp, nbdim, indmin, indmax, &
                  (type_interp(i) == Agrif_weno) ) then
             indmin(i) = indmin(i) - 2
             indmax(i) = indmax(i) + 2
-
-            if (Agrif_UseSpecialValue) then
-               indmin(i) = indmin(i)-MaxSearch
-               indmax(i) = indmax(i)+MaxSearch
-            endif
-
         elseif ( (type_interp(i) /= Agrif_constant) .and.   &
                  (type_interp(i) /= Agrif_linear) ) then
             indmin(i) = indmin(i) - 1
             indmax(i) = indmax(i) + 1
-
-            if (Agrif_UseSpecialValue) then
-               indmin(i) = indmin(i)-MaxSearch
-               indmax(i) = indmax(i)+MaxSearch
-            endif
-
-        elseif ( (type_interp(i) == Agrif_constant) .or.   &
-                 (type_interp(i) == Agrif_linear) ) then
-            if (Agrif_UseSpecialValue) then
-               indmin(i) = indmin(i)-MaxSearch
-               indmax(i) = indmax(i)+MaxSearch
-            endif
-
         endif
 !
     enddo

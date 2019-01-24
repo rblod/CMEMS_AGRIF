@@ -54,7 +54,7 @@ conv:
 		$(MAKE) -C ../../ext/AGRIF/LIB
 
 AGRIF_LIB: 
-		$(MAKE) -C ../../ext/AGRIF FC=$(FC) CPP=$(CPP) FFLAGS="$(FFLAGS)"
+		$(MAKE) -C ../../ext/AGRIF FC=$(FC) CPP=$(CPP) CPPFLAGS="-DAGRIF_MPI" FFLAGS="$(FFLAGS)"
 else
 
 prepagrif:
@@ -85,8 +85,8 @@ $(DIR_LIB)/libdomcfg.a: $(OBJS_CREATE_DOMCFG)
 
 ifeq ($(AGRIF),YES)
 
-obj/agrif2model.o:src/agrif2model.F90 MODEL.CPP 
-		$(CPP) -I$(DIR_PPSRC)/AGRIF_INC -include MODEL.CPP $(CPPFLAGS) src/agrif2model.F90 > $(DIR_PPSRC_2)/$(*F).f90	
+obj/agrif2model.o:src_agrif/agrif2model.F90 MODEL.CPP 
+		$(CPP) -I$(DIR_PPSRC)/AGRIF_INC -include MODEL.CPP $(CPPFLAGS) src_agrif/agrif2model.F90 > $(DIR_PPSRC_2)/$(*F).f90	
 		$(FC) $(FFLAGS) -c $(DIR_PPSRC_2)/$(*F).f90 -o $(DIR_OBJS)/$(*F).o -I../../ext/AGRIF -I$(DIR_OBJS)  $(FFLAGS_SPEC)
         
 $(DIR_OBJS)/%.o: $(DIR_FILES)/%.F90 make.inc MODEL.CPP 

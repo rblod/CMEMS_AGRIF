@@ -79,10 +79,6 @@ end module Agrif_Link
 !        modify by conv. To use : var = Agrif_Parent_IRhox()
 !                    Agrif_Curgrid % spaceref(1)
 !===================================================================================================
-!  function Agrif_Parent_Irhox
-!        modify by conv. To use : var = Agrif_Parent_IRhox()
-!                    Agrif_Curgrid % parent % spaceref(1)
-!===================================================================================================
 !  function Agrif_Rhoy
 !        modify by conv. To use : var = Agrif_Rhoy()
 !                    REAL(Agrif_Curgrid % spaceref(2))
@@ -95,9 +91,8 @@ end module Agrif_Link
 !        modify by conv. To use : var = Agrif_Parent_IRhoy()
 !                    Agrif_Curgrid % spaceref(2)
 !===================================================================================================
-!  function Agrif_Parent_Irhoy
-!        modify by conv. To use : var = Agrif_Parent_IRhoy()
-!                    Agrif_Curgrid % parent % spaceref(2)
+
+
 !===================================================================================================
 !  function Agrif_Rhoz
 !        modify by conv. To use : var = Agrif_Rhoz()
@@ -110,10 +105,7 @@ end module Agrif_Link
 !  function Agrif_Irhoz
 !        modify by conv. To use : var = Agrif_Parent_IRhoz()
 !                    Agrif_Curgrid % spaceref(3)
-!===================================================================================================
-!  function Agrif_Parent_Irhoz
-!        modify by conv. To use : var = Agrif_Parent_IRhoz()
-!                    Agrif_Curgrid % parent % spaceref(3)
+
 !===================================================================================================
 !  function Agrif_NearCommonBorderX
 !        modify by conv. To use : var = Agrif_NearCommonBorderX()

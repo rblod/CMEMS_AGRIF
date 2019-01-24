@@ -90,6 +90,7 @@ CONTAINS
       
       nreci  = 2 * jpreci
       nrecj  = 2 * jprecj
+      print *,'jpni = ',jpni,jpnj
       iresti = MOD( jpiglo - nreci , jpni )
       irestj = MOD( jpjglo - nrecj , jpnj )
 

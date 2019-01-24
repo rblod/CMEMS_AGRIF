@@ -1,5 +1,5 @@
 !
-! $Id: modupdate.F90 5656 2015-07-31 08:55:56Z timgraham $
+! $Id: modupdate.F 779 2007-12-22 17:04:17Z rblod $
 !
 !     AGRIF (Adaptive Grid Refinement In Fortran)
 !
@@ -389,10 +389,10 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
     include 'mpif.h'
 #endif
 !
-    integer, dimension(6),     intent(in)   :: type_update  !< Type of update (copy or average)
     type(Agrif_Variable), pointer           :: parent       !< Variable of the parent grid
     type(Agrif_Variable), pointer           :: child        !< Variable of the child grid
     integer,                   intent(in)   :: nbdim
+    integer, dimension(nbdim), intent(in)   :: type_update  !< Type of update (copy or average)
     integer, dimension(nbdim), intent(in)   :: pttab        !< Index of the first point inside the domain
     integer, dimension(nbdim), intent(in)   :: petab        !< Index of the first point inside the domain
     integer, dimension(nbdim), intent(in)   :: lb_child  !< Index of the first point inside the domain for the child
@@ -581,7 +581,8 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
         call Get_External_Data_first(tab4t(:,:,1),tab4t(:,:,2),tab4t(:,:,3),tab4t(:,:,4),   &
                                      nbdim, memberinall, coords,                            &
                                      sendtoproc1,recvfromproc1,                             &
-                                     tab4t(:,:,5),tab4t(:,:,6),tab4t(:,:,7),tab4t(:,:,8))
+                                     tab4t(:,:,5),tab4t(:,:,6),tab4t(:,:,7),tab4t(:,:,8),   &
+                                     tab4t(:,:,1),tab4t(:,:,2))
     endif
 
     call ExchangeSameLevel(sendtoproc1,recvfromproc1,nbdim,         &
@@ -1153,7 +1154,8 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
         call Get_External_Data_first(tab5t(:,:,1),tab5t(:,:,2),tab5t(:,:,3),tab5t(:,:,4),   &
                                      nbdim, memberinall2, coords,                           &
                                      sendtoproc2, recvfromproc2,                            &
-                                     tab5t(:,:,5),tab5t(:,:,6),tab5t(:,:,7),tab5t(:,:,8))
+                                     tab5t(:,:,5),tab5t(:,:,6),tab5t(:,:,7),tab5t(:,:,8),   &
+                                     tab5t(:,:,1),tab5t(:,:,2))
 
         call Agrif_Addto_list_update(child%list_update,pttab,petab,lb_child,lb_parent,      &
                                      nbdim,tab4t,tab5t,memberinall,memberinall2,            &

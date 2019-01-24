@@ -108,6 +108,33 @@ type Agrif_Variable
     real(4), dimension(:,:,:,:,:)  , allocatable :: sarray5
     real(4), dimension(:,:,:,:,:,:), allocatable :: sarray6
 !> @}
+!> \name Arrays containing the values of the grid variables (real)
+!> @{
+    real,    dimension(:)          , pointer :: parray1
+    real,    dimension(:,:)        , pointer :: parray2
+    real,    dimension(:,:,:)      , pointer :: parray3
+    real,    dimension(:,:,:,:)    , pointer :: parray4
+    real,    dimension(:,:,:,:,:)  , pointer :: parray5
+    real,    dimension(:,:,:,:,:,:), pointer :: parray6
+!> @}
+!> \name Arrays containing the values of the grid variables (real*8)
+!> @{
+    real(8), dimension(:)          , pointer :: pdarray1
+    real(8), dimension(:,:)        , pointer :: pdarray2
+    real(8), dimension(:,:,:)      , pointer :: pdarray3
+    real(8), dimension(:,:,:,:)    , pointer :: pdarray4
+    real(8), dimension(:,:,:,:,:)  , pointer :: pdarray5
+    real(8), dimension(:,:,:,:,:,:), pointer :: pdarray6
+!> @}
+!> \name Arrays containing the values of the grid variables (real*4)
+!> @{
+    real(4), dimension(:)          , pointer :: psarray1
+    real(4), dimension(:,:)        , pointer :: psarray2
+    real(4), dimension(:,:,:)      , pointer :: psarray3
+    real(4), dimension(:,:,:,:)    , pointer :: psarray4
+    real(4), dimension(:,:,:,:,:)  , pointer :: psarray5
+    real(4), dimension(:,:,:,:,:,:), pointer :: psarray6
+!> @}
 !> \name Arrays used to restore the values
 !> @{
     integer, dimension(:)          , pointer :: restore1D => NULL()
@@ -152,9 +179,9 @@ type Agrif_Variable_c
 !
 !> \name Arrays containing the values of the grid variables (character)
 !> @{
-    character(2400)                             :: carray0
-    character(200), dimension(:)  , allocatable :: carray1
-    character(200), dimension(:,:), allocatable :: carray2
+    character(4000)                             :: carray0
+    character(400), dimension(:)  , allocatable :: carray1
+    character(400), dimension(:,:), allocatable :: carray2
 !> @}
 !---------------------------------------------------------------------------------------------------
 end type Agrif_Variable_c
@@ -217,7 +244,7 @@ type Agrif_Variable_l
 !
 !> \name Arrays containing the values of the grid variables (logical)
 !> @{
-    logical                                      :: larray0
+    logical                                      :: larray0 = .FALSE.
     logical, dimension(:)          , allocatable :: larray1
     logical, dimension(:,:)        , allocatable :: larray2
     logical, dimension(:,:,:)      , allocatable :: larray3
@@ -241,7 +268,7 @@ type Agrif_Variable_i
 !
 !> \name Arrays containing the values of the grid variables (integer)
 !> @{
-    integer                                      :: iarray0
+    integer                                      :: iarray0 = 0
     integer, dimension(:)          , allocatable :: iarray1
     integer, dimension(:,:)        , allocatable :: iarray2
     integer, dimension(:,:,:)      , allocatable :: iarray3

@@ -86,9 +86,16 @@ CONTAINS
       INTEGER ::   istp       ! time step index
       !!----------------------------------------------------------------------
       !
+#if defined key_agrif
+      CALL Agrif_Init_Grids()      ! AGRIF: set the meshes
+#endif
       !                            !-----------------------!
       CALL nemo_init               !==  Initialisations  ==!
       !                            !-----------------------!
+
+#if defined key_agrif
+      CALL Agrif_Regrid()
+#endif
 
       ! check that all process are still there... If some process have an error,
       ! they will never enter in step and other processes will wait until the end of the cpu time!

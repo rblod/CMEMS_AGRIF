@@ -179,6 +179,7 @@ CONTAINS
 
 
    FUNCTION mynode( ldtxt, ldname, kumnam_ref , kumnam_cfg , kumond , kstop, localComm )
+   use agrif_util
       !!----------------------------------------------------------------------
       !!                  ***  routine mynode  ***
       !!
@@ -220,7 +221,13 @@ CONTAINS
 
 
 
-
+#if defined key_agrif
+      IF (.not.agrif_root()) then
+        jpni = Agrif_Parent(jpni)
+        jpnj = Agrif_Parent(jpnj)
+        jpnij = Agrif_Parent(jpnij)
+      ENDIF
+#endif
 
 
 
@@ -307,13 +314,13 @@ CONTAINS
          ENDIF
       ENDIF
 
-
-
-
-
-
-
-
+#if defined key_agrif
+      IF( Agrif_Root() ) THEN
+         CALL Agrif_MPI_Init(mpi_comm_opa)
+      ELSE
+         CALL Agrif_MPI_set_grid_comm(mpi_comm_opa)
+      ENDIF
+#endif
 
       CALL mpi_comm_rank( mpi_comm_opa, mpprank, ierr )
       CALL mpi_comm_size( mpi_comm_opa, mppsize, ierr )
@@ -4072,7 +4079,13 @@ CONTAINS
       IF( PRESENT( karea ) ) THEN
          IF( karea > 1 )   WRITE(clfile, "(a,'_',i4.4)") TRIM(clfile), karea-1
       ENDIF
+#if defined key_agrif
+      IF( .NOT. Agrif_Root() )   clfile = TRIM(Agrif_CFixed())//'_'//TRIM(clfile)
+      knum=Agrif_Get_Unit()
+      print *,'CLFILE = ',trim(clfile)
+#else
       knum=get_unit()
+#endif
       !
       iost=0
       IF( cdacce(1:6) == 'DIRECT' )  THEN
