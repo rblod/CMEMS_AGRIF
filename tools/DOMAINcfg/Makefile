@@ -58,6 +58,15 @@ AGRIF_LIB:
 else
 
 prepagrif:
+		@echo
+		@echo ===================================================
+		@echo   Create working directories for AGRIF ...
+		@echo ===================================================
+		mkdir -p obj
+		mkdir -p $(DIR_PPSRC_2)
+		mkdir -p $(DIR_LIB)
+		mkdir -p $(DIR_OBJS)
+		@echo
 conv:
 AGRIF_LIB: 
 
