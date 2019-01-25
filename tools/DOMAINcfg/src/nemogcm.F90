@@ -94,6 +94,7 @@ CONTAINS
       !                            !-----------------------!
 
 #if defined key_agrif
+      CALL Agrif_Declare_Var      
       CALL Agrif_Regrid()
 #endif
 
@@ -252,7 +253,7 @@ CONTAINS
       !                                      ! General initialization
                             CALL     phy_cst    ! Physical constants
                             CALL     dom_cfg    ! Domain configuration
-                            CALL     dom_init   ! Domain
+      IF(Agrif_root ()   )          CALL     dom_init   ! Domain
       IF( ln_ctl        )   CALL prt_ctl_init   ! Print control
       !
    END SUBROUTINE nemo_init

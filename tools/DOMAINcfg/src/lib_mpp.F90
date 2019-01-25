@@ -151,9 +151,9 @@ MODULE lib_mpp
    INTEGER         , PUBLIC ::   nn_buffer          !: size of the buffer in case of mpi_bsend
 
    ! Communications summary report
-   CHARACTER(len=128), DIMENSION(:), ALLOCATABLE ::   crname_lbc                   !: names of lbc_lnk calling routines
-   CHARACTER(len=128), DIMENSION(:), ALLOCATABLE ::   crname_glb                   !: names of global comm calling routines
-   CHARACTER(len=128), DIMENSION(:), ALLOCATABLE ::   crname_dlg                   !: names of delayed global comm calling routines
+   CHARACTER(len=400), DIMENSION(:), ALLOCATABLE ::   crname_lbc                   !: names of lbc_lnk calling routines
+   CHARACTER(len=400), DIMENSION(:), ALLOCATABLE ::   crname_glb                   !: names of global comm calling routines
+   CHARACTER(len=400), DIMENSION(:), ALLOCATABLE ::   crname_dlg                   !: names of delayed global comm calling routines
    INTEGER, PUBLIC                               ::   ncom_stp = 0                 !: copy of time step # istp
    INTEGER, PUBLIC                               ::   ncom_fsbc = 1                !: copy of sbc time step # nn_fsbc
    INTEGER, PUBLIC                               ::   ncom_dttrc = 1               !: copy of top time step # nn_dttrc

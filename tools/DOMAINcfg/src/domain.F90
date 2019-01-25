@@ -42,6 +42,8 @@ MODULE domain
    PRIVATE
 
    PUBLIC   dom_init   ! called by opa.F90
+   PUBLIC   dom_nam  ! called by opa.F90
+   PUBLIC   cfg_write   ! called by opa.F90
 
    !!-------------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
@@ -83,6 +85,7 @@ CONTAINS
       !
                      CALL dom_nam               ! read namelist ( namrun, namdom )
                   !   CALL dom_clo               ! Closed seas and lake
+         
                      CALL dom_hgr               ! Horizontal mesh
                      CALL dom_zgr               ! Vertical mesh and bathymetry
                      CALL dom_msk               ! Masks

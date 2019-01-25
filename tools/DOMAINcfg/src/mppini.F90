@@ -270,10 +270,20 @@ CONTAINS
       
 #if defined key_agrif
       IF( .NOT. Agrif_Root() ) THEN       ! AGRIF children: specific setting (cf. agrif_user.F90)
-         IF( jpiglo /= nbcellsx + 2 + 2*nbghostcells )   &
+         IF( jpiglo /= nbcellsx + 2 + 2*nbghostcells ) THEN
+            IF(lwp) THEN
+               WRITE(numout,*)
+               WRITE(numout,*) 'jpiglo shoud be: ', nbcellsx + 2 + 2*nbghostcells
+            ENDIF        
             CALL ctl_stop( 'STOP', 'mpp_init: Agrif children requires jpiglo == nbcellsx + 2 + 2*nbghostcells' )
-         IF( jpjglo /= nbcellsy + 2 + 2*nbghostcells )   &
+         ENDIF   
+         IF( jpjglo /= nbcellsy + 2 + 2*nbghostcells ) THEN
+            IF(lwp) THEN
+               WRITE(numout,*)
+               WRITE(numout,*) 'jpjglo shoud be: ', nbcellsy + 2 + 2*nbghostcells
+            ENDIF        
             CALL ctl_stop( 'STOP', 'mpp_init: Agrif children requires jpjglo == nbcellsy + 2 + 2*nbghostcells' )
+         ENDIF   
          IF( ln_use_jattr )   CALL ctl_stop( 'STOP', 'mpp_init:Agrif children requires ln_use_jattr = .false. ' )
       ENDIF
 #endif
