@@ -184,7 +184,7 @@ intent                      { intent_spec = 1; return TOK_INTENT; }
 pointer                     { return TOK_POINTER; }
 optional                    { return TOK_OPTIONAL; }
 save                        { return TOK_SAVE; }
-^[ \t]*type[ \t]*\(         { pos_cur_decl = setposcur()-5; return TOK_TYPEPAR; }
+^[ \t]*type[ \t]*\(         { pos_cur_decl = setposcur()-strlen(fortran_text); return TOK_TYPEPAR; }
 ^[ \t]*type/[ \t\,:]+       { return TOK_TYPE; }
 end[ \t]*type               { return TOK_ENDTYPE; }
 stat                        { if (inallocate == 1) return TOK_STAT; else { strcpy(yylval.na,fortran_text); return TOK_NAME; } }
