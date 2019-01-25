@@ -7,12 +7,11 @@ MODULE prtctl
    !!            3.4  !  11-11  (C. Harris) decomposition changes for running with CICE
    !!----------------------------------------------------------------------
    USE dom_oce          ! ocean space and time domain variables
-
-
-
+#if defined key_nemocice_decomp
+   USE ice_domain_size, only: nx_global, ny_global
+#endif
    USE in_out_manager   ! I/O manager
    USE lib_mpp          ! distributed memory computing
-   USE wrk_nemo         ! work arrays
 
    IMPLICIT NONE
    PRIVATE
@@ -36,13 +35,13 @@ MODULE prtctl
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: prtctl.F90 5025 2015-01-12 15:53:50Z timgraham $ 
-   !! Software governed by the CeCILL licence     (./LICENSE)
+   !! $Id: prtctl.F90 10068 2018-08-28 14:09:04Z nicolasmartin $ 
+   !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
    SUBROUTINE prt_ctl (tab2d_1, tab3d_1, mask1, clinfo1, tab2d_2, tab3d_2,   &
-      &                                  mask2, clinfo2, ovlap, kdim, clinfo3 )
+      &                                  mask2, clinfo2, kdim, clinfo3 )
       !!----------------------------------------------------------------------
       !!                     ***  ROUTINE prt_ctl  ***
       !!
@@ -74,7 +73,6 @@ CONTAINS
       !!                    tab3d_2 : second 3D array
       !!                    mask2   : mask (3D) to apply to the tab[23]d_2 array
       !!                    clinfo2 : information about the tab[23]d_2 array
-      !!                    ovlap   : overlap value
       !!                    kdim    : k- direction for 3D arrays 
       !!                    clinfo3 : additional information 
       !!----------------------------------------------------------------------
@@ -86,22 +84,17 @@ CONTAINS
       REAL(wp), DIMENSION(:,:,:), INTENT(in), OPTIONAL ::   tab3d_2
       REAL(wp), DIMENSION(:,:,:), INTENT(in), OPTIONAL ::   mask2
       CHARACTER (len=*)         , INTENT(in), OPTIONAL ::   clinfo2
-      INTEGER                   , INTENT(in), OPTIONAL ::   ovlap
       INTEGER                   , INTENT(in), OPTIONAL ::   kdim
       CHARACTER (len=*)         , INTENT(in), OPTIONAL ::   clinfo3
       !
       CHARACTER (len=15) :: cl2
-      INTEGER ::   overlap, jn, sind, eind, kdir,j_id
+      INTEGER ::  jn, sind, eind, kdir,j_id
       REAL(wp) :: zsum1, zsum2, zvctl1, zvctl2
-      REAL(wp), POINTER, DIMENSION(:,:)   :: ztab2d_1, ztab2d_2
-      REAL(wp), POINTER, DIMENSION(:,:,:) :: zmask1, zmask2, ztab3d_1, ztab3d_2
+      REAL(wp), DIMENSION(jpi,jpj)     :: ztab2d_1, ztab2d_2
+      REAL(wp), DIMENSION(jpi,jpj,jpk) :: zmask1, zmask2, ztab3d_1, ztab3d_2
       !!----------------------------------------------------------------------
 
-      CALL wrk_alloc( jpi,jpj, ztab2d_1, ztab2d_2 )
-      CALL wrk_alloc( jpi,jpj,jpk, zmask1, zmask2, ztab3d_1, ztab3d_2 )
-
       ! Arrays, scalars initialization 
-      overlap   = 0
       kdir      = jpkm1
       cl2       = ''
       zsum1     = 0.e0
@@ -117,7 +110,6 @@ CONTAINS
 
       ! Control of optional arguments
       IF( PRESENT(clinfo2) )   cl2                  = clinfo2
-      IF( PRESENT(ovlap)   )   overlap              = ovlap
       IF( PRESENT(kdim)    )   kdir                 = kdim
       IF( PRESENT(tab2d_1) )   ztab2d_1(:,:)        = tab2d_1(:,:)
       IF( PRESENT(tab2d_2) )   ztab2d_2(:,:)        = tab2d_2(:,:)
@@ -141,20 +133,20 @@ CONTAINS
          ! Set indices for the SUM control
          IF( .NOT. lsp_area ) THEN
             IF (lk_mpp .AND. jpnij > 1)   THEN
-               nictls = MAX( 1, nlditl(jn) - overlap )
-               nictle = nleitl(jn) + overlap * MIN( 1, nlcitl(jn) - nleitl(jn)) 
-               njctls = MAX( 1, nldjtl(jn) - overlap )
-               njctle = nlejtl(jn) + overlap * MIN( 1, nlcjtl(jn) - nlejtl(jn))
+               nictls = MAX(  1, nlditl(jn) )
+               nictle = MIN(jpi, nleitl(jn) )
+               njctls = MAX(  1, nldjtl(jn) )
+               njctle = MIN(jpj, nlejtl(jn) )
                ! Do not take into account the bound of the domain
                IF( ibonitl(jn) == -1 .OR. ibonitl(jn) == 2 ) nictls = MAX(2, nictls)
                IF( ibonjtl(jn) == -1 .OR. ibonjtl(jn) == 2 ) njctls = MAX(2, njctls)
                IF( ibonitl(jn) ==  1 .OR. ibonitl(jn) == 2 ) nictle = MIN(nictle, nleitl(jn) - 1)
                IF( ibonjtl(jn) ==  1 .OR. ibonjtl(jn) == 2 ) njctle = MIN(njctle, nlejtl(jn) - 1)
             ELSE
-               nictls = MAX( 1, nimpptl(jn) + nlditl(jn) - 1 - overlap )
-               nictle = nimpptl(jn) + nleitl(jn) - 1 + overlap * MIN( 1, nlcitl(jn) - nleitl(jn) ) 
-               njctls = MAX( 1, njmpptl(jn) + nldjtl(jn) - 1 - overlap )
-               njctle = njmpptl(jn) + nlejtl(jn) - 1 + overlap * MIN( 1, nlcjtl(jn) - nlejtl(jn) ) 
+               nictls = MAX(  1, nimpptl(jn) - 1 + nlditl(jn) )
+               nictle = MIN(jpi, nimpptl(jn) - 1 + nleitl(jn) )
+               njctls = MAX(  1, njmpptl(jn) - 1 + nldjtl(jn) )
+               njctle = MIN(jpj, njmpptl(jn) - 1 + nlejtl(jn) )
                ! Do not take into account the bound of the domain
                IF( ibonitl(jn) == -1 .OR. ibonitl(jn) == 2 ) nictls = MAX(2, nictls)
                IF( ibonjtl(jn) == -1 .OR. ibonjtl(jn) == 2 ) njctls = MAX(2, njctls)
@@ -206,9 +198,6 @@ CONTAINS
          ENDIF
 
       ENDDO
-
-      CALL wrk_dealloc( jpi,jpj, ztab2d_1, ztab2d_2 )
-      CALL wrk_dealloc( jpi,jpj,jpk, zmask1, zmask2, ztab3d_1, ztab3d_2 )
       !
    END SUBROUTINE prt_ctl
 
@@ -397,12 +386,10 @@ CONTAINS
       !!                (global boundary or neighbouring domain) and of the global
       !!                periodic
       !!                Type :         jperio global periodic condition
-      !!                               nperio local  periodic condition
       !!
       !! ** Action  : - set domain parameters
       !!                    nimpp     : longitudinal index 
       !!                    njmpp     : latitudinal  index
-      !!                    nperio    : lateral condition type 
       !!                    narea     : number for local area
       !!                    nlcil      : first dimension
       !!                    nlcjl      : second dimension
@@ -424,12 +411,12 @@ CONTAINS
          nlcjl , nbondil, nbondjl,       &
          nrecil, nrecjl, nldil, nleil, nldjl, nlejl
 
-      INTEGER, POINTER, DIMENSION(:,:) ::   iimpptl, ijmpptl, ilcitl, ilcjtl   ! workspace
+      INTEGER, DIMENSION(jpi,jpj) ::   iimpptl, ijmpptl, ilcitl, ilcjtl   ! workspace
       REAL(wp) ::   zidom, zjdom            ! temporary scalars
+      INTEGER ::   inum                     ! local logical unit
       !!----------------------------------------------------------------------
 
       !
-      CALL wrk_alloc( isplt, jsplt, ilcitl, ilcjtl, iimpptl, ijmpptl )
       !
       !  1. Dimension arrays for subdomains
       ! -----------------------------------
@@ -439,21 +426,33 @@ CONTAINS
       !  dimensions divided by the number of processors minus the overlap
       !  array (cf. par_oce.F90).
 
+#if defined key_nemocice_decomp
+      ijpi = ( nx_global+2-2*nn_hls + (isplt-1) ) / isplt + 2*nn_hls
+      ijpj = ( ny_global+2-2*nn_hls + (jsplt-1) ) / jsplt + 2*nn_hls 
+#else
+      ijpi = ( jpiglo-2*nn_hls + (isplt-1) ) / isplt + 2*nn_hls
+      ijpj = ( jpjglo-2*nn_hls + (jsplt-1) ) / jsplt + 2*nn_hls
+#endif
 
 
-
-
-      ijpi = ( jpiglo-2*jpreci + (isplt-1) ) / isplt + 2*jpreci
-      ijpj = ( jpjglo-2*jprecj + (jsplt-1) ) / jsplt + 2*jprecj
-
-
-
-      nrecil  = 2 * jpreci
-      nrecjl  = 2 * jprecj
+      nrecil  = 2 * nn_hls
+      nrecjl  = 2 * nn_hls
       irestil = MOD( jpiglo - nrecil , isplt )
       irestjl = MOD( jpjglo - nrecjl , jsplt )
 
       IF(  irestil == 0 )   irestil = isplt
+#if defined key_nemocice_decomp
+
+      ! In order to match CICE the size of domains in NEMO has to be changed
+      ! The last line of blocks (west) will have fewer points 
+      DO jj = 1, jsplt 
+         DO ji=1, isplt-1 
+            ilcitl(ji,jj) = ijpi 
+         END DO 
+         ilcitl(isplt,jj) = jpiglo - (isplt - 1) * (ijpi - nrecil)
+      END DO 
+
+#else 
 
       DO jj = 1, jsplt
          DO ji = 1, irestil
@@ -464,8 +463,20 @@ CONTAINS
          END DO
       END DO
 
+#endif
       
       IF( irestjl == 0 )   irestjl = jsplt
+#if defined key_nemocice_decomp 
+
+      ! Same change to domains in North-South direction as in East-West. 
+      DO ji = 1, isplt 
+         DO jj=1, jsplt-1 
+            ilcjtl(ji,jj) = ijpj 
+         END DO 
+         ilcjtl(ji,jsplt) = jpjglo - (jsplt - 1) * (ijpj - nrecjl)
+      END DO 
+
+#else 
 
       DO ji = 1, isplt
          DO jj = 1, irestjl
@@ -476,6 +487,7 @@ CONTAINS
          END DO
       END DO
 
+#endif
       zidom = nrecil
       DO ji = 1, isplt
          zidom = zidom + ilcitl(ji,1) - nrecil
@@ -537,12 +549,12 @@ CONTAINS
          IF( isplt            == 1 )   nbondil =  2      ! one processor only in i-direction
          ibonitl(jn) = nbondil
          
-         nldil =  1   + jpreci
-         nleil = nlcil - jpreci
+         nldil =  1   + nn_hls
+         nleil = nlcil - nn_hls
          IF( nbondil == -1 .OR. nbondil == 2 )   nldil = 1
          IF( nbondil ==  1 .OR. nbondil == 2 )   nleil = nlcil
-         nldjl =  1   + jprecj
-         nlejl = nlcjl - jprecj
+         nldjl =  1   + nn_hls
+         nlejl = nlcjl - nn_hls
          IF( nbondjl == -1 .OR. nbondjl == 2 )   nldjl = 1
          IF( nbondjl ==  1 .OR. nbondjl == 2 )   nlejl = nlcjl
          nlditl(jn) = nldil
@@ -551,8 +563,20 @@ CONTAINS
          nlejtl(jn) = nlejl
       END DO
       !
-      !
-      CALL wrk_dealloc( isplt, jsplt, ilcitl, ilcjtl, iimpptl, ijmpptl )
+      ! Save processor layout in layout_prtctl.dat file 
+      IF(lwp) THEN
+         CALL ctl_opn( inum, 'layout_prtctl.dat', 'REPLACE', 'FORMATTED', 'SEQUENTIAL', -1, numout, .FALSE., narea )
+         WRITE(inum,'(a)') 'nproc nlcil nlcjl nldil nldjl nleil nlejl nimpptl njmpptl ibonitl ibonjtl'
+         !
+         DO jn = 1, ijsplt
+            WRITE(inum,'(i5,6i6,4i8)') jn-1,nlcitl(jn),  nlcjtl(jn), &
+               &                            nlditl(jn),  nldjtl(jn), &
+               &                            nleitl(jn),  nlejtl(jn), &
+               &                           nimpptl(jn), njmpptl(jn), &
+               &                           ibonitl(jn), ibonjtl(jn)
+         END DO
+         CLOSE(inum)   
+      END IF
       !
       !
    END SUBROUTINE sub_dom

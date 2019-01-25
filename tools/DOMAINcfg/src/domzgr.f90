@@ -36,7 +36,7 @@ MODULE domzgr
    !!---------------------------------------------------------------------
    USE oce               ! ocean variables
    USE dom_oce           ! ocean domain
-   USE closea            ! closed seas
+!   USE closea            ! closed seas
    !
    USE in_out_manager    ! I/O manager
    USE iom               ! I/O library
@@ -58,6 +58,11 @@ MODULE domzgr
    REAL(wp) ::   rn_sbot_max       ! maximum depth of s-bottom surface (= ocean depth) (>0) (m)
    REAL(wp) ::   rn_rmax           ! maximum cut-off r-value allowed (0<rn_rmax<1)
    REAL(wp) ::   rn_hc             ! Critical depth for transition from sigma to stretched coordinates
+  INTEGER , PUBLIC ::   ntopo           !: = 0/1 ,compute/read the bathymetry file
+   REAL(wp), PUBLIC ::   e3zps_min       !: miminum thickness for partial steps (meters)
+   REAL(wp), PUBLIC ::   e3zps_rat       !: minimum thickness ration for partial steps
+   INTEGER, PUBLIC ::   nperio            !: type of lateral boundary condition
+
    ! Song and Haidvogel 1994 stretching parameters
    REAL(wp) ::   rn_theta          ! surface control parameter (0<=rn_theta<=20)
    REAL(wp) ::   rn_thetb          ! bottom control parameter  (0<=rn_thetb<= 1)
@@ -114,7 +119,7 @@ CONTAINS
       NAMELIST/namzgr/ ln_zco, ln_zps, ln_sco, ln_isfcav, ln_linssh
       !!----------------------------------------------------------------------
       !
-      IF( nn_timing == 1 )   CALL timing_start('dom_zgr')
+  !    IF( nn_timing == 1 )   CALL timing_start('dom_zgr')
       !
       REWIND( numnam_ref )              ! Namelist namzgr in reference namelist : Vertical coordinate
       READ  ( numnam_ref, namzgr, IOSTAT = ios, ERR = 901 )
@@ -182,7 +187,7 @@ CONTAINS
             &                          ' w ', MAXVAL(   e3w_0(:,:,:) )
       ENDIF
       !
-      IF( nn_timing == 1 )  CALL timing_stop('dom_zgr')
+    !  IF( nn_timing == 1 )  CALL timing_stop('dom_zgr')
       !
    END SUBROUTINE dom_zgr
 
@@ -216,7 +221,7 @@ CONTAINS
       REAL(wp) ::   za2, zkth2, zacr2      ! Values for optional double tanh function set from parameters 
       !!----------------------------------------------------------------------
       !
-      IF( nn_timing == 1 )  CALL timing_start('zgr_z')
+   !   IF( nn_timing == 1 )  CALL timing_start('zgr_z')
       !
       ! Set variables from parameters
       ! ------------------------------
@@ -348,7 +353,7 @@ CONTAINS
          IF( gdepw_1d(jk) <  0._wp .OR. gdept_1d(jk) <  0._wp )   CALL ctl_stop( 'dom:zgr_z: gdepw_1d or gdept_1d < 0 ' )
       END DO
       !
-      IF( nn_timing == 1 )  CALL timing_stop('zgr_z')
+   !   IF( nn_timing == 1 )  CALL timing_stop('zgr_z')
       !
    END SUBROUTINE zgr_z
 
@@ -394,7 +399,7 @@ CONTAINS
       REAL(wp), ALLOCATABLE, DIMENSION(:,:) ::   zdta   ! global domain scalar data
       !!----------------------------------------------------------------------
       !
-      IF( nn_timing == 1 )  CALL timing_start('zgr_bat')
+   !   IF( nn_timing == 1 )  CALL timing_start('zgr_bat')
       !
       IF(lwp) WRITE(numout,*)
       IF(lwp) WRITE(numout,*) '    zgr_bat : defines level and meter bathymetry'
@@ -610,7 +615,7 @@ CONTAINS
          CALL ctl_stop( '    zgr_bat : '//trim(ctmp1) )
       ENDIF
       !
-      IF( nn_closea == 0 )   CALL clo_bat( bathy, mbathy )    !==  NO closed seas or lakes  ==!
+    !  IF( nn_closea == 0 )   CALL clo_bat( bathy, mbathy )    !==  NO closed seas or lakes  ==!
       !                       
       IF ( .not. ln_sco ) THEN                                !==  set a minimum depth  ==!
          IF( rn_hmin < 0._wp ) THEN    ;   ik = - INT( rn_hmin )                                      ! from a nb of level
@@ -623,7 +628,7 @@ CONTAINS
          IF(lwp) write(numout,*) 'Minimum ocean depth: ', zhmin, ' minimum number of ocean levels : ', ik
       ENDIF
       !
-      IF( nn_timing == 1 )  CALL timing_stop('zgr_bat')
+   !   IF( nn_timing == 1 )  CALL timing_stop('zgr_bat')
       !
    END SUBROUTINE zgr_bat
 
@@ -707,7 +712,7 @@ CONTAINS
       REAL(wp), POINTER, DIMENSION(:,:) ::  zbathy
       !!----------------------------------------------------------------------
       !
-      IF( nn_timing == 1 )  CALL timing_start('zgr_bat_ctl')
+  !    IF( nn_timing == 1 )  CALL timing_start('zgr_bat_ctl')
       !
       CALL wrk_alloc( jpi, jpj, zbathy )
       !
@@ -737,7 +742,7 @@ CONTAINS
             END DO
          END DO
       END DO
-      IF( lk_mpp )   CALL mpp_sum( icompt )
+   !   IF( lk_mpp )   CALL mpp_sum( icompt )
       IF( icompt == 0 ) THEN
          IF(lwp) WRITE(numout,*)'     no isolated ocean grid points'
       ELSE
@@ -745,7 +750,7 @@ CONTAINS
       ENDIF
       IF( lk_mpp ) THEN
          zbathy(:,:) = FLOAT( mbathy(:,:) )
-         CALL lbc_lnk( zbathy, 'T', 1._wp )
+         CALL lbc_lnk( 'toto',zbathy, 'T', 1._wp )
          mbathy(:,:) = INT( zbathy(:,:) )
       ENDIF
       !                                          ! East-west cyclic boundary conditions
@@ -783,7 +788,7 @@ CONTAINS
 !!gm     !!bug ???  think about it !
          !   ... mono- or macro-tasking: T-point, >0, 2D array, no slab
          zbathy(:,:) = FLOAT( mbathy(:,:) )
-         CALL lbc_lnk( zbathy, 'T', 1._wp )
+         CALL lbc_lnk( 'toto',zbathy, 'T', 1._wp )
          mbathy(:,:) = INT( zbathy(:,:) )
       ENDIF
       ! Number of ocean level inferior or equal to jpkm1
@@ -804,7 +809,7 @@ CONTAINS
       !
       CALL wrk_dealloc( jpi, jpj, zbathy )
       !
-      IF( nn_timing == 1 )  CALL timing_stop('zgr_bat_ctl')
+   !!   IF( nn_timing == 1 )  CALL timing_stop('zgr_bat_ctl')
       !
    END SUBROUTINE zgr_bat_ctl
 
@@ -825,7 +830,7 @@ CONTAINS
       REAL(wp), POINTER, DIMENSION(:,:) ::  zmbk
       !!----------------------------------------------------------------------
       !
-      IF( nn_timing == 1 )  CALL timing_start('zgr_bot_level')
+   !   IF( nn_timing == 1 )  CALL timing_start('zgr_bot_level')
       !
       CALL wrk_alloc( jpi, jpj, zmbk )
       !
@@ -843,12 +848,12 @@ CONTAINS
          END DO
       END DO
       ! converte into REAL to use lbc_lnk ; impose a min value of 1 as a zero can be set in lbclnk 
-      zmbk(:,:) = REAL( mbku(:,:), wp )   ;   CALL lbc_lnk(zmbk,'U',1.)   ;   mbku  (:,:) = MAX( INT( zmbk(:,:) ), 1 )
-      zmbk(:,:) = REAL( mbkv(:,:), wp )   ;   CALL lbc_lnk(zmbk,'V',1.)   ;   mbkv  (:,:) = MAX( INT( zmbk(:,:) ), 1 )
+      zmbk(:,:) = REAL( mbku(:,:), wp )   ;   CALL lbc_lnk('toto',zmbk,'U',1.)   ;   mbku  (:,:) = MAX( INT( zmbk(:,:) ), 1 )
+      zmbk(:,:) = REAL( mbkv(:,:), wp )   ;   CALL lbc_lnk('toto',zmbk,'V',1.)   ;   mbkv  (:,:) = MAX( INT( zmbk(:,:) ), 1 )
       !
       CALL wrk_dealloc( jpi, jpj, zmbk )
       !
-      IF( nn_timing == 1 )  CALL timing_stop('zgr_bot_level')
+   !   IF( nn_timing == 1 )  CALL timing_stop('zgr_bot_level')
       !
    END SUBROUTINE zgr_bot_level
 
@@ -869,7 +874,7 @@ CONTAINS
       REAL(wp), POINTER, DIMENSION(:,:) ::  zmik
       !!----------------------------------------------------------------------
       !
-      IF( nn_timing == 1 )  CALL timing_start('zgr_top_level')
+   !   IF( nn_timing == 1 )  CALL timing_start('zgr_top_level')
       !
       CALL wrk_alloc( jpi, jpj, zmik )
       !
@@ -888,13 +893,13 @@ CONTAINS
       END DO
 
       ! converte into REAL to use lbc_lnk ; impose a min value of 1 as a zero can be set in lbclnk 
-      zmik(:,:) = REAL( miku(:,:), wp )   ;   CALL lbc_lnk(zmik,'U',1.)   ;   miku  (:,:) = MAX( INT( zmik(:,:) ), 1 )
-      zmik(:,:) = REAL( mikv(:,:), wp )   ;   CALL lbc_lnk(zmik,'V',1.)   ;   mikv  (:,:) = MAX( INT( zmik(:,:) ), 1 )
-      zmik(:,:) = REAL( mikf(:,:), wp )   ;   CALL lbc_lnk(zmik,'F',1.)   ;   mikf  (:,:) = MAX( INT( zmik(:,:) ), 1 )
+      zmik(:,:) = REAL( miku(:,:), wp )   ;   CALL lbc_lnk('toto',zmik,'U',1.)   ;   miku  (:,:) = MAX( INT( zmik(:,:) ), 1 )
+      zmik(:,:) = REAL( mikv(:,:), wp )   ;   CALL lbc_lnk('toto',zmik,'V',1.)   ;   mikv  (:,:) = MAX( INT( zmik(:,:) ), 1 )
+      zmik(:,:) = REAL( mikf(:,:), wp )   ;   CALL lbc_lnk('toto',zmik,'F',1.)   ;   mikf  (:,:) = MAX( INT( zmik(:,:) ), 1 )
       !
       CALL wrk_dealloc( jpi, jpj, zmik )
       !
-      IF( nn_timing == 1 )  CALL timing_stop('zgr_top_level')
+   !   IF( nn_timing == 1 )  CALL timing_stop('zgr_top_level')
       !
    END SUBROUTINE zgr_top_level
 
@@ -910,7 +915,7 @@ CONTAINS
       INTEGER  ::   jk
       !!----------------------------------------------------------------------
       !
-      IF( nn_timing == 1 )  CALL timing_start('zgr_zco')
+    !  IF( nn_timing == 1 )  CALL timing_start('zgr_zco')
       !
       DO jk = 1, jpk
          gdept_0(:,:,jk) = gdept_1d(jk)
@@ -925,7 +930,7 @@ CONTAINS
          e3vw_0 (:,:,jk) = e3w_1d  (jk)
       END DO
       !
-      IF( nn_timing == 1 )  CALL timing_stop('zgr_zco')
+   !   IF( nn_timing == 1 )  CALL timing_stop('zgr_zco')
       !
    END SUBROUTINE zgr_zco
 
@@ -984,7 +989,7 @@ CONTAINS
       REAL(wp), POINTER, DIMENSION(:,:,:) ::  zprt
       !!---------------------------------------------------------------------
       !
-      IF( nn_timing == 1 )  CALL timing_start('zgr_zps')
+   !   IF( nn_timing == 1 )  CALL timing_start('zgr_zps')
       !
       CALL wrk_alloc( jpi,jpj,jpk,   zprt )
       !
@@ -1117,8 +1122,8 @@ CONTAINS
          END DO
       END IF
 
-      CALL lbc_lnk( e3u_0 , 'U', 1._wp )   ;   CALL lbc_lnk( e3uw_0, 'U', 1._wp )   ! lateral boundary conditions
-      CALL lbc_lnk( e3v_0 , 'V', 1._wp )   ;   CALL lbc_lnk( e3vw_0, 'V', 1._wp )
+      CALL lbc_lnk('toto', e3u_0 , 'U', 1._wp )   ;   CALL lbc_lnk('toto', e3uw_0, 'U', 1._wp )   ! lateral boundary conditions
+      CALL lbc_lnk( 'toto',e3v_0 , 'V', 1._wp )   ;   CALL lbc_lnk('toto', e3vw_0, 'V', 1._wp )
       !
 
       DO jk = 1, jpk                        ! set to z-scale factor if zero (i.e. along closed boundaries)
@@ -1139,7 +1144,7 @@ CONTAINS
             END DO
          END DO
       END DO
-      CALL lbc_lnk( e3f_0, 'F', 1._wp )       ! Lateral boundary conditions
+      CALL lbc_lnk('toto', e3f_0, 'F', 1._wp )       ! Lateral boundary conditions
       !
       DO jk = 1, jpk                        ! set to z-scale factor if zero (i.e. along closed boundaries)
          WHERE( e3f_0(:,:,jk) == 0._wp )   e3f_0(:,:,jk) = e3t_1d(jk)
@@ -1182,7 +1187,7 @@ CONTAINS
       !
       CALL wrk_dealloc( jpi,jpj,jpk,   zprt )
       !
-      IF( nn_timing == 1 )  CALL timing_stop('zgr_zps')
+   !   IF( nn_timing == 1 )  CALL timing_stop('zgr_zps')
       !
    END SUBROUTINE zgr_zps
 
@@ -1216,7 +1221,7 @@ CONTAINS
       INTEGER , POINTER, DIMENSION(:,:)   ::   zmbathy, zmisfdep         ! 2D workspace (ISH)
       !!---------------------------------------------------------------------
       !
-      IF( nn_timing == 1 )   CALL timing_start('zgr_isf')
+  !!    IF( nn_timing == 1 )   CALL timing_start('zgr_isf')
       !
       CALL wrk_alloc( jpi,jpj,   zbathy, zmask, zrisfdep)
       CALL wrk_alloc( jpi,jpj,   zmisfdep, zmbathy )
@@ -1263,14 +1268,14 @@ CONTAINS
          END WHERE
          IF( lk_mpp ) THEN
             zbathy(:,:)  = FLOAT( misfdep(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
+            CALL lbc_lnk( 'toto',zbathy, 'T', 1. )
             misfdep(:,:) = INT( zbathy(:,:) )
 
-            CALL lbc_lnk( risfdep,'T', 1. )
-            CALL lbc_lnk( bathy,  'T', 1. )
+            CALL lbc_lnk( 'toto',risfdep,'T', 1. )
+            CALL lbc_lnk( 'toto',bathy,  'T', 1. )
 
             zbathy(:,:)  = FLOAT( mbathy(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
+            CALL lbc_lnk( 'toto',zbathy, 'T', 1. )
             mbathy(:,:)  = INT( zbathy(:,:) )
          ENDIF
          IF( nperio == 1 .OR. nperio  ==  4 .OR. nperio  ==  6 ) THEN 
@@ -1384,14 +1389,14 @@ CONTAINS
  
          IF( lk_mpp ) THEN
             zbathy(:,:)  = FLOAT( misfdep(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
+            CALL lbc_lnk( 'toto',zbathy, 'T', 1. )
             misfdep(:,:) = INT( zbathy(:,:) )
 
-            CALL lbc_lnk( risfdep,'T', 1. )
-            CALL lbc_lnk( bathy,  'T', 1. )
+            CALL lbc_lnk( 'toto',risfdep,'T', 1. )
+            CALL lbc_lnk( 'toto',bathy,  'T', 1. )
 
             zbathy(:,:)  = FLOAT( mbathy(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
+            CALL lbc_lnk( 'toto',zbathy, 'T', 1. )
             mbathy(:,:)  = INT( zbathy(:,:) )
          ENDIF
  ! point V misdep(ji,jj) == mbathy(ji,jj+1) 
@@ -1421,14 +1426,14 @@ CONTAINS
  
          IF( lk_mpp ) THEN 
             zbathy(:,:)  = FLOAT( misfdep(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
+            CALL lbc_lnk( 'toto',zbathy, 'T', 1. )
             misfdep(:,:) = INT( zbathy(:,:) )
 
-            CALL lbc_lnk( risfdep,'T', 1. )
-            CALL lbc_lnk( bathy,  'T', 1. )
+            CALL lbc_lnk( 'toto',risfdep,'T', 1. )
+            CALL lbc_lnk( 'toto',bathy,  'T', 1. )
 
             zbathy(:,:)  = FLOAT( mbathy(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
+            CALL lbc_lnk( 'toto',zbathy, 'T', 1. )
             mbathy(:,:)  = INT( zbathy(:,:) )
          ENDIF 
  
@@ -1458,14 +1463,14 @@ CONTAINS
  
          IF( lk_mpp ) THEN 
             zbathy(:,:)  = FLOAT( misfdep(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
+            CALL lbc_lnk( 'toto',zbathy, 'T', 1. )
             misfdep(:,:) = INT( zbathy(:,:) )
 
-            CALL lbc_lnk( risfdep,'T', 1. )
-            CALL lbc_lnk( bathy,  'T', 1. )
+            CALL lbc_lnk( 'toto',risfdep,'T', 1. )
+            CALL lbc_lnk( 'toto',bathy,  'T', 1. )
 
             zbathy(:,:)  = FLOAT( mbathy(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
+            CALL lbc_lnk( 'toto',zbathy, 'T', 1. )
             mbathy(:,:)  = INT( zbathy(:,:) )
          ENDIF 
  
@@ -1495,14 +1500,14 @@ CONTAINS
  
          IF( lk_mpp ) THEN
             zbathy(:,:)  = FLOAT( misfdep(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
+            CALL lbc_lnk( 'toto',zbathy, 'T', 1. )
             misfdep(:,:) = INT( zbathy(:,:) )
 
-            CALL lbc_lnk( risfdep,'T', 1. )
-            CALL lbc_lnk( bathy,  'T', 1. )
+            CALL lbc_lnk( 'toto',risfdep,'T', 1. )
+            CALL lbc_lnk( 'toto',bathy,  'T', 1. )
 
             zbathy(:,:)  = FLOAT( mbathy(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
+            CALL lbc_lnk( 'toto',zbathy, 'T', 1. )
             mbathy(:,:)  = INT( zbathy(:,:) )
          ENDIF
       END DO
@@ -1532,14 +1537,14 @@ CONTAINS
          END WHERE
          IF( lk_mpp ) THEN
             zbathy(:,:)  = FLOAT( misfdep(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
+            CALL lbc_lnk( 'toto',zbathy, 'T', 1. )
             misfdep(:,:) = INT( zbathy(:,:) )
 
-            CALL lbc_lnk( risfdep,'T', 1. )
-            CALL lbc_lnk( bathy,  'T', 1. )
+            CALL lbc_lnk( 'toto',risfdep,'T', 1. )
+            CALL lbc_lnk('toto', bathy,  'T', 1. )
 
             zbathy(:,:)  = FLOAT( mbathy(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
+            CALL lbc_lnk( 'toto',zbathy, 'T', 1. )
             mbathy(:,:)  = INT( zbathy(:,:) )
          ENDIF
  
@@ -1564,14 +1569,14 @@ CONTAINS
          END WHERE
          IF( lk_mpp ) THEN
             zbathy(:,:)  = FLOAT( misfdep(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
+            CALL lbc_lnk( 'toto',zbathy, 'T', 1. )
             misfdep(:,:) = INT( zbathy(:,:) )
 
-            CALL lbc_lnk( risfdep,'T', 1. )
-            CALL lbc_lnk( bathy,  'T', 1. )
+            CALL lbc_lnk( 'toto',risfdep,'T', 1. )
+            CALL lbc_lnk( 'toto',bathy,  'T', 1. )
 
             zbathy(:,:)  = FLOAT( mbathy(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
+            CALL lbc_lnk( 'toto',zbathy, 'T', 1. )
             mbathy(:,:)  = INT( zbathy(:,:) )
          ENDIF
  
@@ -1600,14 +1605,14 @@ CONTAINS
  
          IF( lk_mpp ) THEN 
             zbathy(:,:)  = FLOAT( misfdep(:,:) ) 
-            CALL lbc_lnk( zbathy,  'T', 1. ) 
+            CALL lbc_lnk( 'toto',zbathy,  'T', 1. ) 
             misfdep(:,:) = INT( zbathy(:,:) ) 
 
-            CALL lbc_lnk( risfdep, 'T', 1. ) 
-            CALL lbc_lnk( bathy,   'T', 1. )
+            CALL lbc_lnk( 'toto',risfdep, 'T', 1. ) 
+            CALL lbc_lnk( 'toto',bathy,   'T', 1. )
 
             zbathy(:,:) = FLOAT( mbathy(:,:) )
-            CALL lbc_lnk( zbathy,  'T', 1. )
+            CALL lbc_lnk( 'toto',zbathy,  'T', 1. )
             mbathy(:,:) = INT( zbathy(:,:) )
          ENDIF 
  !
@@ -1633,14 +1638,14 @@ CONTAINS
          END DO
          IF( lk_mpp ) THEN 
             zbathy(:,:)  = FLOAT( misfdep(:,:) ) 
-            CALL lbc_lnk( zbathy,  'T', 1. ) 
+            CALL lbc_lnk( 'toto',zbathy,  'T', 1. ) 
             misfdep(:,:) = INT( zbathy(:,:) ) 
 
-            CALL lbc_lnk( risfdep, 'T', 1. ) 
-            CALL lbc_lnk( bathy,   'T', 1. )
+            CALL lbc_lnk( 'toto',risfdep, 'T', 1. ) 
+            CALL lbc_lnk( 'toto',bathy,   'T', 1. )
 
             zbathy(:,:) = FLOAT( mbathy(:,:) )
-            CALL lbc_lnk( zbathy,  'T', 1. )
+            CALL lbc_lnk( 'toto',zbathy,  'T', 1. )
             mbathy(:,:) = INT( zbathy(:,:) )
          ENDIF 
  ! if not compatible after all check (ie U point water column less than 2 cells), mask U
@@ -1653,14 +1658,14 @@ CONTAINS
          END DO
          IF( lk_mpp ) THEN 
             zbathy(:,:)  = FLOAT( misfdep(:,:) ) 
-            CALL lbc_lnk( zbathy,  'T', 1. ) 
+            CALL lbc_lnk( 'toto',zbathy,  'T', 1. ) 
             misfdep(:,:) = INT( zbathy(:,:) ) 
 
-            CALL lbc_lnk( risfdep, 'T', 1. ) 
-            CALL lbc_lnk( bathy,   'T', 1. )
+            CALL lbc_lnk('toto', risfdep, 'T', 1. ) 
+            CALL lbc_lnk('toto', bathy,   'T', 1. )
 
             zbathy(:,:) = FLOAT( mbathy(:,:) )
-            CALL lbc_lnk( zbathy,  'T', 1. )
+            CALL lbc_lnk( 'toto',zbathy,  'T', 1. )
             mbathy(:,:) = INT( zbathy(:,:) )
          ENDIF 
  ! if not compatible after all check (ie U point water column less than 2 cells), mask U
@@ -1673,14 +1678,14 @@ CONTAINS
          END DO
          IF( lk_mpp ) THEN 
             zbathy(:,:)  = FLOAT( misfdep(:,:) ) 
-            CALL lbc_lnk( zbathy, 'T', 1. ) 
+            CALL lbc_lnk('toto', zbathy, 'T', 1. ) 
             misfdep(:,:) = INT( zbathy(:,:) ) 
 
-            CALL lbc_lnk( risfdep,'T', 1. ) 
-            CALL lbc_lnk( bathy,  'T', 1. )
+            CALL lbc_lnk('toto', risfdep,'T', 1. ) 
+            CALL lbc_lnk( 'toto',bathy,  'T', 1. )
 
             zbathy(:,:) = FLOAT( mbathy(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
+            CALL lbc_lnk( 'toto',zbathy, 'T', 1. )
             mbathy(:,:) = INT( zbathy(:,:) )
          ENDIF 
  ! if not compatible after all check (ie V point water column less than 2 cells), mask V
@@ -1693,14 +1698,14 @@ CONTAINS
          END DO
          IF( lk_mpp ) THEN 
             zbathy(:,:)  = FLOAT( misfdep(:,:) ) 
-            CALL lbc_lnk( zbathy, 'T', 1. ) 
+            CALL lbc_lnk( 'toto',zbathy, 'T', 1. ) 
             misfdep(:,:) = INT( zbathy(:,:) ) 
 
-            CALL lbc_lnk( risfdep,'T', 1. ) 
-            CALL lbc_lnk( bathy,  'T', 1. )
+            CALL lbc_lnk( 'toto',risfdep,'T', 1. ) 
+            CALL lbc_lnk('toto', bathy,  'T', 1. )
 
             zbathy(:,:) = FLOAT( mbathy(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
+            CALL lbc_lnk( 'toto',zbathy, 'T', 1. )
             mbathy(:,:) = INT( zbathy(:,:) )
          ENDIF 
  ! if not compatible after all check (ie V point water column less than 2 cells), mask V
@@ -1713,14 +1718,14 @@ CONTAINS
          END DO
          IF( lk_mpp ) THEN 
             zbathy(:,:)  = FLOAT( misfdep(:,:) ) 
-            CALL lbc_lnk( zbathy, 'T', 1. ) 
+            CALL lbc_lnk( 'toto',zbathy, 'T', 1. ) 
             misfdep(:,:) = INT( zbathy(:,:) ) 
 
-            CALL lbc_lnk( risfdep,'T', 1. ) 
-            CALL lbc_lnk( bathy,  'T', 1. )
+            CALL lbc_lnk( 'toto',risfdep,'T', 1. ) 
+            CALL lbc_lnk( 'toto',bathy,  'T', 1. )
 
             zbathy(:,:) = FLOAT( mbathy(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
+            CALL lbc_lnk( 'toto',zbathy, 'T', 1. )
             mbathy(:,:) = INT( zbathy(:,:) )
          ENDIF 
  ! if not compatible after all check, mask T
@@ -1857,7 +1862,7 @@ CONTAINS
       CALL wrk_dealloc( jpi, jpj, zmask, zbathy, zrisfdep )
       CALL wrk_dealloc( jpi, jpj, zmisfdep, zmbathy )
       !
-      IF( nn_timing == 1 )   CALL timing_stop('zgr_isf')
+  !    IF( nn_timing == 1 )   CALL timing_stop('zgr_isf')
       !      
    END SUBROUTINE zgr_isf
 
@@ -1919,7 +1924,7 @@ CONTAINS
          &                rn_thetb, rn_bb, rn_alpha, rn_efold, rn_zs, rn_zb_a, rn_zb_b
      !!----------------------------------------------------------------------
       !
-      IF( nn_timing == 1 )  CALL timing_start('zgr_sco')
+   !!   IF( nn_timing == 1 )  CALL timing_start('zgr_sco')
       !
       CALL wrk_alloc( jpi,jpj,   zenv, ztmp, zmsk, zri, zrj, zhbat , ztmpi1, ztmpi2, ztmpj1, ztmpj2 )
       !
@@ -2001,7 +2006,7 @@ CONTAINS
          END DO
 
       ! apply lateral boundary condition   CAUTION: keep the value when the lbc field is zero
-      CALL lbc_lnk( zenv, 'T', 1._wp, 'no0' )
+      CALL lbc_lnk( 'toto',zenv, 'T', 1._wp, 'no0' )
       ! 
       ! smooth the bathymetry (if required)
       scosrf(:,:) = 0._wp             ! ocean surface depth (here zero: no under ice-shelf sea)
@@ -2055,7 +2060,7 @@ CONTAINS
                IF( zrj(ji,jj) < -rn_rmax )   ztmpj2(ji  ,ijp1) = zenv(ji  ,jj  ) * zrfact
             END DO
          END DO
-         IF( lk_mpp )   CALL mpp_max( zrmax )   ! max over the global domain
+  !       IF( lk_mpp )   CALL mpp_max( zrmax )   ! max over the global domain
          !
          IF(lwp)WRITE(numout,*) 'zgr_sco :   iter= ',jl, ' rmax= ', zrmax
          !
@@ -2065,7 +2070,7 @@ CONTAINS
             END DO
          END DO
          ! apply lateral boundary condition   CAUTION: keep the value when the lbc field is zero
-         CALL lbc_lnk( zenv, 'T', 1._wp, 'no0' )
+         CALL lbc_lnk( 'toto',zenv, 'T', 1._wp, 'no0' )
          !                                                  ! ================ !
       END DO                                                !     End loop     !
       !                                                     ! ================ !
@@ -2109,7 +2114,7 @@ CONTAINS
       ! 
       ! Apply lateral boundary condition
 !!gm  ! CAUTION: retain non zero value in the initial file this should be OK for orca cfg, not for EEL
-      zhbat(:,:) = hbatu(:,:)   ;   CALL lbc_lnk( hbatu, 'U', 1._wp )
+      zhbat(:,:) = hbatu(:,:)   ;   CALL lbc_lnk('toto', hbatu, 'U', 1._wp )
       DO jj = 1, jpj
          DO ji = 1, jpi
             IF( hbatu(ji,jj) == 0._wp ) THEN
@@ -2119,7 +2124,7 @@ CONTAINS
             ENDIF
          END DO
       END DO
-      zhbat(:,:) = hbatv(:,:)   ;   CALL lbc_lnk( hbatv, 'V', 1._wp )
+      zhbat(:,:) = hbatv(:,:)   ;   CALL lbc_lnk('toto', hbatv, 'V', 1._wp )
       DO jj = 1, jpj
          DO ji = 1, jpi
             IF( hbatv(ji,jj) == 0._wp ) THEN
@@ -2128,7 +2133,7 @@ CONTAINS
             ENDIF
          END DO
       END DO
-      zhbat(:,:) = hbatf(:,:)   ;   CALL lbc_lnk( hbatf, 'F', 1._wp )
+      zhbat(:,:) = hbatf(:,:)   ;   CALL lbc_lnk('toto', hbatf, 'F', 1._wp )
       DO jj = 1, jpj
          DO ji = 1, jpi
             IF( hbatf(ji,jj) == 0._wp ) THEN
@@ -2176,13 +2181,13 @@ CONTAINS
                            CALL s_tanh()
       ENDIF 
 
-      CALL lbc_lnk( e3t_0 , 'T', 1._wp )
-      CALL lbc_lnk( e3u_0 , 'U', 1._wp )
-      CALL lbc_lnk( e3v_0 , 'V', 1._wp )
-      CALL lbc_lnk( e3f_0 , 'F', 1._wp )
-      CALL lbc_lnk( e3w_0 , 'W', 1._wp )
-      CALL lbc_lnk( e3uw_0, 'U', 1._wp )
-      CALL lbc_lnk( e3vw_0, 'V', 1._wp )
+      CALL lbc_lnk( 'toto',e3t_0 , 'T', 1._wp )
+      CALL lbc_lnk( 'toto',e3u_0 , 'U', 1._wp )
+      CALL lbc_lnk( 'toto',e3v_0 , 'V', 1._wp )
+      CALL lbc_lnk( 'toto',e3f_0 , 'F', 1._wp )
+      CALL lbc_lnk( 'toto',e3w_0 , 'W', 1._wp )
+      CALL lbc_lnk( 'toto',e3uw_0, 'U', 1._wp )
+      CALL lbc_lnk('toto', e3vw_0, 'V', 1._wp )
       !
         WHERE( e3t_0 (:,:,:) == 0._wp )   e3t_0 (:,:,:) = 1._wp
         WHERE( e3u_0 (:,:,:) == 0._wp )   e3u_0 (:,:,:) = 1._wp
@@ -2314,7 +2319,7 @@ CONTAINS
       !
       CALL wrk_dealloc( jpi, jpj, zenv, ztmp, zmsk, zri, zrj, zhbat , ztmpi1, ztmpi2, ztmpj1, ztmpj2 )
       !
-      IF( nn_timing == 1 )  CALL timing_stop('zgr_sco')
+   !!!   IF( nn_timing == 1 )  CALL timing_stop('zgr_sco')
       !
    END SUBROUTINE zgr_sco
 
@@ -2585,10 +2590,10 @@ CONTAINS
         ENDDO
       ENDDO
       !
-      CALL lbc_lnk(e3t_0 ,'T',1.) ; CALL lbc_lnk(e3u_0 ,'T',1.)
-      CALL lbc_lnk(e3v_0 ,'T',1.) ; CALL lbc_lnk(e3f_0 ,'T',1.)
-      CALL lbc_lnk(e3w_0 ,'T',1.)
-      CALL lbc_lnk(e3uw_0,'T',1.) ; CALL lbc_lnk(e3vw_0,'T',1.)
+      CALL lbc_lnk('toto',e3t_0 ,'T',1.) ; CALL lbc_lnk('toto',e3u_0 ,'T',1.)
+      CALL lbc_lnk('toto',e3v_0 ,'T',1.) ; CALL lbc_lnk('toto',e3f_0 ,'T',1.)
+      CALL lbc_lnk('toto',e3w_0 ,'T',1.)
+      CALL lbc_lnk('toto',e3uw_0,'T',1.) ; CALL lbc_lnk('toto',e3vw_0,'T',1.)
       !
       CALL wrk_dealloc( jpi,jpj,jpk,   z_gsigw3, z_gsigt3, z_gsi3w3                                      )
       CALL wrk_dealloc( jpi,jpj,jpk,   z_esigt3, z_esigw3, z_esigtu3, z_esigtv3, z_esigtf3, z_esigwu3, z_esigwv3 )

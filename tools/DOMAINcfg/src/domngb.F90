@@ -10,10 +10,9 @@ MODULE domngb
    !!   dom_ngb       : find the closest grid point from a given lon/lat position
    !!----------------------------------------------------------------------
    USE dom_oce        ! ocean space and time domain
+   !
    USE in_out_manager ! I/O manager
    USE lib_mpp        ! for mppsum
-   USE wrk_nemo       ! Memory allocation
-   USE timing         ! Timing
 
    IMPLICIT NONE
    PRIVATE
@@ -22,8 +21,8 @@ MODULE domngb
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: domngb.F90 6140 2015-12-21 11:35:23Z timgraham $ 
-   !! Software governed by the CeCILL licence     (./LICENSE)
+   !! $Id: domngb.F90 10425 2018-12-19 21:54:16Z smasson $ 
+   !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
@@ -44,12 +43,8 @@ CONTAINS
       INTEGER :: ik         ! working level
       INTEGER , DIMENSION(2) ::   iloc
       REAL(wp)               ::   zlon, zmini
-      REAL(wp), POINTER, DIMENSION(:,:) ::  zglam, zgphi, zmask, zdist
+      REAL(wp), DIMENSION(jpi,jpj) ::   zglam, zgphi, zmask, zdist
       !!--------------------------------------------------------------------
-      !
-      IF( nn_timing == 1 )  CALL timing_start('dom_ngb')
-      !
-      CALL wrk_alloc( jpi,jpj,   zglam, zgphi, zmask, zdist )
       !
       zmask(:,:) = 0._wp
       ik = 1
@@ -61,30 +56,23 @@ CONTAINS
       CASE DEFAULT ; zglam(:,:) = glamt(:,:) ; zgphi(:,:) = gphit(:,:) ; zmask(nldi:nlei,nldj:nlej) = tmask(nldi:nlei,nldj:nlej,ik)
       END SELECT
 
-      IF (jphgr_msh /= 2 .AND. jphgr_msh /= 3) THEN
-         zlon       = MOD( plon       + 720., 360. )                                     ! plon between    0 and 360
-         zglam(:,:) = MOD( zglam(:,:) + 720., 360. )                                     ! glam between    0 and 360
-         IF( zlon > 270. )   zlon = zlon - 360.                                          ! zlon between  -90 and 270
-         IF( zlon <  90. )   WHERE( zglam(:,:) > 180. ) zglam(:,:) = zglam(:,:) - 360.   ! glam between -180 and 180
-         zglam(:,:) = zglam(:,:) - zlon
-      ELSE
-         zglam(:,:) = zglam(:,:) - plon
-      END IF
+      zlon       = MOD( plon       + 720., 360. )                                     ! plon between    0 and 360
+      zglam(:,:) = MOD( zglam(:,:) + 720., 360. )                                     ! glam between    0 and 360
+      IF( zlon > 270. )   zlon = zlon - 360.                                          ! zlon between  -90 and 270
+      IF( zlon <  90. )   WHERE( zglam(:,:) > 180. ) zglam(:,:) = zglam(:,:) - 360.   ! glam between -180 and 180
+      zglam(:,:) = zglam(:,:) - zlon
 
       zgphi(:,:) = zgphi(:,:) - plat
       zdist(:,:) = zglam(:,:) * zglam(:,:) + zgphi(:,:) * zgphi(:,:)
       
       IF( lk_mpp ) THEN  
-         CALL mpp_minloc( zdist(:,:), zmask, zmini, kii, kjj)
+         CALL mpp_minloc( 'domngb', zdist(:,:), zmask, zmini, iloc)
+         kii = iloc(1) ; kjj = iloc(2)
       ELSE
          iloc(:) = MINLOC( zdist(:,:), mask = zmask(:,:) == 1.e0 )
          kii = iloc(1) + nimpp - 1
          kjj = iloc(2) + njmpp - 1
       ENDIF
-      !
-      CALL wrk_dealloc( jpi,jpj,   zglam, zgphi, zmask, zdist )
-      !
-      IF( nn_timing == 1 )  CALL timing_stop('dom_ngb')
       !
    END SUBROUTINE dom_ngb
 

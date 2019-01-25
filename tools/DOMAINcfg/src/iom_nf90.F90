@@ -1,22 +1,22 @@
 MODULE iom_nf90
-   !!=====================================================================
+   !!======================================================================
    !!                    ***  MODULE  iom_nf90 ***
    !! Input/Output manager :  Library to read input files with NF90 (only fliocom module)
-   !!====================================================================
+   !!======================================================================
    !! History :  9.0  ! 05 12  (J. Belier) Original code
    !!            9.0  ! 06 02  (S. Masson) Adaptation to NEMO
    !!             "   ! 07 07  (D. Storkey) Changes to iom_nf90_gettime
-   !!--------------------------------------------------------------------
-   !!gm  caution add !DIR nec: improved performance to be checked as well as no result changes
+   !!            3.6  ! 2015-15  (J. Harle) Added procedure to read REAL attributes
+   !!            4.0  ! 2017-11 (M. Andrejczuk) Extend IOM interface to write any 3D fields
+   !!----------------------------------------------------------------------
 
-   !!--------------------------------------------------------------------
+   !!----------------------------------------------------------------------
    !!   iom_open       : open a file read only
    !!   iom_close      : close a file or all files opened by iom
    !!   iom_get        : read a field (interfaced to several routines)
-   !!   iom_gettime    : read the time axis kvid in the file
    !!   iom_varid      : get the id of a variable in a file
    !!   iom_rstput     : write a field in a restart file (interfaced to several routines)
-   !!--------------------------------------------------------------------
+   !!----------------------------------------------------------------------
    USE dom_oce         ! ocean space and time domain
    USE lbclnk          ! lateal boundary condition / mpp exchanges
    USE iom_def         ! iom variables definitions
@@ -27,14 +27,11 @@ MODULE iom_nf90
    IMPLICIT NONE
    PRIVATE
 
-   PUBLIC iom_nf90_open, iom_nf90_close, iom_nf90_varid, iom_nf90_get, iom_nf90_gettime, iom_nf90_rstput
-   PUBLIC iom_nf90_getatt
+   PUBLIC iom_nf90_open  , iom_nf90_close, iom_nf90_varid, iom_nf90_get, iom_nf90_rstput
+   PUBLIC iom_nf90_chkatt, iom_nf90_getatt, iom_nf90_putatt
 
    INTERFACE iom_nf90_get
       MODULE PROCEDURE iom_nf90_g0d, iom_nf90_g123d
-   END INTERFACE
-   INTERFACE iom_nf90_getatt
-      MODULE PROCEDURE iom_nf90_intatt
    END INTERFACE
    INTERFACE iom_nf90_rstput
       MODULE PROCEDURE iom_nf90_rp0123d
@@ -42,13 +39,12 @@ MODULE iom_nf90
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: iom_nf90.F90 6140 2015-12-21 11:35:23Z timgraham $
-   !! Software governed by the CeCILL licence (./LICENSE)
+   !! $Id: iom_nf90.F90 10522 2019-01-16 08:35:15Z smasson $
+   !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
-
 CONTAINS
 
-   SUBROUTINE iom_nf90_open( cdname, kiomid, ldwrt, ldok, kdompar )
+   SUBROUTINE iom_nf90_open( cdname, kiomid, ldwrt, ldok, kdompar, kdlev )
       !!---------------------------------------------------------------------
       !!                   ***  SUBROUTINE  iom_open  ***
       !!
@@ -59,6 +55,7 @@ CONTAINS
       LOGICAL                , INTENT(in   )           ::   ldwrt       ! read or write the file?
       LOGICAL                , INTENT(in   )           ::   ldok        ! check the existence 
       INTEGER, DIMENSION(2,5), INTENT(in   ), OPTIONAL ::   kdompar     ! domain parameters: 
+      INTEGER                , INTENT(in   ), OPTIONAL ::   kdlev       ! size of the third dimension
 
       CHARACTER(LEN=256) ::   clinfo           ! info character
       CHARACTER(LEN=256) ::   cltmp            ! temporary character
@@ -71,17 +68,24 @@ CONTAINS
       INTEGER            ::   imode            ! creation mode flag: NF90_CLOBBER or NF90_NOCLOBBER or NF90_HDF5
       INTEGER            ::   ihdf5            ! local variable for retrieval of value for NF90_HDF5
       LOGICAL            ::   llclobber        ! local definition of ln_clobber
+      INTEGER            ::   ilevels           ! vertical levels
       !---------------------------------------------------------------------
-
+      !
       clinfo = '                    iom_nf90_open ~~~  '
-      istop = nstop   ! store the actual value of nstop
+      istop = nstop     ! store the actual value of nstop
+      !
+      !                 !number of vertical levels
+      IF( PRESENT(kdlev) ) THEN   ;   ilevels = kdlev    ! use input value (useful for sea-ice)
+      ELSE                        ;   ilevels = jpk      ! by default jpk
+      ENDIF
+      !
       IF( nn_chunksz > 0 ) THEN   ;   ichunk = nn_chunksz
       ELSE                        ;   ichunk = NF90_SIZEHINT_DEFAULT
       ENDIF
       !
       llclobber = ldwrt .AND. ln_clobber
-      IF( ldok .AND. .NOT. llclobber ) THEN      ! Open existing file...
-         !                 ! =============
+      IF( ldok .AND. .NOT. llclobber ) THEN      !==  Open existing file ==!
+         !                                       !=========================!
          IF( ldwrt ) THEN  ! ... in write mode
             IF(lwp) WRITE(numout,*) TRIM(clinfo)//' open existing file: '//TRIM(cdname)//' in WRITE mode'
             IF( snc4set%luse ) THEN
@@ -94,10 +98,10 @@ CONTAINS
             IF(lwp) WRITE(numout,*) TRIM(clinfo)//' open existing file: '//TRIM(cdname)//' in READ mode'
             CALL iom_nf90_check(NF90_OPEN( TRIM(cdname), NF90_NOWRITE, if90id, chunksize = ichunk ), clinfo)
          ENDIF
-      ELSE                                       ! the file does not exist (or we overwrite it)
-         !                 ! =============
+      ELSE                                       !== the file doesn't exist ==!   (or we overwrite it)
+         !                                       !============================!
          iln = INDEX( cdname, '.nc' )
-         IF( ldwrt ) THEN  ! the file should be open in write mode so we create it...
+         IF( ldwrt ) THEN              !* the file should be open in write mode so we create it...
             IF( jpnij > 1 ) THEN
                WRITE(cltmp,'(a,a,i4.4,a)') cdname(1:iln-1), '_', narea-1, '.nc'
                cdname = TRIM(cltmp)
@@ -117,12 +121,14 @@ CONTAINS
             ELSE
                CALL iom_nf90_check(NF90_CREATE( TRIM(cdname), imode, if90id, chunksize = ichunk ), clinfo)
             ENDIF
-            CALL iom_nf90_check(NF90_SET_FILL( if90id, NF90_NOFILL, idmy                     ), clinfo)
+            CALL iom_nf90_check(NF90_SET_FILL( if90id, NF90_NOFILL,                   idmy ), clinfo)
             ! define dimensions
-            CALL iom_nf90_check(NF90_DEF_DIM( if90id, 'x', kdompar(1,1)  , idmy ), clinfo)
-            CALL iom_nf90_check(NF90_DEF_DIM( if90id, 'y', kdompar(2,1)  , idmy ), clinfo)
-            CALL iom_nf90_check(NF90_DEF_DIM( if90id, 'z', jpk           , idmy ), clinfo)
-            CALL iom_nf90_check(NF90_DEF_DIM( if90id, 't', NF90_UNLIMITED, idmy ), clinfo)
+            CALL iom_nf90_check(NF90_DEF_DIM( if90id,            'x',   kdompar(1,1), idmy ), clinfo)
+            CALL iom_nf90_check(NF90_DEF_DIM( if90id,            'y',   kdompar(2,1), idmy ), clinfo)
+            CALL iom_nf90_check(NF90_DEF_DIM( if90id,      'nav_lev',            jpk, idmy ), clinfo)
+            CALL iom_nf90_check(NF90_DEF_DIM( if90id, 'time_counter', NF90_UNLIMITED, idmy ), clinfo)
+            IF( PRESENT(kdlev) )   &
+               CALL iom_nf90_check(NF90_DEF_DIM( if90id,    'numcat',          kdlev, idmy ), clinfo)
             ! global attributes
             CALL iom_nf90_check(NF90_PUT_ATT( if90id, NF90_GLOBAL, 'DOMAIN_number_total'   , jpnij              ), clinfo)
             CALL iom_nf90_check(NF90_PUT_ATT( if90id, NF90_GLOBAL, 'DOMAIN_number'         , narea-1            ), clinfo)
@@ -134,10 +140,11 @@ CONTAINS
             CALL iom_nf90_check(NF90_PUT_ATT( if90id, NF90_GLOBAL, 'DOMAIN_halo_size_start', kdompar(:,4)       ), clinfo)
             CALL iom_nf90_check(NF90_PUT_ATT( if90id, NF90_GLOBAL, 'DOMAIN_halo_size_end'  , kdompar(:,5)       ), clinfo)
             CALL iom_nf90_check(NF90_PUT_ATT( if90id, NF90_GLOBAL, 'DOMAIN_type'           , 'BOX'              ), clinfo)
-         ELSE              ! the file should be open for read mode so it must exist...
+         ELSE                          !* the file should be open for read mode so it must exist...
             CALL ctl_stop( TRIM(clinfo), ' should be impossible case...' )
          ENDIF
       ENDIF
+      !
       ! start to fill file informations
       ! =============
       IF( istop == nstop ) THEN   ! no error within this routine
@@ -148,14 +155,14 @@ CONTAINS
          ENDDO
          iom_file(kiomid)%name   = TRIM(cdname)
          iom_file(kiomid)%nfid   = if90id
-         iom_file(kiomid)%iolib  = jpnf90
          iom_file(kiomid)%nvars  = 0
          iom_file(kiomid)%irec   = -1   ! useless for NetCDF files, used to know if the file is in define mode 
+         iom_file(kiomid)%nlev   = ilevels
          CALL iom_nf90_check(NF90_Inquire(if90id, unlimitedDimId = iom_file(kiomid)%iduld), clinfo)
-         IF ( iom_file(kiomid)%iduld .GE. 0 ) THEN
-           CALL iom_nf90_check(NF90_Inquire_Dimension(if90id, iom_file(kiomid)%iduld,     & 
-        &                                               name = iom_file(kiomid)%uldname,  &
-        &                                               len  = iom_file(kiomid)%lenuld ), clinfo )
+         IF( iom_file(kiomid)%iduld .GE. 0 ) THEN
+            CALL iom_nf90_check(NF90_Inquire_Dimension(if90id, iom_file(kiomid)%iduld,    & 
+               &                                       name = iom_file(kiomid)%uldname,   &
+               &                                       len  = iom_file(kiomid)%lenuld ), clinfo )
          ENDIF
          IF(lwp) WRITE(numout,*) '                   ---> '//TRIM(cdname)//' OK'
       ELSE
@@ -174,10 +181,8 @@ CONTAINS
       INTEGER, INTENT(in) ::   kiomid   ! iom identifier of the file to be closed
       CHARACTER(LEN=100)  ::   clinfo   ! info character
       !---------------------------------------------------------------------
-      !
       clinfo = '      iom_nf90_close    , file: '//TRIM(iom_file(kiomid)%name)
       CALL iom_nf90_check(NF90_CLOSE(iom_file(kiomid)%nfid), clinfo)
-      !    
    END SUBROUTINE iom_nf90_close
 
 
@@ -237,8 +242,8 @@ CONTAINS
          END IF
          ! return the simension size
          IF( PRESENT(kdimsz) ) THEN 
-            IF( i_nvd == SIZE(kdimsz) ) THEN
-               kdimsz(:) = iom_file(kiomid)%dimsz(1:i_nvd,kiv)
+            IF( i_nvd <= SIZE(kdimsz) ) THEN
+               kdimsz(1:i_nvd) = iom_file(kiomid)%dimsz(1:i_nvd,kiv)
             ELSE
                WRITE(ctmp1,*) i_nvd, SIZE(kdimsz)
                CALL ctl_stop( TRIM(clinfo), 'error in kdimsz size'//TRIM(ctmp1) )
@@ -251,6 +256,9 @@ CONTAINS
       !
    END FUNCTION iom_nf90_varid
 
+   !!----------------------------------------------------------------------
+   !!                   INTERFACE iom_nf90_get
+   !!----------------------------------------------------------------------
 
    SUBROUTINE iom_nf90_g0d( kiomid, kvid, pvar, kstart )
       !!-----------------------------------------------------------------------
@@ -267,7 +275,6 @@ CONTAINS
       !---------------------------------------------------------------------
       clinfo = 'iom_nf90_g0d , file: '//TRIM(iom_file(kiomid)%name)//', var: '//TRIM(iom_file(kiomid)%cn_var(kvid))
       CALL iom_nf90_check(NF90_GET_VAR(iom_file(kiomid)%nfid, iom_file(kiomid)%nvid(kvid), pvar, start = kstart), clinfo )
-      ! 
    END SUBROUTINE iom_nf90_g0d
 
 
@@ -312,65 +319,180 @@ CONTAINS
    END SUBROUTINE iom_nf90_g123d
 
 
-   SUBROUTINE iom_nf90_intatt( kiomid, cdatt, pvar )
+   SUBROUTINE iom_nf90_chkatt( kiomid, cdatt, llok, ksize, cdvar )
       !!-----------------------------------------------------------------------
-      !!                  ***  ROUTINE  iom_nf90_intatt  ***
+      !!                  ***  ROUTINE  iom_nf90_chkatt  ***
       !!
-      !! ** Purpose : read an integer attribute with NF90
+      !! ** Purpose : check existence of attribute with NF90
+      !!              (either a global attribute (default) or a variable
+      !!               attribute if optional variable name is supplied (cdvar))
       !!-----------------------------------------------------------------------
       INTEGER         , INTENT(in   ) ::   kiomid   ! Identifier of the file
       CHARACTER(len=*), INTENT(in   ) ::   cdatt    ! attribute name
-      INTEGER         , INTENT(  out) ::   pvar     ! read field
+      LOGICAL         , INTENT(  out) ::   llok     ! error code
+      INTEGER         , INTENT(  out), OPTIONAL     &
+                      &               ::   ksize    ! attribute size
+      CHARACTER(len=*), INTENT(in   ), OPTIONAL     &
+                      &               ::   cdvar    ! name of the variable
       !
       INTEGER                         ::   if90id   ! temporary integer
+      INTEGER                         ::   isize    ! temporary integer
+      INTEGER                         ::   ivarid   ! NetCDF variable Id
+      !---------------------------------------------------------------------
+      !
+      if90id = iom_file(kiomid)%nfid
+      IF( PRESENT(cdvar) ) THEN
+         ! check the variable exists in the file
+         llok = NF90_INQ_VARID( if90id, TRIM(cdvar), ivarid ) == nf90_noerr
+         IF( llok ) &
+            ! check the variable has the attribute required
+            llok = NF90_Inquire_attribute(if90id, ivarid, cdatt, len=isize ) == nf90_noerr
+      ELSE
+         llok = NF90_Inquire_attribute(if90id, NF90_GLOBAL, cdatt, len=isize ) == nf90_noerr
+      ENDIF
+      !
+      IF( PRESENT(ksize) ) ksize = isize
+      !
+      IF( .not. llok) &
+         CALL ctl_warn('iom_nf90_chkatt: no attribute '//cdatt//' found')
+      !
+   END SUBROUTINE iom_nf90_chkatt
+
+
+   !!----------------------------------------------------------------------
+   !!                   INTERFACE iom_nf90_getatt
+   !!----------------------------------------------------------------------
+
+   SUBROUTINE iom_nf90_getatt( kiomid, cdatt, katt0d, katt1d, patt0d, patt1d, cdatt0d, cdvar)
+      !!-----------------------------------------------------------------------
+      !!                  ***  ROUTINE  iom_nf90_getatt  ***
+      !!
+      !! ** Purpose : read an attribute with NF90
+      !!              (either a global attribute (default) or a variable
+      !!               attribute if optional variable name is supplied (cdvar))
+      !!-----------------------------------------------------------------------
+      INTEGER               , INTENT(in   )           ::   kiomid   ! Identifier of the file
+      CHARACTER(len=*)      , INTENT(in   )           ::   cdatt    ! attribute name
+      INTEGER               , INTENT(  out), OPTIONAL ::   katt0d   ! read scalar integer
+      INTEGER, DIMENSION(:) , INTENT(  out), OPTIONAL ::   katt1d   ! read 1d array integer
+      REAL(wp)              , INTENT(  out), OPTIONAL ::   patt0d   ! read scalar  real
+      REAL(wp), DIMENSION(:), INTENT(  out), OPTIONAL ::   patt1d   ! read 1d array real
+      CHARACTER(len=*)      , INTENT(  out), OPTIONAL ::   cdatt0d  ! read character
+      CHARACTER(len=*)      , INTENT(in   ), OPTIONAL ::   cdvar    ! name of the variable
+      !
+      INTEGER                         ::   if90id   ! temporary integer
+      INTEGER                         ::   ivarid   ! NetCDF variable Id
       LOGICAL                         ::   llok     ! temporary logical
       CHARACTER(LEN=100)              ::   clinfo   ! info character
       !---------------------------------------------------------------------
-      ! 
+      !
       if90id = iom_file(kiomid)%nfid
-      llok = NF90_Inquire_attribute(if90id, NF90_GLOBAL, cdatt) == nf90_noerr
+      IF( PRESENT(cdvar) ) THEN
+         ! check the variable exists in the file
+         llok = NF90_INQ_VARID( if90id, TRIM(cdvar), ivarid ) == nf90_noerr
+         IF( llok ) THEN
+            ! check the variable has the attribute required
+            llok = NF90_Inquire_attribute(if90id, ivarid, cdatt) == nf90_noerr
+         ELSE
+            CALL ctl_warn('iom_nf90_getatt: no variable '//TRIM(cdvar)//' found')
+         ENDIF
+      ELSE
+         llok = NF90_Inquire_attribute(if90id, NF90_GLOBAL, cdatt) == nf90_noerr
+         ivarid = NF90_GLOBAL
+      ENDIF
+      !
       IF( llok) THEN
          clinfo = 'iom_nf90_getatt, file: '//TRIM(iom_file(kiomid)%name)//', att: '//TRIM(cdatt)
-         CALL iom_nf90_check(NF90_GET_ATT(if90id, NF90_GLOBAL, cdatt, values=pvar), clinfo)
+         IF(PRESENT( katt0d))   CALL iom_nf90_check(NF90_GET_ATT(if90id, ivarid, cdatt, values =  katt0d), clinfo)
+         IF(PRESENT( katt1d))   CALL iom_nf90_check(NF90_GET_ATT(if90id, ivarid, cdatt, values =  katt1d), clinfo)
+         IF(PRESENT( patt0d))   CALL iom_nf90_check(NF90_GET_ATT(if90id, ivarid, cdatt, values =  patt0d), clinfo)
+         IF(PRESENT( patt1d))   CALL iom_nf90_check(NF90_GET_ATT(if90id, ivarid, cdatt, values =  patt1d), clinfo)
+         IF(PRESENT(cdatt0d))   CALL iom_nf90_check(NF90_GET_ATT(if90id, ivarid, cdatt, values = cdatt0d), clinfo)
       ELSE
-         CALL ctl_warn('iom_nf90_getatt: no attribute '//cdatt//' found')
-         pvar = -999
+         CALL ctl_warn('iom_nf90_getatt: no attribute '//TRIM(cdatt)//' found')
+         IF(PRESENT( katt0d))    katt0d    = -999
+         IF(PRESENT( katt1d))    katt1d(:) = -999
+         IF(PRESENT( patt0d))    patt0d    = -999._wp
+         IF(PRESENT( patt1d))    patt1d(:) = -999._wp
+         IF(PRESENT(cdatt0d))   cdatt0d    = '!'
       ENDIF
-      ! 
-   END SUBROUTINE iom_nf90_intatt
+      !
+   END SUBROUTINE iom_nf90_getatt
 
 
-   SUBROUTINE iom_nf90_gettime( kiomid, kvid, ptime, cdunits, cdcalendar )
-      !!--------------------------------------------------------------------
-      !!                   ***  SUBROUTINE iom_gettime  ***
+   SUBROUTINE iom_nf90_putatt( kiomid, cdatt, katt0d, katt1d, patt0d, patt1d, cdatt0d, cdvar)
+      !!-----------------------------------------------------------------------
+      !!                  ***  ROUTINE  iom_nf90_putatt  ***
       !!
-      !! ** Purpose : read the time axis kvid in the file with NF90
-      !!--------------------------------------------------------------------
-      INTEGER                   , INTENT(in   ) ::   kiomid     ! file Identifier
-      INTEGER                   , INTENT(in   ) ::   kvid       ! variable id
-      REAL(wp), DIMENSION(:)    , INTENT(  out) ::   ptime      ! the time axis
-      CHARACTER(len=*), OPTIONAL, INTENT(  out) ::   cdunits    ! units attribute
-      CHARACTER(len=*), OPTIONAL, INTENT(  out) ::   cdcalendar ! calendar attribute
+      !! ** Purpose : write an attribute with NF90
+      !!              (either a global attribute (default) or a variable
+      !!               attribute if optional variable name is supplied (cdvar))
+      !!-----------------------------------------------------------------------
+      INTEGER               , INTENT(in   )           ::   kiomid   ! Identifier of the file
+      CHARACTER(len=*)      , INTENT(in   )           ::   cdatt    ! attribute name
+      INTEGER               , INTENT(in   ), OPTIONAL ::   katt0d   ! read scalar integer
+      INTEGER, DIMENSION(:) , INTENT(in   ), OPTIONAL ::   katt1d   ! read 1d array integer
+      REAL(wp)              , INTENT(in   ), OPTIONAL ::   patt0d   ! read scalar  real
+      REAL(wp), DIMENSION(:), INTENT(in   ), OPTIONAL ::   patt1d   ! read 1d array real
+      CHARACTER(len=*)      , INTENT(in   ), OPTIONAL ::   cdatt0d  ! read character
+      CHARACTER(len=*)      , INTENT(in   ), OPTIONAL ::   cdvar    ! name of the variable
       !
-      CHARACTER(LEN=100) ::   clinfo     ! info character
+      INTEGER                         ::   if90id   ! temporary integer
+      INTEGER                         ::   ivarid   ! NetCDF variable Id
+      INTEGER                         ::   isize    ! Attribute size
+      INTEGER                         ::   itype    ! Attribute type
+      LOGICAL                         ::   llok     ! temporary logical
+      LOGICAL                         ::   llatt     ! temporary logical
+      LOGICAL                         ::   lldata   ! temporary logical
+      CHARACTER(LEN=100)              ::   clinfo   ! info character
       !---------------------------------------------------------------------
-      clinfo = 'iom_nf90_gettime, file: '//TRIM(iom_file(kiomid)%name)//', var: '//TRIM(iom_file(kiomid)%cn_var(kvid))
-      CALL iom_nf90_check(NF90_GET_VAR(iom_file(kiomid)%nfid, iom_file(kiomid)%nvid(kvid), ptime(:),   &
-            &                           start=(/ 1 /), count=(/ iom_file(kiomid)%dimsz(1, kvid) /)), clinfo)
-      IF ( PRESENT(cdunits) ) THEN 
-         CALL iom_nf90_check(NF90_GET_ATT(iom_file(kiomid)%nfid, iom_file(kiomid)%nvid(kvid), "units", &
-            &                           values=cdunits), clinfo)
+      !
+      if90id = iom_file(kiomid)%nfid
+      IF( PRESENT(cdvar) ) THEN
+         llok = NF90_INQ_VARID( if90id, TRIM(cdvar), ivarid ) == nf90_noerr   ! is the variable in the file?
+         IF( .NOT. llok ) THEN
+            CALL ctl_warn('iom_nf90_putatt: no variable '//TRIM(cdvar)//' found'   &
+               &        , '                 no attribute '//cdatt//' written' )
+            RETURN
+         ENDIF
+      ELSE
+         ivarid = NF90_GLOBAL
       ENDIF
-      IF ( PRESENT(cdcalendar) ) THEN 
-         CALL iom_nf90_check(NF90_GET_ATT(iom_file(kiomid)%nfid, iom_file(kiomid)%nvid(kvid), "calendar", &
-            &                           values=cdcalendar), clinfo)
+      llatt = NF90_Inquire_attribute(if90id, ivarid, cdatt, len = isize, xtype = itype ) == nf90_noerr
+      !
+      ! trick: irec used to know if the file is in define mode or not
+      lldata = iom_file(kiomid)%irec /= -1   ! default: go back in define mode if in data mode
+      IF( lldata .AND. llatt ) THEN          ! attribute already there. Do we really need to go back in define mode?
+         ! do we have the appropriate type?
+         IF(PRESENT( katt0d) .OR. PRESENT( katt1d))   llok = itype == NF90_INT
+         IF(PRESENT( patt0d) .OR. PRESENT( patt1d))   llok = itype == NF90_DOUBLE
+         IF(PRESENT(cdatt0d)                      )   llok = itype == NF90_CHAR
+         ! and do we have the appropriate size?
+         IF(PRESENT( katt0d))   llok = llok .AND. isize == 1
+         IF(PRESENT( katt1d))   llok = llok .AND. isize == SIZE(katt1d)
+         IF(PRESENT( patt0d))   llok = llok .AND. isize == 1
+         IF(PRESENT( patt1d))   llok = llok .AND. isize == SIZE(patt1d)
+         IF(PRESENT(cdatt0d))   llok = llok .AND. isize == LEN_TRIM(cdatt0d)
+         !
+         lldata = .NOT. llok
       ENDIF
       !
-   END SUBROUTINE iom_nf90_gettime
+      clinfo = 'iom_nf90_putatt, file: '//TRIM(iom_file(kiomid)%name)//', att: '//TRIM(cdatt)
+      IF(lldata)   CALL iom_nf90_check(NF90_REDEF( if90id ), clinfo)   ! leave data mode to define mode
+      !
+      IF(PRESENT( katt0d))   CALL iom_nf90_check(NF90_PUT_ATT(if90id, ivarid, cdatt, values =       katt0d) , clinfo)
+      IF(PRESENT( katt1d))   CALL iom_nf90_check(NF90_PUT_ATT(if90id, ivarid, cdatt, values =       katt1d) , clinfo)
+      IF(PRESENT( patt0d))   CALL iom_nf90_check(NF90_PUT_ATT(if90id, ivarid, cdatt, values =       patt0d) , clinfo)
+      IF(PRESENT( patt1d))   CALL iom_nf90_check(NF90_PUT_ATT(if90id, ivarid, cdatt, values =       patt1d) , clinfo)
+      IF(PRESENT(cdatt0d))   CALL iom_nf90_check(NF90_PUT_ATT(if90id, ivarid, cdatt, values = trim(cdatt0d)), clinfo)
+      !
+      IF(lldata)   CALL iom_nf90_check(NF90_ENDDEF( if90id ), clinfo)   ! leave define mode to data mode
+      !
+   END SUBROUTINE iom_nf90_putatt
 
 
    SUBROUTINE iom_nf90_rp0123d( kt, kwrite, kiomid, cdvar , kvid  , ktype,   &
-         &                               pv_r0d, pv_r1d, pv_r2d, pv_r3d )
+         &                                  pv_r0d, pv_r1d, pv_r2d, pv_r3d )
       !!--------------------------------------------------------------------
       !!                   ***  SUBROUTINE  iom_nf90_rstput  ***
       !!
@@ -394,17 +516,18 @@ CONTAINS
       INTEGER, DIMENSION(4) :: idimsz               ! dimensions size  
       INTEGER, DIMENSION(4) :: idimid               ! dimensions id
       CHARACTER(LEN=256)    :: clinfo               ! info character
-      CHARACTER(LEN= 12), DIMENSION(4) :: cltmp     ! temporary character
+      CHARACTER(LEN= 12), DIMENSION(5) :: cltmp     ! temporary character
       INTEGER               :: if90id               ! nf90 file identifier
       INTEGER               :: idmy                 ! dummy variable
       INTEGER               :: itype                ! variable type
       INTEGER, DIMENSION(4) :: ichunksz             ! NetCDF4 chunk sizes. Will be computed using
-                                                    ! nn_nchunks_[i,j,k,t] namelist parameters
-      INTEGER               :: ichunkalg, ishuffle,&
-                               ideflate, ideflate_level
-                                                    ! NetCDF4 internally fixed parameters
+      !                                             ! nn_nchunks_[i,j,k,t] namelist parameters
+      INTEGER               :: ichunkalg, ishuffle, ideflate, ideflate_level
+      !                                             ! NetCDF4 internally fixed parameters
       LOGICAL               :: lchunk               ! logical switch to activate chunking and compression
-                                                    ! when appropriate (currently chunking is applied to 4d fields only)
+      !                                             ! when appropriate (currently chunking is applied to 4d fields only)
+      INTEGER               :: idlv                 ! local variable
+      INTEGER               :: idim3                ! id of the third dimension
       !---------------------------------------------------------------------
       !
       clinfo = '          iom_nf90_rp0123d, file: '//TRIM(iom_file(kiomid)%name)//', var: '//TRIM(cdvar)
@@ -418,7 +541,8 @@ CONTAINS
             CALL iom_nf90_check(NF90_REDEF( if90id ), clinfo)   ;   iom_file(kiomid)%irec = -1
          ENDIF
          ! define the dimension variables if it is not already done
-         cltmp = (/ 'nav_lon     ', 'nav_lat     ', 'nav_lev     ', 'time_counter' /)
+         ! Warning: we must use the same character length in an array constructor (at least for gcc compiler)
+         cltmp = (/ 'nav_lon     ', 'nav_lat     ', 'nav_lev     ', 'time_counter', 'numcat      ' /)   
          CALL iom_nf90_check(NF90_DEF_VAR( if90id, TRIM(cltmp(1)), NF90_FLOAT , (/ 1, 2 /), iom_file(kiomid)%nvid(1) ), clinfo)
          CALL iom_nf90_check(NF90_DEF_VAR( if90id, TRIM(cltmp(2)), NF90_FLOAT , (/ 1, 2 /), iom_file(kiomid)%nvid(2) ), clinfo)
          CALL iom_nf90_check(NF90_DEF_VAR( if90id, TRIM(cltmp(3)), NF90_FLOAT , (/ 3    /), iom_file(kiomid)%nvid(3) ), clinfo)
@@ -426,8 +550,15 @@ CONTAINS
          ! update informations structure related the dimension variable we just added...
          iom_file(kiomid)%nvars       = 4
          iom_file(kiomid)%luld(1:4)   = (/ .FALSE., .FALSE., .FALSE., .TRUE. /)
-         iom_file(kiomid)%cn_var(1:4) = cltmp
-         iom_file(kiomid)%ndims(1:4)  = (/ 2, 2, 1, 1 /)  
+         iom_file(kiomid)%cn_var(1:4) = cltmp(1:4)
+         iom_file(kiomid)%ndims(1:4)  = (/ 2, 2, 1, 1 /)
+         IF( NF90_INQ_DIMID( if90id, 'numcat', idmy ) == nf90_noerr ) THEN   ! add a 5th variable corresponding to the 5th dimension
+            CALL iom_nf90_check(NF90_DEF_VAR( if90id, TRIM(cltmp(5)), NF90_FLOAT , (/ 5 /), iom_file(kiomid)%nvid(5) ), clinfo)
+            iom_file(kiomid)%nvars     = 5
+            iom_file(kiomid)%luld(5)   = .FALSE.
+            iom_file(kiomid)%cn_var(5) = cltmp(5)
+            iom_file(kiomid)%ndims(5)  = 1
+         ENDIF
          ! trick: defined to 0 to say that dimension variables are defined but not yet written
          iom_file(kiomid)%dimsz(1, 1)  = 0   
          IF(lwp) WRITE(numout,*) TRIM(clinfo)//' define dimension variables done'
@@ -449,17 +580,25 @@ CONTAINS
          ENDIF
          ! variable definition
          IF(     PRESENT(pv_r0d) ) THEN   ;   idims = 0
-         ELSEIF( PRESENT(pv_r1d) ) THEN   ;   idims = 2   ;   idimid(1:idims) = (/    3,4/)
+         ELSEIF( PRESENT(pv_r1d) ) THEN
+            IF( SIZE(pv_r1d,1) == jpk ) THEN   ;   idim3 = 3
+            ELSE                               ;   idim3 = 5
+            ENDIF
+                                              idims = 2   ;   idimid(1:idims) = (/idim3,4/)
          ELSEIF( PRESENT(pv_r2d) ) THEN   ;   idims = 3   ;   idimid(1:idims) = (/1,2  ,4/)
-         ELSEIF( PRESENT(pv_r3d) ) THEN   ;   idims = 4   ;   idimid(1:idims) = (/1,2,3,4/)
+         ELSEIF( PRESENT(pv_r3d) ) THEN
+            IF( SIZE(pv_r3d,3) == jpk ) THEN   ;   idim3 = 3
+            ELSE                               ;   idim3 = 5
+            ENDIF
+                                              idims = 4   ;   idimid(1:idims) = (/1,2,idim3,4/)
          ENDIF
          IF( PRESENT(ktype) ) THEN   ! variable external type
             SELECT CASE (ktype)
-            CASE (jp_r8)  ;   itype = NF90_DOUBLE
-            CASE (jp_r4)  ;   itype = NF90_FLOAT
-            CASE (jp_i4)  ;   itype = NF90_INT
-            CASE (jp_i2)  ;   itype = NF90_SHORT
-            CASE (jp_i1)  ;   itype = NF90_BYTE
+            CASE (jp_r8)   ;   itype = NF90_DOUBLE
+            CASE (jp_r4)   ;   itype = NF90_FLOAT
+            CASE (jp_i4)   ;   itype = NF90_INT
+            CASE (jp_i2)   ;   itype = NF90_SHORT
+            CASE (jp_i1)   ;   itype = NF90_BYTE
             CASE DEFAULT   ;   CALL ctl_stop( TRIM(clinfo)//' unknown variable type' )
             END SELECT
          ELSE
@@ -467,13 +606,13 @@ CONTAINS
          ENDIF
          IF( PRESENT(pv_r0d) ) THEN
             CALL iom_nf90_check(NF90_DEF_VAR( if90id, TRIM(cdvar), itype,                    &
-                 &                            iom_file(kiomid)%nvid(idvar) ), clinfo)
+               &                              iom_file(kiomid)%nvid(idvar) ), clinfo )
          ELSE
             CALL iom_nf90_check(NF90_DEF_VAR( if90id, TRIM(cdvar), itype, idimid(1:idims),   &
-                 &                            iom_file(kiomid)%nvid(idvar) ), clinfo)
+               &                              iom_file(kiomid)%nvid(idvar) ), clinfo )
          ENDIF
          lchunk = .false.
-         IF( snc4set%luse .AND. idims.eq.4 ) lchunk = .true.
+         IF( snc4set%luse .AND. idims == 4 )   lchunk = .true.
          ! update informations structure related the new variable we want to add...
          iom_file(kiomid)%nvars         = idvar
          iom_file(kiomid)%cn_var(idvar) = TRIM(cdvar)
@@ -494,7 +633,7 @@ CONTAINS
             ichunksz(2) = MIN( ichunksz(2),MAX( (ichunksz(2)-1)/snc4set%nj + 1 ,16 ) ) ! Suggested default nc4set%nj=2
             ichunksz(3) = MIN( ichunksz(3),MAX( (ichunksz(3)-1)/snc4set%nk + 1 , 1 ) ) ! Suggested default nc4set%nk=6
             ichunksz(4) = 1                                                            ! Do not allow chunks to span the
-                                                                                       ! unlimited dimension
+            !                                                                          ! unlimited dimension
             CALL iom_nf90_check(SET_NF90_DEF_VAR_CHUNKING(if90id, idvar, ichunkalg, ichunksz), clinfo)
             CALL iom_nf90_check(SET_NF90_DEF_VAR_DEFLATE(if90id, idvar, ishuffle, ideflate, ideflate_level), clinfo)
             IF(lwp) WRITE(numout,*) TRIM(clinfo)//' chunked ok. Chunks sizes: ', ichunksz
@@ -503,7 +642,7 @@ CONTAINS
       ELSE
          idvar = kvid
       ENDIF
-
+      !
       ! time step kwrite : write the variable
       IF( kt == kwrite ) THEN
          ! are we in write mode?
@@ -527,20 +666,23 @@ CONTAINS
             ! =============
             ! trick: is defined to 0 => dimension variable are defined but not yet written
             IF( iom_file(kiomid)%dimsz(1, 1) == 0 ) THEN
-               CALL iom_nf90_check(NF90_INQ_VARID( if90id, 'nav_lon'     , idmy ), clinfo)
-               CALL iom_nf90_check(NF90_PUT_VAR( if90id, idmy, glamt(ix1:ix2, iy1:iy2) ), clinfo)
-               CALL iom_nf90_check(NF90_INQ_VARID( if90id, 'nav_lat'     , idmy ), clinfo)
-               CALL iom_nf90_check(NF90_PUT_VAR( if90id, idmy, gphit(ix1:ix2, iy1:iy2) ), clinfo)
-               CALL iom_nf90_check(NF90_INQ_VARID( if90id, 'nav_lev'     , idmy ), clinfo)
-               CALL iom_nf90_check(NF90_PUT_VAR( if90id, idmy, gdept_1d                ), clinfo)
+               CALL iom_nf90_check( NF90_INQ_VARID( if90id, 'nav_lon'     , idmy )         , clinfo )
+               CALL iom_nf90_check( NF90_PUT_VAR  ( if90id, idmy, glamt(ix1:ix2, iy1:iy2) ), clinfo )
+               CALL iom_nf90_check( NF90_INQ_VARID( if90id, 'nav_lat'     , idmy )         , clinfo )
+               CALL iom_nf90_check( NF90_PUT_VAR  ( if90id, idmy, gphit(ix1:ix2, iy1:iy2) ), clinfo )
+               CALL iom_nf90_check( NF90_INQ_VARID( if90id, 'nav_lev'     , idmy ), clinfo )
+               CALL iom_nf90_check( NF90_PUT_VAR  ( if90id, idmy, gdept_1d       ), clinfo )
+               IF( NF90_INQ_VARID( if90id, 'numcat', idmy ) == nf90_noerr ) THEN
+                  CALL iom_nf90_check( NF90_PUT_VAR  ( if90id, idmy, (/ (idlv, idlv = 1,iom_file(kiomid)%nlev) /)), clinfo )
+               ENDIF
                ! +++ WRONG VALUE: to be improved but not really useful...
-               CALL iom_nf90_check(NF90_INQ_VARID( if90id, 'time_counter', idmy ), clinfo)
-               CALL iom_nf90_check(NF90_PUT_VAR( if90id, idmy, kt                      ), clinfo)   
+               CALL iom_nf90_check( NF90_INQ_VARID( if90id, 'time_counter', idmy ), clinfo )
+               CALL iom_nf90_check( NF90_PUT_VAR( if90id, idmy, kt                      ), clinfo )   
                ! update the values of the variables dimensions size
-               CALL iom_nf90_check(NF90_INQUIRE_DIMENSION( if90id, 1, len = iom_file(kiomid)%dimsz(1,1) ), clinfo)
-               CALL iom_nf90_check(NF90_INQUIRE_DIMENSION( if90id, 2, len = iom_file(kiomid)%dimsz(2,1) ), clinfo)
+               CALL iom_nf90_check( NF90_INQUIRE_DIMENSION( if90id, 1, len = iom_file(kiomid)%dimsz(1,1) ), clinfo )
+               CALL iom_nf90_check( NF90_INQUIRE_DIMENSION( if90id, 2, len = iom_file(kiomid)%dimsz(2,1) ), clinfo )
                iom_file(kiomid)%dimsz(1:2, 2) = iom_file(kiomid)%dimsz(1:2, 1)
-               CALL iom_nf90_check(NF90_INQUIRE_DIMENSION( if90id, 3, len = iom_file(kiomid)%dimsz(1,3) ), clinfo)
+               CALL iom_nf90_check( NF90_INQUIRE_DIMENSION( if90id, 3, len = iom_file(kiomid)%dimsz(1,3) ), clinfo )
                iom_file(kiomid)%dimsz(1  , 4) = 1   ! unlimited dimension
                IF(lwp) WRITE(numout,*) TRIM(clinfo)//' write dimension variables done'
             ENDIF
@@ -549,13 +691,13 @@ CONTAINS
          ! write the data
          ! =============
          IF(     PRESENT(pv_r0d) ) THEN
-            CALL iom_nf90_check(NF90_PUT_VAR( if90id, idvar, pv_r0d                      ), clinfo)
+            CALL iom_nf90_check( NF90_PUT_VAR( if90id, idvar, pv_r0d                    ), clinfo )
          ELSEIF( PRESENT(pv_r1d) ) THEN
-            CALL iom_nf90_check(NF90_PUT_VAR( if90id, idvar, pv_r1d(                  :) ), clinfo)
+            CALL iom_nf90_check( NF90_PUT_VAR( if90id, idvar, pv_r1d(:)                 ), clinfo )
          ELSEIF( PRESENT(pv_r2d) ) THEN
-            CALL iom_nf90_check(NF90_PUT_VAR( if90id, idvar, pv_r2d(ix1:ix2, iy1:iy2   ) ), clinfo)
+            CALL iom_nf90_check( NF90_PUT_VAR( if90id, idvar, pv_r2d(ix1:ix2,iy1:iy2)   ), clinfo )
          ELSEIF( PRESENT(pv_r3d) ) THEN
-            CALL iom_nf90_check(NF90_PUT_VAR( if90id, idvar, pv_r3d(ix1:ix2, iy1:iy2, :) ), clinfo)
+            CALL iom_nf90_check( NF90_PUT_VAR( if90id, idvar, pv_r3d(ix1:ix2,iy1:iy2,:) ), clinfo )
          ENDIF
          ! add 1 to the size of the temporal dimension (not really useful...)
          IF( iom_file(kiomid)%luld(idvar) )   iom_file(kiomid)%dimsz(iom_file(kiomid)%ndims(idvar), idvar)    &

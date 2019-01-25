@@ -23,10 +23,10 @@ MODULE domain
    USE oce             ! ocean variables
    USE dom_oce         ! domain: ocean
    USE phycst          ! physical constants
-   USE closea          ! closed seas
+ !  USE closea          ! closed seas
    USE domhgr          ! domain: set the horizontal mesh
    USE domzgr          ! domain: set the vertical mesh
-   USE domstp          ! domain: set the time-step
+ !  USE domstp          ! domain: set the time-step
    USE dommsk          ! domain: set the mask system
    USE domwri          ! domain: write the meshmask file
    USE domvvl          ! variable volume
@@ -71,7 +71,7 @@ CONTAINS
       REAL(wp), POINTER, DIMENSION(:,:) ::   z1_hu_0, z1_hv_0
       !!----------------------------------------------------------------------
       !
-      IF( nn_timing == 1 )   CALL timing_start('dom_init')
+     ! IF( nn_timing == 1 )   CALL timing_start('dom_init')
       !
       IF(lwp) THEN
          WRITE(numout,*)
@@ -82,7 +82,7 @@ CONTAINS
       !                       !==  Reference coordinate system  ==!
       !
                      CALL dom_nam               ! read namelist ( namrun, namdom )
-                     CALL dom_clo               ! Closed seas and lake
+                  !   CALL dom_clo               ! Closed seas and lake
                      CALL dom_hgr               ! Horizontal mesh
                      CALL dom_zgr               ! Vertical mesh and bathymetry
                      CALL dom_msk               ! Masks
@@ -134,7 +134,7 @@ CONTAINS
       !
       CALL cfg_write         ! create the configuration file
       !
-      IF( nn_timing == 1 )   CALL timing_stop('dom_init')
+    !  IF( nn_timing == 1 )   CALL timing_stop('dom_init')
       !
    END SUBROUTINE dom_init
 
@@ -208,7 +208,6 @@ CONTAINS
          WRITE(numout,*) '      IS coupling at the restart step ln_iscpl   = ', ln_iscpl
       ENDIF
 
-      no = nn_no                    ! conversion DOCTOR names into model names (this should disappear soon)
       cexper = cn_exp
       nrstdt = nn_rstctl
       nit000 = nn_it000
@@ -330,6 +329,8 @@ CONTAINS
       REAL(wp) ::   ze1min, ze1max, ze2min, ze2max
       !!----------------------------------------------------------------------
       !
+#undef CHECK_DOM
+#ifdef CHECK_DOM
       IF(lk_mpp) THEN
          CALL mpp_minloc( e1t(:,:), tmask_i(:,:), ze1min, iimi1,ijmi1 )
          CALL mpp_minloc( e2t(:,:), tmask_i(:,:), ze2min, iimi2,ijmi2 )
@@ -363,6 +364,7 @@ CONTAINS
          WRITE(numout,"(14x,'e2t maxi: ',1f10.2,' at i = ',i5,' j= ',i5)") ze2max, iima2, ijma2
          WRITE(numout,"(14x,'e2t mini: ',1f10.2,' at i = ',i5,' j= ',i5)") ze2min, iimi2, ijmi2
       ENDIF
+#endif
       !
    END SUBROUTINE dom_ctl
 
@@ -399,7 +401,7 @@ CONTAINS
       !                       ! ============================= !
       !         
       clnam = 'domain_cfg'  ! filename (configuration information)
-      CALL iom_open( TRIM(clnam), inum, ldwrt = .TRUE., kiolib = jprstlib )
+      CALL iom_open( TRIM(clnam), inum, ldwrt = .TRUE.)!, kiolib = jprstlib )
       
       !
       !                             !==  ORCA family specificities  ==!

@@ -119,7 +119,7 @@ CONTAINS
       NAMELIST/namlbc/ rn_shlat, ln_vorlat
       !!---------------------------------------------------------------------
       !
-      IF( nn_timing == 1 )  CALL timing_start('dom_msk')
+  !    IF( nn_timing == 1 )  CALL timing_start('dom_msk')
       !
       CALL wrk_alloc( jpi, jpj, imsk )
       CALL wrk_alloc( jpi, jpj, zwf  )
@@ -179,39 +179,39 @@ CONTAINS
 
       ! Interior domain mask (used for global sum)
       ! --------------------
-      tmask_i(:,:) = ssmask(:,:)            ! (ISH) tmask_i = 1 even on the ice shelf
+   !   tmask_i(:,:) = ssmask(:,:)            ! (ISH) tmask_i = 1 even on the ice shelf
 
-      tmask_h(:,:) = 1._wp                 ! 0 on the halo and 1 elsewhere
-      iif = jpreci                         ! ???
-      iil = nlci - jpreci + 1
-      ijf = jprecj                         ! ???
-      ijl = nlcj - jprecj + 1
+  !    tmask_h(:,:) = 1._wp                 ! 0 on the halo and 1 elsewhere
+  !    iif = jpreci                         ! ???
+  !    iil = nlci - jpreci + 1
+  !    ijf = jprecj                         ! ???
+  !    ijl = nlcj - jprecj + 1
 
-      tmask_h( 1 :iif,   :   ) = 0._wp      ! first columns
-      tmask_h(iil:jpi,   :   ) = 0._wp      ! last  columns (including mpp extra columns)
-      tmask_h(   :   , 1 :ijf) = 0._wp      ! first rows
-      tmask_h(   :   ,ijl:jpj) = 0._wp      ! last  rows (including mpp extra rows)
+   !   tmask_h( 1 :iif,   :   ) = 0._wp      ! first columns
+   !   tmask_h(iil:jpi,   :   ) = 0._wp      ! last  columns (including mpp extra columns)
+   !   tmask_h(   :   , 1 :ijf) = 0._wp      ! first rows
+   !   tmask_h(   :   ,ijl:jpj) = 0._wp      ! last  rows (including mpp extra rows)
 
       ! north fold mask
       ! ---------------
-      tpol(1:jpiglo) = 1._wp 
-      fpol(1:jpiglo) = 1._wp
-      IF( jperio == 3 .OR. jperio == 4 ) THEN      ! T-point pivot
-         tpol(jpiglo/2+1:jpiglo) = 0._wp
-         fpol(     1    :jpiglo) = 0._wp
-         IF( mjg(nlej) == jpjglo ) THEN                  ! only half of the nlcj-1 row
-            DO ji = iif+1, iil-1
-               tmask_h(ji,nlej-1) = tmask_h(ji,nlej-1) * tpol(mig(ji))
-            END DO
-         ENDIF
-      ENDIF
+   !   tpol(1:jpiglo) = 1._wp 
+   !   fpol(1:jpiglo) = 1._wp
+   !   IF( jperio == 3 .OR. jperio == 4 ) THEN      ! T-point pivot
+   !      tpol(jpiglo/2+1:jpiglo) = 0._wp
+   !      fpol(     1    :jpiglo) = 0._wp
+   !      IF( mjg(nlej) == jpjglo ) THEN                  ! only half of the nlcj-1 row
+   !         DO ji = iif+1, iil-1
+   !            tmask_h(ji,nlej-1) = tmask_h(ji,nlej-1) * tpol(mig(ji))
+   !         END DO
+   !      ENDIF
+   !   ENDIF
      
-      tmask_i(:,:) = tmask_i(:,:) * tmask_h(:,:)
+   !   tmask_i(:,:) = tmask_i(:,:) * tmask_h(:,:)
 
-      IF( jperio == 5 .OR. jperio == 6 ) THEN      ! F-point pivot
-         tpol(     1    :jpiglo) = 0._wp
-         fpol(jpiglo/2+1:jpiglo) = 0._wp
-      ENDIF
+  !    IF( jperio == 5 .OR. jperio == 6 ) THEN      ! F-point pivot
+  !       tpol(     1    :jpiglo) = 0._wp
+  !       fpol(jpiglo/2+1:jpiglo) = 0._wp
+  !    ENDIF
 
       ! 2. Ocean/land mask at u-,  v-, and z-points (computed from tmask)
       ! -------------------------------------------
@@ -228,22 +228,22 @@ CONTAINS
          END DO
       END DO
       ! (ISF) MIN(1,SUM(umask)) is here to check if you have effectively at least 1 wet cell at u point
-      DO jj = 1, jpjm1
-         DO ji = 1, jpim1   ! vector loop
-            ssumask(ji,jj)  = ssmask(ji,jj) * ssmask(ji+1,jj  )  * MIN(1._wp,SUM(umask(ji,jj,:)))
-            ssvmask(ji,jj)  = ssmask(ji,jj) * ssmask(ji  ,jj+1)  * MIN(1._wp,SUM(vmask(ji,jj,:)))
-         END DO
-         DO ji = 1, jpim1      ! NO vector opt.
-            ssfmask(ji,jj) =  ssmask(ji,jj  ) * ssmask(ji+1,jj  )   &
-               &            * ssmask(ji,jj+1) * ssmask(ji+1,jj+1) * MIN(1._wp,SUM(fmask(ji,jj,:)))
-         END DO
-      END DO
-      CALL lbc_lnk( umask  , 'U', 1._wp )      ! Lateral boundary conditions
-      CALL lbc_lnk( vmask  , 'V', 1._wp )
-      CALL lbc_lnk( fmask  , 'F', 1._wp )
-      CALL lbc_lnk( ssumask, 'U', 1._wp )      ! Lateral boundary conditions
-      CALL lbc_lnk( ssvmask, 'V', 1._wp )
-      CALL lbc_lnk( ssfmask, 'F', 1._wp )
+!     DO jj = 1, jpjm1
+!         DO ji = 1, jpim1   ! vector loop
+!            ssumask(ji,jj)  = ssmask(ji,jj) * ssmask(ji+1,jj  )  * MIN(1._wp,SUM(umask(ji,jj,:)))
+!            ssvmask(ji,jj)  = ssmask(ji,jj) * ssmask(ji  ,jj+1)  * MIN(1._wp,SUM(vmask(ji,jj,:)))
+!!         END DO
+!         DO ji = 1, jpim1      ! NO vector opt.
+!            ssfmask(ji,jj) =  ssmask(ji,jj  ) * ssmask(ji+1,jj  )   &
+!               &            * ssmask(ji,jj+1) * ssmask(ji+1,jj+1) * MIN(1._wp,SUM(fmask(ji,jj,:)))
+!         END DO
+!      END DO
+      CALL lbc_lnk( 'toto',umask  , 'U', 1._wp )      ! Lateral boundary conditions
+      CALL lbc_lnk( 'toto',vmask  , 'V', 1._wp )
+      CALL lbc_lnk( 'toto',fmask  , 'F', 1._wp )
+ !     CALL lbc_lnk( 'toto',ssumask, 'U', 1._wp )      ! Lateral boundary conditions
+ !     CALL lbc_lnk( 'toto',ssvmask, 'V', 1._wp )
+ !     CALL lbc_lnk( 'toto',ssfmask, 'F', 1._wp )
 
       ! 3. Ocean/land mask at wu-, wv- and w points 
       !----------------------------------------------
@@ -354,14 +354,14 @@ CONTAINS
          !
       ENDIF
       !
-      CALL lbc_lnk( fmask, 'F', 1._wp )      ! Lateral boundary conditions on fmask
+      CALL lbc_lnk( 'toto',fmask, 'F', 1._wp )      ! Lateral boundary conditions on fmask
       !
       ! CAUTION : The fmask may be further modified in dyn_vor_init ( dynvor.F90 )
       !
       CALL wrk_dealloc( jpi, jpj, imsk )
       CALL wrk_dealloc( jpi, jpj, zwf  )
       !
-      IF( nn_timing == 1 )  CALL timing_stop('dom_msk')
+  !    IF( nn_timing == 1 )  CALL timing_stop('dom_msk')
       !
    END SUBROUTINE dom_msk
    

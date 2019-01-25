@@ -111,7 +111,7 @@ CONTAINS
       INTEGER  ::   ie1e2u_v             ! fag for u- & v-surface read in coordinate file or not
       !!----------------------------------------------------------------------
       !
-      IF( nn_timing == 1 )  CALL timing_start('dom_hgr')
+  !    IF( nn_timing == 1 )  CALL timing_start('dom_hgr')
       !
       IF(lwp) THEN
          WRITE(numout,*)
@@ -271,11 +271,11 @@ CONTAINS
          ! resolution in meters
          ze1 = 106000. / REAL( jp_cfg , wp )            
          ! benchmark: forced the resolution to be about 100 km
-         IF( nbench /= 0 )   ze1 = 106000._wp     
+       !  IF( nbench /= 0 )   ze1 = 106000._wp     
          zsin_alpha = - SQRT( 2._wp ) * 0.5_wp
          zcos_alpha =   SQRT( 2._wp ) * 0.5_wp
          ze1deg = ze1 / (ra * rad)
-         IF( nbench /= 0 )   ze1deg = ze1deg / REAL( jp_cfg , wp )   ! benchmark: keep the lat/+lon
+       !  IF( nbench /= 0 )   ze1deg = ze1deg / REAL( jp_cfg , wp )   ! benchmark: keep the lat/+lon
          !                                                           ! at the right jp_cfg resolution
          glam0 = zlam1 + zcos_alpha * ze1deg * REAL( jpjglo-2 , wp )
          gphi0 = zphi1 + zsin_alpha * ze1deg * REAL( jpjglo-2 , wp )
@@ -394,8 +394,8 @@ CONTAINS
          IF( lk_mpp ) THEN 
             zminff=ff_f(nldi,nldj)
             zmaxff=ff_f(nldi,nlej)
-            CALL mpp_min( zminff )   ! min over the global domain
-            CALL mpp_max( zmaxff )   ! max over the global domain
+            CALL mpp_min( 'toto',zminff )   ! min over the global domain
+            CALL mpp_max( 'toto',zmaxff )   ! max over the global domain
             IF(lwp) WRITE(numout,*) '          Coriolis parameter varies globally from ', zminff,' to ', zmaxff
          END IF
          !
@@ -417,8 +417,8 @@ CONTAINS
          IF( lk_mpp ) THEN 
             zminff=ff_f(nldi,nldj)
             zmaxff=ff_f(nldi,nlej)
-            CALL mpp_min( zminff )   ! min over the global domain
-            CALL mpp_max( zmaxff )   ! max over the global domain
+            CALL mpp_min('toto', zminff )   ! min over the global domain
+            CALL mpp_max( 'toto',zmaxff )   ! max over the global domain
             IF(lwp) WRITE(numout,*) '          Coriolis parameter varies globally from ', zminff,' to ', zmaxff
          END IF
          !
@@ -429,12 +429,12 @@ CONTAINS
       ! ------------------------------------------
       ! The equator line must be the latitude coordinate axe
 
-      IF( nperio == 2 ) THEN
-         znorme = SQRT( SUM( gphiu(:,2) * gphiu(:,2) ) ) / REAL( jpi )
-         IF( znorme > 1.e-13 ) CALL ctl_stop( ' ===>>>> : symmetrical condition: rerun with good equator line' )
-      ENDIF
+!      IF( nperio == 2 ) THEN
+!         znorme = SQRT( SUM( gphiu(:,2) * gphiu(:,2) ) ) / REAL( jpi )
+!         IF( znorme > 1.e-13 ) CALL ctl_stop( ' ===>>>> : symmetrical condition: rerun with good equator line' )
+!      ENDIF
       !
-      IF( nn_timing == 1 )  CALL timing_stop('dom_hgr')
+    !  IF( nn_timing == 1 )  CALL timing_stop('dom_hgr')
       !
    END SUBROUTINE dom_hgr
 

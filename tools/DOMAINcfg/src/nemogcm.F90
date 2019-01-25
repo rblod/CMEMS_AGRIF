@@ -99,7 +99,7 @@ CONTAINS
 
       ! check that all process are still there... If some process have an error,
       ! they will never enter in step and other processes will wait until the end of the cpu time!
-      IF( lk_mpp )   CALL mpp_max( nstop )
+      IF( lk_mpp )   CALL mpp_max( 'nemogcm',nstop )
 
       IF(lwp) WRITE(numout,cform_aaa)   ! Flag AAAAAAA
 
@@ -112,7 +112,6 @@ CONTAINS
          WRITE(numout,*) nstop, ' error have been found'
       ENDIF
       !
-      IF( nn_timing == 1 )   CALL timing_finalize
       !
       CALL nemo_closefile
       !
@@ -126,14 +125,13 @@ CONTAINS
       !!
       !! ** Purpose :   initialization of the NEMO GCM
       !!----------------------------------------------------------------------
-      INTEGER ::   ji            ! dummy loop indices
-      INTEGER ::   ilocal_comm   ! local integer
-      INTEGER ::   ios
-      CHARACTER(len=80), DIMENSION(16) ::   cltxt
-      !
-      NAMELIST/namctl/ ln_ctl  , nn_print, nn_ictls, nn_ictle,   &
-         &             nn_isplt, nn_jsplt, nn_jctls, nn_jctle,   &
-         &             nn_bench, nn_timing, nn_diacfl
+      INTEGER  ::   ji                 ! dummy loop indices
+      INTEGER  ::   ios, ilocal_comm   ! local integers
+      CHARACTER(len=120), DIMENSION(60) ::   cltxt, cltxt2, clnam
+       !
+     NAMELIST/namctl/ ln_ctl   , sn_cfctl, nn_print, nn_ictls, nn_ictle,   &
+         &             nn_isplt , nn_jsplt, nn_jctls, nn_jctle,             &
+         &             ln_timing, ln_diacfl
       NAMELIST/namcfg/ ln_e3_dep,                                &
          &             cp_cfg, cp_cfz, jp_cfg, jpidta, jpjdta, jpkdta, jpiglo, jpjglo, &
          &             jpizoom, jpjzoom, jperio, ln_use_jattr
@@ -151,7 +149,7 @@ CONTAINS
 
       REWIND( numnam_cfg )              ! Namelist namctl in confguration namelist : Control prints & Benchmark
       READ  ( numnam_cfg, namctl, IOSTAT = ios, ERR = 902 )
-902   IF( ios /= 0 ) CALL ctl_nam ( ios , 'namctl in configuration namelist', .TRUE. )
+      902   IF( ios /= 0 ) CALL ctl_nam ( ios , 'namctl in configuration namelist', .TRUE. )
 
       !
       REWIND( numnam_ref )              ! Namelist namcfg in reference namelist : Control prints & Benchmark
@@ -170,7 +168,6 @@ CONTAINS
       !                             !      on unit number numond on first proc   !
       !                             !--------------------------------------------!
       ! Nodes selection (control print return in cltxt)
-      ilocal_comm = 0
       narea = mynode( cltxt, 'output.namelist.dyn', numnam_ref, numnam_cfg, numond , nstop )
       narea = narea + 1                                     ! mynode return the rank of proc (0 --> jpnij -1 )
 
@@ -185,25 +182,7 @@ CONTAINS
          WRITE( numond, namcfg )
       ENDIF
 
-      ! If dimensions of processor grid weren't specified in the namelist file
-      ! then we calculate them here now that we have our communicator size
-      IF( jpni < 1 .OR. jpnj < 1 ) THEN
-         IF( Agrif_Root() )   CALL nemo_partition( mppsize )
-      ENDIF
-
-      ! Calculate domain dimensions given calculated jpni and jpnj
-      ! This used to be done in par_oce.F90 when they were parameters rather than variables
-      IF( Agrif_Root() ) THEN
-         jpi = ( jpiglo     -2*jpreci + (jpni-1) ) / jpni + 2*jpreci    ! first  dim.
-         jpj = ( jpjglo     -2*jprecj + (jpnj-1) ) / jpnj + 2*jprecj    ! second dim.
-      ENDIF         
-         jpk = jpkdta                                             ! third dim
-         jpim1 = jpi-1                                            ! inner domain indices
-         jpjm1 = jpj-1                                            !   "           "
-         jpkm1 = jpk-1                                            !   "           "
-         jpij  = jpi*jpj                                          !  jpi x j
-
-      IF(lwp) THEN                            ! open listing units
+        IF(lwp) THEN                            ! open listing units
          !
          CALL ctl_opn( numout, 'ocean.output', 'REPLACE', 'FORMATTED', 'SEQUENTIAL', -1, 6, .FALSE., narea )
          !
@@ -211,18 +190,55 @@ CONTAINS
          WRITE(numout,*) '   CNRS - NERC - Met OFFICE - MERCATOR-ocean - INGV - CMCC'
          WRITE(numout,*) '                       NEMO team'
          WRITE(numout,*) '            Ocean General Circulation Model'
-         WRITE(numout,*) '                  version 3.7  (2015) '
+         WRITE(numout,*) '                NEMO version 4.0  (2019) '
          WRITE(numout,*)
+         WRITE(numout,*) "           ._      ._      ._      ._      ._    "
+         WRITE(numout,*) "       _.-._)`\_.-._)`\_.-._)`\_.-._)`\_.-._)`\_ "
          WRITE(numout,*)
+         WRITE(numout,*) "           o         _,           _,             "
+         WRITE(numout,*) "            o      .' (        .-' /             "
+         WRITE(numout,*) "           o     _/..._'.    .'   /              "
+         WRITE(numout,*) "      (    o .-'`      ` '-./  _.'               "
+         WRITE(numout,*) "       )    ( o)           ;= <_         (       "
+         WRITE(numout,*) "      (      '-.,\\__ __.-;`\   '.        )      "
+         WRITE(numout,*) "       )  )       \) |`\ \)  '.   \      (   (   "
+         WRITE(numout,*) "      (  (           \_/       '-._\      )   )  "
+         WRITE(numout,*) "       )  )                        `     (   (   "
+         WRITE(numout,*) "     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ "
+         WRITE(numout,*)
+         
          DO ji = 1, SIZE(cltxt)
-            IF( TRIM(cltxt(ji)) /= '' )   WRITE(numout,*) cltxt(ji)      ! control print of mynode
+            IF( TRIM(cltxt (ji)) /= '' )   WRITE(numout,*) TRIM(cltxt(ji))    ! control print of mynode
          END DO
-         WRITE(numout,cform_aaa)                                         ! Flag AAAAAAA
+         WRITE(numout,*)
+         WRITE(numout,*)
+   !      DO ji = 1, SIZE(cltxt2)
+   !         IF( TRIM(cltxt2(ji)) /= '' )   WRITE(numout,*) TRIM(cltxt2(ji))   ! control print of domain size
+   !      END DO
+         !
+         WRITE(numout,cform_aaa)                                        ! Flag AAAAAAA
          !
       ENDIF
+      ! open /dev/null file to be able to supress output write easily
+   !   CALL ctl_opn( numnul, '/dev/null', 'REPLACE', 'FORMATTED', 'SEQUENTIAL', -1, 6, .FALSE. )
+      !
+      !                                      ! Domain decomposition
+      CALL mpp_init                          ! MPP
 
-      ! Now we know the dimensions of the grid and numout has been set we can
-      ! allocate arrays
+
+
+ !    IF( Agrif_Root() ) THEN
+ !        jpi = ( jpiglo     -2*jpreci + (jpni-1) ) / jpni + 2*jpreci    ! first  dim.
+ !        jpj = ( jpjglo     -2*jprecj + (jpnj-1) ) / jpnj + 2*jprecj    ! second dim.
+ !     ENDIF
+         jpk = jpkdta                                             ! third dim
+         jpim1 = jpi-1                                            ! inner domain indices
+         jpjm1 = jpj-1                                            !   "           "
+         jpkm1 = jpk-1                                            !   "           "
+         jpij  = jpi*jpj                                          !  jpi x j
+
+
+      ! Now we know the dimensions of the grid and numout has been set: we can allocate arrays
       CALL nemo_alloc()
 
       !                             !-------------------------------!
@@ -232,15 +248,9 @@ CONTAINS
       CALL nemo_ctl                          ! Control prints & Benchmark
 
       !                                      ! Domain decomposition
-      IF( jpni*jpnj == jpnij ) THEN   ;   CALL mpp_init      ! standard cutting out
-      ELSE                            ;   CALL mpp_init2     ! eliminate land processors
-      ENDIF
-      !
-      IF( nn_timing == 1 )  CALL timing_init
-      !
+        !
       !                                      ! General initialization
                             CALL     phy_cst    ! Physical constants
-                            CALL     eos_init   ! Equation of state
                             CALL     dom_cfg    ! Domain configuration
                             CALL     dom_init   ! Domain
       IF( ln_ctl        )   CALL prt_ctl_init   ! Print control
@@ -259,10 +269,21 @@ CONTAINS
       !
       IF(lwp) THEN                  ! control print
          WRITE(numout,*)
-         WRITE(numout,*) 'nemo_ctl: Control prints & Benchmark'
-         WRITE(numout,*) '~~~~~~~ '
+         WRITE(numout,*) 'nemo_ctl: Control prints'
+         WRITE(numout,*) '~~~~~~~~'
          WRITE(numout,*) '   Namelist namctl'
          WRITE(numout,*) '      run control (for debugging)     ln_ctl     = ', ln_ctl
+         WRITE(numout,*) '       finer control over o/p sn_cfctl%l_config  = ', sn_cfctl%l_config
+         WRITE(numout,*) '                              sn_cfctl%l_runstat = ', sn_cfctl%l_runstat
+         WRITE(numout,*) '                              sn_cfctl%l_trcstat = ', sn_cfctl%l_trcstat
+         WRITE(numout,*) '                              sn_cfctl%l_oceout  = ', sn_cfctl%l_oceout
+         WRITE(numout,*) '                              sn_cfctl%l_layout  = ', sn_cfctl%l_layout
+         WRITE(numout,*) '                              sn_cfctl%l_mppout  = ', sn_cfctl%l_mppout
+         WRITE(numout,*) '                              sn_cfctl%l_mpptop  = ', sn_cfctl%l_mpptop
+         WRITE(numout,*) '                              sn_cfctl%procmin   = ', sn_cfctl%procmin  
+         WRITE(numout,*) '                              sn_cfctl%procmax   = ', sn_cfctl%procmax  
+         WRITE(numout,*) '                              sn_cfctl%procincr  = ', sn_cfctl%procincr 
+         WRITE(numout,*) '                              sn_cfctl%ptimincr  = ', sn_cfctl%ptimincr 
          WRITE(numout,*) '      level of print                  nn_print   = ', nn_print
          WRITE(numout,*) '      Start i indice for SUM control  nn_ictls   = ', nn_ictls
          WRITE(numout,*) '      End i indice for SUM control    nn_ictle   = ', nn_ictle
@@ -270,8 +291,8 @@ CONTAINS
          WRITE(numout,*) '      End j indice for SUM control    nn_jctle   = ', nn_jctle
          WRITE(numout,*) '      number of proc. following i     nn_isplt   = ', nn_isplt
          WRITE(numout,*) '      number of proc. following j     nn_jsplt   = ', nn_jsplt
-         WRITE(numout,*) '      benchmark parameter (0/1)       nn_bench   = ', nn_bench
-         WRITE(numout,*) '      timing activated    (0/1)       nn_timing  = ', nn_timing
+         WRITE(numout,*) '      timing by routine               ln_timing  = ', ln_timing
+         WRITE(numout,*) '      CFL diagnostics                 ln_diacfl  = ', ln_diacfl
       ENDIF
       !
       nprint    = nn_print          ! convert DOCTOR namelist names into OLD names
@@ -281,35 +302,9 @@ CONTAINS
       njctle    = nn_jctle
       isplt     = nn_isplt
       jsplt     = nn_jsplt
-      nbench    = nn_bench
 
-      IF(lwp) THEN                  ! control print
-         WRITE(numout,*)
-         WRITE(numout,*) 'namcfg  : configuration initialization through namelist read'
-         WRITE(numout,*) '~~~~~~~ '
-         WRITE(numout,*) '   Namelist namcfg'
-         WRITE(numout,*) '      vertical scale factors =T: e3.=dk[depth]       ln_e3_dep = ', ln_e3_dep
-         WRITE(numout,*) '                             =F: old definition                 '
-         WRITE(numout,*) '      configuration name                               cp_cfg  = ', TRIM(cp_cfg)
-         WRITE(numout,*) '      configuration zoom name                          cp_cfz  = ', TRIM(cp_cfz)
-         WRITE(numout,*) '      configuration resolution                         jp_cfg  = ', jp_cfg
-         WRITE(numout,*) '      1st lateral dimension ( >= jpiglo )              jpidta  = ', jpidta
-         WRITE(numout,*) '      2nd    "         "    ( >= jpjglo )              jpjdta  = ', jpjdta
-         WRITE(numout,*) '      3nd    "         "                               jpkdta  = ', jpkdta
-         WRITE(numout,*) '      1st dimension of global domain in i              jpiglo  = ', jpiglo
-         WRITE(numout,*) '      2nd    -                  -    in j              jpjglo  = ', jpjglo
-         WRITE(numout,*) '      left bottom i index of the zoom (in data domain) jpizoom = ', jpizoom
-         WRITE(numout,*) '      left bottom j index of the zoom (in data domain) jpizoom = ', jpjzoom
-         WRITE(numout,*) '      lateral cond. type (between 0 and 6)             jperio  = ', jperio   
-         WRITE(numout,*) '      use file attribute if exists as i/p j-start ln_use_jattr = ', ln_use_jattr
-         !
-         IF(.NOT.ln_e3_dep ) THEN
-            WRITE(numout,cform_war)
-            WRITE(numout,*)
-            WRITE(numout,*) '      ===>>>>    Obsolescent definition of e3 scale factors is used'
-            WRITE(numout,*)
-         ENDIF
-      ENDIF
+     !  IF( .NOT.ln_read_cfg )   ln_closea = .false.   ! dealing possible only with a domcfg file
+      !
       !                             ! Parameter control
       !
       IF( ln_ctl ) THEN                 ! sub-domain area indices for the control prints
@@ -349,9 +344,13 @@ CONTAINS
          ENDIF
       ENDIF
       !
-      IF( 1_wp /= SIGN(1._wp,-0._wp)  )   CALL ctl_stop( 'nemo_ctl: The intrinsec SIGN function follows ',  &
-         &                                               'f2003 standard. '                              ,  &
-         &                                               'Compile with key_nosignedzero enabled' )
+!      IF( 1._wp /= SIGN(1._wp,-0._wp)  )   CALL ctl_stop( 'nemo_ctl: The intrinsec SIGN function follows f2003 standard.',  &
+!         &                                                'Compile with key_nosignedzero enabled:',   &
+!         &                                                '--> add -Dkey_nosignedzero to the definition of %CPP in your arch file' )
+      !
+#if defined key_agrif
+      IF( ln_timing )   CALL ctl_stop( 'AGRIF not implemented with ln_timing = true')
+#endif
       !
    END SUBROUTINE nemo_ctl
 
@@ -368,7 +367,6 @@ CONTAINS
       CALL iom_close                                 ! close all input/output files managed by iom_*
       !
       IF( numstp          /= -1 )   CLOSE( numstp          )   ! time-step file
-      IF( numsol          /= -1 )   CLOSE( numsol          )   ! solver file
       IF( numnam_ref      /= -1 )   CLOSE( numnam_ref      )   ! oce reference namelist
       IF( numnam_cfg      /= -1 )   CLOSE( numnam_cfg      )   ! oce configuration namelist
       IF( lwm.AND.numond  /= -1 )   CLOSE( numond          )   ! oce output namelist
@@ -402,7 +400,7 @@ CONTAINS
       ierr =        oce_alloc       ()          ! ocean
       ierr = ierr + dom_oce_alloc   ()          ! ocean domain
       !
-      IF( lk_mpp    )   CALL mpp_sum( ierr )
+      CALL mpp_sum( 'nemogcm', ierr )
       IF( ierr /= 0 )   CALL ctl_stop( 'STOP', 'nemo_alloc : unable to allocate standard ocean arrays' )
       !
    END SUBROUTINE nemo_alloc

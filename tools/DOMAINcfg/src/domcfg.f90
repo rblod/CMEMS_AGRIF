@@ -36,7 +36,7 @@ CONTAINS
       !!
       !!----------------------------------------------------------------------
       !
-      IF( nn_timing == 1 )  CALL timing_start('dom_cfg')
+    !  IF( nn_timing == 1 )  CALL timing_start('dom_cfg')
       !
       IF(lwp) THEN                   ! Control print
          WRITE(numout,*)
@@ -59,7 +59,7 @@ CONTAINS
       !
       CALL dom_glo                   ! global domain versus zoom and/or local domain
       !
-      IF( nn_timing == 1 )  CALL timing_stop('dom_cfg')
+    !  IF( nn_timing == 1 )  CALL timing_stop('dom_cfg')
       !
    END SUBROUTINE dom_cfg
 

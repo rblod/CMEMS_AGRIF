@@ -1,5 +1,5 @@
 SHELL = /bin/bash
-AGRIF=YES
+AGRIF=NO
 
 include make.inc
 
@@ -16,6 +16,9 @@ DIR_LIB=lib
 FILENAMES =$(notdir $(basename $(wildcard src/*.F90))) $(notdir $(basename $(wildcard src/*.F))) $(notdir $(basename $(wildcard src/*.c))) $(notdir $(basename $(wildcard src/*.f))) $(notdir $(basename $(wildcard src/*.f90)))
 FILES=src/*
 OBJS_CREATE_DOMCFG=$(addsuffix .o,$(addprefix $(DIR_OBJS)/,$(FILENAMES)))
+EXCLUDE=obj/agrif2model.o
+OBJS_CREATE_DOMCFG := $(filter-out $(EXCLUDE),$(OBJS_CREATE_DOMCFG))
+
 ifeq ($(AGRIF),YES)
 OBJS_AGRIF=obj/agrif2model.o
 else
@@ -30,8 +33,13 @@ all: depend conv prepagrif AGRIF_LIB $(OBJS_CREATE_DOMCFG) $(PROGS)
 		@echo
 
 
-make_domain_cfg.exe: $(DIR_LIB)/libdomcfg.a $(DIR_FILES)/nemogcm.f90 $(OBJS_CREATE_DOMCFG) $(OBJS_AGRIF)
+ifeq ($(AGRIF),YES)
+make_domain_cfg.exe: $(DIR_LIB)/libdomcfg.a $(DIR_FILES)/nemogcm.F90 $(OBJS_CREATE_DOMCFG) $(OBJS_AGRIF)
 		$(FC) $(LINKFLAGS) $(FFLAGS) -o $(PROGS) $(OBJS_AGRIF) $(DIR_LIB)/libdomcfg.a $(LIBS) -I$(DIR_OBJS) $(FFLAGS_SPEC) -I../../ext/AGRIF -L../../ext/AGRIF -lagrif
+else
+make_domain_cfg.exe: $(DIR_LIB)/libdomcfg.a $(DIR_FILES)/nemogcm.F90 $(OBJS_CREATE_DOMCFG) 
+		$(FC) $(LINKFLAGS) $(FFLAGS) -o $(PROGS)  $(DIR_LIB)/libdomcfg.a $(LIBS) -I$(DIR_OBJS) $(FFLAGS_SPEC)
+endif	
 
 ifeq ($(AGRIF),YES)
 prepagrif:
@@ -60,7 +68,7 @@ else
 prepagrif:
 		@echo
 		@echo ===================================================
-		@echo   Create working directories for AGRIF ...
+		@echo   Create working directories  ...
 		@echo ===================================================
 		mkdir -p obj
 		mkdir -p $(DIR_PPSRC_2)
@@ -85,10 +93,10 @@ $(DIR_LIB)/libdomcfg.a: $(OBJS_CREATE_DOMCFG)
 
 ifeq ($(AGRIF),YES)
 
-obj/agrif2model.o:src_agrif/agrif2model.F90 MODEL.CPP 
-		$(CPP) -I$(DIR_PPSRC)/AGRIF_INC -include MODEL.CPP $(CPPFLAGS) src_agrif/agrif2model.F90 > $(DIR_PPSRC_2)/$(*F).f90	
+obj/agrif2model.o:src/agrif2model.F90 MODEL.CPP 
+		$(CPP) -I$(DIR_PPSRC)/AGRIF_INC -include MODEL.CPP $(CPPFLAGS) src/agrif2model.F90 > $(DIR_PPSRC_2)/$(*F).f90	
 		$(FC) $(FFLAGS) -c $(DIR_PPSRC_2)/$(*F).f90 -o $(DIR_OBJS)/$(*F).o -I../../ext/AGRIF -I$(DIR_OBJS)  $(FFLAGS_SPEC)
-        
+
 $(DIR_OBJS)/%.o: $(DIR_FILES)/%.F90 make.inc MODEL.CPP 
 		$(CPP) -include MODEL.CPP $(CPPFLAGS) $(DIR_FILES)/$(*F).F90 > $(DIR_PPSRC)/$(*F).f90
 		cd NEMOFILES ; ./conv ./agrif_oce.in -rm \
@@ -105,9 +113,10 @@ $(DIR_OBJS)/%.o: $(DIR_FILES)/%.f90 make.inc MODEL.CPP
 		$(FC) $(FFLAGS) -c $(DIR_PPSRC_2)/$(*F).f90 -o $(DIR_OBJS)/$(*F).o -I../../ext/AGRIF -I$(DIR_OBJS)  $(FFLAGS_SPEC) 
 
 else
-$(DIR_OBJS)/%.o: $(DIR_FILES)/%.F make.inc MODEL.CPP
-		$(CPP) -include MODEL.CPP $(CPPFLAGS) $(DIR_FILES)/$(*F).F > $(DIR_PPSRC_2)/$(*F).f
-		$(FC) $(FFLAGS) $(F77FLG) -c $(DIR_PPSRC_2)/$(*F).f -o $(DIR_OBJS)/$(*F).o -I$(DIR_OBJS)  $(FFLAGS_SPEC) 
+
+$(DIR_OBJS)/%.o: $(DIR_FILES)/%.F90 make.inc MODEL.CPP
+		$(CPP) -include MODEL.CPP $(CPPFLAGS) $(DIR_FILES)/$(*F).F90 > $(DIR_PPSRC_2)/$(*F).f90
+		$(FC) $(FFLAGS) -c $(DIR_PPSRC_2)/$(*F).f90 -o $(DIR_OBJS)/$(*F).o -I$(DIR_OBJS)  $(FFLAGS_SPEC) 
 
 $(DIR_OBJS)/%.o: $(DIR_FILES)/%.f90 make.inc MODEL.CPP
 		$(FC) $(FFLAGS) -c $(DIR_FILES)/$(*F).f90 -o $(DIR_OBJS)/$(*F).o -I$(DIR_OBJS)  $(FFLAGS_SPEC) 

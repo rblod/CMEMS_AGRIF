@@ -11,7 +11,6 @@ MODULE step_oce
 
    USE daymod           ! calendar                         (day     routine)
 
-   USE eosbn2           ! equation of state                (eos_bn2 routine)
 
    USE prtctl           ! Print control                    (prt_ctl routine)
 
