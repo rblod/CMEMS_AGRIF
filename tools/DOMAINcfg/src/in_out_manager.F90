@@ -119,7 +119,7 @@ MODULE in_out_manager
       INTEGER :: ptimincr  = 1        !: timestep increment to output (time.step and run.stat)
    END TYPE sn_ctl
 
-   TYPE (sn_ctl) :: sn_cfctl     !: run control structure for selective output
+   TYPE(sn_ctl) :: sn_cfctl     !: run control structure for selective output
    LOGICAL ::   ln_timing        !: run control for timing
    LOGICAL ::   ln_diacfl        !: flag whether to create CFL diagnostics
    INTEGER ::   nn_print         !: level of print (0 no print)
