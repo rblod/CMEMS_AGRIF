@@ -1,5 +1,5 @@
 SHELL = /bin/bash
-AGRIF=NO
+AGRIF=YES
 
 include make.inc
 
@@ -15,15 +15,14 @@ DIR_LIB=lib
 
 FILENAMES =$(notdir $(basename $(wildcard src/*.F90))) $(notdir $(basename $(wildcard src/*.F))) $(notdir $(basename $(wildcard src/*.c))) $(notdir $(basename $(wildcard src/*.f))) $(notdir $(basename $(wildcard src/*.f90)))
 FILES=src/*
-OBJS_CREATE_DOMCFG=$(addsuffix .o,$(addprefix $(DIR_OBJS)/,$(FILENAMES)))
-EXCLUDE=obj/agrif2model.o
-OBJS_CREATE_DOMCFG := $(filter-out $(EXCLUDE),$(OBJS_CREATE_DOMCFG))
-
 ifeq ($(AGRIF),YES)
 OBJS_AGRIF=obj/agrif2model.o
 else
 OBJS_AGRIF=
 endif	
+
+OBJS_CREATE_DOMCFG=$(addsuffix .o,$(addprefix $(DIR_OBJS)/,$(FILENAMES)))
+OBJS_CREATE_DOMCFG := $(filter-out $(OBJS_AGRIF),$(OBJS_CREATE_DOMCFG))
 
 all: depend conv prepagrif AGRIF_LIB $(OBJS_CREATE_DOMCFG) $(PROGS)
 		@echo
@@ -34,7 +33,7 @@ all: depend conv prepagrif AGRIF_LIB $(OBJS_CREATE_DOMCFG) $(PROGS)
 
 
 ifeq ($(AGRIF),YES)
-make_domain_cfg.exe: $(DIR_LIB)/libdomcfg.a $(DIR_FILES)/nemogcm.F90 $(OBJS_CREATE_DOMCFG) $(OBJS_AGRIF)
+make_domain_cfg.exe: $(DIR_LIB)/libdomcfg.a $(DIR_FILES)/nemogcm.F90 $(OBJS_AGRIF) $(OBJS_CREATE_DOMCFG) 
 		$(FC) $(LINKFLAGS) $(FFLAGS) -o $(PROGS) $(OBJS_AGRIF) $(DIR_LIB)/libdomcfg.a $(LIBS) -I$(DIR_OBJS) $(FFLAGS_SPEC) -I../../ext/AGRIF -L../../ext/AGRIF -lagrif
 else
 make_domain_cfg.exe: $(DIR_LIB)/libdomcfg.a $(DIR_FILES)/nemogcm.F90 $(OBJS_CREATE_DOMCFG) 
@@ -56,6 +55,7 @@ prepagrif:
 		mkdir -p $(DIR_PPSRC)/AGRIF_INC
 		\cp ../../ext/AGRIF/conv $(DIR_PPSRC)
 		\cp ../../ext/AGRIF/agrif_oce.in $(DIR_PPSRC)
+		echo $(OBJS_CREATE_DOMCFG)
 		@echo
 
 conv:
@@ -93,7 +93,7 @@ $(DIR_LIB)/libdomcfg.a: $(OBJS_CREATE_DOMCFG)
 
 ifeq ($(AGRIF),YES)
 
-obj/agrif2model.o:src/agrif2model.F90 MODEL.CPP 
+$(OBJS_AGRIF):src/agrif2model.F90  $(OBJS_CREATE_DOMCFG) MODEL.CPP 
 		$(CPP) -I$(DIR_PPSRC)/AGRIF_INC -include MODEL.CPP $(CPPFLAGS) src/agrif2model.F90 > $(DIR_PPSRC_2)/$(*F).f90	
 		$(FC) $(FFLAGS) -c $(DIR_PPSRC_2)/$(*F).f90 -o $(DIR_OBJS)/$(*F).o -I../../ext/AGRIF -I$(DIR_OBJS)  $(FFLAGS_SPEC)
 

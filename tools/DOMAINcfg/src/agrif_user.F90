@@ -61,6 +61,7 @@ SUBROUTINE Agrif_get_proc_info( imin, imax, jmin, jmax )
       !!                 *** ROUTINE Agrif_get_proc_info ***
       !!----------------------------------------------------------------------
    USE par_oce
+   USE dom_oce 
    !!
    IMPLICIT NONE
    !
