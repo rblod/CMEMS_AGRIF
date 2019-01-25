@@ -624,38 +624,40 @@
    clname(1)   = 'DUMMY'   !  name of constituent - all tidal components must be set in namelist_cfg
 /
 !-----------------------------------------------------------------------
-&nambdy        !  unstructured open boundaries                          ("key_bdy")
+&nambdy        !  unstructured open boundaries                          (default: OFF)
 !-----------------------------------------------------------------------
-    nb_bdy         = 0                    !  number of open boundary sets
-    ln_coords_file = .true.               !  =T : read bdy coordinates from file
-    cn_coords_file = 'coordinates.bdy.nc' !  bdy coordinates files
-    ln_mask_file   = .false.              !  =T : read mask from file
-    cn_mask_file   = ''                   !  name of mask file (if ln_mask_file=.TRUE.)
-    cn_dyn2d       = 'none'               !
-    nn_dyn2d_dta   =  0                   !  = 0, bdy data are equal to the initial state
-                                          !  = 1, bdy data are read in 'bdydata   .nc' files
-                                          !  = 2, use tidal harmonic forcing data from files
-                                          !  = 3, use external data AND tidal harmonic forcing
-    cn_dyn3d      =  'none'               !
-    nn_dyn3d_dta  =  0                    !  = 0, bdy data are equal to the initial state
-                                          !  = 1, bdy data are read in 'bdydata   .nc' files
-    cn_tra        =  'none'               !
-    nn_tra_dta    =  0                    !  = 0, bdy data are equal to the initial state
-                                          !  = 1, bdy data are read in 'bdydata   .nc' files
-    cn_ice_lim      =  'none'             !
-    nn_ice_lim_dta  =  0                  !  = 0, bdy data are equal to the initial state
-                                          !  = 1, bdy data are read in 'bdydata   .nc' files
-    rn_ice_tem      = 270.                !  lim3 only: arbitrary temperature of incoming sea ice
-    rn_ice_sal      = 10.                 !  lim3 only:      --   salinity           --
-    rn_ice_age      = 30.                 !  lim3 only:      --   age                --
-
-    ln_tra_dmp    =.false.                !  open boudaries conditions for tracers
-    ln_dyn3d_dmp  =.false.                !  open boundary condition for baroclinic velocities
-    rn_time_dmp   =  1.                   ! Damping time scale in days
-    rn_time_dmp_out =  1.                 ! Outflow damping time scale
-    nn_rimwidth   = 10                    !  width of the relaxation zone
-    ln_vol        = .false.               !  total volume correction (see nn_volctl parameter)
-    nn_volctl     = 1                     !  = 0, the total water flux across open boundaries is zero
+   ln_bdy         = .false.   !  Use unstructured open boundaries
+   nb_bdy         = 0         !  number of open boundary sets
+   ln_coords_file = .true.    !  =T : read bdy coordinates from file
+      cn_coords_file = 'coordinates.bdy.nc'  !  bdy coordinates files
+   ln_mask_file   = .false.   !  =T : read mask from file
+      cn_mask_file = ''        !  name of mask file (if ln_mask_file=.TRUE.)
+   cn_dyn2d    = 'none'       !
+   nn_dyn2d_dta   =  0        !  = 0, bdy data are equal to the initial state
+      !                       !  = 1, bdy data are read in 'bdydata   .nc' files
+      !                       !  = 2, use tidal harmonic forcing data from files
+      !                       !  = 3, use external data AND tidal harmonic forcing
+   cn_dyn3d      =  'none'    !
+   nn_dyn3d_dta  =  0         !  = 0, bdy data are equal to the initial state
+   !                          !  = 1, bdy data are read in 'bdydata   .nc' files
+   cn_tra        =  'none'    !
+   nn_tra_dta    =  0         !  = 0, bdy data are equal to the initial state
+   !                          !  = 1, bdy data are read in 'bdydata   .nc' files
+   cn_ice        =  'none'    !
+   nn_ice_dta    =  0         !  = 0, bdy data are equal to the initial state
+   !                          !  = 1, bdy data are read in 'bdydata   .nc' files
+   rn_ice_tem    = 270.       !  si3 only: arbitrary temperature of incoming sea ice
+   rn_ice_sal    = 10.        !  si3 only:      --   salinity           --
+   rn_ice_age    = 30.        !  si3 only:      --   age                --
+   !
+   ln_tra_dmp    =.false.     !  open boudaries conditions for tracers
+   ln_dyn3d_dmp  =.false.     !  open boundary condition for baroclinic velocities
+   rn_time_dmp   =  1.        !  Damping time scale in days
+   rn_time_dmp_out = 1.        !  Outflow damping time scale
+   nn_rimwidth   = 10         !  width of the relaxation zone
+   ln_vol        = .false.    !  total volume correction (see nn_volctl parameter)
+   nn_volctl     =  1         !  = 0, the total water flux across open boundaries is zero
+   nb_jpk_bdy    = -1         ! number of levels in the bdy data (set < 0 if consistent with planned run)
 /
 !-----------------------------------------------------------------------
 &nambdy_dta    !  open boundaries - external data                       ("key_bdy")
@@ -1072,20 +1074,30 @@
 !!======================================================================
 !
 !-----------------------------------------------------------------------
-&nammpp        !   Massively Parallel Processing                        ("key_mpp_mpi)
+&nammpp        !   Massively Parallel Processing                        ("key_mpp_mpi")
 !-----------------------------------------------------------------------
    cn_mpi_send =  'I'      !  mpi send/recieve type   ='S', 'B', or 'I' for standard send,
-                           !  buffer blocking send or immediate non-blocking sends, resp.
+   !                       !  buffer blocking send or immediate non-blocking sends, resp.
    nn_buffer   =   0       !  size in bytes of exported buffer ('B' case), 0 no exportation
-   ln_nnogather=  .false.  !  activate code to avoid mpi_allgather use at the northfold
-   jpni        =   0       !  jpni   number of processors following i (set automatically if < 1)
-   jpnj        =   0       !  jpnj   number of processors following j (set automatically if < 1)
-   jpnij       =   0       !  jpnij  number of local domains (set automatically if < 1)
+   ln_nnogather =  .true.  !  activate code to avoid mpi_allgather use at the northfold
+   jpni        =   1       !  jpni   number of processors following i (set automatically if < 1)
+   jpnj        =   1       !  jpnj   number of processors following j (set automatically if < 1)
 /
 !-----------------------------------------------------------------------
-&namctl        !   Control prints & Benchmark
+&namctl        !   Control prints                                       (default: OFF)
 !-----------------------------------------------------------------------
-   ln_ctl      = .false.   !  trends control print (expensive!)
+   ln_ctl = .FALSE.                 ! Toggle all report printing on/off (T/F); Ignored if sn_cfctl%l_config is T
+     sn_cfctl%l_config = .TRUE.     ! IF .true. then control which reports are written with the following
+       sn_cfctl%l_runstat = .FALSE. ! switches and which areas produce reports with the proc integer settings.
+       sn_cfctl%l_trcstat = .FALSE. ! The default settings for the proc integers should ensure
+       sn_cfctl%l_oceout  = .FALSE. ! that  all areas report.
+       sn_cfctl%l_layout  = .FALSE. !
+       sn_cfctl%l_mppout  = .FALSE. !
+       sn_cfctl%l_mpptop  = .FALSE. !
+       sn_cfctl%procmin   = 0       ! Minimum area number for reporting [default:0]
+       sn_cfctl%procmax   = 1000000 ! Maximum area number for reporting [default:1000000]
+       sn_cfctl%procincr  = 1       ! Increment for optional subsetting of areas [default:1]
+       sn_cfctl%ptimincr  = 1       ! Timestep increment for writing time step progress info
    nn_print    =    0      !  level of print (0 no extra print)
    nn_ictls    =    0      !  start i indice of control sum (use to compare mono versus
    nn_ictle    =    0      !  end   i indice of control sum        multi processor runs
@@ -1093,10 +1105,8 @@
    nn_jctle    =    0      !  end   j indice of control
    nn_isplt    =    1      !  number of processors in i-direction
    nn_jsplt    =    1      !  number of processors in j-direction
-   nn_bench    =    0      !  Bench mode (1/0): CAUTION use zero except for bench
-                           !     (no physical validity of the results)
-   nn_timing   =    0      !  timing by routine activated (=1) creates timing.output file, or not (=0)
-   nn_diacfl   =    0      !  Write out CFL diagnostics (=1) in cfl_diagnostics.ascii, or not (=0)
+   ln_timing   = .false.   !  timing by routine write out in timing.output file
+   ln_diacfl   = .false.   !  CFL diagnostics write out in cfl_diagnostics.ascii
 /
 !-----------------------------------------------------------------------
 &namsto        ! Stochastic parametrization of EOS                      (default: NO)
