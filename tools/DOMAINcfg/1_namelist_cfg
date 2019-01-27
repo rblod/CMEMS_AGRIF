@@ -21,11 +21,11 @@
    !                       !      
    cp_cfg      =  "zoom"   !  name of the configuration
    jp_cfg      =       2   !  resolution of the configuration
-   jpidta      =     8   !  1st lateral dimension ( >= jpi )
-   jpjdta      =     8   !  2nd    "         "    ( >= jpj )
+   jpidta      =     98   !  1st lateral dimension ( >= jpi )
+   jpjdta      =     98   !  2nd    "         "    ( >= jpj )
    jpkdta      =      31   !  number of levels      ( >= jpk )
-   jpiglo      =     8   !  1st dimension of global domain --> i =jpidta
-   jpjglo      =     8   !  2nd    -                  -    --> j  =jpjdta
+   jpiglo      =     98   !  1st dimension of global domain --> i =jpidta
+   jpjglo      =     98   !  2nd    -                  -    --> j  =jpjdta
    jpizoom     =       1   !  left bottom (i,j) indices of the zoom
    jpjzoom     =       1   !  in data domain indices
    jperio      =       0   !  lateral cond. type (between 0 and 6)

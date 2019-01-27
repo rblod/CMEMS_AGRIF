@@ -34,9 +34,12 @@ SUBROUTINE Agrif_InitValues_cont
 use dom_oce
     integer :: irafx, irafy
     logical :: ln_perio
+    integer nx,ny
 
 irafx = agrif_irhox()
 irafy = agrif_irhoy()
+
+nx=nlci ; ny=nlcj
 
    !       IF(jperio /=1 .AND. jperio/=4 .AND. jperio/=6 ) THEN
    !          nx = (nbcellsx)+2*nbghostcellsfine+2
@@ -94,6 +97,7 @@ END SUBROUTINE Agrif_InitValues_cont
 
 subroutine agrif_declare_var()
 use par_oce
+use dom_oce
 use agrif_profiles
 
    IMPLICIT NONE
@@ -111,7 +115,8 @@ integer nbghostcellsfine_tot_x, nbghostcellsfine_tot_y
 !ind3 = nbghostcellsfine_tot_y + 1
 ind2 = 2 + nbghostcells
 ind3 = ind2
-nbghostcellsfine_tot_x=nbghostcells
+nbghostcellsfine_tot_x=nbghostcells+1
+nbghostcellsfine_tot_y=nbghostcells+1
 
 CALL agrif_declare_variable((/2,2/),(/ind2,ind3/),(/'x','y'/),(/1,1/),(/nx,ny/),glamt_id)
 
