@@ -91,6 +91,9 @@ nx=nlci ; ny=nlcj
          glamf(1,:)=glamf(nx-1,:)
          glamf(nx,:)=glamf(2,:)
        endif
+
+       call agrif_init_scales()
+
         
 END SUBROUTINE Agrif_InitValues_cont  
 
@@ -119,7 +122,6 @@ nbghostcellsfine_tot_x=nbghostcells+1
 nbghostcellsfine_tot_y=nbghostcells+1
 
 CALL agrif_declare_variable((/2,2/),(/ind2,ind3/),(/'x','y'/),(/1,1/),(/nx,ny/),glamt_id)
-
 CALL agrif_declare_variable((/1,2/),(/ind2-1,ind3/),(/'x','y'/),(/1,1/),(/nx,ny/),glamu_id)
 CALL agrif_declare_variable((/2,1/),(/ind2,ind3-1/),(/'x','y'/),(/1,1/),(/nx,ny/),glamv_id)
 CALL agrif_declare_variable((/1,1/),(/ind2-1,ind3-1/),(/'x','y'/),(/1,1/),(/nx,ny/),glamf_id)
@@ -128,6 +130,16 @@ CALL agrif_declare_variable((/2,2/),(/ind2,ind3/),(/'x','y'/),(/1,1/),(/nx,ny/),
 CALL agrif_declare_variable((/1,2/),(/ind2-1,ind3/),(/'x','y'/),(/1,1/),(/nx,ny/),gphiu_id)
 CALL agrif_declare_variable((/2,1/),(/ind2,ind3-1/),(/'x','y'/),(/1,1/),(/nx,ny/),gphiv_id)
 CALL agrif_declare_variable((/1,1/),(/ind2-1,ind3-1/),(/'x','y'/),(/1,1/),(/nx,ny/),gphif_id)
+
+CALL agrif_declare_variable((/2,2/),(/ind2,ind3/),(/'x','y'/),(/1,1/),(/nx,ny/),e1t_id)
+CALL agrif_declare_variable((/1,2/),(/ind2-1,ind3/),(/'x','y'/),(/1,1/),(/nx,ny/),e1u_id)
+CALL agrif_declare_variable((/2,1/),(/ind2,ind3-1/),(/'x','y'/),(/1,1/),(/nx,ny/),e1v_id)
+CALL agrif_declare_variable((/1,1/),(/ind2-1,ind3-1/),(/'x','y'/),(/1,1/),(/nx,ny/),e1f_id)
+
+CALL agrif_declare_variable((/2,2/),(/ind2,ind3/),(/'x','y'/),(/1,1/),(/nx,ny/),e2t_id)
+CALL agrif_declare_variable((/1,2/),(/ind2-1,ind3/),(/'x','y'/),(/1,1/),(/nx,ny/),e2u_id)
+CALL agrif_declare_variable((/2,1/),(/ind2,ind3-1/),(/'x','y'/),(/1,1/),(/nx,ny/),e2v_id)
+CALL agrif_declare_variable((/1,1/),(/ind2-1,ind3-1/),(/'x','y'/),(/1,1/),(/nx,ny/),e2f_id)
 
 CALL Agrif_Set_bcinterp(glamt_id,interp=AGRIF_linear)
 CALL Agrif_Set_interp(glamt_id,interp=AGRIF_linear)
@@ -161,6 +173,41 @@ CALL Agrif_Set_bcinterp(gphif_id,interp=AGRIF_linear)
 CALL Agrif_Set_interp(gphif_id,interp=AGRIF_linear)
 CALL Agrif_Set_bc( gphif_id, (/0,max(nbghostcellsfine_tot_x,nbghostcellsfine_tot_y)-1/) )
 
+!
+
+CALL Agrif_Set_bcinterp(e1t_id,interp=AGRIF_ppm)
+CALL Agrif_Set_interp(e1t_id,interp=AGRIF_ppm)
+CALL Agrif_Set_bc( e1t_id, (/0,max(nbghostcellsfine_tot_x,nbghostcellsfine_tot_y)-1/) )
+
+CALL Agrif_Set_bcinterp(e1u_id, interp1=Agrif_linear, interp2=AGRIF_ppm)
+CALL Agrif_Set_interp(e1u_id, interp1=Agrif_linear, interp2=AGRIF_ppm)
+CALL Agrif_Set_bc( e1u_id, (/0,max(nbghostcellsfine_tot_x,nbghostcellsfine_tot_y)-1/) )
+
+CALL Agrif_Set_bcinterp(e1v_id,interp1=AGRIF_ppm, interp2=Agrif_linear)
+CALL Agrif_Set_interp(e1v_id, interp1=AGRIF_ppm, interp2=Agrif_linear)
+CALL Agrif_Set_bc( e1v_id, (/0,max(nbghostcellsfine_tot_x,nbghostcellsfine_tot_y)-1/) )
+
+CALL Agrif_Set_bcinterp(e1f_id,interp=AGRIF_linear)
+CALL Agrif_Set_interp(e1f_id,interp=AGRIF_linear)
+CALL Agrif_Set_bc( e1f_id, (/0,max(nbghostcellsfine_tot_x,nbghostcellsfine_tot_y)-1/) )
+
+CALL Agrif_Set_bcinterp(e2t_id,interp=AGRIF_ppm)
+CALL Agrif_Set_interp(e2t_id,interp=AGRIF_ppm)
+CALL Agrif_Set_bc( e2t_id, (/0,max(nbghostcellsfine_tot_x,nbghostcellsfine_tot_y)-1/) )
+
+CALL Agrif_Set_bcinterp(e2u_id,interp1=Agrif_linear, interp2=AGRIF_ppm)
+CALL Agrif_Set_interp(e2u_id,interp1=Agrif_linear, interp2=AGRIF_ppm)
+CALL Agrif_Set_bc( e2u_id, (/0,max(nbghostcellsfine_tot_x,nbghostcellsfine_tot_y)-1/) )
+
+CALL Agrif_Set_bcinterp(e2v_id,interp1=AGRIF_ppm, interp2=Agrif_linear)
+CALL Agrif_Set_interp(e2v_id,interp1=AGRIF_ppm, interp2=Agrif_linear)
+CALL Agrif_Set_bc( e2v_id, (/0,max(nbghostcellsfine_tot_x,nbghostcellsfine_tot_y)-1/) )
+
+CALL Agrif_Set_bcinterp(e2f_id,interp=AGRIF_linear)
+CALL Agrif_Set_interp(e2f_id,interp=AGRIF_linear)
+CALL Agrif_Set_bc( e2f_id, (/0,max(nbghostcellsfine_tot_x,nbghostcellsfine_tot_y)-1/) )
+
+
 end subroutine agrif_declare_var
 
 
@@ -181,6 +228,26 @@ call Agrif_Init_variable(gphiv_id, procname = init_gphiv)
 call Agrif_Init_variable(gphif_id, procname = init_gphif)
 
 end subroutine agrif_init_lonlat
+
+subroutine agrif_init_scales()
+use agrif_profiles
+use agrif_util
+external :: init_e1t, init_e1u, init_e1v, init_e1f
+external :: init_e2t, init_e2u, init_e2v, init_e2f
+
+call Agrif_Init_variable(e1t_id, procname = init_e1t)
+call Agrif_Init_variable(e1u_id, procname = init_e1u)
+call Agrif_Init_variable(e1v_id, procname = init_e1v)
+call Agrif_Init_variable(e1f_id, procname = init_e1f)
+
+call Agrif_Init_variable(e2t_id, procname = init_e2t)
+call Agrif_Init_variable(e2u_id, procname = init_e2u)
+call Agrif_Init_variable(e2v_id, procname = init_e2v)
+call Agrif_Init_variable(e2f_id, procname = init_e2f)
+
+end subroutine agrif_init_scales
+
+
 
    SUBROUTINE init_glamt( ptab, i1, i2, j1, j2, before, nb,ndir)
    use dom_oce
@@ -383,6 +450,206 @@ end subroutine agrif_init_lonlat
       !
    END SUBROUTINE init_gphif
 
+
+   SUBROUTINE init_e1t( ptab, i1, i2, j1, j2, before, nb,ndir)
+   use dom_oce
+      !!----------------------------------------------------------------------
+      !!                  ***  ROUTINE interpsshn  ***
+      !!----------------------------------------------------------------------  
+      INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2
+      REAL, DIMENSION(i1:i2,j1:j2), INTENT(inout) ::   ptab
+      LOGICAL                         , INTENT(in   ) ::   before
+      INTEGER                         , INTENT(in   ) ::   nb , ndir
+      LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
+      !
+      !!----------------------------------------------------------------------  
+      !
+         western_side  = (nb == 1).AND.(ndir == 1)
+         eastern_side  = (nb == 1).AND.(ndir == 2)
+         southern_side = (nb == 2).AND.(ndir == 1)
+         northern_side = (nb == 2).AND.(ndir == 2)
+      IF( before) THEN
+         ptab(i1:i2,j1:j2) = e1t(i1:i2,j1:j2)
+      ELSE
+         e1t(i1:i2,j1:j2)=ptab/Agrif_rhoy()
+      ENDIF
+      !
+   END SUBROUTINE init_e1t
+
+   SUBROUTINE init_e1u( ptab, i1, i2, j1, j2, before, nb,ndir)
+   use dom_oce
+      !!----------------------------------------------------------------------
+      !!                  ***  ROUTINE interpsshn  ***
+      !!----------------------------------------------------------------------  
+      INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2
+      REAL, DIMENSION(i1:i2,j1:j2), INTENT(inout) ::   ptab
+      LOGICAL                         , INTENT(in   ) ::   before
+      INTEGER                         , INTENT(in   ) ::   nb , ndir
+      LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
+      !
+      !!----------------------------------------------------------------------  
+      !
+         western_side  = (nb == 1).AND.(ndir == 1)
+         eastern_side  = (nb == 1).AND.(ndir == 2)
+         southern_side = (nb == 2).AND.(ndir == 1)
+         northern_side = (nb == 2).AND.(ndir == 2)
+      IF( before) THEN
+         ptab(i1:i2,j1:j2) = e1u(i1:i2,j1:j2)
+      ELSE
+         e1u(i1:i2,j1:j2)=ptab/Agrif_rhoy()
+      ENDIF
+      !
+   END SUBROUTINE init_e1u
+
+   SUBROUTINE init_e1v( ptab, i1, i2, j1, j2, before, nb,ndir)
+   use dom_oce
+      !!----------------------------------------------------------------------
+      !!                  ***  ROUTINE interpsshn  ***
+      !!----------------------------------------------------------------------  
+      INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2
+      REAL, DIMENSION(i1:i2,j1:j2), INTENT(inout) ::   ptab
+      LOGICAL                         , INTENT(in   ) ::   before
+      INTEGER                         , INTENT(in   ) ::   nb , ndir
+      LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
+      !
+      !!----------------------------------------------------------------------  
+      !
+         western_side  = (nb == 1).AND.(ndir == 1)
+         eastern_side  = (nb == 1).AND.(ndir == 2)
+         southern_side = (nb == 2).AND.(ndir == 1)
+         northern_side = (nb == 2).AND.(ndir == 2)
+      IF( before) THEN
+         ptab(i1:i2,j1:j2) = e1v(i1:i2,j1:j2)
+      ELSE
+         e1v(i1:i2,j1:j2)=ptab/Agrif_rhoy()
+      ENDIF
+      !
+   END SUBROUTINE init_e1v
+
+   SUBROUTINE init_e1f( ptab, i1, i2, j1, j2, before, nb,ndir)
+   use dom_oce
+      !!----------------------------------------------------------------------
+      !!                  ***  ROUTINE interpsshn  ***
+      !!----------------------------------------------------------------------  
+      INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2
+      REAL, DIMENSION(i1:i2,j1:j2), INTENT(inout) ::   ptab
+      LOGICAL                         , INTENT(in   ) ::   before
+      INTEGER                         , INTENT(in   ) ::   nb , ndir
+      LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
+      !
+      !!----------------------------------------------------------------------  
+      !
+         western_side  = (nb == 1).AND.(ndir == 1)
+         eastern_side  = (nb == 1).AND.(ndir == 2)
+         southern_side = (nb == 2).AND.(ndir == 1)
+         northern_side = (nb == 2).AND.(ndir == 2)
+      IF( before) THEN
+         ptab(i1:i2,j1:j2) = e1f(i1:i2,j1:j2)
+      ELSE
+         e1f(i1:i2,j1:j2)=ptab/Agrif_rhoy()
+      ENDIF
+      !
+   END SUBROUTINE init_e1f
+
+  SUBROUTINE init_e2t( ptab, i1, i2, j1, j2, before, nb,ndir)
+   use dom_oce
+      !!----------------------------------------------------------------------
+      !!                  ***  ROUTINE interpsshn  ***
+      !!----------------------------------------------------------------------  
+      INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2
+      REAL, DIMENSION(i1:i2,j1:j2), INTENT(inout) ::   ptab
+      LOGICAL                         , INTENT(in   ) ::   before
+      INTEGER                         , INTENT(in   ) ::   nb , ndir
+      LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
+      !
+      !!----------------------------------------------------------------------  
+      !
+         western_side  = (nb == 1).AND.(ndir == 1)
+         eastern_side  = (nb == 1).AND.(ndir == 2)
+         southern_side = (nb == 2).AND.(ndir == 1)
+         northern_side = (nb == 2).AND.(ndir == 2)
+      IF( before) THEN
+         ptab(i1:i2,j1:j2) = e2t(i1:i2,j1:j2)
+      ELSE
+         e2t(i1:i2,j1:j2)=ptab/Agrif_rhoy()
+      ENDIF
+      !
+   END SUBROUTINE init_e2t
+
+   SUBROUTINE init_e2u( ptab, i1, i2, j1, j2, before, nb,ndir)
+   use dom_oce
+      !!----------------------------------------------------------------------
+      !!                  ***  ROUTINE interpsshn  ***
+      !!----------------------------------------------------------------------  
+      INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2
+      REAL, DIMENSION(i1:i2,j1:j2), INTENT(inout) ::   ptab
+      LOGICAL                         , INTENT(in   ) ::   before
+      INTEGER                         , INTENT(in   ) ::   nb , ndir
+      LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
+      !
+      !!----------------------------------------------------------------------  
+      !
+         western_side  = (nb == 1).AND.(ndir == 1)
+         eastern_side  = (nb == 1).AND.(ndir == 2)
+         southern_side = (nb == 2).AND.(ndir == 1)
+         northern_side = (nb == 2).AND.(ndir == 2)
+      IF( before) THEN
+         ptab(i1:i2,j1:j2) = e2u(i1:i2,j1:j2)
+      ELSE
+         e2u(i1:i2,j1:j2)=ptab/Agrif_rhoy()
+      ENDIF
+      !
+   END SUBROUTINE init_e2u
+
+   SUBROUTINE init_e2v( ptab, i1, i2, j1, j2, before, nb,ndir)
+   use dom_oce
+      !!----------------------------------------------------------------------
+      !!                  ***  ROUTINE interpsshn  ***
+      !!----------------------------------------------------------------------  
+      INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2
+      REAL, DIMENSION(i1:i2,j1:j2), INTENT(inout) ::   ptab
+      LOGICAL                         , INTENT(in   ) ::   before
+      INTEGER                         , INTENT(in   ) ::   nb , ndir
+      LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
+      !
+      !!----------------------------------------------------------------------  
+      !
+         western_side  = (nb == 1).AND.(ndir == 1)
+         eastern_side  = (nb == 1).AND.(ndir == 2)
+         southern_side = (nb == 2).AND.(ndir == 1)
+         northern_side = (nb == 2).AND.(ndir == 2)
+      IF( before) THEN
+         ptab(i1:i2,j1:j2) = e2v(i1:i2,j1:j2)
+      ELSE
+         e2v(i1:i2,j1:j2)=ptab/Agrif_rhoy()
+      ENDIF
+      !
+   END SUBROUTINE init_e2v
+
+   SUBROUTINE init_e2f( ptab, i1, i2, j1, j2, before, nb,ndir)
+   use dom_oce
+      !!----------------------------------------------------------------------
+      !!                  ***  ROUTINE interpsshn  ***
+      !!----------------------------------------------------------------------  
+      INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2
+      REAL, DIMENSION(i1:i2,j1:j2), INTENT(inout) ::   ptab
+      LOGICAL                         , INTENT(in   ) ::   before
+      INTEGER                         , INTENT(in   ) ::   nb , ndir
+      LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
+      !
+      !!----------------------------------------------------------------------  
+      !
+         western_side  = (nb == 1).AND.(ndir == 1)
+         eastern_side  = (nb == 1).AND.(ndir == 2)
+         southern_side = (nb == 2).AND.(ndir == 1)
+         northern_side = (nb == 2).AND.(ndir == 2)
+      IF( before) THEN
+         ptab(i1:i2,j1:j2) = e2f(i1:i2,j1:j2)
+      ELSE
+         e2f(i1:i2,j1:j2)=ptab/Agrif_rhoy()
+      ENDIF
+      !
+   END SUBROUTINE init_e2f
 
 
 SUBROUTINE agrif_nemo_init
