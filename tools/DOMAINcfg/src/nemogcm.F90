@@ -93,8 +93,7 @@ CONTAINS
       CALL nemo_init               !==  Initialisations  ==!
       !                            !-----------------------!
 
-#if defined key_agrif
-      CALL Agrif_Declare_Var      
+#if defined key_agrif    
       CALL Agrif_Regrid()
 #endif
 
@@ -226,7 +225,9 @@ CONTAINS
       !                                      ! Domain decomposition
       CALL mpp_init                          ! MPP
 
-
+#if defined key_agrif
+      CALL Agrif_Declare_Var
+#endif
 
  !    IF( Agrif_Root() ) THEN
  !        jpi = ( jpiglo     -2*jpreci + (jpni-1) ) / jpni + 2*jpreci    ! first  dim.

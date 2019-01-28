@@ -61,9 +61,6 @@ nx=nlci ; ny=nlcj
   WRITE(*,*)'Size of the High resolution grid: ',nx,' x ',ny
   WRITE(*,*) ' '
        
-       
-       call agrif_declare_var()
-       
        call agrif_init_lonlat()
        ln_perio=.FALSE. 
        if( jperio ==1 .OR. jperio==2 .OR. jperio==4) ln_perio=.TRUE.
