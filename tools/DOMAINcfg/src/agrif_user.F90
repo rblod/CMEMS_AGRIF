@@ -25,7 +25,7 @@ SUBROUTINE Agrif_InitValues
    CALL dom_nam
    CALL Agrif_InitValues_cont   
    print *,'JPI = ',jpi,nbcellsx
-  CALL cfg_write         ! create the configuration file
+   CALL cfg_write         ! create the configuration file
    
 END SUBROUTINE Agrif_InitValues
 
@@ -60,9 +60,6 @@ nx=nlci ; ny=nlcj
   WRITE(*,*) ' '
   WRITE(*,*)'Size of the High resolution grid: ',nx,' x ',ny
   WRITE(*,*) ' '
-       
-       
-       call agrif_declare_var()
        
        call agrif_init_lonlat()
        ln_perio=.FALSE. 
@@ -141,6 +138,8 @@ CALL agrif_declare_variable((/1,2/),(/ind2-1,ind3/),(/'x','y'/),(/1,1/),(/nx,ny/
 CALL agrif_declare_variable((/2,1/),(/ind2,ind3-1/),(/'x','y'/),(/1,1/),(/nx,ny/),e2v_id)
 CALL agrif_declare_variable((/1,1/),(/ind2-1,ind3-1/),(/'x','y'/),(/1,1/),(/nx,ny/),e2f_id)
 
+CALL agrif_declare_variable((/2,2/),(/ind2,ind3/),(/'x','y'/),(/1,1/),(/nx,ny/),bathy_id)
+
 CALL Agrif_Set_bcinterp(glamt_id,interp=AGRIF_linear)
 CALL Agrif_Set_interp(glamt_id,interp=AGRIF_linear)
 CALL Agrif_Set_bc( glamt_id, (/0,max(nbghostcellsfine_tot_x,nbghostcellsfine_tot_y)-1/) )
@@ -207,6 +206,9 @@ CALL Agrif_Set_bcinterp(e2f_id,interp=AGRIF_linear)
 CALL Agrif_Set_interp(e2f_id,interp=AGRIF_linear)
 CALL Agrif_Set_bc( e2f_id, (/0,max(nbghostcellsfine_tot_x,nbghostcellsfine_tot_y)-1/) )
 
+CALL Agrif_Set_bcinterp(bathy_id,interp=AGRIF_linear)
+CALL Agrif_Set_interp(bathy_id,interp=AGRIF_linear)
+CALL Agrif_Set_bc( bathy_id, (/0,max(nbghostcellsfine_tot_x,nbghostcellsfine_tot_y)-1/) )
 
 end subroutine agrif_declare_var
 

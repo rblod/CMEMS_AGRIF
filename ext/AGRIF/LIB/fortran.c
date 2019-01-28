@@ -11265,7 +11265,7 @@ YY_RULE_SETUP
 case 73:
 YY_RULE_SETUP
 #line 188 "fortran.lex"
-{ pos_cur_decl = setposcur()-5; return TOK_TYPEPAR; }
+{ pos_cur_decl = setposcur()-strlen(fortran_text); return TOK_TYPEPAR; }
 	YY_BREAK
 case 74:
 YY_RULE_SETUP

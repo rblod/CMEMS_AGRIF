@@ -6,4 +6,5 @@ integer :: e1t_id, e1u_id, e1v_id, e1f_id
 integer :: e2t_id, e2u_id, e2v_id, e2f_id
 
 
+integer :: bathy_id
 end module agrif_profiles
