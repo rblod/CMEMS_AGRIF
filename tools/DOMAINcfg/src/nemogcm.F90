@@ -253,7 +253,7 @@ CONTAINS
       !                                      ! General initialization
                             CALL     phy_cst    ! Physical constants
                             CALL     dom_cfg    ! Domain configuration
-      IF(Agrif_root ()   )          CALL     dom_init   ! Domain
+                            CALL     dom_init   ! Domain
       IF( ln_ctl        )   CALL prt_ctl_init   ! Print control
       !
    END SUBROUTINE nemo_init

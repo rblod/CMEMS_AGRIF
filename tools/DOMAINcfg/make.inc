@@ -1,5 +1,5 @@
 FC=mpif90
-FFLAGS=  -O0 -fdefault-real-8  -ffree-line-length-none -I$(NCDF_ROOT)/include -fbounds-check  -fbacktrace -g 
+FFLAGS=  -O0 -fdefault-real-8  -ffree-line-length-none -I$(NCDF_ROOT)/include -fbacktrace -g 
 FFLAGS_SPEC= -J$(DIR_OBJS) 
 #-fbounds-check  -fbacktrace -g -fcheck=all -Wall
 CPP=cpp
@@ -10,7 +10,7 @@ CPPFLAGS += $(CPPARCH)
 CC=mpicc
 CFLAGS = -Df2cFortran 
 
-NCDF_ROOT=/usr/local
+NCDF_ROOT=/usr
 INC_NETCDF = -I$(NCDF_ROOT)/include
 LIB_NETCDF= -L$(NCDF_ROOT)/lib/ -lnetcdf -lnetcdff
 

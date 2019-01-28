@@ -16,7 +16,7 @@ MODULE domzgr
    !!            3.3  ! 2010-11  (G. Madec) add mbk. arrays associated to the deepest ocean level
    !!            3.4  ! 2012-08  (J. Siddorn) added Siddorn and Furner stretching function
    !!            3.4  ! 2012-12  (R. Bourdalle-Badie and G. Reffray)  modify C1D case  
-   !!            3.6  ! 2014-11  (P. Mathiot and C. Harris) add ice shelf capabilitye  
+   !!            3.6  ! 2014-11  (P. Mathiot and C. Harris) add ice shelf capabilitye
    !!            3.?  ! 2015-11  (H. Liu) Modifications for Wetting/Drying
    !!----------------------------------------------------------------------
 
@@ -558,6 +558,9 @@ CONTAINS
             !
          ENDIF
          IF( ln_zps .OR. ln_sco )   THEN              ! zps or sco : read meter bathymetry
+#if defined key_agrif
+            if (agrif_root()) then
+#endif
             CALL iom_open ( 'bathy_meter.nc', inum ) 
             IF ( ln_isfcav ) THEN
                CALL iom_get  ( inum, jpdom_data, 'Bathymetry_isf', bathy, lrowattr=.false. )
@@ -565,6 +568,11 @@ CONTAINS
                CALL iom_get  ( inum, jpdom_data, 'Bathymetry'    , bathy, lrowattr=ln_use_jattr  )
             END IF
             CALL iom_close( inum )
+#if defined key_agrif
+            else
+              CALL agrif_create_bathy_meter()
+            endif
+#endif
             !                                                
             ! initialisation isf variables
             risfdep(:,:)=0._wp ; misfdep(:,:)=1             
