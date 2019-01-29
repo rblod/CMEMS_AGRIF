@@ -614,6 +614,8 @@
    rn_sponge_tra = 2880.   !  coefficient for tracer   sponge layer [m2/s]
    rn_sponge_dyn = 2880.   !  coefficient for dynamics sponge layer [m2/s]
    ln_chk_bathy  = .FALSE. !
+   npt_connect   = 2
+   npt_copy      = 2
 /
 !-----------------------------------------------------------------------
 &nam_tide      !   tide parameters                                      ("key_tide")
