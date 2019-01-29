@@ -446,7 +446,7 @@ subroutine Agrif_Interp_variable ( tabvarsindic, procname )
     type(Agrif_Variable), pointer   :: child_var        ! Variable on the parent grid
     type(Agrif_Variable), pointer   :: child_tmp        ! Temporary variable on the child grid
 !
-    print *,'OK1'
+
     if ( Agrif_Curgrid%level <= 0 ) return
 !
 
@@ -455,7 +455,6 @@ subroutine Agrif_Interp_variable ( tabvarsindic, procname )
         root_var   => child_var % root_var
 
 !
-    print *,'OK2'
     nbdim     = root_var % nbdim
     torestore = root_var % restore
 !
