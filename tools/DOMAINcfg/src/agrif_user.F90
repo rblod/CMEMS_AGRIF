@@ -21,10 +21,8 @@ SUBROUTINE Agrif_InitValues
  
    CALL nemo_init       !* Initializations of each fine grid
 
-   CALL agrif_nemo_init  ! specific namelist part if needed
    CALL dom_nam
    CALL Agrif_InitValues_cont   
-   print *,'JPI = ',jpi,nbcellsx
    CALL cfg_write         ! create the configuration file
    
 END SUBROUTINE Agrif_InitValues
@@ -99,12 +97,14 @@ subroutine agrif_declare_var()
 use par_oce
 use dom_oce
 use agrif_profiles
+use agrif_parameters
 
    IMPLICIT NONE
    
 integer :: ind1, ind2, ind3
 integer nx,ny
 integer nbghostcellsfine_tot_x, nbghostcellsfine_tot_y
+INTEGER :: irafx
 !!----------------------------------------------------------------------
 
    ! 1. Declaration of the type of variable which have to be interpolated
@@ -118,6 +118,10 @@ ind3 = ind2
 nbghostcellsfine_tot_x=nbghostcells+1
 nbghostcellsfine_tot_y=nbghostcells+1
 
+irafx = Agrif_irhox()
+
+CALL agrif_nemo_init  ! specific namelist part if needed
+
 CALL agrif_declare_variable((/2,2/),(/ind2,ind3/),(/'x','y'/),(/1,1/),(/nx,ny/),glamt_id)
 CALL agrif_declare_variable((/1,2/),(/ind2-1,ind3/),(/'x','y'/),(/1,1/),(/nx,ny/),glamu_id)
 CALL agrif_declare_variable((/2,1/),(/ind2,ind3-1/),(/'x','y'/),(/1,1/),(/nx,ny/),glamv_id)
@@ -127,6 +131,8 @@ CALL agrif_declare_variable((/2,2/),(/ind2,ind3/),(/'x','y'/),(/1,1/),(/nx,ny/),
 CALL agrif_declare_variable((/1,2/),(/ind2-1,ind3/),(/'x','y'/),(/1,1/),(/nx,ny/),gphiu_id)
 CALL agrif_declare_variable((/2,1/),(/ind2,ind3-1/),(/'x','y'/),(/1,1/),(/nx,ny/),gphiv_id)
 CALL agrif_declare_variable((/1,1/),(/ind2-1,ind3-1/),(/'x','y'/),(/1,1/),(/nx,ny/),gphif_id)
+
+! Horizontal scale factors
 
 CALL agrif_declare_variable((/2,2/),(/ind2,ind3/),(/'x','y'/),(/1,1/),(/nx,ny/),e1t_id)
 CALL agrif_declare_variable((/1,2/),(/ind2-1,ind3/),(/'x','y'/),(/1,1/),(/nx,ny/),e1u_id)
@@ -138,7 +144,21 @@ CALL agrif_declare_variable((/1,2/),(/ind2-1,ind3/),(/'x','y'/),(/1,1/),(/nx,ny/
 CALL agrif_declare_variable((/2,1/),(/ind2,ind3-1/),(/'x','y'/),(/1,1/),(/nx,ny/),e2v_id)
 CALL agrif_declare_variable((/1,1/),(/ind2-1,ind3-1/),(/'x','y'/),(/1,1/),(/nx,ny/),e2f_id)
 
+! Bathymetry
+
 CALL agrif_declare_variable((/2,2/),(/ind2,ind3/),(/'x','y'/),(/1,1/),(/nx,ny/),bathy_id)
+
+! Vertical scale factors
+CALL agrif_declare_variable((/2,2,0/),(/ind2,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nx,ny,jpk/),e3t_id)
+CALL agrif_declare_variable((/2,2,0/),(/ind2,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nx,ny,jpk/),e3t_copy_id)
+CALL agrif_declare_variable((/2,2,0/),(/ind2,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nx,ny,jpk+1/),e3t_connect_id)
+
+CALL agrif_declare_variable((/1,2,0/),(/ind2-1,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nx,ny,jpk/),e3u_id)
+CALL agrif_declare_variable((/2,1,0/),(/ind2,ind3-1,0/),(/'x','y','N'/),(/1,1,1/),(/nx,ny,jpk/),e3v_id)
+
+! Bottom level
+
+CALL agrif_declare_variable((/2,2/),(/ind2,ind3/),(/'x','y'/),(/1,1/),(/nx,ny/),bottom_level_id)
 
 CALL Agrif_Set_bcinterp(glamt_id,interp=AGRIF_linear)
 CALL Agrif_Set_interp(glamt_id,interp=AGRIF_linear)
@@ -209,6 +229,36 @@ CALL Agrif_Set_bc( e2f_id, (/0,max(nbghostcellsfine_tot_x,nbghostcellsfine_tot_y
 CALL Agrif_Set_bcinterp(bathy_id,interp=AGRIF_linear)
 CALL Agrif_Set_interp(bathy_id,interp=AGRIF_linear)
 CALL Agrif_Set_bc( bathy_id, (/0,max(nbghostcellsfine_tot_x,nbghostcellsfine_tot_y)-1/) )
+
+! Vertical scale factors
+CALL Agrif_Set_bcinterp(e3t_id,interp=AGRIF_ppm)
+CALL Agrif_Set_interp(e3t_id,interp=AGRIF_ppm)
+CALL Agrif_Set_bc( e3t_id, (/0,max(nbghostcellsfine_tot_x,nbghostcellsfine_tot_y)-1/) )
+CALL Agrif_Set_Updatetype( e3t_id, update = AGRIF_Update_Average)
+
+CALL Agrif_Set_bcinterp(e3t_copy_id,interp=AGRIF_constant)
+CALL Agrif_Set_interp(e3t_copy_id,interp=AGRIF_constant)
+CALL Agrif_Set_bc( e3t_copy_id, (/-npt_copy*irafx-1,max(nbghostcellsfine_tot_x,nbghostcellsfine_tot_y)-1/))
+
+CALL Agrif_Set_bcinterp(e3t_connect_id,interp=AGRIF_ppm)
+CALL Agrif_Set_interp(e3t_connect_id,interp=AGRIF_ppm)
+CALL Agrif_Set_bc( e3t_connect_id, (/-(npt_copy+npt_connect)*irafx-1,-npt_copy*irafx-2/))
+
+CALL Agrif_Set_bcinterp(e3u_id, interp1=Agrif_linear, interp2=AGRIF_ppm)
+CALL Agrif_Set_interp(e3u_id, interp1=Agrif_linear, interp2=AGRIF_ppm)
+CALL Agrif_Set_bc( e3u_id, (/0,max(nbghostcellsfine_tot_x,nbghostcellsfine_tot_y)-1/) )
+CALL Agrif_Set_Updatetype(e3u_id,update1 = Agrif_Update_Copy, update2 = Agrif_Update_Average)
+
+CALL Agrif_Set_bcinterp(e3v_id,interp1=AGRIF_ppm, interp2=Agrif_linear)
+CALL Agrif_Set_interp(e3v_id, interp1=AGRIF_ppm, interp2=Agrif_linear)
+CALL Agrif_Set_bc( e3v_id, (/0,max(nbghostcellsfine_tot_x,nbghostcellsfine_tot_y)-1/) )
+CALL Agrif_Set_Updatetype(e3v_id,update1 = Agrif_Update_Average, update2 = Agrif_Update_Copy)
+   
+! Bottom level
+CALL Agrif_Set_bcinterp(bottom_level_id,interp=AGRIF_constant)
+CALL Agrif_Set_interp(bottom_level_id,interp=AGRIF_constant)
+CALL Agrif_Set_bc( bottom_level_id, (/-npt_copy*irafx-1,max(nbghostcellsfine_tot_x,nbghostcellsfine_tot_y)-1/))
+CALL Agrif_Set_Updatetype( bottom_level_id, update = AGRIF_Update_Max)
 
 end subroutine agrif_declare_var
 
@@ -655,12 +705,36 @@ end subroutine agrif_init_scales
 
 
 SUBROUTINE agrif_nemo_init
+USE agrif_parameters
+USE in_out_manager
+USE lib_mpp
 
-   USE in_out_manager
-   USE lib_mpp
+   
    !!
    IMPLICIT NONE
+   
+   INTEGER ::   ios
+   
+   NAMELIST/namagrif/ nn_cln_update,ln_spc_dyn,rn_sponge_tra,rn_sponge_dyn,ln_chk_bathy,npt_connect, npt_copy
 
+      REWIND( numnam_ref )              ! Namelist namagrif in reference namelist : nesting parameters
+      READ  ( numnam_ref, namagrif, IOSTAT = ios, ERR = 901 )
+901   IF( ios /= 0 ) CALL ctl_nam ( ios , 'namagrif in reference namelist', lwp )
+
+      REWIND( numnam_cfg )              ! Namelist namzgr in configuration namelist : nesting parameters
+      READ  ( numnam_cfg, namagrif, IOSTAT = ios, ERR = 902 )
+902   IF( ios /= 0 ) CALL ctl_nam ( ios , 'namagrif in configuration namelist', lwp )
+      IF(lwm) WRITE ( numond, namagrif )
+
+      IF(lwp) THEN                     ! Control print
+         WRITE(numout,*)
+         WRITE(numout,*) 'agrif_nemo_init : nesting'
+         WRITE(numout,*) '~~~~~~~'
+         WRITE(numout,*) '   Namelist namagrif : set nesting parameters'
+         WRITE(numout,*) '      npt_copy     = ', npt_copy
+         WRITE(numout,*) '      npt_connect  = ', npt_connect
+      ENDIF
+      
 END SUBROUTINE agrif_nemo_init
    
 

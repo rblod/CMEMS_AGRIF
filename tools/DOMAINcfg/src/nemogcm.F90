@@ -61,6 +61,10 @@ MODULE nemogcm
    PUBLIC   nemo_alloc  ! needed by TAM
 
    CHARACTER(lc) ::   cform_aaa="( /, 'AAAAAAAA', / ) "     ! flag for output listing
+   
+#if defined key_agrif 
+   external agrif_boundary_connections, agrif_update_all, agrif_recompute_scalefactors
+#endif
 
    !!----------------------------------------------------------------------
    !! NEMO/OPA 3.7 , NEMO Consortium (2015)
@@ -95,6 +99,14 @@ CONTAINS
 
 #if defined key_agrif    
       CALL Agrif_Regrid()
+      
+      CALL Agrif_Step_Child(agrif_boundary_connections)
+      
+      CALL Agrif_Step_Child_adj(agrif_update_all)
+      
+      CALL Agrif_Step_Child(agrif_recompute_scalefactors)
+      
+      CALL Agrif_Step_Child(cfg_write)
 #endif
 
       ! check that all process are still there... If some process have an error,
@@ -225,10 +237,6 @@ CONTAINS
       !                                      ! Domain decomposition
       CALL mpp_init                          ! MPP
 
-#if defined key_agrif
-      CALL Agrif_Declare_Var
-#endif
-
  !    IF( Agrif_Root() ) THEN
  !        jpi = ( jpiglo     -2*jpreci + (jpni-1) ) / jpni + 2*jpreci    ! first  dim.
  !        jpj = ( jpjglo     -2*jprecj + (jpnj-1) ) / jpnj + 2*jprecj    ! second dim.
@@ -239,6 +247,9 @@ CONTAINS
          jpkm1 = jpk-1                                            !   "           "
          jpij  = jpi*jpj                                          !  jpi x j
 
+#if defined key_agrif
+      CALL Agrif_Declare_Var
+#endif
 
       ! Now we know the dimensions of the grid and numout has been set: we can allocate arrays
       CALL nemo_alloc()
