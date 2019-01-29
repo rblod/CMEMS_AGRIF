@@ -22,7 +22,6 @@ SUBROUTINE Agrif_InitValues
    CALL nemo_init       !* Initializations of each fine grid
 
    CALL dom_nam
-   CALL Agrif_InitValues_cont   
    CALL cfg_write         ! create the configuration file
    
 END SUBROUTINE Agrif_InitValues
