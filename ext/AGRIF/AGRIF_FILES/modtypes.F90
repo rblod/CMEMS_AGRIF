@@ -370,6 +370,7 @@ end type Agrif_Variables_List
     integer, parameter    :: Agrif_Update_Copy = 1              !< copy
     integer, parameter    :: Agrif_Update_Average = 2           !< average
     integer, parameter    :: Agrif_Update_Full_Weighting = 3    !< full-weighting
+    integer, parameter    :: Agrif_Update_Max = 4               !< Max
 !> @}
 !> \name Raffinement grid switches
 !> @{

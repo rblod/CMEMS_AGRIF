@@ -219,6 +219,71 @@ subroutine Agrif_basicupdate_average1d ( x, y, np, nc, s_parent, s_child, ds_par
 !---------------------------------------------------------------------------------------------------
 end subroutine Agrif_basicupdate_average1d
 !===================================================================================================
+
+!===================================================================================================
+!  subroutine Agrif_basicupdate_max1d
+!
+!> Carries out an update by taking the maximum on a parent grid (vector x)from its child grid (vector y).
+!---------------------------------------------------------------------------------------------------
+subroutine Agrif_basicupdate_max1d ( x, y, np, nc, s_parent, s_child, ds_parent, ds_child )
+!---------------------------------------------------------------------------------------------------
+    REAL, DIMENSION(np), intent(out)    :: x
+    REAL, DIMENSION(nc), intent(in)     :: y
+    INTEGER,             intent(in)     :: np,nc
+    REAL,                intent(in)     :: s_parent,  s_child
+    REAL,                intent(in)     :: ds_parent, ds_child
+!
+    INTEGER :: i, ii, locind_child_left, coeffraf
+    REAL    :: xpos, invcoeffraf
+    INTEGER :: nbnonnuls
+    INTEGER :: diffmod
+!
+    coeffraf = nint(ds_parent/ds_child)
+    invcoeffraf = 1./coeffraf
+!
+    if (coeffraf == 1) then
+        locind_child_left = 1 + nint((s_parent - s_child)/ds_child)
+        x(1:np) = y(locind_child_left:locind_child_left+np-1)
+        return
+    endif
+!
+    xpos = s_parent
+    x = -HUGE(1.0)
+!
+    diffmod = 0
+!
+    IF ( mod(coeffraf,2) == 0 ) diffmod = 1
+!
+    locind_child_left = 1 + agrif_int((xpos - s_child)/ds_child)
+!
+    IF (Agrif_UseSpecialValueInUpdate) THEN
+        do i = 1,np
+            nbnonnuls = 0
+!CDIR NOVECTOR
+            do ii = -coeffraf/2+locind_child_left+diffmod, &
+                     coeffraf/2+locind_child_left
+                IF (y(ii) /= Agrif_SpecialValueFineGrid) THEN
+                    x(i) = max(x(i),y(ii))
+                ENDIF
+            enddo
+            locind_child_left = locind_child_left + coeffraf
+        enddo
+    ELSE
+!
+!CDIR ALTCODE
+        do i = 1,np
+!CDIR NOVECTOR
+            do ii = -coeffraf/2+locind_child_left+diffmod, &
+                     coeffraf/2+locind_child_left
+                x(i) = max(x(i),y(ii))
+            enddo
+            locind_child_left = locind_child_left + coeffraf
+        enddo
+    ENDIF
+!---------------------------------------------------------------------------------------------------
+end subroutine Agrif_basicupdate_max1d
+!===================================================================================================
+
 !
 !===================================================================================================
 !  subroutine Average1dPrecompute

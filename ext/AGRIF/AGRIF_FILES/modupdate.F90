@@ -1356,7 +1356,7 @@ subroutine Agrif_Prtbounds ( nbdim, indmin, indmax, s_Parent_temp, s_Child_temp,
         positionmin = s_parent(i) + (indmin(i)-lb_parent(i))*ds_parent(i)
         IF ( do_update(i) ) THEN
             IF (posvar(i) == 1) THEN
-                IF      (type_update(i) == Agrif_Update_Average) THEN
+                IF ((type_update(i) == Agrif_Update_Average).OR.(type_update(i) == Agrif_Update_Max)) THEN
                     positionmin = positionmin - ds_parent(i)/2.
                 ELSE IF (type_update(i) == Agrif_Update_Full_Weighting) THEN
                     positionmin = positionmin - (ds_parent(i)-ds_child(i))
@@ -1382,7 +1382,7 @@ subroutine Agrif_Prtbounds ( nbdim, indmin, indmax, s_Parent_temp, s_Child_temp,
 
         IF ( do_update(i) ) THEN
             IF (posvar(i) == 1) THEN
-                IF      (type_update(i) == Agrif_Update_Average) THEN
+                IF ((type_update(i) == Agrif_Update_Average).OR.(type_update(i) == Agrif_Update_Max)) THEN
                     positionmax = positionmax  + ds_parent(i)/2.
                 ELSE IF (type_update(i) == Agrif_Update_Full_Weighting) THEN
                     positionmax = positionmax  + (ds_parent(i)-ds_child(i))
@@ -2008,6 +2008,13 @@ subroutine Agrif_UpdateBase ( type_update,              &
                      s_parent,  s_child,            &
                     ds_parent, ds_child )
 !
+    elseif ( type_update == Agrif_Update_Max ) then
+!
+        call Agrif_basicupdate_max1d(           &
+                    parent_tab, child_tab,          &
+                    np,         nc,                 &
+                     s_parent,  s_child,            &
+                    ds_parent, ds_child )
     elseif ( type_update == Agrif_Update_Full_Weighting ) then
 !
         call Agrif_basicupdate_full_weighting1D(    &

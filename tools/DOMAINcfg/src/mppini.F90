@@ -538,7 +538,6 @@ CONTAINS
       njmpp = ijmppt(ii,ij)
       jpi = nlci
       jpj = nlcj
-            print *,'ICI nlci = ',nlci,jpi
       jpk = jpkglo                                             ! third dim
 #if defined key_agrif
       ! simple trick to use same vertical grid as parent but different number of levels: 

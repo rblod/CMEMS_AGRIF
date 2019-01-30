@@ -130,6 +130,9 @@ CONTAINS
       !
       CASE ( 0 )                     !==  read in coordinate.nc file  ==!
          !
+#if defined key_agrif
+         IF (agrif_root()) THEN
+#endif
          IF(lwp) WRITE(numout,*)
          IF(lwp) WRITE(numout,*) '          curvilinear coordinate on the sphere read in "coordinate" file'
          !
@@ -142,6 +145,11 @@ CONTAINS
             e1e2u (:,:) = e1u(:,:) * e2u(:,:)   
             e1e2v (:,:) = e1v(:,:) * e2v(:,:) 
          ENDIF
+#if defined key_agrif
+         ELSE
+           CALL Agrif_InitValues_cont()
+         ENDIF
+#endif
          !
       CASE ( 1 )                     !==  geographical mesh on the sphere with regular (in degree) grid-spacing  ==!
          !
