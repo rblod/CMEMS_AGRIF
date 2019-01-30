@@ -44,6 +44,7 @@ MODULE domzgr
    USE lib_mpp           ! distributed memory computing library
    USE wrk_nemo          ! Memory allocation
    USE timing            ! Timing
+   USE dombat
 
    IMPLICIT NONE
    PRIVATE
@@ -58,7 +59,7 @@ MODULE domzgr
    REAL(wp) ::   rn_sbot_max       ! maximum depth of s-bottom surface (= ocean depth) (>0) (m)
    REAL(wp) ::   rn_rmax           ! maximum cut-off r-value allowed (0<rn_rmax<1)
    REAL(wp) ::   rn_hc             ! Critical depth for transition from sigma to stretched coordinates
-  INTEGER , PUBLIC ::   ntopo           !: = 0/1 ,compute/read the bathymetry file
+   INTEGER , PUBLIC ::   ntopo           !: = 0/1 ,compute/read the bathymetry file
    REAL(wp), PUBLIC ::   e3zps_min       !: miminum thickness for partial steps (meters)
    REAL(wp), PUBLIC ::   e3zps_rat       !: minimum thickness ration for partial steps
    INTEGER, PUBLIC ::   nperio            !: type of lateral boundary condition
@@ -520,7 +521,7 @@ CONTAINS
          DEALLOCATE( idta, zdta )
          !
          !                                            ! ================ !
-      ELSEIF( ntopo == 1 ) THEN                       !   read in file   ! (over the local domain)
+      ELSEIF( ntopo == 1 .OR. ntopo ==2 ) THEN                       !   read in file   ! (over the local domain)
          !                                            ! ================ !
          !
          IF( ln_zco )   THEN                          ! zco : read level bathymetry 
@@ -559,19 +560,27 @@ CONTAINS
          ENDIF
          IF( ln_zps .OR. ln_sco )   THEN              ! zps or sco : read meter bathymetry
 #if defined key_agrif
-            if (agrif_root()) then
+            IF (agrif_root()) THEN
 #endif
-            CALL iom_open ( 'bathy_meter.nc', inum ) 
-            IF ( ln_isfcav ) THEN
-               CALL iom_get  ( inum, jpdom_data, 'Bathymetry_isf', bathy, lrowattr=.false. )
+            IF( ntopo == 1) THEN
+               CALL iom_open ( 'bathy_meter.nc', inum ) 
+               IF ( ln_isfcav ) THEN
+                  CALL iom_get  ( inum, jpdom_data, 'Bathymetry_isf', bathy, lrowattr=.false. )
+               ELSE
+                  CALL iom_get  ( inum, jpdom_data, 'Bathymetry'    , bathy, lrowattr=ln_use_jattr  )
+               END IF
+               CALL iom_close( inum )
             ELSE
-               CALL iom_get  ( inum, jpdom_data, 'Bathymetry'    , bathy, lrowattr=ln_use_jattr  )
-            END IF
-            CALL iom_close( inum )
+               CALL dom_bat
+            ENDIF       
 #if defined key_agrif
-            else
-              CALL agrif_create_bathy_meter()
-            endif
+            ELSE
+               IF( ntopo == 1) THEN
+                  CALL agrif_create_bathy_meter()
+               ELSE 
+                  CALL dom_bat 
+               ENDIF    
+            ENDIF
 #endif
             !                                                
             ! initialisation isf variables

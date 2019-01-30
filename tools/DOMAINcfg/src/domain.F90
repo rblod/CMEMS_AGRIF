@@ -158,7 +158,8 @@ CONTAINS
          &             nn_it000, nn_itend , nn_date0    , nn_time0     , nn_leapy  , nn_istate ,     &
          &             nn_stock, nn_write , ln_mskland  , ln_clobber   , nn_chunksz, nn_euler  ,     &
          &             ln_cfmeta, ln_iscpl
-      NAMELIST/namdom/ nn_bathy, rn_bathy , rn_e3zps_min, rn_e3zps_rat, nn_msh, rn_hmin, rn_isfhmin, &
+      NAMELIST/namdom/ nn_bathy, cn_topo, cn_bath, cn_lon, cn_lat, nn_interp,                        &
+         &             rn_bathy , rn_e3zps_min, rn_e3zps_rat, nn_msh, rn_hmin, rn_isfhmin,           &
          &             rn_atfp , rn_rdt   , nn_closea   , ln_crs      , jphgr_msh ,                  &
          &             ppglam0, ppgphi0, ppe1_deg, ppe2_deg, ppe1_m, ppe2_m,                         &
          &             ppsur, ppa0, ppa1, ppkth, ppacr, ppdzmin, pphmax, ldbletanh,                  &
@@ -272,6 +273,9 @@ CONTAINS
          WRITE(numout,*)
          WRITE(numout,*) '   Namelist namdom : space & time domain'
          WRITE(numout,*) '      flag read/compute bathymetry      nn_bathy     = ', nn_bathy
+         IF( nn_bathy == 2 ) THEN
+            WRITE(numout,*) '      compute bathymetry from file      cn_topo      = ', cn_topo
+         ENDIF   
          WRITE(numout,*) '      Depth (if =0 bathy=jpkm1)         rn_bathy     = ', rn_bathy
          WRITE(numout,*) '      min depth of the ocean    (>0) or    rn_hmin   = ', rn_hmin
          WRITE(numout,*) '      min number of ocean level (<0)       '

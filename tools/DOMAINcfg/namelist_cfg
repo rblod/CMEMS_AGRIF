@@ -39,6 +39,14 @@
 !-----------------------------------------------------------------------
 &namdom        !   space and time domain (bathymetry, mesh, timestep)
 !-----------------------------------------------------------------------
+   nn_bathy    =    1      !  compute analyticaly (=0) or read (=1) the bathymetry file
+                           !  or compute (2) from external bathymetry
+   nn_interp   =    1                          ! type of interpolation (nn_bathy =2)                          
+   cn_topo     =  'bathymetry_ORCA12_V3.3.nc'  ! external topo file (nn_bathy =2)
+   cn_bath     =  'Bathymetry'                 ! topo name in file  (nn_bathy =2)
+   cn_lon      =  'nav_lon'                    ! lon  name in file  (nn_bathy =2)
+   cn_lat      =  'nav_lat'                    ! lat  name in file  (nn_bathy =2)
+   rn_bathy    =    0.     !  value of the bathymetry. if (=0) bottom flat at jpkm1
    jphgr_msh   =       0               !  type of horizontal mesh
    ppglam0     =  999999.0             !  longitude of first raw and column T-point (jphgr_msh = 1)
    ppgphi0     =  999999.0             ! latitude  of first raw and column T-point (jphgr_msh = 1)
