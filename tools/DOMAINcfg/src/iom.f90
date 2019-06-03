@@ -625,7 +625,7 @@ CONTAINS
    END SUBROUTINE iom_swap
 
 
-   SUBROUTINE iom_open( cdname, kiomid, ldwrt, kdom, ldstop, ldiof, kdlev )
+   SUBROUTINE iom_open( cdname, kiomid, ldwrt, kdom, lagrif, ldstop, ldiof, kdlev )
       !!---------------------------------------------------------------------
       !!                   ***  SUBROUTINE  iom_open  ***
       !!
@@ -636,6 +636,7 @@ CONTAINS
       LOGICAL         , INTENT(in   ), OPTIONAL ::   ldwrt    ! open in write modeb          (default = .FALSE.)
       INTEGER         , INTENT(in   ), OPTIONAL ::   kdom     ! Type of domain to be written (default = jpdom_local_noovlap)
       LOGICAL         , INTENT(in   ), OPTIONAL ::   ldstop   ! stop if open to read a non-existing file (default = .TRUE.)
+      LOGICAL         , INTENT(in   ), OPTIONAL ::   lagrif   ! add 1_ prefix for AGRIF (default = .TRUE.
       LOGICAL         , INTENT(in   ), OPTIONAL ::   ldiof    ! Interp On the Fly, needed for AGRIF (default = .FALSE.)
       INTEGER         , INTENT(in   ), OPTIONAL ::   kdlev    ! number of vertical levels
       !
@@ -649,6 +650,7 @@ CONTAINS
       LOGICAL               ::   llnoov    ! local definition to read overlap
       LOGICAL               ::   llstop    ! local definition of ldstop
       LOGICAL               ::   lliof     ! local definition of ldiof
+      LOGICAL               ::   llagrif   ! local definition of lagrif
       INTEGER               ::   icnt      ! counter for digits in clcpu (max = jpmax_digits)
       INTEGER               ::   iln, ils  ! lengths of character
       INTEGER               ::   idom      ! type of domain
@@ -681,6 +683,10 @@ CONTAINS
       IF( PRESENT(ldstop) ) THEN   ;   llstop = ldstop
       ELSE                         ;   llstop = .TRUE.
       ENDIF
+      ! do we add agrif suffix
+      IF( PRESENT(lagrif) ) THEN   ;   llagrif = lagrif
+      ELSE                         ;   llagrif = .TRUE.
+      ENDIF
       ! are we using interpolation on the fly?
       IF( PRESENT(ldiof) ) THEN   ;   lliof = ldiof
       ELSE                        ;   lliof = .FALSE.
@@ -691,7 +697,7 @@ CONTAINS
       ! create the file name by added, if needed, TRIM(Agrif_CFixed()) and TRIM(clsuffix)
       ! =============
       clname   = trim(cdname)
-      IF ( .NOT. Agrif_Root() .AND. .NOT. lliof ) THEN
+      IF ( .NOT. Agrif_Root() .AND. .NOT. lliof .AND. llagrif) THEN
          iln    = INDEX(clname,'/') 
          cltmpn = clname(1:iln)
          clname = clname(iln+1:LEN_TRIM(clname))
