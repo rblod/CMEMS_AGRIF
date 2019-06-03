@@ -1,0 +1,14 @@
+tools/DOMAINcfg/NEMOFILES/
+
+cfgs/AGRIF_TEST/
+
+ext/AGRIF/AGRIF_OBJS/
+
+tools/DOMAINcfg/ppsrc/
+*.o
+
+ext/AGRIF/LIB.old/
+
+*.mod
+
+ext/AGRIF/AGRIF_YOURFILES/
