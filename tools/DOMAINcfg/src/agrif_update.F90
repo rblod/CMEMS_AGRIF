@@ -5,7 +5,9 @@ USE agrif_profiles
 external update_bottom_level, update_e3t, update_e3u, update_e3v
 
 if (agrif_root()) return
+
 call agrif_update_variable(bottom_level_id,locupdate=(/npt_copy,0/),procname = update_bottom_level)
+
 
       Agrif_UseSpecialValueInUpdate = .TRUE.
       Agrif_SpecialValueFineGrid    = 0._wp
@@ -13,8 +15,6 @@ call agrif_update_variable(bottom_level_id,locupdate=(/npt_copy,0/),procname = u
 call agrif_update_variable(e3t_id,procname = update_e3t)
       Agrif_UseSpecialValueInUpdate = .FALSE.
 
-call agrif_update_variable(e3u_id,procname = update_e3u)
-call agrif_update_variable(e3v_id,procname = update_e3v)
 !call agrif_update_variable(e3u_id,procname = update_e3u)
 !call agrif_update_variable(e3v_id,procname = update_e3v)
       
@@ -70,7 +70,7 @@ end subroutine agrif_update_all
             DO jk=k1,k2
                DO jj=j1,j2
                   DO ji=i1,i2
-                   if (mbkt(ji,jj) < jk) then
+                   if (mbkt(ji,jj) <= jk) then
                      tabres(ji,jj,jk) = e3t_0(ji,jj,jk)
                    else
                      tabres(ji,jj,jk) = 0.
@@ -82,10 +82,10 @@ end subroutine agrif_update_all
             DO jk=k1,k2
                DO jj=j1,j2
                   DO ji=i1,i2
-                   if (mbkt(ji,jj) < jk) then
-                     e3t_0(ji,jj,jk) = e3t_1d(jk)
-                   else
+                   if (mbkt(ji,jj) <= jk) then
                      e3t_0(ji,jj,jk) = MAX(tabres(ji,jj,jk),MIN(e3zps_min,e3t_1d(jk)*e3zps_rat))
+                   else
+                     e3t_0(ji,jj,jk) = e3t_1d(jk)
                    endif
                   END DO
                END DO
@@ -114,7 +114,7 @@ end subroutine agrif_update_all
          DO jk = k1, k2
           do jj=j1,j2
           do ji=i1,i2
-           if (min(mbkt(ji,jj),mbkt(ji+1,jj))<jk) then
+           if (min(mbkt(ji,jj),mbkt(ji+1,jj))<=jk) then
             tabres(ji,jj,jk) = zrhoy * e2u(ji,jj) * MIN(e3zps_min,e3t_1d(jk)*e3zps_rat)
            else
             tabres(ji,jj,jk) = zrhoy * e2u(ji,jj) * e3u_0(ji,jj,jk)
@@ -126,10 +126,10 @@ end subroutine agrif_update_all
          DO jk=k1,k2
             DO jj=j1,j2
                DO ji=i1,i2
-                 if (min(mbkt(ji,jj),mbkt(ji+1,jj))<jk) then
-                   e3u_0(ji,jj,jk)=e3t_1d(jk)
+                 if (min(mbkt(ji,jj),mbkt(ji+1,jj))<=jk) then
+                   e3u_0(ji,jj,jk)=MAX(tabres(ji,jj,jk) / e2u(ji,jj),MIN(e3zps_min,e3t_1d(jk)*e3zps_rat))
                  else
-                   e3u_0(ji,jj,jk) = MAX(tabres(ji,jj,jk) / e2u(ji,jj),MIN(e3zps_min,e3t_1d(jk)*e3zps_rat))
+                   e3u_0(ji,jj,jk) = e3t_1d(jk)
                  endif
                END DO
             END DO
@@ -158,7 +158,7 @@ end subroutine agrif_update_all
          DO jk = k1, k2
           do jj=j1,j2
           do ji=i1,i2
-           if (min(mbkt(ji,jj),mbkt(ji,jj+1))<jk) then
+           if (min(mbkt(ji,jj),mbkt(ji,jj+1))<=jk) then
             tabres(ji,jj,jk) = zrhox * e1v(ji,jj) * MIN(e3zps_min,e3t_1d(jk)*e3zps_rat)
            else
             tabres(ji,jj,jk) = zrhox * e1v(ji,jj) * e3v_0(ji,jj,jk)
@@ -170,10 +170,10 @@ end subroutine agrif_update_all
          DO jk=k1,k2
             DO jj=j1,j2
                DO ji=i1,i2
-                 if (min(mbkt(ji,jj),mbkt(ji,jj+1))<jk) then
-                   e3v_0(ji,jj,jk)=e3t_1d(jk)
+                 if (min(mbkt(ji,jj),mbkt(ji,jj+1))<=jk) then
+                   e3v_0(ji,jj,jk)=MAX(tabres(ji,jj,jk) / e1v(ji,jj),MIN(e3zps_min,e3t_1d(jk)*e3zps_rat))
                  else
-                   e3v_0(ji,jj,jk) = MAX(tabres(ji,jj,jk) / e1v(ji,jj),MIN(e3zps_min,e3t_1d(jk)*e3zps_rat))
+                   e3v_0(ji,jj,jk) = e3t_1d(jk)
                  endif
                END DO
             END DO
