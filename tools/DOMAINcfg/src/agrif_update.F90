@@ -15,6 +15,8 @@ call agrif_update_variable(e3t_id,procname = update_e3t)
 
 call agrif_update_variable(e3u_id,procname = update_e3u)
 call agrif_update_variable(e3v_id,procname = update_e3v)
+!call agrif_update_variable(e3u_id,procname = update_e3u)
+!call agrif_update_variable(e3v_id,procname = update_e3v)
       
 end subroutine agrif_update_all
 
