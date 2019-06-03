@@ -597,7 +597,9 @@ CONTAINS
         END DO
 
       ENDIF
+#if defined key_mpp_mpi
       l_north_nogather = .TRUE.
+#endif
    END SUBROUTINE nemo_northcomms
 
 
