@@ -8,8 +8,8 @@ INTEGER :: ji,jj,jk,ikb,ikt
 
       ! Scale factors and depth at U-, V-, UW and VW-points
       DO jk = 1, jpk                        ! initialisation to z-scale factors
-!         e3u_0 (:,:,jk) = e3t_1d(jk)
-!         e3v_0 (:,:,jk) = e3t_1d(jk)
+         e3u_0 (:,:,jk) = e3t_1d(jk)
+         e3v_0 (:,:,jk) = e3t_1d(jk)
          e3uw_0(:,:,jk) = e3w_1d(jk)
          e3vw_0(:,:,jk) = e3w_1d(jk)
       END DO
@@ -17,8 +17,8 @@ INTEGER :: ji,jj,jk,ikb,ikt
       DO jk = 1,jpk                         ! Computed as the minimum of neighbooring scale factors
          DO jj = 1, jpjm1
             DO ji = 1, jpim1   ! vector opt.
-!               e3u_0 (ji,jj,jk) = MIN( e3t_0(ji,jj,jk), e3t_0(ji+1,jj,jk) )
-!               e3v_0 (ji,jj,jk) = MIN( e3t_0(ji,jj,jk), e3t_0(ji,jj+1,jk) )
+               e3u_0 (ji,jj,jk) = MIN( e3t_0(ji,jj,jk), e3t_0(ji+1,jj,jk) )
+               e3v_0 (ji,jj,jk) = MIN( e3t_0(ji,jj,jk), e3t_0(ji,jj+1,jk) )
                e3uw_0(ji,jj,jk) = MIN( e3w_0(ji,jj,jk), e3w_0(ji+1,jj,jk) )
                e3vw_0(ji,jj,jk) = MIN( e3w_0(ji,jj,jk), e3w_0(ji,jj+1,jk) )
             END DO
