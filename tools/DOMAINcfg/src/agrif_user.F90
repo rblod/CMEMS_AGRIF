@@ -119,6 +119,10 @@ nbghostcellsfine_tot_y=nbghostcells+1
 
 irafx = Agrif_irhox()
 
+if (agrif_root()) then
+   call agrif_set_periodicity(1, jpiglo - 2)
+endif
+
 CALL agrif_nemo_init  ! specific namelist part if needed
 
 CALL agrif_declare_variable((/2,2/),(/ind2,ind3/),(/'x','y'/),(/1,1/),(/nx,ny/),glamt_id)
@@ -241,7 +245,7 @@ CALL Agrif_Set_bc( e3t_copy_id, (/-npt_copy*irafx-1,max(nbghostcellsfine_tot_x,n
 
 CALL Agrif_Set_bcinterp(e3t_connect_id,interp=AGRIF_ppm)
 CALL Agrif_Set_interp(e3t_connect_id,interp=AGRIF_ppm)
-CALL Agrif_Set_bc( e3t_connect_id, (/-(npt_copy+npt_connect)*irafx-1,-npt_copy*irafx-2/))
+CALL Agrif_Set_bc( e3t_connect_id, (/-(npt_copy+npt_connect)*irafx-1,-npt_copy*irafx/))
 
 CALL Agrif_Set_bcinterp(e3u_id, interp1=Agrif_linear, interp2=AGRIF_ppm)
 CALL Agrif_Set_interp(e3u_id, interp1=Agrif_linear, interp2=AGRIF_ppm)
@@ -317,6 +321,7 @@ end subroutine agrif_init_scales
          eastern_side  = (nb == 1).AND.(ndir == 2)
          southern_side = (nb == 2).AND.(ndir == 1)
          northern_side = (nb == 2).AND.(ndir == 2)
+
       IF( before) THEN
          ptab(i1:i2,j1:j2) = glamt(i1:i2,j1:j2)
       ELSE
@@ -808,5 +813,4 @@ SUBROUTINE Agrif_estimate_parallel_cost(imin, imax,jmin, jmax, nbprocs, grid_cos
    grid_cost = REAL(imax-imin+1,wp)*REAL(jmax-jmin+1,wp) / REAL(nbprocs,wp)
    !
 END SUBROUTINE Agrif_estimate_parallel_cost
-
 #endif
