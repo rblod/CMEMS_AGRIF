@@ -55,7 +55,7 @@ subroutine Agrif_Childbounds ( nbdim,           &
                                proc_id,         &
                                coords,          &
                                lb_tab_true, ub_tab_true, memberin,  &
-                               indminglob3,indmaxglob3)
+                               indminglob3,indmaxglob3,check_perio)
 !---------------------------------------------------------------------------------------------------
     integer,                   intent(in)  :: nbdim         !< Number of dimensions
     integer, dimension(nbdim), intent(in)  :: lb_var        !< Local lower boundary on the current processor
@@ -68,9 +68,17 @@ subroutine Agrif_Childbounds ( nbdim,           &
     integer, dimension(nbdim), intent(out) :: lb_tab_true   !< Global value of lb_var on the current processor
     integer, dimension(nbdim), intent(out) :: ub_tab_true   !< Global value of ub_var on the current processor
     logical,                   intent(out) :: memberin
+    logical,optional,          intent(in)  :: check_perio   !< check for periodicity
+    logical :: check_perio_local
 !
     integer :: i, coord_i
     integer :: lb_glob_index, ub_glob_index ! Lower and upper global indices
+    
+    if (present(check_perio)) then
+       check_perio_local=check_perio
+    else
+       check_perio_local = .FALSE.
+    endif
 !
     do i = 1, nbdim
 !
@@ -79,17 +87,34 @@ subroutine Agrif_Childbounds ( nbdim,           &
 #if defined AGRIF_MPI
         call Agrif_InvLoc( lb_var(i), proc_id, coord_i, lb_glob_index )
         call Agrif_InvLoc( ub_var(i), proc_id, coord_i, ub_glob_index )
+        if (agrif_debug_interp) then
+        print *,'direction ',i,' lblogb ubglob = ',lb_glob_index,ub_glob_index
+        endif
+        if (check_perio_local .AND. agrif_curgrid%periodicity(i)) then
+          if (lb_tab(i)>=lb_glob_index) then
+          else if (lb_tab(i)<ub_glob_index-agrif_curgrid%periodicity_decal(i)) then
+            lb_glob_index = lb_glob_index - agrif_curgrid%periodicity_decal(i)
+            ub_glob_index = ub_glob_index - agrif_curgrid%periodicity_decal(i)
+          endif
+        endif
+        
         if (present(indminglob3)) then
           indminglob3(i)=lb_glob_index
           indmaxglob3(i)=ub_glob_index
         endif
 #else
         lb_glob_index = lb_var(i)
+        if (check_perio_local .AND. agrif_curgrid%periodicity(i)) then
+          lb_glob_index = lb_tab(i)
+        endif
         ub_glob_index = ub_var(i)
 #endif
         lb_tab_true(i) = max(lb_tab(i), lb_glob_index)
         ub_tab_true(i) = min(ub_tab(i), ub_glob_index)
-
+        if (agrif_debug_interp) then
+        print *,'childbounds = ',i,lb_tab(i),lb_glob_index,lb_tab_true(i), &
+        ub_tab(i),ub_glob_index,ub_tab_true(i)
+        endif
     enddo
 !
     memberin = .true.
@@ -99,6 +124,9 @@ subroutine Agrif_Childbounds ( nbdim,           &
             exit
         endif
     enddo
+    if (agrif_debug_interp) then
+    print *,'memberin = ',memberin
+    endif
 !---------------------------------------------------------------------------------------------------
 end subroutine Agrif_Childbounds
 !===================================================================================================
@@ -788,7 +816,7 @@ end subroutine Agrif_GetLocalBoundaries
 !> For a global index located on the current processor, tabarray gives the corresponding local index
 !---------------------------------------------------------------------------------------------------
 subroutine Agrif_GlobalToLocalBounds ( locbounds, lb_var, ub_var, lb_glob, ub_glob,    &
-                                       coords, nbdim, rank, member )
+                                       coords, nbdim, rank, member,check_perio )
 !---------------------------------------------------------------------------------------------------
     integer, dimension(nbdim,2,2), intent(out)   :: locbounds   !< Local values of \b lb_glob and \b ub_glob
     integer, dimension(nbdim),     intent(in)    :: lb_var      !< Local lower boundary on the current processor
@@ -799,9 +827,19 @@ subroutine Agrif_GlobalToLocalBounds ( locbounds, lb_var, ub_var, lb_glob, ub_gl
     integer,                       intent(in)    :: nbdim       !< Dimension of the array
     integer,                       intent(in)    :: rank        !< Rank of the processor
     logical,                       intent(out)   :: member
+    logical,optional,          intent(in)  :: check_perio   !< check for periodicity
+    logical :: check_perio_local
 !
-    integer     :: i, i1, k
+    integer     :: i, i1, k, idecal
     integer     :: nbloc(nbdim)
+    
+    if (present(check_perio)) then
+       check_perio_local=check_perio
+    else
+       check_perio_local = .FALSE.
+    endif
+!
+
 !
     locbounds(:,1,:) =  HUGE(1)
     locbounds(:,2,:) = -HUGE(1)
@@ -818,16 +856,22 @@ subroutine Agrif_GlobalToLocalBounds ( locbounds, lb_var, ub_var, lb_glob, ub_gl
        locbounds(i,2,2) = ub_glob(i)
      else
         call Agrif_InvLoc(lb_var(i), rank, coords(i), i1)
+        if ((i1>ub_glob(i)).AND.check_perio_local) then
+          idecal = agrif_curgrid%periodicity_decal(i)
+        else
+          idecal = 0
+        endif
 !
         do k = lb_glob(i)+lb_var(i)-i1,ub_glob(i)+lb_var(i)-i1
 !
-            if ( (k >= lb_var(i)) .AND. (k <= ub_var(i)) ) then
+            if ( (k + idecal >= lb_var(i)) .AND. (k + idecal <= ub_var(i)) ) then
+!            if ((k<=ub_var(i)).AND.((k>=lb_var(i).OR.check_perio_local))) then
                 nbloc(i) = 1
                 locbounds(i,1,1) = min(locbounds(i,1,1),k-lb_var(i)+i1)
                 locbounds(i,2,1) = max(locbounds(i,2,1),k-lb_var(i)+i1)
 
-                locbounds(i,1,2) = min(locbounds(i,1,2),k)
-                locbounds(i,2,2) = max(locbounds(i,2,2),k)
+                locbounds(i,1,2) = min(locbounds(i,1,2),k + idecal)
+                locbounds(i,2,2) = max(locbounds(i,2,2),k + idecal)
             endif
         enddo
      endif

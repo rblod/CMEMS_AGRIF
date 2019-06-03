@@ -422,6 +422,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
     integer,dimension(nbdim)     :: type_update_temp
     logical :: memberin, member
     integer :: nbin, ndirin
+    integer :: i
 !
 #if defined AGRIF_MPI
 !
@@ -429,7 +430,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
     logical, dimension(0:Agrif_Nbprocs-1) :: sendtoproc1,recvfromproc1
     logical, dimension(0:Agrif_Nbprocs-1) :: sendtoproc2,recvfromproc2
     integer                               :: code, local_proc
-    integer                               :: i,j,k
+    integer                               :: j,k
     integer, dimension(nbdim,4)           :: tab3
     integer, dimension(nbdim,4,0:Agrif_Nbprocs-1) :: tab4
     integer, dimension(nbdim,0:Agrif_Nbprocs-1,8) :: tab4t
@@ -449,6 +450,12 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
     logical :: compute_average
     real :: coeff_multi
     integer :: nb_dimensions
+    
+! CHUNK (periodicity)
+
+    INTEGER :: nb_chunks
+    INTEGER, DIMENSION(2,nbdim,2,2) :: parentarray_chunk
+    
 !
 !   Get local lower and upper bound of the child variable
     call Agrif_get_var_bounds_array(child, lowerbound, upperbound, nbdim)
@@ -458,8 +465,23 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
 !
     coords = child % root_var % coords
 !
+
     call Agrif_Childbounds( nbdim, lowerbound, upperbound, pttab, petab, Agrif_Procrank,    &
                             coords, pttruetab, cetruetab, memberin )
+                            
+        if (agrif_debug_update) then
+        print *,'************CHILDBOUNDS*********************************'
+#ifdef AGRIF_MPI
+         print *,'Processeur ',Agrif_Procrank
+#endif
+        print *,'memberin ',memberin
+        do i = 1 , nbdim
+        print *,'Direction ',i,' indices debut: ',pttab(i),pttruetab(i)
+        print *,'Direction ',i,' indices fin  : ',petab(i),cetruetab(i)
+        enddo
+        print *,'*********************************************'
+        endif
+        
     call Agrif_Prtbounds( nbdim, indminglob, indmaxglob, s_Parent_temp, s_Child_temp,       &
                          s_child, ds_child, s_parent, ds_parent,                            &
                          pttab, petab, lb_child, lb_parent                                  &
@@ -467,6 +489,23 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
                        , posvar, type_update, do_update, pttruetabwhole, cetruetabwhole     &
 #endif
             )
+            
+        if (agrif_debug_update) then
+        print *,'************PRTBOUNDS*********************************'
+#ifdef AGRIF_MPI
+         print *,'Processeur ',Agrif_Procrank
+#endif
+        do i = 1 , nbdim
+        print *,'Direction ',i,' indminglob : ',indminglob(i)
+        print *,'Direction ',i,' indmaxglob : ',indmaxglob(i)
+        enddo
+        
+        do i = 1 , nbdim
+        print *,'Direction ',i,' s_Parent_temp : ',s_Parent_temp(i)
+        print *,'Direction ',i,' s_Child_temp  : ',s_Child_temp(i)
+        enddo
+        print *,'*********************************************'
+        endif
 
 #if defined AGRIF_MPI
 !
@@ -475,6 +514,19 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
                                        pttruetab,cetruetab, coords,         &
                                        nbdim, Agrif_Procrank, member)
     ENDIF
+    
+        if (agrif_debug_update) then
+        print *,'************GlobalToLocalBounds******************'
+#ifdef AGRIF_MPI
+         print *,'Processeur ',Agrif_Procrank
+#endif
+        do i = 1 , nbdim
+        print *,'Direction ',i,' childarray global : ',childarray(i,1,1),childarray(i,2,1)
+        print *,'Direction ',i,' childarray local  : ',childarray(i,1,2),childarray(i,2,2)
+        enddo
+        
+        print *,'*********************************************'
+        endif
 
     call Agrif_Prtbounds(nbdim, indmin, indmax,                     &
                          s_Parent_temp, s_Child_temp,               &
@@ -482,6 +534,23 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
                          pttruetab, cetruetab, lb_child, lb_parent, &
                          posvar, type_update, do_update,            &
                          pttruetabwhole, cetruetabwhole)
+                         
+        if (agrif_debug_update) then
+        print *,'************PRTBOUNDS II *********************************'
+#ifdef AGRIF_MPI
+         print *,'Processeur ',Agrif_Procrank
+#endif
+        do i = 1 , nbdim
+        print *,'Direction ',i,' indmin : ',indmin(i)
+        print *,'Direction ',i,' indmax : ',indmax(i)
+        enddo
+        
+        do i = 1 , nbdim
+        print *,'Direction ',i,' s_Parent_temp : ',s_Parent_temp(i)
+        print *,'Direction ',i,' s_Child_temp  : ',s_Child_temp(i)
+        enddo
+        print *,'*********************************************'
+        endif
 !
 #else
     indmin = indminglob
@@ -1120,15 +1189,42 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
     local_proc = Agrif_Procrank
     call Agrif_get_var_bounds_array(parent,lowerbound,upperbound,nbdim)
     call Agrif_ChildGrid_to_ParentGrid()
+
     call Agrif_Childbounds(nbdim, lowerbound, upperbound,                   &
                            indminglob,  indmaxglob,  local_proc, coords,    &
-                           indminglob2, indmaxglob2, member)
+                           indminglob2, indmaxglob2, member,check_perio=.TRUE.)
+                           
+        if (agrif_debug_update) then
+        print *,'************CHILDBOUNDS PARENT*********************************'
+#ifdef AGRIF_MPI
+         print *,'Processeur ',Agrif_Procrank
+#endif
+        print *,'member ',member
+        do i = 1 , nbdim
+        print *,'Direction ',i,' indminglob2 : ',indminglob2(i)
+        print *,'Direction ',i,' indmaxglob2 : ',indmaxglob2(i)
+        enddo
+        print *,'*********************************************'
+        endif
 !
     IF (member) THEN
         call Agrif_GlobalToLocalBounds(parentarray, lowerbound, upperbound, &
                                        indminglob2, indmaxglob2, coords,    &
-                                       nbdim, local_proc, member)
+                                       nbdim, local_proc, member,check_perio=.TRUE.)
     ENDIF
+    
+        if (agrif_debug_update) then
+        print *,'************GlobalToLocalBounds II******************'
+#ifdef AGRIF_MPI
+         print *,'Processeur ',Agrif_Procrank
+#endif
+        do i = 1 , nbdim
+        print *,'Direction ',i,' parentarray global : ',parentarray(i,1,1),parentarray(i,2,1)
+        print *,'Direction ',i,' parentarray local  : ',parentarray(i,1,2),parentarray(i,2,2)
+        enddo
+        
+        print *,'*********************************************'
+        endif
 
     call Agrif_ParentGrid_to_ChildGrid()
 
@@ -1233,7 +1329,40 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
 !
     IF (member) THEN
 
+        nb_chunks=1
+        do i=1,2
+          parentarray_chunk(i,:,:,:) = parentarray
+        enddo
+        
+        do i=1,nbdim
+          if (agrif_curgrid%parent%periodicity(i)) then
+            if (parentarray(i,1,2) < 1) then
+              if (parentarray(i,2,2) > 0) then
+                print *,'CHUNK IS REQUIRED IN DIRECTION: ',i,parentarray(i,1,2)
+                nb_chunks=nb_chunks+1
+                parentarray_chunk(1,i,1,2)=parentarray(i,1,2)+agrif_curgrid%parent%periodicity_decal(i)
+                parentarray_chunk(1,i,2,2)=1+agrif_curgrid%parent%periodicity_decal(i)
+                parentarray_chunk(2,i,1,2)=2
+                parentarray_chunk(2,i,2,2)=parentarray(i,2,2)
+                parentarray_chunk(1,i,1,1)=parentarray(i,1,1)
+                parentarray_chunk(1,i,2,1)=parentarray(i,1,1)-parentarray(i,1,2)+1
+                parentarray_chunk(2,i,1,1)=parentarray(i,1,1)-parentarray(i,1,2)+2
+                parentarray_chunk(2,i,2,1)=parentarray(i,2,1)
+              else
+                print *,'CHUNK IS NOT REQUIRED WE JUST TRANSLATE according to periodicity'
+                parentarray_chunk(1,i,1,2)=parentarray(i,1,2)+agrif_curgrid%parent%periodicity_decal(i)
+                parentarray_chunk(1,i,2,2)=parentarray(i,2,2)+agrif_curgrid%parent%periodicity_decal(i)
+                parentarray_chunk(1,i,1,1)=parentarray(i,1,1)
+                parentarray_chunk(1,i,2,1)=parentarray(i,2,1)
+              endif
+            endif
+          endif
+        enddo
+        
         call Agrif_ChildGrid_to_ParentGrid()
+        
+        
+        do i=1,nb_chunks
 !
         SELECT CASE(nbdim)
         CASE(1)
@@ -1241,19 +1370,33 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
                     parentarray(1,1,1):parentarray(1,2,1)), &
                     parentarray(1,1,2),parentarray(1,2,2),.FALSE.,nbin,ndirin)
         CASE(2)
-            call procname( tempPextend % array2(            &
-                    parentarray(1,1,1):parentarray(1,2,1),  &
-                    parentarray(2,1,1):parentarray(2,2,1)), &
-                    parentarray(1,1,2),parentarray(1,2,2),  &
-                    parentarray(2,1,2),parentarray(2,2,2),.FALSE.,nbin,ndirin)
+            ! call procname( tempPextend % array2(            &
+                    ! parentarray(1,1,1):parentarray(1,2,1),  &
+                    ! parentarray(2,1,1):parentarray(2,2,1)), &
+                    ! parentarray(1,1,2),parentarray(1,2,2),  &
+                    ! parentarray(2,1,2),parentarray(2,2,2),.FALSE.,nbin,ndirin)
+                    
+            call procname(tempPextend%array2(parentarray_chunk(i,1,1,1):parentarray_chunk(i,1,2,1), & 
+                      parentarray_chunk(i,2,1,1):parentarray_chunk(i,2,2,1)),         &
+                      parentarray_chunk(i,1,1,2),parentarray_chunk(i,1,2,2),    &
+                      parentarray_chunk(i,2,1,2),parentarray_chunk(i,2,2,2),.FALSE.,nbin,ndirin)
+                      
         CASE(3)
-            call procname( tempPextend % array3(            &
-                    parentarray(1,1,1):parentarray(1,2,1),  &
-                    parentarray(2,1,1):parentarray(2,2,1),  &
-                    parentarray(3,1,1):parentarray(3,2,1)), &
-                    parentarray(1,1,2),parentarray(1,2,2),  &
-                    parentarray(2,1,2),parentarray(2,2,2),  &
-                    parentarray(3,1,2),parentarray(3,2,2),.FALSE.,nbin,ndirin)
+            ! call procname( tempPextend % array3(            &
+                    ! parentarray(1,1,1):parentarray(1,2,1),  &
+                    ! parentarray(2,1,1):parentarray(2,2,1),  &
+                    ! parentarray(3,1,1):parentarray(3,2,1)), &
+                    ! parentarray(1,1,2),parentarray(1,2,2),  &
+                    ! parentarray(2,1,2),parentarray(2,2,2),  &
+                    ! parentarray(3,1,2),parentarray(3,2,2),.FALSE.,nbin,ndirin)
+                    
+            call procname(tempPextend%array3(parentarray_chunk(i,1,1,1):parentarray_chunk(i,1,2,1), & 
+                      parentarray_chunk(i,2,1,1):parentarray_chunk(i,2,2,1), & 
+                      parentarray_chunk(i,3,1,1):parentarray_chunk(i,3,2,1)),                 &
+                      parentarray_chunk(i,1,1,2),parentarray_chunk(i,1,2,2),    &
+                      parentarray_chunk(i,2,1,2),parentarray_chunk(i,2,2,2),    &
+                      parentarray_chunk(i,3,1,2),parentarray_chunk(i,3,2,2),.FALSE.,nbin,ndirin)
+                      
         CASE(4)
             call procname( tempPextend % array4(            &
                     parentarray(1,1,1):parentarray(1,2,1),  &
@@ -1291,6 +1434,8 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
                     parentarray(5,1,2),parentarray(5,2,2),  &
                     parentarray(6,1,2),parentarray(6,2,2),.FALSE.,nbin,ndirin)
         END SELECT
+        
+        enddo ! enddo i=1,nb_chunks
 !
         call Agrif_ParentGrid_to_ChildGrid()
 !

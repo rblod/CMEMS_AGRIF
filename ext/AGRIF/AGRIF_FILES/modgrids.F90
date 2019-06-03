@@ -87,6 +87,8 @@ type Agrif_Grid
     integer                             :: level    !< level of the grid in the hierarchy
     logical                             :: allocation_is_done = .false.
     logical                             :: grand_mother_grid = .false.
+    logical,dimension(3)                :: periodicity = .false.
+    integer,dimension(3)                :: periodicity_decal = 0
 !---------------------------------------------------------------------------------------------------
 end type Agrif_Grid
 !===================================================================================================

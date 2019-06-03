@@ -401,7 +401,9 @@ end type Agrif_Variables_List
     real, dimension(:,:,:,:,:)  , allocatable :: parray5
     real, dimension(:,:,:,:,:,:), allocatable :: parray6
 !
-    logical :: agrif_debug = .false.    ! may be activaded in users subroutine for debugging purposes
+    logical :: agrif_debug = .false.        ! may be activaded in users subroutine for debugging purposes
+    logical :: agrif_debug_interp = .false. ! may be activaded in users subroutine for debugging interpolations
+    logical :: agrif_debug_update = .false. ! may be activaded in users subroutine for debugging updates
 
 ! If a grand mother grid is present
     logical :: agrif_coarse = .false.
