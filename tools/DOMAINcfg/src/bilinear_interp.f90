@@ -24,16 +24,16 @@ MODULE bilinear_interp
   !
   INTEGER :: grid1_size,grid2_size,grid1_rank, grid2_rank
   !      
-  INTEGER, DIMENSION(:), POINTER :: grid1_dims, grid2_dims  
+  INTEGER, DIMENSION(:) :: grid1_dims, grid2_dims  
   !  
 
   !-----------------------------------------------------------------------
   !     grid coordinates and masks
   !-----------------------------------------------------------------------
   !
-  LOGICAL, DIMENSION(:), POINTER :: grid1_mask,grid2_mask        
+  LOGICAL, DIMENSION(:) :: grid1_mask,grid2_mask        
   ! each grid center in radians
-  REAL*8,DIMENSION(:),POINTER :: &
+  REAL*8,DIMENSION(:) :: &
        grid1_center_lat,  &
        grid1_center_lon,  & 
        grid2_center_lat,  &
@@ -43,7 +43,7 @@ MODULE bilinear_interp
   !
   ! lat/lon bounding box for use in restricting grid searches
   !
-  REAL*8,DIMENSION(:,:), POINTER :: grid1_bound_box,grid2_bound_box   
+  REAL*8,DIMENSION(:,:) :: grid1_bound_box,grid2_bound_box   
   !
   !-----------------------------------------------------------------------
   !     bins for restricting searches
@@ -54,11 +54,11 @@ MODULE bilinear_interp
   !
   ! min,max adds for grid cells in this lat bin
   !
-  INTEGER,DIMENSION(:,:),POINTER :: bin_addr1,bin_addr2 
+  INTEGER,DIMENSION(:,:) :: bin_addr1,bin_addr2 
   !
   ! min,max longitude for each search bin
   !
-  REAL*8, DIMENSION(:,:),POINTER :: bin_lats,bin_lons 
+  REAL*8, DIMENSION(:,:) :: bin_lats,bin_lons 
 
   REAL*8, PARAMETER :: zero   = 0.0,  &
        one    = 1.0,  &
@@ -105,13 +105,13 @@ MODULE bilinear_interp
        ,norm_opt        &  ! option for normalization (conserv only)
        ,resize_increment ! default amount to increase array size
 
-  INTEGER , DIMENSION(:), POINTER :: &
+  INTEGER , DIMENSION(:) :: &
        grid1_add_map1, &  ! grid1 address for each link in mapping 1
        grid2_add_map1, &  ! grid2 address for each link in mapping 1
        grid1_add_map2, &  ! grid1 address for each link in mapping 2
        grid2_add_map2    ! grid2 address for each link in mapping 2
 
-  REAL*8, DIMENSION(:,:), POINTER ::   &
+  REAL*8, DIMENSION(:,:) ::   &
        wts_map1, &   ! map weights for each link (num_wts,max_links)
        wts_map2     ! map weights for each link (num_wts,max_links)
   !
@@ -130,11 +130,11 @@ CONTAINS
     !this routine makes any necessary changes (e.g. for 0,2pi longitude range)
     !-----------------------------------------------------------------------
     !
-    REAL*8,DIMENSION(:,:),POINTER :: grid1_lat,grid2_lat,grid1_lon,grid2_lon
+    REAL*8,DIMENSION(:,:) :: grid1_lat,grid2_lat,grid1_lon,grid2_lon
     LOGICAL,DIMENSION(:,:) :: mask
     !      
-    INTEGER,DIMENSION(:),POINTER :: source_add,destination_add  
-    REAL*8,DIMENSION(:,:),POINTER :: remap_matrix       
+    INTEGER,DIMENSION(:),ALLOCATABLE :: source_add,destination_add  
+    REAL*8,DIMENSION(:,:), ALLOCATABLE :: remap_matrix       
     !
     !-----------------------------------------------------------------------
     ! local variables
@@ -145,7 +145,7 @@ CONTAINS
     !          
     ! integer mask
     ! 
-    INTEGER, DIMENSION(:), POINTER :: imask 
+    INTEGER, DIMENSION(:), ALLOCATABLE :: imask 
     !
     ! lat/lon intervals for search bins
     !
@@ -157,9 +157,9 @@ CONTAINS
     !
     !      write(*,*)'proceed to Bilinear interpolation ...'
     !
-    IF(ASSOCIATED(wts_map1)) DEALLOCATE(wts_map1)
-    IF(ASSOCIATED(grid1_add_map1)) DEALLOCATE(grid1_add_map1)
-    IF(ASSOCIATED(grid2_add_map1)) DEALLOCATE(grid2_add_map1)
+!    IF(ALLOCATED(wts_map1)) DEALLOCATE(wts_map1)
+!    IF(ALLOCATED(grid1_add_map1)) DEALLOCATE(grid1_add_map1)
+!    IF(ALLOCATED(grid2_add_map1)) DEALLOCATE(grid2_add_map1)
 
 
     !
@@ -1155,13 +1155,13 @@ CONTAINS
          ierr,    &  ! error flag
          mxlinks   ! size of link arrays
 
-    INTEGER, DIMENSION(:), POINTER ::    &
+    INTEGER, DIMENSION(:), ALLOCATABLE ::    &
          add1_tmp,   & ! temp array for resizing address arrays
          add2_tmp  ! temp array for resizing address arrays
     !
     ! temp array for resizing weight arrays
     !
-    REAL*8, DIMENSION(:,:), POINTER :: wts_tmp   
+    REAL*8, DIMENSION(:,:), ALLOCATABLE :: wts_tmp   
     !
     !-----------------------------------------------------------------------
     !***
