@@ -24,16 +24,16 @@ MODULE bilinear_interp
   !
   INTEGER :: grid1_size,grid2_size,grid1_rank, grid2_rank
   !      
-  INTEGER, DIMENSION(:) :: grid1_dims, grid2_dims  
+  INTEGER, DIMENSION(:), ALLOCATABLE :: grid1_dims, grid2_dims  
   !  
 
   !-----------------------------------------------------------------------
   !     grid coordinates and masks
   !-----------------------------------------------------------------------
   !
-  LOGICAL, DIMENSION(:) :: grid1_mask,grid2_mask        
+  LOGICAL, DIMENSION(:), ALLOCATABLE :: grid1_mask,grid2_mask        
   ! each grid center in radians
-  REAL*8,DIMENSION(:) :: &
+  REAL*8,DIMENSION(:), ALLOCATABLE :: &
        grid1_center_lat,  &
        grid1_center_lon,  & 
        grid2_center_lat,  &
@@ -43,7 +43,7 @@ MODULE bilinear_interp
   !
   ! lat/lon bounding box for use in restricting grid searches
   !
-  REAL*8,DIMENSION(:,:) :: grid1_bound_box,grid2_bound_box   
+  REAL*8,DIMENSION(:,:), ALLOCATABLE :: grid1_bound_box,grid2_bound_box   
   !
   !-----------------------------------------------------------------------
   !     bins for restricting searches
@@ -54,11 +54,11 @@ MODULE bilinear_interp
   !
   ! min,max adds for grid cells in this lat bin
   !
-  INTEGER,DIMENSION(:,:) :: bin_addr1,bin_addr2 
+  INTEGER,DIMENSION(:,:), ALLOCATABLE :: bin_addr1,bin_addr2 
   !
   ! min,max longitude for each search bin
   !
-  REAL*8, DIMENSION(:,:) :: bin_lats,bin_lons 
+  REAL*8, DIMENSION(:,:), ALLOCATABLE  :: bin_lats,bin_lons 
 
   REAL*8, PARAMETER :: zero   = 0.0,  &
        one    = 1.0,  &
@@ -105,13 +105,13 @@ MODULE bilinear_interp
        ,norm_opt        &  ! option for normalization (conserv only)
        ,resize_increment ! default amount to increase array size
 
-  INTEGER , DIMENSION(:) :: &
+  INTEGER , DIMENSION(:), ALLOCATABLE :: &
        grid1_add_map1, &  ! grid1 address for each link in mapping 1
        grid2_add_map1, &  ! grid2 address for each link in mapping 1
        grid1_add_map2, &  ! grid1 address for each link in mapping 2
        grid2_add_map2    ! grid2 address for each link in mapping 2
 
-  REAL*8, DIMENSION(:,:) ::   &
+  REAL*8, DIMENSION(:,:), ALLOCATABLE ::   &
        wts_map1, &   ! map weights for each link (num_wts,max_links)
        wts_map2     ! map weights for each link (num_wts,max_links)
   !
@@ -462,11 +462,11 @@ CONTAINS
        source_add = 1
     END WHERE
     !               
-    DEALLOCATE(grid1_bound_box,grid2_bound_box,grid1_center_lat,grid1_center_lon)
-    DEALLOCATE(grid2_center_lat,grid2_center_lon,grid2_add_map1,grid1_add_map1,wts_map1)
-    DEALLOCATE(grid1_frac,grid2_frac,grid1_dims,grid2_dims,grid2_mask,imask)
-    DEALLOCATE(bin_addr1,bin_addr2,bin_lats,bin_lons)
-    DEALLOCATE(grid1_mask)	
+    !DEALLOCATE(grid1_bound_box,grid2_bound_box,grid1_center_lat,grid1_center_lon)
+    !DEALLOCATE(grid2_center_lat,grid2_center_lon,grid2_add_map1,grid1_add_map1,wts_map1)
+    !DEALLOCATE(grid1_frac,grid2_frac,grid1_dims,grid2_dims,grid2_mask,imask)
+    !DEALLOCATE(bin_addr1,bin_addr2,bin_lats,bin_lons)
+    !DEALLOCATE(grid1_mask)	
     !	
     !-----------------------------------------------------------------------
 
@@ -1104,7 +1104,7 @@ CONTAINS
          grid2_add_map1(max_links_map1),    &
          wts_map1(num_wts, max_links_map1))
 
-    grid1_add_map1 = 0.	
+    grid1_add_map1 = 0.
     grid2_add_map1 = 0.
     wts_map1 = 0.
 

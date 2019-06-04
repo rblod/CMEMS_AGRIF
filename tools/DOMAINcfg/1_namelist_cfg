@@ -21,11 +21,11 @@
    !                       !      
    cp_cfg      =  "zoom"   !  name of the configuration
    jp_cfg      =       2   !  resolution of the configuration
-   jpidta      =     83   !  1st lateral dimension ( >= jpi )
-   jpjdta      =     62   !  2nd    "         "    ( >= jpj )
+   jpidta      =     98   !  1st lateral dimension ( >= jpi )
+   jpjdta      =     98   !  2nd    "         "    ( >= jpj )
    jpkdta      =      31   !  number of levels      ( >= jpk )
-   jpiglo      =     83   !  1st dimension of global domain --> i =jpidta
-   jpjglo      =     62   !  2nd    -                  -    --> j  =jpjdta
+   jpiglo      =     98   !  1st dimension of global domain --> i =jpidta
+   jpjglo      =     98   !  2nd    -                  -    --> j  =jpjdta
    jpizoom     =       1   !  left bottom (i,j) indices of the zoom
    jpjzoom     =       1   !  in data domain indices
    jperio      =       0   !  lateral cond. type (between 0 and 6)
@@ -252,7 +252,7 @@
 !-----------------------------------------------------------------------
 &nammpp        !   Massively Parallel Processing                        ("key_mpp_mpi)
 !-----------------------------------------------------------------------
-jpni = 2
+jpni = 1
 jpnj=1
 /
 !-----------------------------------------------------------------------
