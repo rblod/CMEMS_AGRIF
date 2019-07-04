@@ -87,7 +87,7 @@ SUBROUTINE Agrif_InitValues_cont_dom
    !
    ! Declaration of the type of variable which have to be interpolated
    !
-   CALL agrif_declare_var_dom
+   !CALL agrif_declare_var_dom
    !
 END SUBROUTINE Agrif_InitValues_cont_dom
 
@@ -164,7 +164,7 @@ SUBROUTINE Agrif_InitValues_cont
 
    ! 1. Declaration of the type of variable which have to be interpolated
    !---------------------------------------------------------------------
-   CALL agrif_declare_var
+   !CALL agrif_declare_var
 
    ! 2. First interpolations of potentially non zero fields
    !-------------------------------------------------------
@@ -360,6 +360,11 @@ SUBROUTINE agrif_declare_var
 # endif
    ENDIF
 
+   ! Initial or restart velues
+   CALL Agrif_Set_MaskMaxSearch(25)
+   CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts/),tsini_id)     
+   CALL Agrif_Set_MaskMaxSearch(5)
+
    ! 2. Type of interpolation
    !-------------------------
    CALL Agrif_Set_bcinterp(tsn_id,interp=AGRIF_linear)
@@ -385,6 +390,9 @@ SUBROUTINE agrif_declare_var
 
    IF( ln_zdftke.OR.ln_zdfgls )   CALL Agrif_Set_bcinterp( avm_id, interp=AGRIF_linear )
 
+   CALL Agrif_Set_bcinterp(tsini_id,interp=AGRIF_ppm)
+   CALL Agrif_Set_interp  (tsini_id,interp=AGRIF_ppm)
+
    ! 3. Location of interpolation
    !-----------------------------
    CALL Agrif_Set_bc(       tsn_id, (/0,ind1/) )
@@ -405,8 +413,9 @@ SUBROUTINE agrif_declare_var
    CALL Agrif_Set_bc( umsk_id, (/0,0/) )
    CALL Agrif_Set_bc( vmsk_id, (/0,0/) )
 
-
    IF( ln_zdftke.OR.ln_zdfgls )   CALL Agrif_Set_bc( avm_id, (/0,ind1/) )
+
+   CALL Agrif_Set_bc(       tsini_id, (/0,ind1/) )
 
    ! 4. Update type
    !--------------- 
@@ -468,7 +477,7 @@ SUBROUTINE Agrif_InitValues_cont_ice
    !
    ! Declaration of the type of variable which have to be interpolated (parent=>child)
    !----------------------------------------------------------------------------------
-   CALL agrif_declare_var_ice
+   !CALL agrif_declare_var_ice
 
    ! Controls
 
@@ -579,7 +588,7 @@ SUBROUTINE Agrif_InitValues_cont_top
 
    ! 1. Declaration of the type of variable which have to be interpolated
    !---------------------------------------------------------------------
-   CALL agrif_declare_var_top
+   !CALL agrif_declare_var_top
 
    ! 2. First interpolations of potentially non zero fields
    !-------------------------------------------------------

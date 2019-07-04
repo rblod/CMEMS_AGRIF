@@ -55,6 +55,7 @@ MODULE agrif_oce
    INTEGER, PUBLIC :: un_interp_id, vn_interp_id                              ! AGRIF profiles for interpolations
    INTEGER, PUBLIC :: un_update_id, vn_update_id                              ! AGRIF profiles for udpates
    INTEGER, PUBLIC :: tsn_sponge_id, un_sponge_id, vn_sponge_id               ! AGRIF profiles for sponge layers
+   INTEGER, PUBLIC :: tsini_id                                                ! AGRIF profile for Levitus
 # if defined key_top
    INTEGER, PUBLIC :: trn_id, trn_sponge_id
 # endif  
