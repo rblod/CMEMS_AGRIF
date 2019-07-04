@@ -97,7 +97,6 @@ CONTAINS
          !                                    ! Initialization of ocean to zero
          !
          IF( ln_tsd_init ) THEN               
-            CALL dta_tsd( nit000, tsb )       ! read 3D T and S data at nit000
             IF( Agrif_Root() ) THEN
                CALL dta_tsd( nit000, tsb )       ! read 3D T and S data at nit000
             ELSE
