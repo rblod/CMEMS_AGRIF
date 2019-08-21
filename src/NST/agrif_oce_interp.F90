@@ -42,6 +42,7 @@ MODULE agrif_oce_interp
    PUBLIC   interptsn, interpsshn, interpavm
    PUBLIC   interpunb, interpvnb , interpub2b, interpvb2b
    PUBLIC   interpe3t, interpumsk, interpvmsk
+   PUBLIC   agrif_initts
 
    INTEGER ::   bdy_tinterp = 0
 
@@ -1428,6 +1429,24 @@ CONTAINS
       !
    END SUBROUTINE interpavm
 
+   SUBROUTINE agrif_initts(tabres,i1,i2,j1,j2,k1,k2,m1,m2,before)
+       INTEGER :: i1, i2, j1, j2, k1, k2, m1, m2
+       REAL(wp):: tabres(i1:i2,j1:j2,k1:k2,m1:m2)
+       LOGICAL :: before
+
+       INTEGER :: jm
+
+       IF (before) THEN
+         DO jm=m1,m2
+             tabres(i1:i2,j1:j2,k1:k2,jm) = tsb(i1:i2,j1:j2,k1:k2,jm)
+         END DO
+       ELSE
+         DO jm=m1,m2
+             tsb(i1:i2,j1:j2,k1:k2,jm)=tabres(i1:i2,j1:j2,k1:k2,jm)
+         END DO
+       ENDIF
+   END SUBROUTINE agrif_initts 
+   
 #else
    !!----------------------------------------------------------------------
    !!   Empty module                                          no AGRIF zoom

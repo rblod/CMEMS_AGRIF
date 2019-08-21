@@ -6826,17 +6826,11 @@ void process_fortran(const char *input_file)
 
 #define yy_create_buffer fortran__create_buffer
 #define yy_delete_buffer fortran__delete_buffer
-#define yy_scan_buffer fortran__scan_buffer
-#define yy_scan_string fortran__scan_string
-#define yy_scan_bytes fortran__scan_bytes
+#define yy_flex_debug fortran__flex_debug
 #define yy_init_buffer fortran__init_buffer
 #define yy_flush_buffer fortran__flush_buffer
 #define yy_load_buffer_state fortran__load_buffer_state
 #define yy_switch_to_buffer fortran__switch_to_buffer
-#define yypush_buffer_state fortran_push_buffer_state
-#define yypop_buffer_state fortran_pop_buffer_state
-#define yyensure_buffer_stack fortran_ensure_buffer_stack
-#define yy_flex_debug fortran__flex_debug
 #define yyin fortran_in
 #define yyleng fortran_leng
 #define yylex fortran_lex
@@ -6851,244 +6845,10 @@ void process_fortran(const char *input_file)
 
 #define FLEX_SCANNER
 #define YY_FLEX_MAJOR_VERSION 2
-#define YY_FLEX_MINOR_VERSION 6
-#define YY_FLEX_SUBMINOR_VERSION 4
+#define YY_FLEX_MINOR_VERSION 5
+#define YY_FLEX_SUBMINOR_VERSION 35
 #if YY_FLEX_SUBMINOR_VERSION > 0
 #define FLEX_BETA
-#endif
-
-#ifdef yy_create_buffer
-#define fortran__create_buffer_ALREADY_DEFINED
-#else
-#define yy_create_buffer fortran__create_buffer
-#endif
-
-#ifdef yy_delete_buffer
-#define fortran__delete_buffer_ALREADY_DEFINED
-#else
-#define yy_delete_buffer fortran__delete_buffer
-#endif
-
-#ifdef yy_scan_buffer
-#define fortran__scan_buffer_ALREADY_DEFINED
-#else
-#define yy_scan_buffer fortran__scan_buffer
-#endif
-
-#ifdef yy_scan_string
-#define fortran__scan_string_ALREADY_DEFINED
-#else
-#define yy_scan_string fortran__scan_string
-#endif
-
-#ifdef yy_scan_bytes
-#define fortran__scan_bytes_ALREADY_DEFINED
-#else
-#define yy_scan_bytes fortran__scan_bytes
-#endif
-
-#ifdef yy_init_buffer
-#define fortran__init_buffer_ALREADY_DEFINED
-#else
-#define yy_init_buffer fortran__init_buffer
-#endif
-
-#ifdef yy_flush_buffer
-#define fortran__flush_buffer_ALREADY_DEFINED
-#else
-#define yy_flush_buffer fortran__flush_buffer
-#endif
-
-#ifdef yy_load_buffer_state
-#define fortran__load_buffer_state_ALREADY_DEFINED
-#else
-#define yy_load_buffer_state fortran__load_buffer_state
-#endif
-
-#ifdef yy_switch_to_buffer
-#define fortran__switch_to_buffer_ALREADY_DEFINED
-#else
-#define yy_switch_to_buffer fortran__switch_to_buffer
-#endif
-
-#ifdef yypush_buffer_state
-#define fortran_push_buffer_state_ALREADY_DEFINED
-#else
-#define yypush_buffer_state fortran_push_buffer_state
-#endif
-
-#ifdef yypop_buffer_state
-#define fortran_pop_buffer_state_ALREADY_DEFINED
-#else
-#define yypop_buffer_state fortran_pop_buffer_state
-#endif
-
-#ifdef yyensure_buffer_stack
-#define fortran_ensure_buffer_stack_ALREADY_DEFINED
-#else
-#define yyensure_buffer_stack fortran_ensure_buffer_stack
-#endif
-
-#ifdef yylex
-#define fortran_lex_ALREADY_DEFINED
-#else
-#define yylex fortran_lex
-#endif
-
-#ifdef yyrestart
-#define fortran_restart_ALREADY_DEFINED
-#else
-#define yyrestart fortran_restart
-#endif
-
-#ifdef yylex_init
-#define fortran_lex_init_ALREADY_DEFINED
-#else
-#define yylex_init fortran_lex_init
-#endif
-
-#ifdef yylex_init_extra
-#define fortran_lex_init_extra_ALREADY_DEFINED
-#else
-#define yylex_init_extra fortran_lex_init_extra
-#endif
-
-#ifdef yylex_destroy
-#define fortran_lex_destroy_ALREADY_DEFINED
-#else
-#define yylex_destroy fortran_lex_destroy
-#endif
-
-#ifdef yyget_debug
-#define fortran_get_debug_ALREADY_DEFINED
-#else
-#define yyget_debug fortran_get_debug
-#endif
-
-#ifdef yyset_debug
-#define fortran_set_debug_ALREADY_DEFINED
-#else
-#define yyset_debug fortran_set_debug
-#endif
-
-#ifdef yyget_extra
-#define fortran_get_extra_ALREADY_DEFINED
-#else
-#define yyget_extra fortran_get_extra
-#endif
-
-#ifdef yyset_extra
-#define fortran_set_extra_ALREADY_DEFINED
-#else
-#define yyset_extra fortran_set_extra
-#endif
-
-#ifdef yyget_in
-#define fortran_get_in_ALREADY_DEFINED
-#else
-#define yyget_in fortran_get_in
-#endif
-
-#ifdef yyset_in
-#define fortran_set_in_ALREADY_DEFINED
-#else
-#define yyset_in fortran_set_in
-#endif
-
-#ifdef yyget_out
-#define fortran_get_out_ALREADY_DEFINED
-#else
-#define yyget_out fortran_get_out
-#endif
-
-#ifdef yyset_out
-#define fortran_set_out_ALREADY_DEFINED
-#else
-#define yyset_out fortran_set_out
-#endif
-
-#ifdef yyget_leng
-#define fortran_get_leng_ALREADY_DEFINED
-#else
-#define yyget_leng fortran_get_leng
-#endif
-
-#ifdef yyget_text
-#define fortran_get_text_ALREADY_DEFINED
-#else
-#define yyget_text fortran_get_text
-#endif
-
-#ifdef yyget_lineno
-#define fortran_get_lineno_ALREADY_DEFINED
-#else
-#define yyget_lineno fortran_get_lineno
-#endif
-
-#ifdef yyset_lineno
-#define fortran_set_lineno_ALREADY_DEFINED
-#else
-#define yyset_lineno fortran_set_lineno
-#endif
-
-#ifdef yywrap
-#define fortran_wrap_ALREADY_DEFINED
-#else
-#define yywrap fortran_wrap
-#endif
-
-#ifdef yyalloc
-#define fortran_alloc_ALREADY_DEFINED
-#else
-#define yyalloc fortran_alloc
-#endif
-
-#ifdef yyrealloc
-#define fortran_realloc_ALREADY_DEFINED
-#else
-#define yyrealloc fortran_realloc
-#endif
-
-#ifdef yyfree
-#define fortran_free_ALREADY_DEFINED
-#else
-#define yyfree fortran_free
-#endif
-
-#ifdef yytext
-#define fortran_text_ALREADY_DEFINED
-#else
-#define yytext fortran_text
-#endif
-
-#ifdef yyleng
-#define fortran_leng_ALREADY_DEFINED
-#else
-#define yyleng fortran_leng
-#endif
-
-#ifdef yyin
-#define fortran_in_ALREADY_DEFINED
-#else
-#define yyin fortran_in
-#endif
-
-#ifdef yyout
-#define fortran_out_ALREADY_DEFINED
-#else
-#define yyout fortran_out
-#endif
-
-#ifdef yy_flex_debug
-#define fortran__flex_debug_ALREADY_DEFINED
-#else
-#define yy_flex_debug fortran__flex_debug
-#endif
-
-#ifdef yylineno
-#define fortran_lineno_ALREADY_DEFINED
-#else
-#define yylineno fortran_lineno
 #endif
 
 /* First, we deal with  platform-specific or compiler-specific issues. */
@@ -7124,6 +6884,7 @@ typedef int16_t flex_int16_t;
 typedef uint16_t flex_uint16_t;
 typedef int32_t flex_int32_t;
 typedef uint32_t flex_uint32_t;
+typedef uint64_t flex_uint64_t;
 #else
 typedef signed char flex_int8_t;
 typedef short int flex_int16_t;
@@ -7131,6 +6892,7 @@ typedef int flex_int32_t;
 typedef unsigned char flex_uint8_t; 
 typedef unsigned short int flex_uint16_t;
 typedef unsigned int flex_uint32_t;
+#endif /* ! C99 */
 
 /* Limits of integral types. */
 #ifndef INT8_MIN
@@ -7161,61 +6923,63 @@ typedef unsigned int flex_uint32_t;
 #define UINT32_MAX             (4294967295U)
 #endif
 
-#ifndef SIZE_MAX
-#define SIZE_MAX               (~(size_t)0)
-#endif
-
-#endif /* ! C99 */
-
 #endif /* ! FLEXINT_H */
 
-/* begin standard C++ headers. */
+#ifdef __cplusplus
 
-/* TODO: this is always defined, so inline it */
+/* The "const" storage-class-modifier is valid. */
+#define YY_USE_CONST
+
+#else	/* ! __cplusplus */
+
+/* C99 requires __STDC__ to be defined as 1. */
+#if defined (__STDC__)
+
+#define YY_USE_CONST
+
+#endif	/* defined (__STDC__) */
+#endif	/* ! __cplusplus */
+
+#ifdef YY_USE_CONST
 #define yyconst const
-
-#if defined(__GNUC__) && __GNUC__ >= 3
-#define yynoreturn __attribute__((__noreturn__))
 #else
-#define yynoreturn
+#define yyconst
 #endif
 
 /* Returned upon end-of-file. */
 #define YY_NULL 0
 
-/* Promotes a possibly negative, possibly signed char to an
- *   integer in range [0..255] for use as an array index.
+/* Promotes a possibly negative, possibly signed char to an unsigned
+ * integer for use as an array index.  If the signed char is negative,
+ * we want to instead treat it as an 8-bit unsigned char, hence the
+ * double cast.
  */
-#define YY_SC_TO_UI(c) ((YY_CHAR) (c))
+#define YY_SC_TO_UI(c) ((unsigned int) (unsigned char) c)
 
 /* Enter a start condition.  This macro really ought to take a parameter,
  * but we do it the disgusting crufty way forced on us by the ()-less
  * definition of BEGIN.
  */
 #define BEGIN (yy_start) = 1 + 2 *
+
 /* Translate the current start state into a value that can be later handed
  * to BEGIN to return to the state.  The YYSTATE alias is for lex
  * compatibility.
  */
 #define YY_START (((yy_start) - 1) / 2)
 #define YYSTATE YY_START
+
 /* Action number for EOF rule of a given start state. */
 #define YY_STATE_EOF(state) (YY_END_OF_BUFFER + state + 1)
+
 /* Special action meaning "start processing a new file". */
-#define YY_NEW_FILE yyrestart( yyin  )
+#define YY_NEW_FILE fortran_restart(fortran_in  )
+
 #define YY_END_OF_BUFFER_CHAR 0
 
 /* Size of default input buffer. */
 #ifndef YY_BUF_SIZE
-#ifdef __ia64__
-/* On IA-64, the buffer size is 16k, not 8k.
- * Moreover, YY_BUF_SIZE is 2*YY_READ_BUF_SIZE in the general case.
- * Ditto for the __ia64__ case accordingly.
- */
-#define YY_BUF_SIZE 32768
-#else
 #define YY_BUF_SIZE 16384
-#endif /* __ia64__ */
 #endif
 
 /* The state buf must be large enough to hold one state per character in the main buffer.
@@ -7232,30 +6996,30 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 typedef size_t yy_size_t;
 #endif
 
-extern int yyleng;
+extern yy_size_t fortran_leng;
 
-extern FILE *yyin, *yyout;
+extern FILE *fortran_in, *fortran_out;
 
 #define EOB_ACT_CONTINUE_SCAN 0
 #define EOB_ACT_END_OF_FILE 1
 #define EOB_ACT_LAST_MATCH 2
-    
+
     #define YY_LESS_LINENO(n)
-    #define YY_LINENO_REWIND_TO(ptr)
     
 /* Return all but the first "n" matched characters back to the input stream. */
 #define yyless(n) \
 	do \
 		{ \
-		/* Undo effects of setting up yytext. */ \
+		/* Undo effects of setting up fortran_text. */ \
         int yyless_macro_arg = (n); \
         YY_LESS_LINENO(yyless_macro_arg);\
 		*yy_cp = (yy_hold_char); \
 		YY_RESTORE_YY_MORE_OFFSET \
 		(yy_c_buf_p) = yy_cp = yy_bp + yyless_macro_arg - YY_MORE_ADJ; \
-		YY_DO_BEFORE_ACTION; /* set up yytext again */ \
+		YY_DO_BEFORE_ACTION; /* set up fortran_text again */ \
 		} \
 	while ( 0 )
+
 #define unput(c) yyunput( c, (yytext_ptr)  )
 
 #ifndef YY_STRUCT_YY_BUFFER_STATE
@@ -7270,12 +7034,12 @@ struct yy_buffer_state
 	/* Size of input buffer in bytes, not including room for EOB
 	 * characters.
 	 */
-	int yy_buf_size;
+	yy_size_t yy_buf_size;
 
 	/* Number of characters read into yy_ch_buf, not including EOB
 	 * characters.
 	 */
-	int yy_n_chars;
+	yy_size_t yy_n_chars;
 
 	/* Whether we "own" the buffer - i.e., we know we created it,
 	 * and can realloc() it to grow it, and should free() it to
@@ -7298,7 +7062,7 @@ struct yy_buffer_state
 
     int yy_bs_lineno; /**< The line count. */
     int yy_bs_column; /**< The column count. */
-
+    
 	/* Whether to try to fill the input buffer when we reach the
 	 * end of it.
 	 */
@@ -7315,8 +7079,8 @@ struct yy_buffer_state
 	 * possible backing-up.
 	 *
 	 * When we actually see the EOF, we change the status to "new"
-	 * (via yyrestart()), so that the user can continue scanning by
-	 * just pointing yyin at a new input file.
+	 * (via fortran_restart()), so that the user can continue scanning by
+	 * just pointing fortran_in at a new input file.
 	 */
 #define YY_BUFFER_EOF_PENDING 2
 
@@ -7326,7 +7090,7 @@ struct yy_buffer_state
 /* Stack of input buffers. */
 static size_t yy_buffer_stack_top = 0; /**< index of top of stack. */
 static size_t yy_buffer_stack_max = 0; /**< capacity of stack. */
-static YY_BUFFER_STATE * yy_buffer_stack = NULL; /**< Stack as an array. */
+static YY_BUFFER_STATE * yy_buffer_stack = 0; /**< Stack as an array. */
 
 /* We provide macros for accessing buffer states in case in the
  * future we want to put the buffer states in a more general
@@ -7337,101 +7101,106 @@ static YY_BUFFER_STATE * yy_buffer_stack = NULL; /**< Stack as an array. */
 #define YY_CURRENT_BUFFER ( (yy_buffer_stack) \
                           ? (yy_buffer_stack)[(yy_buffer_stack_top)] \
                           : NULL)
+
 /* Same as previous macro, but useful when we know that the buffer stack is not
  * NULL or when we need an lvalue. For internal use only.
  */
 #define YY_CURRENT_BUFFER_LVALUE (yy_buffer_stack)[(yy_buffer_stack_top)]
 
-/* yy_hold_char holds the character lost when yytext is formed. */
+/* yy_hold_char holds the character lost when fortran_text is formed. */
 static char yy_hold_char;
-static int yy_n_chars;		/* number of characters read into yy_ch_buf */
-int yyleng;
+static yy_size_t yy_n_chars;		/* number of characters read into yy_ch_buf */
+yy_size_t fortran_leng;
 
 /* Points to current character in buffer. */
-static char *yy_c_buf_p = NULL;
+static char *yy_c_buf_p = (char *) 0;
 static int yy_init = 0;		/* whether we need to initialize */
 static int yy_start = 0;	/* start state number */
 
-/* Flag which is used to allow yywrap()'s to do buffer switches
- * instead of setting up a fresh yyin.  A bit of a hack ...
+/* Flag which is used to allow fortran_wrap()'s to do buffer switches
+ * instead of setting up a fresh fortran_in.  A bit of a hack ...
  */
 static int yy_did_buffer_switch_on_eof;
 
-void yyrestart ( FILE *input_file  );
-void yy_switch_to_buffer ( YY_BUFFER_STATE new_buffer  );
-YY_BUFFER_STATE yy_create_buffer ( FILE *file, int size  );
-void yy_delete_buffer ( YY_BUFFER_STATE b  );
-void yy_flush_buffer ( YY_BUFFER_STATE b  );
-void yypush_buffer_state ( YY_BUFFER_STATE new_buffer  );
-void yypop_buffer_state ( void );
+void fortran_restart (FILE *input_file  );
+void fortran__switch_to_buffer (YY_BUFFER_STATE new_buffer  );
+YY_BUFFER_STATE fortran__create_buffer (FILE *file,int size  );
+void fortran__delete_buffer (YY_BUFFER_STATE b  );
+void fortran__flush_buffer (YY_BUFFER_STATE b  );
+void fortran_push_buffer_state (YY_BUFFER_STATE new_buffer  );
+void fortran_pop_buffer_state (void );
 
-static void yyensure_buffer_stack ( void );
-static void yy_load_buffer_state ( void );
-static void yy_init_buffer ( YY_BUFFER_STATE b, FILE *file  );
-#define YY_FLUSH_BUFFER yy_flush_buffer( YY_CURRENT_BUFFER )
+static void fortran_ensure_buffer_stack (void );
+static void fortran__load_buffer_state (void );
+static void fortran__init_buffer (YY_BUFFER_STATE b,FILE *file  );
 
-YY_BUFFER_STATE yy_scan_buffer ( char *base, yy_size_t size  );
-YY_BUFFER_STATE yy_scan_string ( const char *yy_str  );
-YY_BUFFER_STATE yy_scan_bytes ( const char *bytes, int len  );
+#define YY_FLUSH_BUFFER fortran__flush_buffer(YY_CURRENT_BUFFER )
 
-void *yyalloc ( yy_size_t  );
-void *yyrealloc ( void *, yy_size_t  );
-void yyfree ( void *  );
+YY_BUFFER_STATE fortran__scan_buffer (char *base,yy_size_t size  );
+YY_BUFFER_STATE fortran__scan_string (yyconst char *yy_str  );
+YY_BUFFER_STATE fortran__scan_bytes (yyconst char *bytes,yy_size_t len  );
 
-#define yy_new_buffer yy_create_buffer
+void *fortran_alloc (yy_size_t  );
+void *fortran_realloc (void *,yy_size_t  );
+void fortran_free (void *  );
+
+#define yy_new_buffer fortran__create_buffer
+
 #define yy_set_interactive(is_interactive) \
 	{ \
 	if ( ! YY_CURRENT_BUFFER ){ \
-        yyensure_buffer_stack (); \
+        fortran_ensure_buffer_stack (); \
 		YY_CURRENT_BUFFER_LVALUE =    \
-            yy_create_buffer( yyin, YY_BUF_SIZE ); \
+            fortran__create_buffer(fortran_in,YY_BUF_SIZE ); \
 	} \
 	YY_CURRENT_BUFFER_LVALUE->yy_is_interactive = is_interactive; \
 	}
+
 #define yy_set_bol(at_bol) \
 	{ \
 	if ( ! YY_CURRENT_BUFFER ){\
-        yyensure_buffer_stack (); \
+        fortran_ensure_buffer_stack (); \
 		YY_CURRENT_BUFFER_LVALUE =    \
-            yy_create_buffer( yyin, YY_BUF_SIZE ); \
+            fortran__create_buffer(fortran_in,YY_BUF_SIZE ); \
 	} \
 	YY_CURRENT_BUFFER_LVALUE->yy_at_bol = at_bol; \
 	}
+
 #define YY_AT_BOL() (YY_CURRENT_BUFFER_LVALUE->yy_at_bol)
 
 /* Begin user sect3 */
 
-#define fortran_wrap() (/*CONSTCOND*/1)
+#define fortran_wrap(n) 1
 #define YY_SKIP_YYWRAP
-typedef flex_uint8_t YY_CHAR;
 
-FILE *yyin = NULL, *yyout = NULL;
+typedef unsigned char YY_CHAR;
+
+FILE *fortran_in = (FILE *) 0, *fortran_out = (FILE *) 0;
 
 typedef int yy_state_type;
 
-extern int yylineno;
-int yylineno = 1;
+extern int fortran_lineno;
 
-extern char *yytext;
-#ifdef yytext_ptr
-#undef yytext_ptr
-#endif
-#define yytext_ptr yytext
+int fortran_lineno = 1;
 
-static yy_state_type yy_get_previous_state ( void );
-static yy_state_type yy_try_NUL_trans ( yy_state_type current_state  );
-static int yy_get_next_buffer ( void );
-static void yynoreturn yy_fatal_error ( const char* msg  );
+extern char *fortran_text;
+#define yytext_ptr fortran_text
+
+static yy_state_type yy_get_previous_state (void );
+static yy_state_type yy_try_NUL_trans (yy_state_type current_state  );
+static int yy_get_next_buffer (void );
+static void yy_fatal_error (yyconst char msg[]  );
 
 /* Done after the current pattern has been matched and before the
- * corresponding action - sets up yytext.
+ * corresponding action - sets up fortran_text.
  */
 #define YY_DO_BEFORE_ACTION \
 	(yytext_ptr) = yy_bp; \
-	yyleng = (int) (yy_cp - yy_bp); \
+	fortran_leng = (yy_size_t) (yy_cp - yy_bp); \
 	(yy_hold_char) = *yy_cp; \
 	*yy_cp = '\0'; \
 	(yy_c_buf_p) = yy_cp;
+
 #define YY_NUM_RULES 178
 #define YY_END_OF_BUFFER 179
 /* This struct is not used in this scanner,
@@ -7441,7 +7210,7 @@ struct yy_trans_info
 	flex_int32_t yy_verify;
 	flex_int32_t yy_nxt;
 	};
-static const flex_int16_t yy_acclist[1588] =
+static yyconst flex_int16_t yy_acclist[1588] =
     {   0,
       143,  143,  179,  178,  167,  178,  166,  178,  177,  178,
       178,  156,  178,  160,  178,  170,  178,  178,  159,  178,
@@ -7619,7 +7388,7 @@ static const flex_int16_t yy_acclist[1588] =
       176,  177,  175,  173,  174,  173,  174
     } ;
 
-static const flex_int16_t yy_accept[1884] =
+static yyconst flex_int16_t yy_accept[1884] =
     {   0,
         1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
         1,    2,    3,    3,    3,    3,    3,    4,    5,    7,
@@ -7830,7 +7599,7 @@ static const flex_int16_t yy_accept[1884] =
      1588, 1588, 1588
     } ;
 
-static const YY_CHAR yy_ec[256] =
+static yyconst flex_int32_t yy_ec[256] =
     {   0,
         1,    1,    1,    1,    1,    1,    1,    1,    2,    3,
         1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
@@ -7862,7 +7631,7 @@ static const YY_CHAR yy_ec[256] =
         1,    1,    1,    1,    1
     } ;
 
-static const YY_CHAR yy_meta[81] =
+static yyconst flex_int32_t yy_meta[81] =
     {   0,
         1,    2,    3,    2,    4,    5,    4,    4,    1,    4,
         6,    7,    8,    4,    9,   10,   11,   12,   13,   14,
@@ -7874,7 +7643,7 @@ static const YY_CHAR yy_meta[81] =
        16,   16,   16,   16,   17,   17,   17,   17,   17,    5
     } ;
 
-static const flex_int16_t yy_base[2051] =
+static yyconst flex_int16_t yy_base[2051] =
     {   0,
         0,   79,    0,    0,    0,  151, 2913,   82, 2895,   86,
        89,   92,  224,  303,    0,  375, 2885,   70,  102, 9608,
@@ -8103,7 +7872,7 @@ static const flex_int16_t yy_base[2051] =
      9427, 9445, 9463, 9481, 9499, 9517, 9535, 9553, 9571, 9589
     } ;
 
-static const flex_int16_t yy_def[2051] =
+static yyconst flex_int16_t yy_def[2051] =
     {   0,
      1882,    1, 1883, 1883,    1,    1, 1884, 1884, 1885, 1885,
      1883, 1883, 1882,   13,    1,    1, 1882, 1882, 1882, 1882,
@@ -8332,7 +8101,7 @@ static const flex_int16_t yy_def[2051] =
      1882, 1882, 1882, 1882, 1882, 1882, 1882, 1882, 1882, 1882
     } ;
 
-static const flex_int16_t yy_nxt[9689] =
+static yyconst flex_int16_t yy_nxt[9689] =
     {   0,
        18,   19,   20,   19,   21,   22,   18,   23,   24,   25,
        26,   27,   28,   29,   28,   30,   28,   31,   32,   33,
@@ -9401,7 +9170,7 @@ static const flex_int16_t yy_nxt[9689] =
      1882, 1882, 1882, 1882, 1882, 1882, 1882, 1882
     } ;
 
-static const flex_int16_t yy_chk[9689] =
+static yyconst flex_int16_t yy_chk[9689] =
     {   0,
         1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
         1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
@@ -10470,8 +10239,8 @@ static const flex_int16_t yy_chk[9689] =
      1882, 1882, 1882, 1882, 1882, 1882, 1882, 1882
     } ;
 
-extern int yy_flex_debug;
-int yy_flex_debug = 0;
+extern int fortran__flex_debug;
+int fortran__flex_debug = 0;
 
 static yy_state_type *yy_state_buf=0, *yy_state_ptr=0;
 static char *yy_full_match;
@@ -10483,7 +10252,7 @@ static int *yy_full_state;
 #define YY_TRAILING_HEAD_MASK 0x4000
 #define REJECT \
 { \
-*yy_cp = (yy_hold_char); /* undo effects of setting up yytext */ \
+*yy_cp = (yy_hold_char); /* undo effects of setting up fortran_text */ \
 yy_cp = (yy_full_match); /* restore poss. backed-over text */ \
 (yy_lp) = (yy_full_lp); /* restore orig. accepting pos. */ \
 (yy_state_ptr) = (yy_full_state); /* restore orig. state */ \
@@ -10495,7 +10264,7 @@ goto find_rule; \
 #define yymore() yymore_used_but_not_detected
 #define YY_MORE_ADJ 0
 #define YY_RESTORE_YY_MORE_OFFSET
-char *yytext;
+char *fortran_text;
 #line 1 "fortran.lex"
 /******************************************************************************/
 /*                                                                            */
@@ -10542,7 +10311,7 @@ char *yytext;
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
-extern FILE * yyin;
+extern FILE * fortran_in;
 #define MAX_INCLUDE_DEPTH 30
 #define YY_BUF_SIZE 64000
 YY_BUFFER_STATE include_stack[MAX_INCLUDE_DEPTH];
@@ -10571,8 +10340,7 @@ int count_newlines(const char* str_in)
 
 void out_of_donottreat(void);
 
-#line 3757 "fortran.yy.c"
-#line 3758 "fortran.yy.c"
+#line 3526 "fortran.yy.c"
 
 #define INITIAL 0
 #define parameter 1
@@ -10595,36 +10363,36 @@ void out_of_donottreat(void);
 #define YY_EXTRA_TYPE void *
 #endif
 
-static int yy_init_globals ( void );
+static int yy_init_globals (void );
 
 /* Accessor methods to globals.
    These are made visible to non-reentrant scanners for convenience. */
 
-int yylex_destroy ( void );
+int fortran_lex_destroy (void );
 
-int yyget_debug ( void );
+int fortran_get_debug (void );
 
-void yyset_debug ( int debug_flag  );
+void fortran_set_debug (int debug_flag  );
 
-YY_EXTRA_TYPE yyget_extra ( void );
+YY_EXTRA_TYPE fortran_get_extra (void );
 
-void yyset_extra ( YY_EXTRA_TYPE user_defined  );
+void fortran_set_extra (YY_EXTRA_TYPE user_defined  );
 
-FILE *yyget_in ( void );
+FILE *fortran_get_in (void );
 
-void yyset_in  ( FILE * _in_str  );
+void fortran_set_in  (FILE * in_str  );
 
-FILE *yyget_out ( void );
+FILE *fortran_get_out (void );
 
-void yyset_out  ( FILE * _out_str  );
+void fortran_set_out  (FILE * out_str  );
 
-			int yyget_leng ( void );
+yy_size_t fortran_get_leng (void );
 
-char *yyget_text ( void );
+char *fortran_get_text (void );
 
-int yyget_lineno ( void );
+int fortran_get_lineno (void );
 
-void yyset_lineno ( int _line_number  );
+void fortran_set_lineno (int line_number  );
 
 /* Macros after this point can all be overridden by user definitions in
  * section 1.
@@ -10632,43 +10400,35 @@ void yyset_lineno ( int _line_number  );
 
 #ifndef YY_SKIP_YYWRAP
 #ifdef __cplusplus
-extern "C" int yywrap ( void );
+extern "C" int fortran_wrap (void );
 #else
-extern int yywrap ( void );
+extern int fortran_wrap (void );
 #endif
 #endif
 
-#ifndef YY_NO_UNPUT
+    static void yyunput (int c,char *buf_ptr  );
     
-    static void yyunput ( int c, char *buf_ptr  );
-    
-#endif
-
 #ifndef yytext_ptr
-static void yy_flex_strncpy ( char *, const char *, int );
+static void yy_flex_strncpy (char *,yyconst char *,int );
 #endif
 
 #ifdef YY_NEED_STRLEN
-static int yy_flex_strlen ( const char * );
+static int yy_flex_strlen (yyconst char * );
 #endif
 
 #ifndef YY_NO_INPUT
+
 #ifdef __cplusplus
-static int yyinput ( void );
+static int yyinput (void );
 #else
-static int input ( void );
+static int input (void );
 #endif
 
 #endif
 
 /* Amount of stuff to slurp up with each read. */
 #ifndef YY_READ_BUF_SIZE
-#ifdef __ia64__
-/* On IA-64, the buffer size is 16k, not 8k */
-#define YY_READ_BUF_SIZE 16384
-#else
 #define YY_READ_BUF_SIZE 8192
-#endif /* __ia64__ */
 #endif
 
 /* Copy whatever the last rule matched to the standard output. */
@@ -10676,7 +10436,7 @@ static int input ( void );
 /* This used to be an fputs(), but since the string might contain NUL's,
  * we now use fwrite().
  */
-#define ECHO do { if (fwrite( yytext, (size_t) yyleng, 1, yyout )) {} } while (0)
+#define ECHO fwrite( fortran_text, fortran_leng, 1, fortran_out )
 #endif
 
 /* Gets input and stuffs it into "buf".  number of characters read, or YY_NULL,
@@ -10687,20 +10447,20 @@ static int input ( void );
 	if ( YY_CURRENT_BUFFER_LVALUE->yy_is_interactive ) \
 		{ \
 		int c = '*'; \
-		int n; \
+		yy_size_t n; \
 		for ( n = 0; n < max_size && \
-			     (c = getc( yyin )) != EOF && c != '\n'; ++n ) \
+			     (c = getc( fortran_in )) != EOF && c != '\n'; ++n ) \
 			buf[n] = (char) c; \
 		if ( c == '\n' ) \
 			buf[n++] = (char) c; \
-		if ( c == EOF && ferror( yyin ) ) \
+		if ( c == EOF && ferror( fortran_in ) ) \
 			YY_FATAL_ERROR( "input in flex scanner failed" ); \
 		result = n; \
 		} \
 	else \
 		{ \
 		errno=0; \
-		while ( (result = (int) fread(buf, 1, (yy_size_t) max_size, yyin)) == 0 && ferror(yyin)) \
+		while ( (result = fread(buf, 1, max_size, fortran_in))==0 && ferror(fortran_in)) \
 			{ \
 			if( errno != EINTR) \
 				{ \
@@ -10708,7 +10468,7 @@ static int input ( void );
 				break; \
 				} \
 			errno=0; \
-			clearerr(yyin); \
+			clearerr(fortran_in); \
 			} \
 		}\
 \
@@ -10741,12 +10501,12 @@ static int input ( void );
 #ifndef YY_DECL
 #define YY_DECL_IS_OURS 1
 
-extern int yylex (void);
+extern int fortran_lex (void);
 
-#define YY_DECL int yylex (void)
+#define YY_DECL int fortran_lex (void)
 #endif /* !YY_DECL */
 
-/* Code executed at the beginning of each rule, after yytext and yyleng
+/* Code executed at the beginning of each rule, after fortran_text and fortran_leng
  * have been set up.
  */
 #ifndef YY_USER_ACTION
@@ -10755,23 +10515,30 @@ extern int yylex (void);
 
 /* Code executed at the end of each rule. */
 #ifndef YY_BREAK
-#define YY_BREAK /*LINTED*/break;
+#define YY_BREAK break;
 #endif
 
 #define YY_RULE_SETUP \
-	if ( yyleng > 0 ) \
+	if ( fortran_leng > 0 ) \
 		YY_CURRENT_BUFFER_LVALUE->yy_at_bol = \
-				(yytext[yyleng - 1] == '\n'); \
+				(fortran_text[fortran_leng - 1] == '\n'); \
 	YY_USER_ACTION
 
 /** The main scanner function which does all the work.
  */
 YY_DECL
 {
-	yy_state_type yy_current_state;
-	char *yy_cp, *yy_bp;
-	int yy_act;
+	register yy_state_type yy_current_state;
+	register char *yy_cp, *yy_bp;
+	register int yy_act;
     
+#line 101 "fortran.lex"
+
+  if (infixed) BEGIN(fortran77style) ;
+  if (infree)  BEGIN(fortran90style) ;
+
+#line 3723 "fortran.yy.c"
+
 	if ( !(yy_init) )
 		{
 		(yy_init) = 1;
@@ -10782,42 +10549,33 @@ YY_DECL
 
         /* Create the reject buffer large enough to save one state per allowed character. */
         if ( ! (yy_state_buf) )
-            (yy_state_buf) = (yy_state_type *)yyalloc(YY_STATE_BUF_SIZE  );
+            (yy_state_buf) = (yy_state_type *)fortran_alloc(YY_STATE_BUF_SIZE  );
             if ( ! (yy_state_buf) )
-                YY_FATAL_ERROR( "out of dynamic memory in yylex()" );
+                YY_FATAL_ERROR( "out of dynamic memory in fortran_lex()" );
 
 		if ( ! (yy_start) )
 			(yy_start) = 1;	/* first start state */
 
-		if ( ! yyin )
-			yyin = stdin;
+		if ( ! fortran_in )
+			fortran_in = stdin;
 
-		if ( ! yyout )
-			yyout = stdout;
+		if ( ! fortran_out )
+			fortran_out = stdout;
 
 		if ( ! YY_CURRENT_BUFFER ) {
-			yyensure_buffer_stack ();
+			fortran_ensure_buffer_stack ();
 			YY_CURRENT_BUFFER_LVALUE =
-				yy_create_buffer( yyin, YY_BUF_SIZE );
+				fortran__create_buffer(fortran_in,YY_BUF_SIZE );
 		}
 
-		yy_load_buffer_state(  );
+		fortran__load_buffer_state( );
 		}
 
-	{
-#line 101 "fortran.lex"
-
-#line 103 "fortran.lex"
-  if (infixed) BEGIN(fortran77style) ;
-  if (infree)  BEGIN(fortran90style) ;
-
-#line 3997 "fortran.yy.c"
-
-	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
+	while ( 1 )		/* loops until end-of-file is reached */
 		{
 		yy_cp = (yy_c_buf_p);
 
-		/* Support of yytext. */
+		/* Support of fortran_text. */
 		*yy_cp = (yy_hold_char);
 
 		/* yy_bp points to the position in yy_ch_buf of the start of
@@ -10834,14 +10592,14 @@ YY_DECL
 yy_match:
 		do
 			{
-			YY_CHAR yy_c = yy_ec[YY_SC_TO_UI(*yy_cp)] ;
+			register YY_CHAR yy_c = yy_ec[YY_SC_TO_UI(*yy_cp)];
 			while ( yy_chk[yy_base[yy_current_state] + yy_c] != yy_current_state )
 				{
 				yy_current_state = (int) yy_def[yy_current_state];
 				if ( yy_current_state >= 1883 )
-					yy_c = yy_meta[yy_c];
+					yy_c = yy_meta[(unsigned int) yy_c];
 				}
-			yy_current_state = yy_nxt[yy_base[yy_current_state] + yy_c];
+			yy_current_state = yy_nxt[yy_base[yy_current_state] + (unsigned int) yy_c];
 			*(yy_state_ptr)++ = yy_current_state;
 			++yy_cp;
 			}
@@ -10850,6 +10608,7 @@ yy_match:
 yy_find_action:
 		yy_current_state = *--(yy_state_ptr);
 		(yy_lp) = yy_accept[yy_current_state];
+goto find_rule; /* Shut up GCC warning -Wall */
 find_rule: /* we branch to this label when backing up */
 		for ( ; ; ) /* until we find what rule we matched */
 			{
@@ -10894,207 +10653,207 @@ do_action:	/* This label is used only to access EOF actions. */
 	{ /* beginning of action switch */
 case 1:
 YY_RULE_SETUP
-#line 106 "fortran.lex"
+#line 105 "fortran.lex"
 { return TOK_SUBROUTINE; }
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 107 "fortran.lex"
+#line 106 "fortran.lex"
 { return TOK_PROGRAM; }
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 108 "fortran.lex"
+#line 107 "fortran.lex"
 { inallocate = 1; return TOK_ALLOCATE; }
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 109 "fortran.lex"
+#line 108 "fortran.lex"
 { return TOK_CONTINUE; }
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 110 "fortran.lex"
+#line 109 "fortran.lex"
 { return TOK_NULLIFY; }
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 111 "fortran.lex"
+#line 110 "fortran.lex"
 { inallocate = 1; return TOK_DEALLOCATE; }
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 112 "fortran.lex"
+#line 111 "fortran.lex"
 { return TOK_RESULT; }
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 113 "fortran.lex"
+#line 112 "fortran.lex"
 { return TOK_FUNCTION; }
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 114 "fortran.lex"
+#line 113 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_ENDUNIT;}
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 115 "fortran.lex"
+#line 114 "fortran.lex"
 { pos_curinclude = setposcur()-9; BEGIN(includestate); }
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 116 "fortran.lex"
+#line 115 "fortran.lex"
 { return TOK_USE;}
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 117 "fortran.lex"
+#line 116 "fortran.lex"
 { return TOK_REWIND; }
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 118 "fortran.lex"
+#line 117 "fortran.lex"
 { return TOK_IMPLICIT; }
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 119 "fortran.lex"
+#line 118 "fortran.lex"
 { return TOK_NONE; }
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 120 "fortran.lex"
+#line 119 "fortran.lex"
 { return TOK_CALL; }
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 121 "fortran.lex"
+#line 120 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_TRUE; }
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 122 "fortran.lex"
+#line 121 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_FALSE; }
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 123 "fortran.lex"
+#line 122 "fortran.lex"
 { return TOK_POINT_TO; }
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
-#line 124 "fortran.lex"
+#line 123 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_ASSIGNTYPE;}
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 125 "fortran.lex"
+#line 124 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_DASTER; }
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 126 "fortran.lex"
+#line 125 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_EQV; }
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 127 "fortran.lex"
+#line 126 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_EQ;  }
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-#line 128 "fortran.lex"
+#line 127 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_GT;  }
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
-#line 129 "fortran.lex"
+#line 128 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_GE;  }
 	YY_BREAK
 case 25:
 YY_RULE_SETUP
-#line 130 "fortran.lex"
+#line 129 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_LT;  }
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
-#line 131 "fortran.lex"
+#line 130 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_LE;  }
 	YY_BREAK
 case 27:
 YY_RULE_SETUP
-#line 132 "fortran.lex"
+#line 131 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_NEQV;}
 	YY_BREAK
 case 28:
 YY_RULE_SETUP
-#line 133 "fortran.lex"
+#line 132 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_NE;  }
 	YY_BREAK
 case 29:
 YY_RULE_SETUP
-#line 134 "fortran.lex"
+#line 133 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_NOT; }
 	YY_BREAK
 case 30:
 YY_RULE_SETUP
-#line 135 "fortran.lex"
+#line 134 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_OR;  }
 	YY_BREAK
 case 31:
 YY_RULE_SETUP
-#line 136 "fortran.lex"
+#line 135 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_XOR; }
 	YY_BREAK
 case 32:
 YY_RULE_SETUP
-#line 137 "fortran.lex"
+#line 136 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_AND; }
 	YY_BREAK
 case 33:
 YY_RULE_SETUP
-#line 138 "fortran.lex"
+#line 137 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_EQUALEQUAL; }
 	YY_BREAK
 case 34:
 YY_RULE_SETUP
-#line 139 "fortran.lex"
+#line 138 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_SLASHEQUAL; }
 	YY_BREAK
 case 35:
 YY_RULE_SETUP
-#line 140 "fortran.lex"
+#line 139 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_INFEQUAL; }
 	YY_BREAK
 case 36:
 YY_RULE_SETUP
-#line 141 "fortran.lex"
+#line 140 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_SUPEQUAL; }
 	YY_BREAK
 case 37:
 YY_RULE_SETUP
-#line 142 "fortran.lex"
+#line 141 "fortran.lex"
 { return TOK_MODULE; }
 	YY_BREAK
 case 38:
 YY_RULE_SETUP
-#line 143 "fortran.lex"
+#line 142 "fortran.lex"
 { return TOK_WHILE; }
 	YY_BREAK
 case 39:
 YY_RULE_SETUP
-#line 144 "fortran.lex"
+#line 143 "fortran.lex"
 { return TOK_CONCURRENT; }
 	YY_BREAK
 case 40:
 YY_RULE_SETUP
-#line 145 "fortran.lex"
+#line 144 "fortran.lex"
 { return TOK_ENDDO; }
 	YY_BREAK
 case 41:
 YY_RULE_SETUP
-#line 146 "fortran.lex"
+#line 145 "fortran.lex"
 { strcpy(yylval.na,&fortran_text[2]);
                               if (testandextractfromlist(&List_Do_labels,&fortran_text[2]) == 1)
                               {
@@ -11109,252 +10868,252 @@ YY_RULE_SETUP
 	YY_BREAK
 case 42:
 YY_RULE_SETUP
-#line 157 "fortran.lex"
+#line 156 "fortran.lex"
 { increment_nbtokens = 0; return TOK_PLAINDO;}
 	YY_BREAK
 case 43:
 YY_RULE_SETUP
-#line 158 "fortran.lex"
+#line 157 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_REAL; }
 	YY_BREAK
 case 44:
 YY_RULE_SETUP
-#line 159 "fortran.lex"
+#line 158 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_INTEGER; }
 	YY_BREAK
 case 45:
 YY_RULE_SETUP
-#line 160 "fortran.lex"
+#line 159 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_LOGICAL; }
 	YY_BREAK
 case 46:
 YY_RULE_SETUP
-#line 161 "fortran.lex"
+#line 160 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_CHARACTER; }
 	YY_BREAK
 case 47:
 YY_RULE_SETUP
-#line 162 "fortran.lex"
+#line 161 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_HEXA;}
 	YY_BREAK
 case 48:
 YY_RULE_SETUP
-#line 163 "fortran.lex"
+#line 162 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_DOUBLEPRECISION; }
 	YY_BREAK
 case 49:
 YY_RULE_SETUP
-#line 164 "fortran.lex"
+#line 163 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_DOUBLECOMPLEX; }
 	YY_BREAK
 case 50:
 YY_RULE_SETUP
-#line 165 "fortran.lex"
+#line 164 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_COMPLEX; }
 	YY_BREAK
 case 51:
 YY_RULE_SETUP
-#line 166 "fortran.lex"
+#line 165 "fortran.lex"
 { return TOK_ALLOCATABLE; }
 	YY_BREAK
 case 52:
 YY_RULE_SETUP
-#line 167 "fortran.lex"
+#line 166 "fortran.lex"
 { return TOK_CLOSE; }
 	YY_BREAK
 case 53:
 YY_RULE_SETUP
-#line 168 "fortran.lex"
+#line 167 "fortran.lex"
 { return TOK_INQUIRE; }
 	YY_BREAK
 case 54:
 YY_RULE_SETUP
-#line 169 "fortran.lex"
+#line 168 "fortran.lex"
 { return TOK_DIMENSION; }
 	YY_BREAK
 case 55:
 YY_RULE_SETUP
-#line 170 "fortran.lex"
+#line 169 "fortran.lex"
 { return TOK_PAUSE; }
 	YY_BREAK
 case 56:
 YY_RULE_SETUP
-#line 171 "fortran.lex"
+#line 170 "fortran.lex"
 { return TOK_EQUIVALENCE; }
 	YY_BREAK
 case 57:
 YY_RULE_SETUP
-#line 172 "fortran.lex"
+#line 171 "fortran.lex"
 { return TOK_STOP; }
 	YY_BREAK
 case 58:
 YY_RULE_SETUP
-#line 173 "fortran.lex"
+#line 172 "fortran.lex"
 { return TOK_WHERE; }
 	YY_BREAK
 case 59:
 YY_RULE_SETUP
-#line 174 "fortran.lex"
+#line 173 "fortran.lex"
 { return TOK_ENDWHERE; }
 	YY_BREAK
 case 60:
 YY_RULE_SETUP
-#line 175 "fortran.lex"
+#line 174 "fortran.lex"
 { return TOK_ELSEWHEREPAR; }
 	YY_BREAK
 case 61:
 YY_RULE_SETUP
-#line 176 "fortran.lex"
+#line 175 "fortran.lex"
 { return TOK_ELSEWHERE; }
 	YY_BREAK
 case 62:
 YY_RULE_SETUP
-#line 177 "fortran.lex"
+#line 176 "fortran.lex"
 { return TOK_CONTAINS; }
 	YY_BREAK
 case 63:
 YY_RULE_SETUP
-#line 178 "fortran.lex"
+#line 177 "fortran.lex"
 { return TOK_ONLY; }
 	YY_BREAK
 case 64:
 YY_RULE_SETUP
-#line 179 "fortran.lex"
+#line 178 "fortran.lex"
 { return TOK_PARAMETER; }
 	YY_BREAK
 case 65:
 YY_RULE_SETUP
-#line 180 "fortran.lex"
+#line 179 "fortran.lex"
 { return TOK_RECURSIVE; }
 	YY_BREAK
 case 66:
 YY_RULE_SETUP
-#line 181 "fortran.lex"
+#line 180 "fortran.lex"
 { return TOK_COMMON; }
 	YY_BREAK
 case 67:
 YY_RULE_SETUP
-#line 182 "fortran.lex"
+#line 181 "fortran.lex"
 { return TOK_GLOBAL; }
 	YY_BREAK
 case 68:
 YY_RULE_SETUP
-#line 183 "fortran.lex"
+#line 182 "fortran.lex"
 { return TOK_EXTERNAL; }
 	YY_BREAK
 case 69:
 YY_RULE_SETUP
-#line 184 "fortran.lex"
+#line 183 "fortran.lex"
 { intent_spec = 1; return TOK_INTENT; }
 	YY_BREAK
 case 70:
 YY_RULE_SETUP
-#line 185 "fortran.lex"
+#line 184 "fortran.lex"
 { return TOK_POINTER; }
 	YY_BREAK
 case 71:
 YY_RULE_SETUP
-#line 186 "fortran.lex"
+#line 185 "fortran.lex"
 { return TOK_OPTIONAL; }
 	YY_BREAK
 case 72:
 YY_RULE_SETUP
-#line 187 "fortran.lex"
+#line 186 "fortran.lex"
 { return TOK_SAVE; }
 	YY_BREAK
 case 73:
 YY_RULE_SETUP
-#line 188 "fortran.lex"
+#line 187 "fortran.lex"
 { pos_cur_decl = setposcur()-strlen(fortran_text); return TOK_TYPEPAR; }
 	YY_BREAK
 case 74:
 YY_RULE_SETUP
-#line 189 "fortran.lex"
+#line 188 "fortran.lex"
 { return TOK_TYPE; }
 	YY_BREAK
 case 75:
 YY_RULE_SETUP
-#line 190 "fortran.lex"
+#line 189 "fortran.lex"
 { return TOK_ENDTYPE; }
 	YY_BREAK
 case 76:
 YY_RULE_SETUP
-#line 191 "fortran.lex"
+#line 190 "fortran.lex"
 { if (inallocate == 1) return TOK_STAT; else { strcpy(yylval.na,fortran_text); return TOK_NAME; } }
 	YY_BREAK
 case 77:
 YY_RULE_SETUP
-#line 192 "fortran.lex"
+#line 191 "fortran.lex"
 { return TOK_OPEN; }
 	YY_BREAK
 case 78:
 YY_RULE_SETUP
-#line 193 "fortran.lex"
+#line 192 "fortran.lex"
 { return TOK_RETURN; }
 	YY_BREAK
 case 79:
 YY_RULE_SETUP
-#line 194 "fortran.lex"
+#line 193 "fortran.lex"
 { return TOK_EXIT; }
 	YY_BREAK
 case 80:
 YY_RULE_SETUP
-#line 195 "fortran.lex"
+#line 194 "fortran.lex"
 { return TOK_PRINT; }
 	YY_BREAK
 case 81:
 YY_RULE_SETUP
-#line 196 "fortran.lex"
+#line 195 "fortran.lex"
 { return TOK_PROCEDURE; }
 	YY_BREAK
 case 82:
 YY_RULE_SETUP
-#line 197 "fortran.lex"
+#line 196 "fortran.lex"
 { in_io_control_spec = 1; return TOK_READ_PAR; }
 	YY_BREAK
 case 83:
 YY_RULE_SETUP
-#line 198 "fortran.lex"
+#line 197 "fortran.lex"
 { return TOK_READ; }
 	YY_BREAK
 case 84:
 YY_RULE_SETUP
-#line 199 "fortran.lex"
+#line 198 "fortran.lex"
 { return TOK_NAMELIST; }
 	YY_BREAK
 case 85:
 YY_RULE_SETUP
-#line 200 "fortran.lex"
+#line 199 "fortran.lex"
 { in_io_control_spec = 1; return TOK_WRITE_PAR; }
 	YY_BREAK
 case 86:
 YY_RULE_SETUP
-#line 201 "fortran.lex"
+#line 200 "fortran.lex"
 { return TOK_WRITE; }
 	YY_BREAK
 case 87:
 YY_RULE_SETUP
-#line 202 "fortran.lex"
+#line 201 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_FLUSH; }
 	YY_BREAK
 case 88:
 YY_RULE_SETUP
-#line 203 "fortran.lex"
+#line 202 "fortran.lex"
 { return TOK_TARGET; }
 	YY_BREAK
 case 89:
 YY_RULE_SETUP
-#line 204 "fortran.lex"
+#line 203 "fortran.lex"
 { return TOK_PUBLIC; }
 	YY_BREAK
 case 90:
 YY_RULE_SETUP
-#line 205 "fortran.lex"
+#line 204 "fortran.lex"
 { return TOK_PRIVATE; }
 	YY_BREAK
 case 91:
 YY_RULE_SETUP
-#line 206 "fortran.lex"
+#line 205 "fortran.lex"
 { strcpy(yylval.na,fortran_text);
                                if (intent_spec==1)
                                 {return TOK_IN; }
@@ -11366,17 +11125,17 @@ YY_RULE_SETUP
 	YY_BREAK
 case 92:
 YY_RULE_SETUP
-#line 214 "fortran.lex"
+#line 213 "fortran.lex"
 { pos_curdata = setposcur()-strlen(fortran_text); /*Init_List_Data_Var();*/ return TOK_DATA; }
 	YY_BREAK
 case 93:
 YY_RULE_SETUP
-#line 215 "fortran.lex"
+#line 214 "fortran.lex"
 { return TOK_PLAINGOTO; }
 	YY_BREAK
 case 94:
 YY_RULE_SETUP
-#line 216 "fortran.lex"
+#line 215 "fortran.lex"
 { strcpy(yylval.na,fortran_text);
                                if (intent_spec==1)
                                 {return TOK_OUT; }
@@ -11388,7 +11147,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 95:
 YY_RULE_SETUP
-#line 224 "fortran.lex"
+#line 223 "fortran.lex"
 { strcpy(yylval.na,fortran_text);
                                if (intent_spec==1)
                                 {return TOK_IN; }
@@ -11400,131 +11159,130 @@ YY_RULE_SETUP
 	YY_BREAK
 case 96:
 YY_RULE_SETUP
-#line 232 "fortran.lex"
+#line 231 "fortran.lex"
 { return TOK_INTRINSIC; }
 	YY_BREAK
 case 97:
 YY_RULE_SETUP
-#line 233 "fortran.lex"
+#line 232 "fortran.lex"
 { return TOK_THEN; }
 	YY_BREAK
 case 98:
 YY_RULE_SETUP
-#line 234 "fortran.lex"
+#line 233 "fortran.lex"
 { return TOK_ELSEIF; }
 	YY_BREAK
 case 99:
 YY_RULE_SETUP
-#line 235 "fortran.lex"
+#line 234 "fortran.lex"
 { return TOK_ELSE; }
 	YY_BREAK
 case 100:
 YY_RULE_SETUP
-#line 236 "fortran.lex"
+#line 235 "fortran.lex"
 { return TOK_ENDIF; }
 	YY_BREAK
 case 101:
 YY_RULE_SETUP
-#line 237 "fortran.lex"
+#line 236 "fortran.lex"
 {strcpy(yylval.na,fortran_text);
                             return TOK_LOGICALIF_PAR;
                             }
 	YY_BREAK
 case 102:
 /* rule 102 can match eol */
-*yy_cp = (yy_hold_char); /* undo effects of setting up yytext */
-YY_LINENO_REWIND_TO(yy_bp + 2);
+*yy_cp = (yy_hold_char); /* undo effects of setting up fortran_text */
 (yy_c_buf_p) = yy_cp = yy_bp + 2;
-YY_DO_BEFORE_ACTION; /* set up yytext again */
+YY_DO_BEFORE_ACTION; /* set up fortran_text again */
 YY_RULE_SETUP
-#line 240 "fortran.lex"
+#line 239 "fortran.lex"
 {strcpy(yylval.na,fortran_text);
                             return TOK_NAME;
                             }
 	YY_BREAK
 case 103:
 YY_RULE_SETUP
-#line 243 "fortran.lex"
+#line 242 "fortran.lex"
 {strcpy(yylval.na,fortran_text);
                             return TOK_LOGICALIF_PAR;
                             }
 	YY_BREAK
 case 104:
 YY_RULE_SETUP
-#line 246 "fortran.lex"
+#line 245 "fortran.lex"
 { return TOK_SELECTCASE; }
 	YY_BREAK
 case 105:
 YY_RULE_SETUP
-#line 247 "fortran.lex"
+#line 246 "fortran.lex"
 { if (in_select_case_stmt > 0) return TOK_CASE ; else return TOK_NAME;}
 	YY_BREAK
 case 106:
 YY_RULE_SETUP
-#line 248 "fortran.lex"
+#line 247 "fortran.lex"
 { return TOK_DEFAULT; }
 	YY_BREAK
 case 107:
 YY_RULE_SETUP
-#line 249 "fortran.lex"
+#line 248 "fortran.lex"
 { return TOK_ENDSELECT; }
 	YY_BREAK
 case 108:
 YY_RULE_SETUP
-#line 250 "fortran.lex"
+#line 249 "fortran.lex"
 { return TOK_FILE; }
 	YY_BREAK
 case 109:
 YY_RULE_SETUP
-#line 251 "fortran.lex"
+#line 250 "fortran.lex"
 { return TOK_ACCESS; }
 	YY_BREAK
 case 110:
 YY_RULE_SETUP
-#line 252 "fortran.lex"
+#line 251 "fortran.lex"
 { return TOK_ACTION; }
 	YY_BREAK
 case 111:
 YY_RULE_SETUP
-#line 253 "fortran.lex"
+#line 252 "fortran.lex"
 { return TOK_IOLENGTH; }
 	YY_BREAK
 case 112:
 YY_RULE_SETUP
-#line 254 "fortran.lex"
+#line 253 "fortran.lex"
 { return TOK_UNIT; }
 	YY_BREAK
 case 113:
 YY_RULE_SETUP
-#line 255 "fortran.lex"
+#line 254 "fortran.lex"
 { return TOK_OPENED; }
 	YY_BREAK
 case 114:
 YY_RULE_SETUP
-#line 256 "fortran.lex"
+#line 255 "fortran.lex"
 { return TOK_FMT; }
 	YY_BREAK
 case 115:
 YY_RULE_SETUP
-#line 257 "fortran.lex"
+#line 256 "fortran.lex"
 { return TOK_NML; }
 	YY_BREAK
 case 116:
 YY_RULE_SETUP
-#line 258 "fortran.lex"
+#line 257 "fortran.lex"
 { return TOK_END; }
 	YY_BREAK
 case 117:
 YY_RULE_SETUP
-#line 259 "fortran.lex"
+#line 258 "fortran.lex"
 { return TOK_EOR; }
 	YY_BREAK
 case 118:
-*yy_cp = (yy_hold_char); /* undo effects of setting up yytext */
+*yy_cp = (yy_hold_char); /* undo effects of setting up fortran_text */
 (yy_c_buf_p) = yy_cp = yy_bp + 3;
-YY_DO_BEFORE_ACTION; /* set up yytext again */
+YY_DO_BEFORE_ACTION; /* set up fortran_text again */
 YY_RULE_SETUP
-#line 260 "fortran.lex"
+#line 259 "fortran.lex"
 {
                             if (in_char_selector ==1)
                                return TOK_LEN;
@@ -11535,11 +11293,11 @@ YY_RULE_SETUP
                             }
 	YY_BREAK
 case 119:
-*yy_cp = (yy_hold_char); /* undo effects of setting up yytext */
+*yy_cp = (yy_hold_char); /* undo effects of setting up fortran_text */
 (yy_c_buf_p) = yy_cp = yy_bp + 4;
-YY_DO_BEFORE_ACTION; /* set up yytext again */
+YY_DO_BEFORE_ACTION; /* set up fortran_text again */
 YY_RULE_SETUP
-#line 268 "fortran.lex"
+#line 267 "fortran.lex"
 {
                             if ((in_char_selector==1) || (in_kind_selector == 1))
                                return TOK_KIND;
@@ -11551,50 +11309,50 @@ YY_RULE_SETUP
 	YY_BREAK
 case 120:
 YY_RULE_SETUP
-#line 276 "fortran.lex"
+#line 275 "fortran.lex"
 { return TOK_ERRMSG; }
 	YY_BREAK
 case 121:
 YY_RULE_SETUP
-#line 277 "fortran.lex"
+#line 276 "fortran.lex"
 { return TOK_MOLD; }
 	YY_BREAK
 case 122:
 YY_RULE_SETUP
-#line 278 "fortran.lex"
+#line 277 "fortran.lex"
 { return TOK_SOURCE; }
 	YY_BREAK
 case 123:
 YY_RULE_SETUP
-#line 279 "fortran.lex"
+#line 278 "fortran.lex"
 { return TOK_POSITION; }
 	YY_BREAK
 case 124:
 YY_RULE_SETUP
-#line 280 "fortran.lex"
+#line 279 "fortran.lex"
 { return TOK_IOMSG; }
 	YY_BREAK
 case 125:
 YY_RULE_SETUP
-#line 281 "fortran.lex"
+#line 280 "fortran.lex"
 { return TOK_IOSTAT; }
 	YY_BREAK
 case 126:
 YY_RULE_SETUP
-#line 282 "fortran.lex"
+#line 281 "fortran.lex"
 { return TOK_ERR; }
 	YY_BREAK
 case 127:
 YY_RULE_SETUP
-#line 283 "fortran.lex"
+#line 282 "fortran.lex"
 { return TOK_FORM; }
 	YY_BREAK
 case 128:
-*yy_cp = (yy_hold_char); /* undo effects of setting up yytext */
+*yy_cp = (yy_hold_char); /* undo effects of setting up fortran_text */
 (yy_c_buf_p) = yy_cp = yy_bp + 4;
-YY_DO_BEFORE_ACTION; /* set up yytext again */
+YY_DO_BEFORE_ACTION; /* set up fortran_text again */
 YY_RULE_SETUP
-#line 284 "fortran.lex"
+#line 283 "fortran.lex"
 {
                             if (in_inquire==1)
                                return TOK_NAME_EQ;
@@ -11606,15 +11364,15 @@ YY_RULE_SETUP
 	YY_BREAK
 case 129:
 YY_RULE_SETUP
-#line 292 "fortran.lex"
+#line 291 "fortran.lex"
 { return TOK_RECL; }
 	YY_BREAK
 case 130:
-*yy_cp = (yy_hold_char); /* undo effects of setting up yytext */
+*yy_cp = (yy_hold_char); /* undo effects of setting up fortran_text */
 (yy_c_buf_p) = yy_cp = yy_bp + 3;
-YY_DO_BEFORE_ACTION; /* set up yytext again */
+YY_DO_BEFORE_ACTION; /* set up fortran_text again */
 YY_RULE_SETUP
-#line 293 "fortran.lex"
+#line 292 "fortran.lex"
 { if (in_io_control_spec == 1)
                               return TOK_REC;
                              else
@@ -11624,11 +11382,11 @@ YY_RULE_SETUP
                              }
 	YY_BREAK
 case 131:
-*yy_cp = (yy_hold_char); /* undo effects of setting up yytext */
+*yy_cp = (yy_hold_char); /* undo effects of setting up fortran_text */
 (yy_c_buf_p) = yy_cp = yy_bp + 6;
-YY_DO_BEFORE_ACTION; /* set up yytext again */
+YY_DO_BEFORE_ACTION; /* set up fortran_text again */
 YY_RULE_SETUP
-#line 300 "fortran.lex"
+#line 299 "fortran.lex"
 { if (close_or_connect == 1)
                               return TOK_STATUS;
                              else
@@ -11639,72 +11397,72 @@ YY_RULE_SETUP
 	YY_BREAK
 case 132:
 YY_RULE_SETUP
-#line 307 "fortran.lex"
+#line 306 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_NAME;}
 	YY_BREAK
 case 133:
 YY_RULE_SETUP
-#line 308 "fortran.lex"
+#line 307 "fortran.lex"
 { return TOK_EXIST; }
 	YY_BREAK
 case 134:
 YY_RULE_SETUP
-#line 309 "fortran.lex"
+#line 308 "fortran.lex"
 { return TOK_CYCLE; }
 	YY_BREAK
 case 135:
 YY_RULE_SETUP
-#line 310 "fortran.lex"
+#line 309 "fortran.lex"
 { return TOK_BACKSPACE; }
 	YY_BREAK
 case 136:
 YY_RULE_SETUP
-#line 311 "fortran.lex"
+#line 310 "fortran.lex"
 { return TOK_FOURDOTS;  }
 	YY_BREAK
 case 137:
 /* rule 137 can match eol */
 YY_RULE_SETUP
-#line 312 "fortran.lex"
+#line 311 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_DSLASH; }
 	YY_BREAK
 case 138:
 YY_RULE_SETUP
-#line 313 "fortran.lex"
+#line 312 "fortran.lex"
 { return TOK_LEFTAB; }
 	YY_BREAK
 case 139:
 YY_RULE_SETUP
-#line 314 "fortran.lex"
+#line 313 "fortran.lex"
 { return TOK_RIGHTAB; }
 	YY_BREAK
 case 140:
 YY_RULE_SETUP
-#line 315 "fortran.lex"
+#line 314 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_SLASH; }
 	YY_BREAK
 case 141:
 /* rule 141 can match eol */
 YY_RULE_SETUP
-#line 316 "fortran.lex"
+#line 315 "fortran.lex"
 {
                               INCREMENT_LINE_NUM() ; strcpy(yylval.na,fortran_text); return TOK_CHAR_CUT; }
 	YY_BREAK
 case 142:
 /* rule 142 can match eol */
 YY_RULE_SETUP
-#line 318 "fortran.lex"
+#line 317 "fortran.lex"
 {Add_Include_1(fortran_text);}
 	YY_BREAK
 case 143:
 YY_RULE_SETUP
-#line 319 "fortran.lex"
+#line 318 "fortran.lex"
 {}
 	YY_BREAK
 case 144:
 /* rule 144 can match eol */
 YY_RULE_SETUP
-#line 320 "fortran.lex"
+#line 319 "fortran.lex"
 {
                   if (inmoduledeclare == 0 )
                   {
@@ -11717,69 +11475,68 @@ YY_RULE_SETUP
 case 145:
 /* rule 145 can match eol */
 YY_RULE_SETUP
-#line 328 "fortran.lex"
+#line 327 "fortran.lex"
 { strcpy(yylval.na,fortran_text);return TOK_CHAR_CONSTANT; }
 	YY_BREAK
 case 146:
 /* rule 146 can match eol */
 YY_RULE_SETUP
-#line 329 "fortran.lex"
+#line 328 "fortran.lex"
 { strcpy(yylval.na,fortran_text);return TOK_CHAR_MESSAGE; }
 	YY_BREAK
 case 147:
 YY_RULE_SETUP
-#line 330 "fortran.lex"
+#line 329 "fortran.lex"
 { BEGIN(donottreat_interface); }
 	YY_BREAK
 case 148:
 /* rule 148 can match eol */
 YY_RULE_SETUP
-#line 331 "fortran.lex"
+#line 330 "fortran.lex"
 { out_of_donottreat(); return '\n'; }
 	YY_BREAK
 case 149:
 /* rule 149 can match eol */
 YY_RULE_SETUP
-#line 332 "fortran.lex"
+#line 331 "fortran.lex"
 {INCREMENT_LINE_NUM() ; }
 	YY_BREAK
 case 150:
 /* rule 150 can match eol */
 YY_RULE_SETUP
-#line 333 "fortran.lex"
+#line 332 "fortran.lex"
 {strcpy(yylval.na,fortran_text); removenewline(yylval.na);
                             return TOK_NAME; }
 	YY_BREAK
 case 151:
 YY_RULE_SETUP
-#line 335 "fortran.lex"
+#line 334 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return TOK_NAME; }
 	YY_BREAK
 case 152:
 YY_RULE_SETUP
-#line 336 "fortran.lex"
+#line 335 "fortran.lex"
 {strcpy(yylval.na,fortran_text); return TOK_CSTREAL; }
 	YY_BREAK
 case 153:
 /* rule 153 can match eol */
-*yy_cp = (yy_hold_char); /* undo effects of setting up yytext */
-YY_LINENO_REWIND_TO(yy_cp - 1);
+*yy_cp = (yy_hold_char); /* undo effects of setting up fortran_text */
 (yy_c_buf_p) = yy_cp -= 1;
-YY_DO_BEFORE_ACTION; /* set up yytext again */
+YY_DO_BEFORE_ACTION; /* set up fortran_text again */
 YY_RULE_SETUP
-#line 337 "fortran.lex"
+#line 336 "fortran.lex"
 {  // REAL1
                               strcpy(yylval.na,fortran_text); return TOK_CSTREAL; }
 	YY_BREAK
 case 154:
 YY_RULE_SETUP
-#line 339 "fortran.lex"
+#line 338 "fortran.lex"
 {  // REAL2
                               strcpy(yylval.na,fortran_text); return TOK_CSTREAL; }
 	YY_BREAK
 case 155:
 YY_RULE_SETUP
-#line 341 "fortran.lex"
+#line 340 "fortran.lex"
 { strcpy(yylval.na,fortran_text);
                              if (lastwasendofstmt == 0)
                               return TOK_CSTINT;
@@ -11797,20 +11554,20 @@ YY_RULE_SETUP
 	YY_BREAK
 case 156:
 YY_RULE_SETUP
-#line 355 "fortran.lex"
+#line 354 "fortran.lex"
 {}
 	YY_BREAK
 case 157:
 YY_RULE_SETUP
-#line 356 "fortran.lex"
+#line 355 "fortran.lex"
 {}
 	YY_BREAK
 case 158:
-*yy_cp = (yy_hold_char); /* undo effects of setting up yytext */
+*yy_cp = (yy_hold_char); /* undo effects of setting up fortran_text */
 (yy_c_buf_p) = yy_cp = yy_bp + 1;
-YY_DO_BEFORE_ACTION; /* set up yytext again */
+YY_DO_BEFORE_ACTION; /* set up fortran_text again */
 YY_RULE_SETUP
-#line 357 "fortran.lex"
+#line 356 "fortran.lex"
 {
                             in_complex_literal = -1;
                             return (int) *fortran_text;
@@ -11818,108 +11575,108 @@ YY_RULE_SETUP
 	YY_BREAK
 case 159:
 YY_RULE_SETUP
-#line 361 "fortran.lex"
+#line 360 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return (int) *fortran_text; }
 	YY_BREAK
 case 160:
 YY_RULE_SETUP
-#line 362 "fortran.lex"
+#line 361 "fortran.lex"
 { strcpy(yylval.na,fortran_text); return (int) *fortran_text; }
 	YY_BREAK
 case 161:
 YY_RULE_SETUP
-#line 363 "fortran.lex"
+#line 362 "fortran.lex"
 { lastwasendofstmt=1; token_since_endofstmt = 0; return TOK_SEMICOLON; }
 	YY_BREAK
 case 162:
 YY_RULE_SETUP
-#line 364 "fortran.lex"
+#line 363 "fortran.lex"
 { if (in_complex_literal==-1) {return TOK_COMMACOMPLEX; in_complex_literal=0;} else; return (int) *fortran_text; }
 	YY_BREAK
 case 163:
 YY_RULE_SETUP
-#line 365 "fortran.lex"
+#line 364 "fortran.lex"
 { return (int) *fortran_text; }
 	YY_BREAK
 case 164:
 YY_RULE_SETUP
-#line 366 "fortran.lex"
+#line 365 "fortran.lex"
 { return (int) *fortran_text; }
 	YY_BREAK
 case 165:
 YY_RULE_SETUP
-#line 367 "fortran.lex"
+#line 366 "fortran.lex"
 { return (int) *fortran_text; }
 	YY_BREAK
 case 166:
 /* rule 166 can match eol */
 YY_RULE_SETUP
-#line 368 "fortran.lex"
+#line 367 "fortran.lex"
 { INCREMENT_LINE_NUM() ; lastwasendofstmt=1; token_since_endofstmt = 0; increment_nbtokens = 0; return '\n'; }
 	YY_BREAK
 case 167:
 YY_RULE_SETUP
-#line 369 "fortran.lex"
+#line 368 "fortran.lex"
 {increment_nbtokens = 0;}
 	YY_BREAK
 case 168:
 /* rule 168 can match eol */
 YY_RULE_SETUP
-#line 370 "fortran.lex"
+#line 369 "fortran.lex"
 {
                               return TOK_LABEL_FORMAT; }
 	YY_BREAK
 case 169:
 /* rule 169 can match eol */
 YY_RULE_SETUP
-#line 372 "fortran.lex"
+#line 371 "fortran.lex"
 {return TOK_LABEL_FORMAT; }
 	YY_BREAK
 case 170:
 /* rule 170 can match eol */
 YY_RULE_SETUP
-#line 373 "fortran.lex"
+#line 372 "fortran.lex"
 { INCREMENT_LINE_NUM() ; newlinef90=1; }
 	YY_BREAK
 case 171:
 /* rule 171 can match eol */
 YY_RULE_SETUP
-#line 374 "fortran.lex"
+#line 373 "fortran.lex"
 { INCREMENT_LINE_NUM() ;}
 	YY_BREAK
 case 172:
 /* rule 172 can match eol */
 YY_RULE_SETUP
-#line 376 "fortran.lex"
+#line 375 "fortran.lex"
 {INCREMENT_LINE_NUM() ; BEGIN(donottreat); }
 	YY_BREAK
 case 173:
 /* rule 173 can match eol */
 YY_RULE_SETUP
-#line 377 "fortran.lex"
+#line 376 "fortran.lex"
 {out_of_donottreat(); return '\n'; }
 	YY_BREAK
 case 174:
 /* rule 174 can match eol */
 YY_RULE_SETUP
-#line 378 "fortran.lex"
+#line 377 "fortran.lex"
 {INCREMENT_LINE_NUM() ; }
 	YY_BREAK
 case 175:
 /* rule 175 can match eol */
 YY_RULE_SETUP
-#line 379 "fortran.lex"
+#line 378 "fortran.lex"
 {INCREMENT_LINE_NUM() ; increment_nbtokens = 0;}
 	YY_BREAK
 case 176:
 /* rule 176 can match eol */
 YY_RULE_SETUP
-#line 380 "fortran.lex"
+#line 379 "fortran.lex"
 {INCREMENT_LINE_NUM() ; increment_nbtokens = 0;}
 	YY_BREAK
 case 177:
 YY_RULE_SETUP
-#line 381 "fortran.lex"
+#line 380 "fortran.lex"
 {increment_nbtokens = 0;}
 	YY_BREAK
 case YY_STATE_EOF(INITIAL):
@@ -11930,15 +11687,15 @@ case YY_STATE_EOF(donottreat_interface):
 case YY_STATE_EOF(includestate):
 case YY_STATE_EOF(fortran77style):
 case YY_STATE_EOF(fortran90style):
-#line 382 "fortran.lex"
+#line 381 "fortran.lex"
 {endoffile = 1; yyterminate();}
 	YY_BREAK
 case 178:
 YY_RULE_SETUP
-#line 383 "fortran.lex"
+#line 382 "fortran.lex"
 ECHO;
 	YY_BREAK
-#line 5124 "fortran.yy.c"
+#line 4881 "fortran.yy.c"
 
 	case YY_END_OF_BUFFER:
 		{
@@ -11953,15 +11710,15 @@ ECHO;
 			{
 			/* We're scanning a new file or input source.  It's
 			 * possible that this happened because the user
-			 * just pointed yyin at a new source and called
-			 * yylex().  If so, then we have to assure
+			 * just pointed fortran_in at a new source and called
+			 * fortran_lex().  If so, then we have to assure
 			 * consistency between YY_CURRENT_BUFFER and our
 			 * globals.  Here is the right place to do so, because
 			 * this is the first action (other than possibly a
 			 * back-up) that will match for the new input source.
 			 */
 			(yy_n_chars) = YY_CURRENT_BUFFER_LVALUE->yy_n_chars;
-			YY_CURRENT_BUFFER_LVALUE->yy_input_file = yyin;
+			YY_CURRENT_BUFFER_LVALUE->yy_input_file = fortran_in;
 			YY_CURRENT_BUFFER_LVALUE->yy_buffer_status = YY_BUFFER_NORMAL;
 			}
 
@@ -12014,11 +11771,11 @@ ECHO;
 				{
 				(yy_did_buffer_switch_on_eof) = 0;
 
-				if ( yywrap(  ) )
+				if ( fortran_wrap( ) )
 					{
 					/* Note: because we've taken care in
 					 * yy_get_next_buffer() to have set up
-					 * yytext, we can now set up
+					 * fortran_text, we can now set up
 					 * yy_c_buf_p so that if some total
 					 * hoser (like flex itself) wants to
 					 * call the scanner after we return the
@@ -12067,8 +11824,7 @@ ECHO;
 			"fatal flex scanner internal error--no action found" );
 	} /* end of action switch */
 		} /* end of scanning one token */
-	} /* end of user's declarations */
-} /* end of yylex */
+} /* end of fortran_lex */
 
 /* yy_get_next_buffer - try to read in a new buffer
  *
@@ -12079,9 +11835,9 @@ ECHO;
  */
 static int yy_get_next_buffer (void)
 {
-    	char *dest = YY_CURRENT_BUFFER_LVALUE->yy_ch_buf;
-	char *source = (yytext_ptr);
-	int number_to_move, i;
+    	register char *dest = YY_CURRENT_BUFFER_LVALUE->yy_ch_buf;
+	register char *source = (yytext_ptr);
+	register int number_to_move, i;
 	int ret_val;
 
 	if ( (yy_c_buf_p) > &YY_CURRENT_BUFFER_LVALUE->yy_ch_buf[(yy_n_chars) + 1] )
@@ -12110,7 +11866,7 @@ static int yy_get_next_buffer (void)
 	/* Try to read more data. */
 
 	/* First move last chars to start of buffer. */
-	number_to_move = (int) ((yy_c_buf_p) - (yytext_ptr) - 1);
+	number_to_move = (int) ((yy_c_buf_p) - (yytext_ptr)) - 1;
 
 	for ( i = 0; i < number_to_move; ++i )
 		*(dest++) = *(source++);
@@ -12123,7 +11879,7 @@ static int yy_get_next_buffer (void)
 
 	else
 		{
-			int num_to_read =
+			yy_size_t num_to_read =
 			YY_CURRENT_BUFFER_LVALUE->yy_buf_size - number_to_move - 1;
 
 		while ( num_to_read <= 0 )
@@ -12149,7 +11905,7 @@ static int yy_get_next_buffer (void)
 		if ( number_to_move == YY_MORE_ADJ )
 			{
 			ret_val = EOB_ACT_END_OF_FILE;
-			yyrestart( yyin  );
+			fortran_restart(fortran_in  );
 			}
 
 		else
@@ -12163,15 +11919,12 @@ static int yy_get_next_buffer (void)
 	else
 		ret_val = EOB_ACT_CONTINUE_SCAN;
 
-	if (((yy_n_chars) + number_to_move) > YY_CURRENT_BUFFER_LVALUE->yy_buf_size) {
+	if ((yy_size_t) ((yy_n_chars) + number_to_move) > YY_CURRENT_BUFFER_LVALUE->yy_buf_size) {
 		/* Extend the array by 50%, plus the number we really need. */
-		int new_size = (yy_n_chars) + number_to_move + ((yy_n_chars) >> 1);
-		YY_CURRENT_BUFFER_LVALUE->yy_ch_buf = (char *) yyrealloc(
-			(void *) YY_CURRENT_BUFFER_LVALUE->yy_ch_buf, (yy_size_t) new_size  );
+		yy_size_t new_size = (yy_n_chars) + number_to_move + ((yy_n_chars) >> 1);
+		YY_CURRENT_BUFFER_LVALUE->yy_ch_buf = (char *) fortran_realloc((void *) YY_CURRENT_BUFFER_LVALUE->yy_ch_buf,new_size  );
 		if ( ! YY_CURRENT_BUFFER_LVALUE->yy_ch_buf )
 			YY_FATAL_ERROR( "out of dynamic memory in yy_get_next_buffer()" );
-		/* "- 2" to take care of EOB's */
-		YY_CURRENT_BUFFER_LVALUE->yy_buf_size = (int) (new_size - 2);
 	}
 
 	(yy_n_chars) += number_to_move;
@@ -12187,8 +11940,8 @@ static int yy_get_next_buffer (void)
 
     static yy_state_type yy_get_previous_state (void)
 {
-	yy_state_type yy_current_state;
-	char *yy_cp;
+	register yy_state_type yy_current_state;
+	register char *yy_cp;
     
 	yy_current_state = (yy_start);
 	yy_current_state += YY_AT_BOL();
@@ -12198,14 +11951,14 @@ static int yy_get_next_buffer (void)
 
 	for ( yy_cp = (yytext_ptr) + YY_MORE_ADJ; yy_cp < (yy_c_buf_p); ++yy_cp )
 		{
-		YY_CHAR yy_c = (*yy_cp ? yy_ec[YY_SC_TO_UI(*yy_cp)] : 1);
+		register YY_CHAR yy_c = (*yy_cp ? yy_ec[YY_SC_TO_UI(*yy_cp)] : 1);
 		while ( yy_chk[yy_base[yy_current_state] + yy_c] != yy_current_state )
 			{
 			yy_current_state = (int) yy_def[yy_current_state];
 			if ( yy_current_state >= 1883 )
-				yy_c = yy_meta[yy_c];
+				yy_c = yy_meta[(unsigned int) yy_c];
 			}
-		yy_current_state = yy_nxt[yy_base[yy_current_state] + yy_c];
+		yy_current_state = yy_nxt[yy_base[yy_current_state] + (unsigned int) yy_c];
 		*(yy_state_ptr)++ = yy_current_state;
 		}
 
@@ -12219,41 +11972,39 @@ static int yy_get_next_buffer (void)
  */
     static yy_state_type yy_try_NUL_trans  (yy_state_type yy_current_state )
 {
-	int yy_is_jam;
+	register int yy_is_jam;
     
-	YY_CHAR yy_c = 1;
+	register YY_CHAR yy_c = 1;
 	while ( yy_chk[yy_base[yy_current_state] + yy_c] != yy_current_state )
 		{
 		yy_current_state = (int) yy_def[yy_current_state];
 		if ( yy_current_state >= 1883 )
-			yy_c = yy_meta[yy_c];
+			yy_c = yy_meta[(unsigned int) yy_c];
 		}
-	yy_current_state = yy_nxt[yy_base[yy_current_state] + yy_c];
+	yy_current_state = yy_nxt[yy_base[yy_current_state] + (unsigned int) yy_c];
 	yy_is_jam = (yy_current_state == 1882);
 	if ( ! yy_is_jam )
 		*(yy_state_ptr)++ = yy_current_state;
 
-		return yy_is_jam ? 0 : yy_current_state;
+	return yy_is_jam ? 0 : yy_current_state;
 }
 
-#ifndef YY_NO_UNPUT
-
-    static void yyunput (int c, char * yy_bp )
+    static void yyunput (int c, register char * yy_bp )
 {
-	char *yy_cp;
+	register char *yy_cp;
     
     yy_cp = (yy_c_buf_p);
 
-	/* undo effects of setting up yytext */
+	/* undo effects of setting up fortran_text */
 	*yy_cp = (yy_hold_char);
 
 	if ( yy_cp < YY_CURRENT_BUFFER_LVALUE->yy_ch_buf + 2 )
 		{ /* need to shift things up to make room */
 		/* +2 for EOB chars. */
-		int number_to_move = (yy_n_chars) + 2;
-		char *dest = &YY_CURRENT_BUFFER_LVALUE->yy_ch_buf[
+		register yy_size_t number_to_move = (yy_n_chars) + 2;
+		register char *dest = &YY_CURRENT_BUFFER_LVALUE->yy_ch_buf[
 					YY_CURRENT_BUFFER_LVALUE->yy_buf_size + 2];
-		char *source =
+		register char *source =
 				&YY_CURRENT_BUFFER_LVALUE->yy_ch_buf[number_to_move];
 
 		while ( source > YY_CURRENT_BUFFER_LVALUE->yy_ch_buf )
@@ -12262,7 +12013,7 @@ static int yy_get_next_buffer (void)
 		yy_cp += (int) (dest - source);
 		yy_bp += (int) (dest - source);
 		YY_CURRENT_BUFFER_LVALUE->yy_n_chars =
-			(yy_n_chars) = (int) YY_CURRENT_BUFFER_LVALUE->yy_buf_size;
+			(yy_n_chars) = YY_CURRENT_BUFFER_LVALUE->yy_buf_size;
 
 		if ( yy_cp < YY_CURRENT_BUFFER_LVALUE->yy_ch_buf + 2 )
 			YY_FATAL_ERROR( "flex scanner push-back overflow" );
@@ -12274,8 +12025,6 @@ static int yy_get_next_buffer (void)
 	(yy_hold_char) = *yy_cp;
 	(yy_c_buf_p) = yy_cp;
 }
-
-#endif
 
 #ifndef YY_NO_INPUT
 #ifdef __cplusplus
@@ -12301,7 +12050,7 @@ static int yy_get_next_buffer (void)
 
 		else
 			{ /* need more input */
-			int offset = (int) ((yy_c_buf_p) - (yytext_ptr));
+			yy_size_t offset = (yy_c_buf_p) - (yytext_ptr);
 			++(yy_c_buf_p);
 
 			switch ( yy_get_next_buffer(  ) )
@@ -12318,13 +12067,13 @@ static int yy_get_next_buffer (void)
 					 */
 
 					/* Reset buffer status. */
-					yyrestart( yyin );
+					fortran_restart(fortran_in );
 
 					/*FALLTHROUGH*/
 
 				case EOB_ACT_END_OF_FILE:
 					{
-					if ( yywrap(  ) )
+					if ( fortran_wrap( ) )
 						return 0;
 
 					if ( ! (yy_did_buffer_switch_on_eof) )
@@ -12344,7 +12093,7 @@ static int yy_get_next_buffer (void)
 		}
 
 	c = *(unsigned char *) (yy_c_buf_p);	/* cast for 8-bit char's */
-	*(yy_c_buf_p) = '\0';	/* preserve yytext */
+	*(yy_c_buf_p) = '\0';	/* preserve fortran_text */
 	(yy_hold_char) = *++(yy_c_buf_p);
 
 	YY_CURRENT_BUFFER_LVALUE->yy_at_bol = (c == '\n');
@@ -12358,32 +12107,32 @@ static int yy_get_next_buffer (void)
  * 
  * @note This function does not reset the start condition to @c INITIAL .
  */
-    void yyrestart  (FILE * input_file )
+    void fortran_restart  (FILE * input_file )
 {
     
 	if ( ! YY_CURRENT_BUFFER ){
-        yyensure_buffer_stack ();
+        fortran_ensure_buffer_stack ();
 		YY_CURRENT_BUFFER_LVALUE =
-            yy_create_buffer( yyin, YY_BUF_SIZE );
+            fortran__create_buffer(fortran_in,YY_BUF_SIZE );
 	}
 
-	yy_init_buffer( YY_CURRENT_BUFFER, input_file );
-	yy_load_buffer_state(  );
+	fortran__init_buffer(YY_CURRENT_BUFFER,input_file );
+	fortran__load_buffer_state( );
 }
 
 /** Switch to a different input buffer.
  * @param new_buffer The new input buffer.
  * 
  */
-    void yy_switch_to_buffer  (YY_BUFFER_STATE  new_buffer )
+    void fortran__switch_to_buffer  (YY_BUFFER_STATE  new_buffer )
 {
     
 	/* TODO. We should be able to replace this entire function body
 	 * with
-	 *		yypop_buffer_state();
-	 *		yypush_buffer_state(new_buffer);
+	 *		fortran_pop_buffer_state();
+	 *		fortran_push_buffer_state(new_buffer);
      */
-	yyensure_buffer_stack ();
+	fortran_ensure_buffer_stack ();
 	if ( YY_CURRENT_BUFFER == new_buffer )
 		return;
 
@@ -12396,21 +12145,21 @@ static int yy_get_next_buffer (void)
 		}
 
 	YY_CURRENT_BUFFER_LVALUE = new_buffer;
-	yy_load_buffer_state(  );
+	fortran__load_buffer_state( );
 
 	/* We don't actually know whether we did this switch during
-	 * EOF (yywrap()) processing, but the only time this flag
-	 * is looked at is after yywrap() is called, so it's safe
+	 * EOF (fortran_wrap()) processing, but the only time this flag
+	 * is looked at is after fortran_wrap() is called, so it's safe
 	 * to go ahead and always set it.
 	 */
 	(yy_did_buffer_switch_on_eof) = 1;
 }
 
-static void yy_load_buffer_state  (void)
+static void fortran__load_buffer_state  (void)
 {
     	(yy_n_chars) = YY_CURRENT_BUFFER_LVALUE->yy_n_chars;
 	(yytext_ptr) = (yy_c_buf_p) = YY_CURRENT_BUFFER_LVALUE->yy_buf_pos;
-	yyin = YY_CURRENT_BUFFER_LVALUE->yy_input_file;
+	fortran_in = YY_CURRENT_BUFFER_LVALUE->yy_input_file;
 	(yy_hold_char) = *(yy_c_buf_p);
 }
 
@@ -12420,35 +12169,35 @@ static void yy_load_buffer_state  (void)
  * 
  * @return the allocated buffer state.
  */
-    YY_BUFFER_STATE yy_create_buffer  (FILE * file, int  size )
+    YY_BUFFER_STATE fortran__create_buffer  (FILE * file, int  size )
 {
 	YY_BUFFER_STATE b;
     
-	b = (YY_BUFFER_STATE) yyalloc( sizeof( struct yy_buffer_state )  );
+	b = (YY_BUFFER_STATE) fortran_alloc(sizeof( struct yy_buffer_state )  );
 	if ( ! b )
-		YY_FATAL_ERROR( "out of dynamic memory in yy_create_buffer()" );
+		YY_FATAL_ERROR( "out of dynamic memory in fortran__create_buffer()" );
 
 	b->yy_buf_size = size;
 
 	/* yy_ch_buf has to be 2 characters longer than the size given because
 	 * we need to put in 2 end-of-buffer characters.
 	 */
-	b->yy_ch_buf = (char *) yyalloc( (yy_size_t) (b->yy_buf_size + 2)  );
+	b->yy_ch_buf = (char *) fortran_alloc(b->yy_buf_size + 2  );
 	if ( ! b->yy_ch_buf )
-		YY_FATAL_ERROR( "out of dynamic memory in yy_create_buffer()" );
+		YY_FATAL_ERROR( "out of dynamic memory in fortran__create_buffer()" );
 
 	b->yy_is_our_buffer = 1;
 
-	yy_init_buffer( b, file );
+	fortran__init_buffer(b,file );
 
 	return b;
 }
 
 /** Destroy the buffer.
- * @param b a buffer created with yy_create_buffer()
+ * @param b a buffer created with fortran__create_buffer()
  * 
  */
-    void yy_delete_buffer (YY_BUFFER_STATE  b )
+    void fortran__delete_buffer (YY_BUFFER_STATE  b )
 {
     
 	if ( ! b )
@@ -12458,27 +12207,31 @@ static void yy_load_buffer_state  (void)
 		YY_CURRENT_BUFFER_LVALUE = (YY_BUFFER_STATE) 0;
 
 	if ( b->yy_is_our_buffer )
-		yyfree( (void *) b->yy_ch_buf  );
+		fortran_free((void *) b->yy_ch_buf  );
 
-	yyfree( (void *) b  );
+	fortran_free((void *) b  );
 }
 
+#ifndef __cplusplus
+extern int isatty (int );
+#endif /* __cplusplus */
+    
 /* Initializes or reinitializes a buffer.
  * This function is sometimes called more than once on the same buffer,
- * such as during a yyrestart() or at EOF.
+ * such as during a fortran_restart() or at EOF.
  */
-    static void yy_init_buffer  (YY_BUFFER_STATE  b, FILE * file )
+    static void fortran__init_buffer  (YY_BUFFER_STATE  b, FILE * file )
 
 {
 	int oerrno = errno;
     
-	yy_flush_buffer( b );
+	fortran__flush_buffer(b );
 
 	b->yy_input_file = file;
 	b->yy_fill_buffer = 1;
 
-    /* If b is the current buffer, then yy_init_buffer was _probably_
-     * called from yyrestart() or through yy_get_next_buffer.
+    /* If b is the current buffer, then fortran__init_buffer was _probably_
+     * called from fortran_restart() or through yy_get_next_buffer.
      * In that case, we don't want to reset the lineno or column.
      */
     if (b != YY_CURRENT_BUFFER){
@@ -12495,7 +12248,7 @@ static void yy_load_buffer_state  (void)
  * @param b the buffer state to be flushed, usually @c YY_CURRENT_BUFFER.
  * 
  */
-    void yy_flush_buffer (YY_BUFFER_STATE  b )
+    void fortran__flush_buffer (YY_BUFFER_STATE  b )
 {
     	if ( ! b )
 		return;
@@ -12515,7 +12268,7 @@ static void yy_load_buffer_state  (void)
 	b->yy_buffer_status = YY_BUFFER_NEW;
 
 	if ( b == YY_CURRENT_BUFFER )
-		yy_load_buffer_state(  );
+		fortran__load_buffer_state( );
 }
 
 /** Pushes the new state onto the stack. The new state becomes
@@ -12524,14 +12277,14 @@ static void yy_load_buffer_state  (void)
  *  @param new_buffer The new state.
  *  
  */
-void yypush_buffer_state (YY_BUFFER_STATE new_buffer )
+void fortran_push_buffer_state (YY_BUFFER_STATE new_buffer )
 {
     	if (new_buffer == NULL)
 		return;
 
-	yyensure_buffer_stack();
+	fortran_ensure_buffer_stack();
 
-	/* This block is copied from yy_switch_to_buffer. */
+	/* This block is copied from fortran__switch_to_buffer. */
 	if ( YY_CURRENT_BUFFER )
 		{
 		/* Flush out information for old buffer. */
@@ -12545,8 +12298,8 @@ void yypush_buffer_state (YY_BUFFER_STATE new_buffer )
 		(yy_buffer_stack_top)++;
 	YY_CURRENT_BUFFER_LVALUE = new_buffer;
 
-	/* copied from yy_switch_to_buffer. */
-	yy_load_buffer_state(  );
+	/* copied from fortran__switch_to_buffer. */
+	fortran__load_buffer_state( );
 	(yy_did_buffer_switch_on_eof) = 1;
 }
 
@@ -12554,18 +12307,18 @@ void yypush_buffer_state (YY_BUFFER_STATE new_buffer )
  *  The next element becomes the new top.
  *  
  */
-void yypop_buffer_state (void)
+void fortran_pop_buffer_state (void)
 {
     	if (!YY_CURRENT_BUFFER)
 		return;
 
-	yy_delete_buffer(YY_CURRENT_BUFFER );
+	fortran__delete_buffer(YY_CURRENT_BUFFER );
 	YY_CURRENT_BUFFER_LVALUE = NULL;
 	if ((yy_buffer_stack_top) > 0)
 		--(yy_buffer_stack_top);
 
 	if (YY_CURRENT_BUFFER) {
-		yy_load_buffer_state(  );
+		fortran__load_buffer_state( );
 		(yy_did_buffer_switch_on_eof) = 1;
 	}
 }
@@ -12573,7 +12326,7 @@ void yypop_buffer_state (void)
 /* Allocates the stack if it does not exist.
  *  Guarantees space for at least one push.
  */
-static void yyensure_buffer_stack (void)
+static void fortran_ensure_buffer_stack (void)
 {
 	yy_size_t num_to_alloc;
     
@@ -12583,15 +12336,15 @@ static void yyensure_buffer_stack (void)
 		 * scanner will even need a stack. We use 2 instead of 1 to avoid an
 		 * immediate realloc on the next call.
          */
-      num_to_alloc = 1; /* After all that talk, this was set to 1 anyways... */
-		(yy_buffer_stack) = (struct yy_buffer_state**)yyalloc
+		num_to_alloc = 1;
+		(yy_buffer_stack) = (struct yy_buffer_state**)fortran_alloc
 								(num_to_alloc * sizeof(struct yy_buffer_state*)
 								);
 		if ( ! (yy_buffer_stack) )
-			YY_FATAL_ERROR( "out of dynamic memory in yyensure_buffer_stack()" );
-
+			YY_FATAL_ERROR( "out of dynamic memory in fortran_ensure_buffer_stack()" );
+								  
 		memset((yy_buffer_stack), 0, num_to_alloc * sizeof(struct yy_buffer_state*));
-
+				
 		(yy_buffer_stack_max) = num_to_alloc;
 		(yy_buffer_stack_top) = 0;
 		return;
@@ -12600,15 +12353,15 @@ static void yyensure_buffer_stack (void)
 	if ((yy_buffer_stack_top) >= ((yy_buffer_stack_max)) - 1){
 
 		/* Increase the buffer to prepare for a possible push. */
-		yy_size_t grow_size = 8 /* arbitrary grow size */;
+		int grow_size = 8 /* arbitrary grow size */;
 
 		num_to_alloc = (yy_buffer_stack_max) + grow_size;
-		(yy_buffer_stack) = (struct yy_buffer_state**)yyrealloc
+		(yy_buffer_stack) = (struct yy_buffer_state**)fortran_realloc
 								((yy_buffer_stack),
 								num_to_alloc * sizeof(struct yy_buffer_state*)
 								);
 		if ( ! (yy_buffer_stack) )
-			YY_FATAL_ERROR( "out of dynamic memory in yyensure_buffer_stack()" );
+			YY_FATAL_ERROR( "out of dynamic memory in fortran_ensure_buffer_stack()" );
 
 		/* zero only the new slots.*/
 		memset((yy_buffer_stack) + (yy_buffer_stack_max), 0, grow_size * sizeof(struct yy_buffer_state*));
@@ -12620,9 +12373,9 @@ static void yyensure_buffer_stack (void)
  * @param base the character buffer
  * @param size the size in bytes of the character buffer
  * 
- * @return the newly allocated buffer state object.
+ * @return the newly allocated buffer state object. 
  */
-YY_BUFFER_STATE yy_scan_buffer  (char * base, yy_size_t  size )
+YY_BUFFER_STATE fortran__scan_buffer  (char * base, yy_size_t  size )
 {
 	YY_BUFFER_STATE b;
     
@@ -12630,69 +12383,68 @@ YY_BUFFER_STATE yy_scan_buffer  (char * base, yy_size_t  size )
 	     base[size-2] != YY_END_OF_BUFFER_CHAR ||
 	     base[size-1] != YY_END_OF_BUFFER_CHAR )
 		/* They forgot to leave room for the EOB's. */
-		return NULL;
+		return 0;
 
-	b = (YY_BUFFER_STATE) yyalloc( sizeof( struct yy_buffer_state )  );
+	b = (YY_BUFFER_STATE) fortran_alloc(sizeof( struct yy_buffer_state )  );
 	if ( ! b )
-		YY_FATAL_ERROR( "out of dynamic memory in yy_scan_buffer()" );
+		YY_FATAL_ERROR( "out of dynamic memory in fortran__scan_buffer()" );
 
-	b->yy_buf_size = (int) (size - 2);	/* "- 2" to take care of EOB's */
+	b->yy_buf_size = size - 2;	/* "- 2" to take care of EOB's */
 	b->yy_buf_pos = b->yy_ch_buf = base;
 	b->yy_is_our_buffer = 0;
-	b->yy_input_file = NULL;
+	b->yy_input_file = 0;
 	b->yy_n_chars = b->yy_buf_size;
 	b->yy_is_interactive = 0;
 	b->yy_at_bol = 1;
 	b->yy_fill_buffer = 0;
 	b->yy_buffer_status = YY_BUFFER_NEW;
 
-	yy_switch_to_buffer( b  );
+	fortran__switch_to_buffer(b  );
 
 	return b;
 }
 
-/** Setup the input buffer state to scan a string. The next call to yylex() will
+/** Setup the input buffer state to scan a string. The next call to fortran_lex() will
  * scan from a @e copy of @a str.
  * @param yystr a NUL-terminated string to scan
  * 
  * @return the newly allocated buffer state object.
  * @note If you want to scan bytes that may contain NUL values, then use
- *       yy_scan_bytes() instead.
+ *       fortran__scan_bytes() instead.
  */
-YY_BUFFER_STATE yy_scan_string (const char * yystr )
+YY_BUFFER_STATE fortran__scan_string (yyconst char * yystr )
 {
     
-	return yy_scan_bytes( yystr, (int) strlen(yystr) );
+	return fortran__scan_bytes(yystr,strlen(yystr) );
 }
 
-/** Setup the input buffer state to scan the given bytes. The next call to yylex() will
+/** Setup the input buffer state to scan the given bytes. The next call to fortran_lex() will
  * scan from a @e copy of @a bytes.
- * @param yybytes the byte buffer to scan
- * @param _yybytes_len the number of bytes in the buffer pointed to by @a bytes.
+ * @param bytes the byte buffer to scan
+ * @param len the number of bytes in the buffer pointed to by @a bytes.
  * 
  * @return the newly allocated buffer state object.
  */
-YY_BUFFER_STATE yy_scan_bytes  (const char * yybytes, int  _yybytes_len )
+YY_BUFFER_STATE fortran__scan_bytes  (yyconst char * yybytes, yy_size_t  _yybytes_len )
 {
 	YY_BUFFER_STATE b;
 	char *buf;
-	yy_size_t n;
-	int i;
+	yy_size_t n, i;
     
 	/* Get memory for full buffer, including space for trailing EOB's. */
-	n = (yy_size_t) (_yybytes_len + 2);
-	buf = (char *) yyalloc( n  );
+	n = _yybytes_len + 2;
+	buf = (char *) fortran_alloc(n  );
 	if ( ! buf )
-		YY_FATAL_ERROR( "out of dynamic memory in yy_scan_bytes()" );
+		YY_FATAL_ERROR( "out of dynamic memory in fortran__scan_bytes()" );
 
 	for ( i = 0; i < _yybytes_len; ++i )
 		buf[i] = yybytes[i];
 
 	buf[_yybytes_len] = buf[_yybytes_len+1] = YY_END_OF_BUFFER_CHAR;
 
-	b = yy_scan_buffer( buf, n );
+	b = fortran__scan_buffer(buf,n );
 	if ( ! b )
-		YY_FATAL_ERROR( "bad buffer in yy_scan_bytes()" );
+		YY_FATAL_ERROR( "bad buffer in fortran__scan_bytes()" );
 
 	/* It's okay to grow etc. this buffer, and we should throw it
 	 * away when we're done.
@@ -12706,9 +12458,9 @@ YY_BUFFER_STATE yy_scan_bytes  (const char * yybytes, int  _yybytes_len )
 #define YY_EXIT_FAILURE 2
 #endif
 
-static void yynoreturn yy_fatal_error (const char* msg )
+static void yy_fatal_error (yyconst char* msg )
 {
-			fprintf( stderr, "%s\n", msg );
+    	(void) fprintf( stderr, "%s\n", msg );
 	exit( YY_EXIT_FAILURE );
 }
 
@@ -12718,14 +12470,14 @@ static void yynoreturn yy_fatal_error (const char* msg )
 #define yyless(n) \
 	do \
 		{ \
-		/* Undo effects of setting up yytext. */ \
+		/* Undo effects of setting up fortran_text. */ \
         int yyless_macro_arg = (n); \
         YY_LESS_LINENO(yyless_macro_arg);\
-		yytext[yyleng] = (yy_hold_char); \
-		(yy_c_buf_p) = yytext + yyless_macro_arg; \
+		fortran_text[fortran_leng] = (yy_hold_char); \
+		(yy_c_buf_p) = fortran_text + yyless_macro_arg; \
 		(yy_hold_char) = *(yy_c_buf_p); \
 		*(yy_c_buf_p) = '\0'; \
-		yyleng = yyless_macro_arg; \
+		fortran_leng = yyless_macro_arg; \
 		} \
 	while ( 0 )
 
@@ -12734,91 +12486,91 @@ static void yynoreturn yy_fatal_error (const char* msg )
 /** Get the current line number.
  * 
  */
-int yyget_lineno  (void)
+int fortran_get_lineno  (void)
 {
-    
-    return yylineno;
+        
+    return fortran_lineno;
 }
 
 /** Get the input stream.
  * 
  */
-FILE *yyget_in  (void)
+FILE *fortran_get_in  (void)
 {
-        return yyin;
+        return fortran_in;
 }
 
 /** Get the output stream.
  * 
  */
-FILE *yyget_out  (void)
+FILE *fortran_get_out  (void)
 {
-        return yyout;
+        return fortran_out;
 }
 
 /** Get the length of the current token.
  * 
  */
-int yyget_leng  (void)
+yy_size_t fortran_get_leng  (void)
 {
-        return yyleng;
+        return fortran_leng;
 }
 
 /** Get the current token.
  * 
  */
 
-char *yyget_text  (void)
+char *fortran_get_text  (void)
 {
-        return yytext;
+        return fortran_text;
 }
 
 /** Set the current line number.
- * @param _line_number line number
+ * @param line_number
  * 
  */
-void yyset_lineno (int  _line_number )
+void fortran_set_lineno (int  line_number )
 {
     
-    yylineno = _line_number;
+    fortran_lineno = line_number;
 }
 
 /** Set the input stream. This does not discard the current
  * input buffer.
- * @param _in_str A readable stream.
+ * @param in_str A readable stream.
  * 
- * @see yy_switch_to_buffer
+ * @see fortran__switch_to_buffer
  */
-void yyset_in (FILE *  _in_str )
+void fortran_set_in (FILE *  in_str )
 {
-        yyin = _in_str ;
+        fortran_in = in_str ;
 }
 
-void yyset_out (FILE *  _out_str )
+void fortran_set_out (FILE *  out_str )
 {
-        yyout = _out_str ;
+        fortran_out = out_str ;
 }
 
-int yyget_debug  (void)
+int fortran_get_debug  (void)
 {
-        return yy_flex_debug;
+        return fortran__flex_debug;
 }
 
-void yyset_debug (int  _bdebug )
+void fortran_set_debug (int  bdebug )
 {
-        yy_flex_debug = _bdebug ;
+        fortran__flex_debug = bdebug ;
 }
 
 static int yy_init_globals (void)
 {
         /* Initialization is the same as for the non-reentrant scanner.
-     * This function is called from yylex_destroy(), so don't allocate here.
+     * This function is called from fortran_lex_destroy(), so don't allocate here.
      */
 
-    (yy_buffer_stack) = NULL;
+    (yy_buffer_stack) = 0;
     (yy_buffer_stack_top) = 0;
     (yy_buffer_stack_max) = 0;
-    (yy_c_buf_p) = NULL;
+    (yy_c_buf_p) = (char *) 0;
     (yy_init) = 0;
     (yy_start) = 0;
 
@@ -12829,39 +12581,39 @@ static int yy_init_globals (void)
 
 /* Defined in main.c */
 #ifdef YY_STDINIT
-    yyin = stdin;
-    yyout = stdout;
+    fortran_in = stdin;
+    fortran_out = stdout;
 #else
-    yyin = NULL;
-    yyout = NULL;
+    fortran_in = (FILE *) 0;
+    fortran_out = (FILE *) 0;
 #endif
 
     /* For future reference: Set errno on error, since we are called by
-     * yylex_init()
+     * fortran_lex_init()
      */
     return 0;
 }
 
-/* yylex_destroy is for both reentrant and non-reentrant scanners. */
-int yylex_destroy  (void)
+/* fortran_lex_destroy is for both reentrant and non-reentrant scanners. */
+int fortran_lex_destroy  (void)
 {
     
     /* Pop the buffer stack, destroying each element. */
 	while(YY_CURRENT_BUFFER){
-		yy_delete_buffer( YY_CURRENT_BUFFER  );
+		fortran__delete_buffer(YY_CURRENT_BUFFER  );
 		YY_CURRENT_BUFFER_LVALUE = NULL;
-		yypop_buffer_state();
+		fortran_pop_buffer_state();
 	}
 
 	/* Destroy the stack itself. */
-	yyfree((yy_buffer_stack) );
+	fortran_free((yy_buffer_stack) );
 	(yy_buffer_stack) = NULL;
 
-    yyfree ( (yy_state_buf) );
+    fortran_free ( (yy_state_buf) );
     (yy_state_buf)  = NULL;
 
     /* Reset the globals. This is important in a non-reentrant scanner so the next time
-     * yylex() is called, initialization will occur. */
+     * fortran_lex() is called, initialization will occur. */
     yy_init_globals( );
 
     return 0;
@@ -12872,19 +12624,18 @@ int yylex_destroy  (void)
  */
 
 #ifndef yytext_ptr
-static void yy_flex_strncpy (char* s1, const char * s2, int n )
+static void yy_flex_strncpy (char* s1, yyconst char * s2, int n )
 {
-		
-	int i;
+	register int i;
 	for ( i = 0; i < n; ++i )
 		s1[i] = s2[i];
 }
 #endif
 
 #ifdef YY_NEED_STRLEN
-static int yy_flex_strlen (const char * s )
+static int yy_flex_strlen (yyconst char * s )
 {
-	int n;
+	register int n;
 	for ( n = 0; s[n]; ++n )
 		;
 
@@ -12892,14 +12643,13 @@ static int yy_flex_strlen (const char * s )
 }
 #endif
 
-void *yyalloc (yy_size_t  size )
+void *fortran_alloc (yy_size_t  size )
 {
-			return malloc(size);
+	return (void *) malloc( size );
 }
 
-void *yyrealloc  (void * ptr, yy_size_t  size )
+void *fortran_realloc  (void * ptr, yy_size_t  size )
 {
-		
 	/* The cast to (char *) in the following accommodates both
 	 * implementations that use char* generic pointers, and those
 	 * that use void* generic pointers.  It works with the latter
@@ -12907,17 +12657,18 @@ void *yyrealloc  (void * ptr, yy_size_t  size )
 	 * any pointer type to void*, and deal with argument conversions
 	 * as though doing an assignment.
 	 */
-	return realloc(ptr, size);
+	return (void *) realloc( (char *) ptr, size );
 }
 
-void yyfree (void * ptr )
+void fortran_free (void * ptr )
 {
-			free( (char *) ptr );	/* see yyrealloc() for (char *) cast */
+	free( (char *) ptr );	/* see fortran_realloc() for (char *) cast */
 }
 
 #define YYTABLES_NAME "yytables"
 
-#line 383 "fortran.lex"
+#line 382 "fortran.lex"
+
 
 
 void out_of_donottreat ( void )

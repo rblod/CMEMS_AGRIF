@@ -21,11 +21,11 @@
    !                       !      
    cp_cfg      =  "zoom"   !  name of the configuration
    jp_cfg      =       2   !  resolution of the configuration
-   jpidta      =     83   !  1st lateral dimension ( >= jpi )
-   jpjdta      =     62   !  2nd    "         "    ( >= jpj )
+   jpidta      =     98   !  1st lateral dimension ( >= jpi )
+   jpjdta      =     98   !  2nd    "         "    ( >= jpj )
    jpkdta      =      31   !  number of levels      ( >= jpk )
-   jpiglo      =     83   !  1st dimension of global domain --> i =jpidta
-   jpjglo      =     62   !  2nd    -                  -    --> j  =jpjdta
+   jpiglo      =     98   !  1st dimension of global domain --> i =jpidta
+   jpjglo      =     98   !  2nd    -                  -    --> j  =jpjdta
    jpizoom     =       1   !  left bottom (i,j) indices of the zoom
    jpjzoom     =       1   !  in data domain indices
    jperio      =       0   !  lateral cond. type (between 0 and 6)
@@ -39,13 +39,14 @@
 !-----------------------------------------------------------------------
 &namdom        !   space and time domain (bathymetry, mesh, timestep)
 !-----------------------------------------------------------------------
-   nn_bathy    =    1      !  compute analyticaly (=0) or read (=1) the bathymetry file
+   nn_bathy    =    2      !  compute analyticaly (=0) or read (=1) the bathymetry file
                            !  or compute (2) from external bathymetry
-   nn_interp   =    1                          ! type of interpolation (nn_bathy =2)                          
-   cn_topo     =  'bathymetry_ORCA12_V3.3.nc'  ! external topo file (nn_bathy =2)
-   cn_bath     =  'Bathymetry'                 ! topo name in file  (nn_bathy =2)
-   cn_lon      =  'nav_lon'                    ! lon  name in file  (nn_bathy =2)
-   cn_lat      =  'nav_lat'                    ! lat  name in file  (nn_bathy =2)
+   nn_interp   =    2                          ! type of interpolation (nn_bathy =2)                          
+   cn_topo     =  'GEBCO_2014_2D.nc'  ! external topo file (nn_bathy =2)
+   cn_bath     =  'elevation'                 ! topo name in file  (nn_bathy =2)
+   cn_lon      =  'lon'                    ! lon  name in file  (nn_bathy =2)
+   cn_lat      =  'lat'                    ! lat  name in file  (nn_bathy =2)
+   rn_scale    =   -1.                 ! scale factor for bathy 
    jphgr_msh   =       0               !  type of horizontal mesh
    ppglam0     =  999999.0             !  longitude of first raw and column T-point (jphgr_msh = 1)
    ppgphi0     =  999999.0             ! latitude  of first raw and column T-point (jphgr_msh = 1)
@@ -251,7 +252,7 @@
 !-----------------------------------------------------------------------
 &nammpp        !   Massively Parallel Processing                        ("key_mpp_mpi)
 !-----------------------------------------------------------------------
-jpni = 2
+jpni = 1
 jpnj=1
 /
 !-----------------------------------------------------------------------

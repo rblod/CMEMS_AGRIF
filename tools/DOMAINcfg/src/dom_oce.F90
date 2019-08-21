@@ -42,6 +42,7 @@ MODULE dom_oce
    CHARACTER(LEN=132), PUBLIC :: cn_bath
    CHARACTER(LEN=132), PUBLIC :: cn_lon
    CHARACTER(LEN=132), PUBLIC :: cn_lat
+   REAL(wp), PUBLIC :: rn_scale
 
    LOGICAL, PUBLIC ::   lzoom      =  .FALSE.   !: zoom flag
    LOGICAL, PUBLIC ::   lzoom_e    =  .FALSE.   !: East  zoom type flag

@@ -50,11 +50,16 @@ SUBROUTINE Agrif_InitValues
    !!
    IMPLICIT NONE
       !!----------------------------------------------------------------------
+
    !
    CALL nemo_init       !* Initializations of each fine grid
 
+
+
+
    !                    !* Agrif initialization
    CALL agrif_nemo_init
+   ! 
    CALL Agrif_InitValues_cont_dom
    CALL Agrif_InitValues_cont
 # if defined key_top
@@ -87,7 +92,7 @@ SUBROUTINE Agrif_InitValues_cont_dom
    !
    ! Declaration of the type of variable which have to be interpolated
    !
-   CALL agrif_declare_var_dom
+  ! CALL agrif_declare_var_dom
    !
 END SUBROUTINE Agrif_InitValues_cont_dom
 
@@ -164,7 +169,7 @@ SUBROUTINE Agrif_InitValues_cont
 
    ! 1. Declaration of the type of variable which have to be interpolated
    !---------------------------------------------------------------------
-   CALL agrif_declare_var
+  ! CALL agrif_declare_var
 
    ! 2. First interpolations of potentially non zero fields
    !-------------------------------------------------------
@@ -176,7 +181,6 @@ SUBROUTINE Agrif_InitValues_cont
    CALL Agrif_Bc_variable(tsn_sponge_id,calledweight=1.,procname=interptsn_sponge)
    ! reset tsa to zero
    tsa(:,:,:,:) = 0.
-
    Agrif_UseSpecialValue = ln_spc_dyn
    CALL Agrif_Bc_variable(un_interp_id,calledweight=1.,procname=interpun)
    CALL Agrif_Bc_variable(vn_interp_id,calledweight=1.,procname=interpvn)
@@ -350,7 +354,7 @@ SUBROUTINE agrif_declare_var
 
    CALL agrif_declare_variable((/2,2/),(/ind3,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),sshn_id)
 
-   IF( ln_zdftke.OR.ln_zdfgls ) THEN
+!   IF( ln_zdftke.OR.ln_zdfgls ) THEN
 !      CALL agrif_declare_variable((/2,2,0/),(/ind3,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nlci,nlcj,jpk/), en_id)
 !      CALL agrif_declare_variable((/2,2,0/),(/ind3,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nlci,nlcj,jpk/),avt_id)
 # if defined key_vertical
@@ -358,7 +362,19 @@ SUBROUTINE agrif_declare_var
 # else
       CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),avm_id)
 # endif
-   ENDIF
+!   ENDIF
+
+   
+   ! Initial or restart velues
+   ! Here we don't have the knwoledge of all the options so we
+   ! declare profile with dimension max number of variables
+   CALL Agrif_Set_MaskMaxSearch(25)
+   !
+   CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts/),tsini_id)
+   !  
+   CALL Agrif_Set_MaskMaxSearch(5)
+
+
 
    ! 2. Type of interpolation
    !-------------------------
@@ -370,6 +386,7 @@ SUBROUTINE agrif_declare_var
    CALL Agrif_Set_bcinterp(tsn_sponge_id,interp=AGRIF_linear)
 
    CALL Agrif_Set_bcinterp(sshn_id,interp=AGRIF_linear)
+
    CALL Agrif_Set_bcinterp(unb_id,interp1=Agrif_linear,interp2=AGRIF_ppm)
    CALL Agrif_Set_bcinterp(vnb_id,interp1=AGRIF_ppm,interp2=Agrif_linear)
    CALL Agrif_Set_bcinterp(ub2b_interp_id,interp1=Agrif_linear,interp2=AGRIF_ppm)
@@ -383,13 +400,19 @@ SUBROUTINE agrif_declare_var
    CALL Agrif_Set_bcinterp(umsk_id,interp=AGRIF_constant)
    CALL Agrif_Set_bcinterp(vmsk_id,interp=AGRIF_constant)
 
-   IF( ln_zdftke.OR.ln_zdfgls )   CALL Agrif_Set_bcinterp( avm_id, interp=AGRIF_linear )
+  ! IF( ln_zdftke.OR.ln_zdfgls )   CALL Agrif_Set_bcinterp( avm_id, interp=AGRIF_linear )
+   CALL Agrif_Set_bcinterp( avm_id, interp=AGRIF_linear )
+
+   ! Initial fields
+   CALL Agrif_Set_bcinterp(tsini_id,interp=AGRIF_ppm)
+   CALL Agrif_Set_interp  (tsini_id,interp=AGRIF_ppm)
 
    ! 3. Location of interpolation
    !-----------------------------
    CALL Agrif_Set_bc(       tsn_id, (/0,ind1/) )
    CALL Agrif_Set_bc( un_interp_id, (/0,ind1/) )
    CALL Agrif_Set_bc( vn_interp_id, (/0,ind1/) )
+   CALL Agrif_Set_bc(       tsini_id, (/0,ind1/) )
 
    CALL Agrif_Set_bc( tsn_sponge_id, (/-nn_sponge_len*Agrif_irhox()-1,0/) )  ! if west and rhox=3 and sponge=2 and ghost=1: columns 2 to 9 
    CALL Agrif_Set_bc(  un_sponge_id, (/-nn_sponge_len*Agrif_irhox()-1,0/) )
@@ -406,7 +429,8 @@ SUBROUTINE agrif_declare_var
    CALL Agrif_Set_bc( vmsk_id, (/0,0/) )
 
 
-   IF( ln_zdftke.OR.ln_zdfgls )   CALL Agrif_Set_bc( avm_id, (/0,ind1/) )
+  ! IF( ln_zdftke.OR.ln_zdfgls )   CALL Agrif_Set_bc( avm_id, (/0,ind1/) )
+   CALL Agrif_Set_bc( avm_id, (/0,ind1/) )
 
    ! 4. Update type
    !--------------- 
@@ -468,7 +492,7 @@ SUBROUTINE Agrif_InitValues_cont_ice
    !
    ! Declaration of the type of variable which have to be interpolated (parent=>child)
    !----------------------------------------------------------------------------------
-   CALL agrif_declare_var_ice
+  ! CALL agrif_declare_var_ice
 
    ! Controls
 
@@ -579,7 +603,7 @@ SUBROUTINE Agrif_InitValues_cont_top
 
    ! 1. Declaration of the type of variable which have to be interpolated
    !---------------------------------------------------------------------
-   CALL agrif_declare_var_top
+  ! CALL agrif_declare_var_top
 
    ! 2. First interpolations of potentially non zero fields
    !-------------------------------------------------------
