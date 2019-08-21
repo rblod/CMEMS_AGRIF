@@ -251,6 +251,14 @@ type Agrif_Variable_l
     logical, dimension(:,:,:,:)    , allocatable :: larray4
     logical, dimension(:,:,:,:,:)  , allocatable :: larray5
     logical, dimension(:,:,:,:,:,:), allocatable :: larray6
+    
+    logical, dimension(:)          , pointer :: plarray1
+    logical, dimension(:,:)        , pointer :: plarray2
+    logical, dimension(:,:,:)      , pointer :: plarray3
+    logical, dimension(:,:,:,:)    , pointer :: plarray4
+    logical, dimension(:,:,:,:,:)  , pointer :: plarray5
+    logical, dimension(:,:,:,:,:,:), pointer :: plarray6
+    
 !> @}
 !---------------------------------------------------------------------------------------------------
 end type Agrif_Variable_l
@@ -275,6 +283,13 @@ type Agrif_Variable_i
     integer, dimension(:,:,:,:)    , allocatable :: iarray4
     integer, dimension(:,:,:,:,:)  , allocatable :: iarray5
     integer, dimension(:,:,:,:,:,:), allocatable :: iarray6
+    
+    integer, dimension(:)          , pointer :: piarray1
+    integer, dimension(:,:)        , pointer :: piarray2
+    integer, dimension(:,:,:)      , pointer :: piarray3
+    integer, dimension(:,:,:,:)    , pointer :: piarray4
+    integer, dimension(:,:,:,:,:)  , pointer :: piarray5
+    integer, dimension(:,:,:,:,:,:), pointer :: piarray6
 !> @}
 !---------------------------------------------------------------------------------------------------
 end type Agrif_Variable_i
@@ -409,6 +424,19 @@ end type Agrif_Variables_List
     logical :: agrif_coarse = .false.
     integer, dimension(3) :: coarse_spaceref = (/1,1,1/)
     integer, dimension(3) :: coarse_timeref  = (/1,1,1/)
+    
+    
+! External mapping procedure
+    Procedure(mapping), pointer :: agrif_external_mapping => NULL()
+    abstract interface
+     subroutine mapping(ndim,bounds,bounds_chunks,correction_required,nb_chunks)
+     integer :: ndim
+     integer,dimension(ndim,2,2) :: bounds
+     integer,dimension(:,:,:,:),allocatable :: bounds_chunks
+     logical,dimension(:),allocatable :: correction_required
+     integer :: nb_chunks
+     end subroutine mapping
+    end interface
 !
 contains
 !
