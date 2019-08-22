@@ -180,14 +180,8 @@ CONTAINS
          WRITE(numout,*) 'ice_rst_read: read ice NetCDF restart file'
          WRITE(numout,*) '~~~~~~~~~~~~'
       ENDIF
- 
-      IF(Agrif_Root()) THEN
-         CALL iom_open ( TRIM(cn_icerst_indir)//'/'//cn_icerst_in, numrir, kdlev = jpl )
-      ELSE
-         numrir=-999
-      ENDIF
 
-      write(*,*) 'Apres iom_open'
+      CALL iom_open ( TRIM(cn_icerst_indir)//'/'//cn_icerst_in, numrir, kdlev = jpl )
 
       CALL iom_get( numrir, 'nn_fsbc', zfice )
       CALL iom_get( numrir, 'kt_ice' , ziter )    

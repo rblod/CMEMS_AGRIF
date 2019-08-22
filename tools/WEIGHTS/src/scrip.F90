@@ -89,10 +89,9 @@
                                  iunit   ! unit number for namelist file
 
       character (char_len) :: nm_in
-#define ARGC
 #if defined ARGC
       integer :: iargc
-  !    external iargc
+      external iargc
 
       if (iargc() == 1) then
         call getarg(1, nm_in)

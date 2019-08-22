@@ -56,10 +56,6 @@ MODULE agrif_oce
    INTEGER, PUBLIC :: un_update_id, vn_update_id                              ! AGRIF profiles for udpates
    INTEGER, PUBLIC :: tsn_sponge_id, un_sponge_id, vn_sponge_id               ! AGRIF profiles for sponge layers
    INTEGER, PUBLIC :: tsini_id                                                ! AGRIF profile for Levitus
-   INTEGER, PUBLIC :: t3D_rst_id, u3D_rst_id, v3D_rst_id                      ! AGRIF profile for restart 3D
-   INTEGER, PUBLIC :: t2D_rst_id, u2D_rst_id, v2D_rst_id                      ! AGRIF profile for restart 2D
-   INTEGER, PUBLIC :: nt3D_rst, nu3D_rst, nv3D_rst                            ! Number of fields in restart
-
 # if defined key_top
    INTEGER, PUBLIC :: trn_id, trn_sponge_id
 # endif  
@@ -71,14 +67,6 @@ MODULE agrif_oce
    INTEGER, PUBLIC :: umsk_id, vmsk_id
    INTEGER, PUBLIC :: kindic_agr
    
-   
-   INTEGER, PUBLIC :: myls, id2d_rst, id3d_rst, id2du_rst, id3du_rst, id2dv_rst, id3dv_rst
-   REAL(wp), PUBLIC, DIMENSION(:,:), POINTER :: tab2d_rst, tab2du_rst,tab2dv_rst
-   REAL(wp), PUBLIC, DIMENSION(:,:,:), POINTER :: tab3d_rst, tab3du_rst,tab3dv_rst
-!$AGRIF_DO_NOT_TREAT
-   INTEGER, DIMENSION(200), PUBLIC :: cvarlist_rst
-!$AGRIF_END_DO_NOT_TREAT
-
    !!----------------------------------------------------------------------
    !! NEMO/NST 4.0 , NEMO Consortium (2018)
    !! $Id: agrif_oce.F90 10425 2018-12-19 21:54:16Z smasson $

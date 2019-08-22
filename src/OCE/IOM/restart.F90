@@ -214,31 +214,25 @@ CONTAINS
          lxios_sini = .FALSE.
          clpath = TRIM(cn_ocerst_indir)
          IF( clpath(LEN_TRIM(clpath):) /= '/' ) clpath = TRIM(clpath) // '/'
-         
-!         IF(Agrif_root()) THEN
-            CALL iom_open( TRIM(clpath)//cn_ocerst_in, numror )
+         CALL iom_open( TRIM(clpath)//cn_ocerst_in, numror )
 ! are we using XIOS to read the data? Part above will have to modified once XIOS
 ! can handle checking if variable is in the restart file (there will be no need to open
 ! restart)
-            IF(.NOT.lxios_set) lrxios = lrxios.AND.lxios_sini
-            IF( lrxios) THEN
-                crxios_context = 'nemo_rst'
-                IF( .NOT.lxios_set ) THEN
-                    IF(lwp) WRITE(numout,*) 'Enable restart reading by XIOS'
-                    CALL iom_init( crxios_context, ld_tmppatch = .false. )
-                    lxios_set = .TRUE.
-                ENDIF
-            ENDIF
-            IF( TRIM(Agrif_CFixed()) /= '0' .AND. lrxios) THEN
-                CALL iom_init( crxios_context, ld_tmppatch = .false. )
-                IF(lwp) WRITE(numout,*) 'Enable restart reading by XIOS for AGRIF'
-                lxios_set = .TRUE.
-             ENDIF 
-!         ELSE
-!          numror=-999
-!         ENDIF
+         IF(.NOT.lxios_set) lrxios = lrxios.AND.lxios_sini
+         IF( lrxios) THEN
+             crxios_context = 'nemo_rst'
+             IF( .NOT.lxios_set ) THEN
+                 IF(lwp) WRITE(numout,*) 'Enable restart reading by XIOS'
+                 CALL iom_init( crxios_context, ld_tmppatch = .false. )
+                 lxios_set = .TRUE.
+             ENDIF
+         ENDIF
+         IF( TRIM(Agrif_CFixed()) /= '0' .AND. lrxios) THEN
+             CALL iom_init( crxios_context, ld_tmppatch = .false. )
+             IF(lwp) WRITE(numout,*) 'Enable restart reading by XIOS for AGRIF'
+             lxios_set = .TRUE.
+         ENDIF 
       ENDIF
-      write(*,*) 'read oce NetCDF :', numror
 
    END SUBROUTINE rst_read_open
 
@@ -256,22 +250,18 @@ CONTAINS
       REAL(wp), DIMENSION(jpi, jpj, jpk) :: w3d
       !!----------------------------------------------------------------------
 
-      write(*,*) 'avant rst_read_open '
       CALL rst_read_open           ! open restart for reading (if not already opened)
-      write(*,*) 'apres rst_read_open '
 
       ! Check dynamics and tracer time-step consistency and force Euler restart if changed
-!      IF( iom_varid( numror, 'rdt', ldstop = .FALSE. ) > 0 )   THEN
-!         CALL iom_get( numror, 'rdt', zrdt, ldxios = lrxios )
-!         IF( zrdt /= rdt )   neuler = 0
-!      ENDIF
+      IF( iom_varid( numror, 'rdt', ldstop = .FALSE. ) > 0 )   THEN
+         CALL iom_get( numror, 'rdt', zrdt, ldxios = lrxios )
+         IF( zrdt /= rdt )   neuler = 0
+      ENDIF
 
-  !    CALL iom_delay_rst( 'READ', 'OCE', numror )   ! read only ocean delayed global communication variables
+      CALL iom_delay_rst( 'READ', 'OCE', numror )   ! read only ocean delayed global communication variables
       
       ! Diurnal DSST 
-      write(*,*) 'avant dirunal'
       IF( ln_diurnal ) CALL iom_get( numror, jpdom_autoglo, 'Dsst' , x_dsst, ldxios = lrxios ) 
-      write(*,*) 'apres dirunal'
       IF ( ln_diurnal_only ) THEN 
          IF(lwp) WRITE( numout, * ) &
          &   "rst_read:- ln_diurnal_only set, setting rhop=rau0" 

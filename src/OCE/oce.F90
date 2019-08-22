@@ -23,7 +23,7 @@ MODULE oce
    REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:)   ::           wn             !: vertical velocity            [m/s]
    REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:)   ::           wi             !: vertical vel. (adaptive-implicit) [m/s]
    REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:)   ::           hdivn          !: horizontal divergence        [s-1]
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:,:) ::   tsb  ,  tsn   , tsa, tstemp    !: 4D T-S fields                  [Celsius,psu] 
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:,:) ::   tsb  ,  tsn   , tsa    !: 4D T-S fields                  [Celsius,psu] 
    REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:,:) ::   rab_b,  rab_n          !: thermal/haline expansion coef. [Celsius-1,psu-1]
    REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:)   ::   rn2b ,  rn2            !: brunt-vaisala frequency**2     [s-2]
    !
@@ -87,7 +87,6 @@ CONTAINS
          &      vb   (jpi,jpj,jpk)      , vn   (jpi,jpj,jpk)      , va(jpi,jpj,jpk)       ,     &          
          &      wn   (jpi,jpj,jpk)      , hdivn(jpi,jpj,jpk)      ,                             &
          &      tsb  (jpi,jpj,jpk,jpts) , tsn  (jpi,jpj,jpk,jpts) , tsa(jpi,jpj,jpk,jpts) ,     &
-         &     tstemp  (jpi,jpj,jpk,jpts) , &
          &      rab_b(jpi,jpj,jpk,jpts) , rab_n(jpi,jpj,jpk,jpts) ,                             &
          &      rn2b (jpi,jpj,jpk)      , rn2  (jpi,jpj,jpk)      ,                             &
          &      rhd  (jpi,jpj,jpk)      , rhop (jpi,jpj,jpk)                              , STAT=ierr(1) )

@@ -294,9 +294,7 @@ CONTAINS
 
 #if defined key_agrif 
       ! interpolation parent grid => child grid for avm_k ( ex : at west border: update column 1 and 2)
-      write(*,*) 'In zdfpy avant agrif_avm'
       IF( l_zdfsh2 )   CALL Agrif_avm
-      write(*,*) 'In zdfpy apres agrif_avm'
 #endif
 
       !                                         !* Lateral boundary conditions (sign unchanged)

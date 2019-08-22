@@ -23,10 +23,9 @@
       REAL(KIND=8), ALLOCATABLE :: wgt(:,:)
       REAL(KIND=8), ALLOCATABLE :: src1(:,:),dst1(:,:),wgt1(:,:)
       LOGICAL  :: around, verbose
-#define ARGC
 #if defined ARGC
       INTEGER(KIND=4) :: iargc
-      !EXTERNAL :: iargc
+      EXTERNAL :: iargc
 #endif
 
       CHARACTER(LEN=256) :: interp_file, output_file, name_file
@@ -70,12 +69,12 @@
       ENDIF
 ! 
       INQUIRE(FILE = TRIM(output_file), EXIST=around)
-   !   IF (around) THEN
-   !    WRITE(*,*) 'Output file: '//TRIM(output_file)//' exists'
-   !    WRITE(*,*) 'Ok to overwrite (y/n)?'
-   !    READ(5,'(a)') y
-   !    IF ( y .ne. 'y' .AND. y .ne. 'Y' ) STOP
-   !   ENDIF
+      IF (around) THEN
+       WRITE(*,*) 'Output file: '//TRIM(output_file)//' exists'
+       WRITE(*,*) 'Ok to overwrite (y/n)?'
+       READ(5,'(a)') y
+       IF ( y .ne. 'y' .AND. y .ne. 'Y' ) STOP
+      ENDIF
 !
       verbose = .true.
 !
