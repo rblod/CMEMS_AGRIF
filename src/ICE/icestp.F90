@@ -251,12 +251,12 @@ CONTAINS
       CALL ice_thd_init                ! set ice thermodynics parameters (clem: important to call it first for melt ponds)
       !
       !                                ! Initial sea-ice state
-      IF( .NOT. ln_rstart ) THEN              ! start from rest: sea-ice deduced from sst
+!      IF( .NOT. ln_rstart ) THEN              ! start from rest: sea-ice deduced from sst
          CALL ice_istate_init
          CALL ice_istate
-      ELSE                                    ! start from a restart file
-         CALL ice_rst_read
-      ENDIF
+!      ELSE                                    ! start from a restart file
+!         CALL ice_rst_read
+!      ENDIF
       CALL ice_var_glo2eqv
       CALL ice_var_agg(1)
       !

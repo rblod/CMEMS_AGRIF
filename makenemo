@@ -277,9 +277,10 @@ fi
 export NEMO_TDIR=${x_t:-$CONFIG_DIR}
 
 ## Save new configuration with sub-components set in work_cfgs.txt
-[ -f ${CONFIG_DIR}/work_cfgs.txt ] && sed -i "/${NEW_CONF} /d" ${CONFIG_DIR}/work_cfgs.txt
+[ -f ${CONFIG_DIR}/work_cfgs.txt ] && sed "/${NEW_CONF} /d" ${CONFIG_DIR}/work_cfgs.txt > ${CONFIG_DIR}/work_cfgs.txt_tmp
+\mv ${CONFIG_DIR}/work_cfgs.txt_tmp ${CONFIG_DIR}/work_cfgs.txt
 echo ${NEW_CONF} "${NEM_SUBDIR}" \
-	>> ${CONFIG_DIR}/work_cfgs.txt
+    >> ${CONFIG_DIR}/work_cfgs.txt
 
 cd ${CONFIG_DIR}
 

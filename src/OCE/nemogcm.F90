@@ -380,8 +380,11 @@ CONTAINS
          !
       ENDIF
       ! open /dev/null file to be able to supress output write easily
-      !CALL ctl_opn( numnul, '/dev/null', 'REPLACE', 'FORMATTED', 'SEQUENTIAL', -1, 6, .FALSE. )
-      numnul=numout
+      IF( Agrif_Root() ) THEN
+         CALL ctl_opn( numnul, '/dev/null', 'REPLACE', 'FORMATTED', 'SEQUENTIAL', -1, 6, .FALSE. )
+      ELSE
+         numnul=Agrif_Parent(numnul)
+      ENDIF
       !
       !                                      ! Domain decomposition
       CALL mpp_init                          ! MPP

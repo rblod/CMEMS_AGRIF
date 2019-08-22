@@ -39,8 +39,8 @@
 #  - unix variables "$..." are accpeted and will be evaluated before calling fcm.
 #  - fcm variables are starting with a % (and not a $)
 #
-%NCDF_HOME           /opt/local
-%HDF5_HOME           /opt/local
+%NCDF_HOME           /usr/local
+%HDF5_HOME           /usr/local
 %XIOS_HOME           /Users/$( whoami )/xios-2.5
 %OASIS_HOME          /not/defined
 
@@ -53,7 +53,8 @@
 
 %CPP	             cpp-mp-4.8 -Dkey_nosignedzero 
 %FC	             mpif90 
-%FCFLAGS             -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none
+%FCFLAGS             -fdefault-real-8 -O3 -funroll-all-loops -fcray-pointer -ffree-line-length-none  -fbacktrace  
+%FCFLAGS             -fdefault-real-8 -O1  -ffree-line-length-none  -fbacktrace  
 %FFLAGS              %FCFLAGS
 %LD                  %FC
 %LDFLAGS             

@@ -81,9 +81,9 @@ CONTAINS
       !! ---------------------------------------------------------------------
 #if defined key_agrif
       kstp = nit000 + Agrif_Nb_Step()
-      IF( lk_agrif_debug ) THEN
+      IF( .true. ) THEN
          IF( Agrif_Root() .and. lwp)   WRITE(*,*) '---'
-         IF(lwp)   WRITE(*,*) 'Grid Number', Agrif_Fixed(),' time step ', kstp, 'int tstep', Agrif_NbStepint()
+         IF(lwp)   WRITE(*,*) 'Grid Number', Agrif_Fixed(),' time step ', kstp, 'int tstep', Agrif_NbStepint(), Agrif_nbfixedgrids
       ENDIF
       IF( kstp == nit000 + 1 )   lk_agrif_fstep = .FALSE.
 # if defined key_iomput

@@ -6,9 +6,10 @@ PROGRAM scripgrid
 
   CHARACTER(char_len) :: infile
 
+#define ARGC
 #if defined ARGC
   INTEGER :: IARGC
-  EXTERNAL IARGC
+ ! EXTERNAL IARGC
 
   if (IARGC() == 1) then
     CALL GETARG(1, infile)

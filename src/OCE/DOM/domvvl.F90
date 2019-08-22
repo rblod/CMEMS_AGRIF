@@ -972,6 +972,7 @@ CONTAINS
          !
          IF( lwxios ) CALL iom_swap(      cxios_context          )
       ENDIF
+      WRITE(*,*) 'fin dom_vvl_rst'
       !
    END SUBROUTINE dom_vvl_rst
 
