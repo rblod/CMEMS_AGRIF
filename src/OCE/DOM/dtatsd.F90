@@ -216,8 +216,8 @@ CONTAINS
          ! 
       ELSE                                !==   z- or zps- coordinate   ==!
          !                             
-         ptsd(:,:,:,jp_tem) = ptsd(:,:,:,jp_tem) * tmask(:,:,:)    ! Mask
-         ptsd(:,:,:,jp_sal) = ptsd(:,:,:,jp_sal) * tmask(:,:,:)
+         ptsd(:,:,:,jp_tem) = ptsd(:,:,:,jp_tem) !* tmask(:,:,:)    ! Mask !RB
+         ptsd(:,:,:,jp_sal) = ptsd(:,:,:,jp_sal) !* tmask(:,:,:)
          !
          IF( ln_zps ) THEN                      ! zps-coordinate (partial steps) interpolation at the last ocean level
             DO jj = 1, jpj
