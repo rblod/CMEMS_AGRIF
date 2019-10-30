@@ -251,14 +251,6 @@ type Agrif_Variable_l
     logical, dimension(:,:,:,:)    , allocatable :: larray4
     logical, dimension(:,:,:,:,:)  , allocatable :: larray5
     logical, dimension(:,:,:,:,:,:), allocatable :: larray6
-    
-    logical, dimension(:)          , pointer :: plarray1
-    logical, dimension(:,:)        , pointer :: plarray2
-    logical, dimension(:,:,:)      , pointer :: plarray3
-    logical, dimension(:,:,:,:)    , pointer :: plarray4
-    logical, dimension(:,:,:,:,:)  , pointer :: plarray5
-    logical, dimension(:,:,:,:,:,:), pointer :: plarray6
-    
 !> @}
 !> \name Arrays containing the values of the grid variables (logical pointers)
 !> @{
@@ -292,14 +284,7 @@ type Agrif_Variable_i
     integer, dimension(:,:,:)      , allocatable :: iarray3
     integer, dimension(:,:,:,:)    , allocatable :: iarray4
     integer, dimension(:,:,:,:,:)  , allocatable :: iarray5
-    integer, dimension(:,:,:,:,:,:), allocatable :: iarray6
-    
-    integer, dimension(:)          , pointer :: piarray1
-    integer, dimension(:,:)        , pointer :: piarray2
-    integer, dimension(:,:,:)      , pointer :: piarray3
-    integer, dimension(:,:,:,:)    , pointer :: piarray4
-    integer, dimension(:,:,:,:,:)  , pointer :: piarray5
-    integer, dimension(:,:,:,:,:,:), pointer :: piarray6
+    integer, dimension(:,:,:,:,:,:), allocatable :: iarray6    
 !> @}
 !
 !> \name Arrays containing the values of the grid variables (integer pointers)
