@@ -135,16 +135,6 @@ CONTAINS
       !                            !-----------------------!
       CALL nemo_init               !==  Initialisations  ==!
       !                            !-----------------------!
-#if defined key_agrif
-      CALL Agrif_Declare_Var_dom   ! AGRIF: set the meshes for DOM
-      CALL Agrif_Declare_Var       !  "      "   "   "      "  DYN/TRA 
-# if defined key_top
-      CALL Agrif_Declare_Var_top   !  "      "   "   "      "  TOP
-# endif
-# if defined key_si3
-      CALL Agrif_Declare_Var_ice   !  "      "   "   "      "  Sea ice
-# endif
-#endif
       ! check that all process are still there... If some process have an error,
       ! they will never enter in step and other processes will wait until the end of the cpu time!
       CALL mpp_max( 'nemogcm', nstop )
@@ -380,8 +370,13 @@ CONTAINS
          !
       ENDIF
       ! open /dev/null file to be able to supress output write easily
-      !CALL ctl_opn( numnul, '/dev/null', 'REPLACE', 'FORMATTED', 'SEQUENTIAL', -1, 6, .FALSE. )
-      numnul=numout
+      IF( Agrif_Root() ) THEN
+         CALL ctl_opn( numnul, '/dev/null', 'REPLACE', 'FORMATTED', 'SEQUENTIAL', -1, 6, .FALSE. )
+      ELSE
+         numnul=Agrif_Parent(numnul)
+      ENDIF
+
+      numnul = numout
       !
       !                                      ! Domain decomposition
       CALL mpp_init                          ! MPP
@@ -423,11 +418,27 @@ CONTAINS
          RETURN                                       ! end of initialization
       ENDIF
       
+         ! AGRIF variables declared here for interpolation of
+         ! initial state just after        
+#if defined key_agrif
+                          CALL Agrif_Declare_Var_dom   ! AGRIF: set the meshes for DOM
+                          CALL Agrif_Declare_Var       !  "      "   "   "      "  DYN/TRA 
+# if defined key_top
+                          CALL Agrif_Declare_Var_top   !  "      "   "   "      "  TOP
+# endif
+              !             CALL Agrif_Declare_Var_ice
+#endif
+
                            CALL  istate_init    ! ocean initial state (Dynamics and tracers)
 
       !                                      ! external forcing 
                            CALL    tide_init    ! tidal harmonics
                            CALL     sbc_init    ! surface boundary conditions (including sea-ice)
+#if defined key_agrif
+# if defined key_si3
+                           CALL Agrif_Declare_Var_ice  !  "      "   "   "      "  Sea ice
+# endif
+#endif
                            CALL     bdy_init    ! Open boundaries initialisation
 
       !                                      ! Ocean physics
