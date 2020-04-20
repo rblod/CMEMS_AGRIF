@@ -252,13 +252,6 @@ type Agrif_Variable_l
     logical, dimension(:,:,:,:,:)  , allocatable :: larray5
     logical, dimension(:,:,:,:,:,:), allocatable :: larray6
     
-    logical, dimension(:)          , pointer :: plarray1
-    logical, dimension(:,:)        , pointer :: plarray2
-    logical, dimension(:,:,:)      , pointer :: plarray3
-    logical, dimension(:,:,:,:)    , pointer :: plarray4
-    logical, dimension(:,:,:,:,:)  , pointer :: plarray5
-    logical, dimension(:,:,:,:,:,:), pointer :: plarray6
-    
 !> @}
 !> \name Arrays containing the values of the grid variables (logical pointers)
 !> @{
@@ -293,13 +286,6 @@ type Agrif_Variable_i
     integer, dimension(:,:,:,:)    , allocatable :: iarray4
     integer, dimension(:,:,:,:,:)  , allocatable :: iarray5
     integer, dimension(:,:,:,:,:,:), allocatable :: iarray6
-    
-    integer, dimension(:)          , pointer :: piarray1
-    integer, dimension(:,:)        , pointer :: piarray2
-    integer, dimension(:,:,:)      , pointer :: piarray3
-    integer, dimension(:,:,:,:)    , pointer :: piarray4
-    integer, dimension(:,:,:,:,:)  , pointer :: piarray5
-    integer, dimension(:,:,:,:,:,:), pointer :: piarray6
 !> @}
 !
 !> \name Arrays containing the values of the grid variables (integer pointers)
@@ -334,8 +320,12 @@ type Agrif_Interp_Loc
     logical, dimension(:),    pointer :: sendtoproc1    => NULL()
     logical, dimension(:),    pointer :: sendtoproc2    => NULL()
     logical, dimension(:),    pointer :: recvfromproc1  => NULL()
-    logical, dimension(:),    pointer :: recvfromproc2  => NULL()
 #endif
+    integer                           :: nb_chunks
+    integer, dimension(:,:,:,:), allocatable :: parentarray_chunk
+    integer, dimension(:,:),allocatable :: decal_chunks
+    logical, dimension(:),allocatable :: correction_required
+    logical, dimension(:),allocatable :: member_chuncks 
 !---------------------------------------------------------------------------------------------------
 end type Agrif_Interp_Loc
 !===================================================================================================
@@ -451,6 +441,8 @@ end type Agrif_Variables_List
     abstract interface
      subroutine mapping(ndim,bounds,bounds_chunks,correction_required,nb_chunks)
      integer :: ndim
+     subroutine mapping(ndim,ptx,pty,bounds,bounds_chunks,correction_required,nb_chunks)
+     integer :: ndim, ptx, pty
      integer,dimension(ndim,2,2) :: bounds
      integer,dimension(:,:,:,:),allocatable :: bounds_chunks
      logical,dimension(:),allocatable :: correction_required
