@@ -422,15 +422,19 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
     integer,dimension(nbdim)     :: type_update_temp
     logical :: memberin, member
     integer :: nbin, ndirin
-    integer :: i
+    integer :: i, j,k,l,m
+    LOGICAL,DIMENSION(:),ALLOCATABLE :: member_chuncks
+    INTEGER,DIMENSION(:,:),ALLOCATABLE :: decal_chunks
 !
 #if defined AGRIF_MPI
 !
     integer,dimension(nbdim)    :: indminglob2,indmaxglob2
+    INTEGER, DIMENSION(:,:),ALLOCATABLE :: indminglob_chunks, indmaxglob_chunks
+    INTEGER, DIMENSION(:,:),ALLOCATABLE :: indminglob2_chunks,indmaxglob2_chunks
+    INTEGER, DIMENSION(:,:),ALLOCATABLE :: indminglob3_chunks,indmaxglob3_chunks
     logical, dimension(0:Agrif_Nbprocs-1) :: sendtoproc1,recvfromproc1
     logical, dimension(0:Agrif_Nbprocs-1) :: sendtoproc2,recvfromproc2
     integer                               :: code, local_proc
-    integer                               :: j,k
     integer, dimension(nbdim,4)           :: tab3
     integer, dimension(nbdim,4,0:Agrif_Nbprocs-1) :: tab4
     integer, dimension(nbdim,0:Agrif_Nbprocs-1,8) :: tab4t
@@ -444,17 +448,23 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
     type(Agrif_Variable), pointer, save :: tempC => NULL()       ! Temporary child grid variable
     type(Agrif_Variable), pointer, save :: tempP => NULL()       ! Temporary parent grid variable
     type(Agrif_Variable), pointer, save :: tempCextend => NULL() ! Temporary child
+    
     type(Agrif_Variable), pointer, save :: tempPextend => NULL() ! Temporary parent
+    type(Agrif_Variable), pointer, save :: tempPextend_chunk => NULL() ! Temporary parent
     type(Agrif_Variable), pointer :: tempP_indic, tempP_average
     type(Agrif_Variable), pointer :: tempC_indic
     logical :: compute_average
     real :: coeff_multi
     integer :: nb_dimensions
     
-! CHUNK (periodicity)
+! CHUNK (e.g. periodicity)
 
     INTEGER :: nb_chunks
-    INTEGER, DIMENSION(2,nbdim,2,2) :: parentarray_chunk
+    INTEGER, DIMENSION(:,:,:,:), ALLOCATABLE :: parentarray_chunk
+    INTEGER, DIMENSION(:,:,:,:), ALLOCATABLE :: parentarray_chunk_decal
+    INTEGER, DIMENSION(:,:,:), ALLOCATABLE :: bounds_chunks
+    logical,dimension(:),allocatable :: correction_required
+!
     
 !
 !   Get local lower and upper bound of the child variable
@@ -1185,48 +1195,189 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
 !
     ENDIF
 
+    if (agrif_debug_update .and. nbdim==2) then
+        print *,'MINMAXUPDATE = ',minval(tempP%array2),maxval(tempP%array2)
+    endif
+
 #if defined AGRIF_MPI
     local_proc = Agrif_Procrank
     call Agrif_get_var_bounds_array(parent,lowerbound,upperbound,nbdim)
     call Agrif_ChildGrid_to_ParentGrid()
 
-    call Agrif_Childbounds(nbdim, lowerbound, upperbound,                   &
-                           indminglob,  indmaxglob,  local_proc, coords,    &
-                           indminglob2, indmaxglob2, member,check_perio=.TRUE.)
-                           
-        if (agrif_debug_update) then
-        print *,'************CHILDBOUNDS PARENT*********************************'
-#ifdef AGRIF_MPI
-         print *,'Processeur ',Agrif_Procrank
-#endif
-        print *,'member ',member
-        do i = 1 , nbdim
-        print *,'Direction ',i,' indminglob2 : ',indminglob2(i)
-        print *,'Direction ',i,' indmaxglob2 : ',indmaxglob2(i)
-        enddo
-        print *,'*********************************************'
+          parentarray(:,1,1) = indminglob
+          parentarray(:,2,1) = indmaxglob
+          parentarray(:,1,2) = indminglob
+          parentarray(:,2,2) = indmaxglob
+        if (associated(agrif_external_mapping)) then
+          call agrif_external_mapping(nbdim,child%root_var % posvar(1),child%root_var % posvar(2), &
+                                      parentarray,parentarray_chunk,correction_required,nb_chunks)
+          allocate(decal_chunks(nb_chunks,nbdim))
+          do i=1,nb_chunks
+            decal_chunks(i,:)=parentarray_chunk(i,:,1,1)-parentarray_chunk(i,:,1,2)
+          enddo
+        else
+            nb_chunks=1
+            allocate(correction_required(nb_chunks))
+            correction_required=.FALSE.
+            allocate(parentarray_chunk(nb_chunks,nbdim,2,2))
+            parentarray_chunk(1,:,:,:)=parentarray
+            allocate(decal_chunks(nb_chunks,nbdim))
+            decal_chunks=0
         endif
-!
-    IF (member) THEN
-        call Agrif_GlobalToLocalBounds(parentarray, lowerbound, upperbound, &
-                                       indminglob2, indmaxglob2, coords,    &
-                                       nbdim, local_proc, member,check_perio=.TRUE.)
-    ENDIF
-    
         if (agrif_debug_update) then
-        print *,'************GlobalToLocalBounds II******************'
+        print *,'AVANT PARENTCHILDBOUNDS'
+        print *,'nombre de chunks ',nb_chunks
+        do i=1,nb_chunks
+          print *,'CHUNK Number : ',i
+          do j=1,nbdim
+           print *,'Direction ',j
+           print *,'MIN MAX (2) = ',parentarray_chunk(i,j,1,2),parentarray_chunk(i,j,2,2)
+           print *,'MIN MAX (1) = ',parentarray_chunk(i,j,1,1),parentarray_chunk(i,j,2,1)
+          enddo
+        enddo
+        print *,'APRES PARENTCHILDBOUNDS'
+        endif
+
+        allocate(indminglob_chunks(nb_chunks,nbdim))
+        allocate(indmaxglob_chunks(nb_chunks,nbdim))
+        allocate(indminglob2_chunks(nb_chunks,nbdim))
+        allocate(indmaxglob2_chunks(nb_chunks,nbdim))
+        allocate(indminglob3_chunks(nb_chunks,nbdim))
+        allocate(indmaxglob3_chunks(nb_chunks,nbdim))
+        allocate(member_chuncks(nb_chunks))
+        
+        do i=1,nb_chunks
+          indminglob_chunks(i,:) = parentarray_chunk(i,:,1,2)
+          indmaxglob_chunks(i,:) = parentarray_chunk(i,:,2,2)
+        enddo
+
+        do i=1,nb_chunks
+              call Agrif_Childbounds(nbdim,lowerbound,upperbound,         &
+                   indminglob_chunks(i,:),indmaxglob_chunks(i,:), local_proc, coords,   &
+                   indminglob2_chunks(i,:),indmaxglob2_chunks(i,:),member_chuncks(i))
+        enddo
+
+        if (agrif_debug_update) then
+        print *,'************CHILDBOUNDSPARENTMPI*********************************'
 #ifdef AGRIF_MPI
          print *,'Processeur ',Agrif_Procrank
 #endif
+        do j=1,nb_chunks
+        print *,'Chunk number ',j
+
         do i = 1 , nbdim
-        print *,'Direction ',i,' parentarray global : ',parentarray(i,1,1),parentarray(i,2,1)
-        print *,'Direction ',i,' parentarray local  : ',parentarray(i,1,2),parentarray(i,2,2)
+        print *,'Direction ',i,' indices debut: ',indminglob_chunks(j,i),indminglob2_chunks(j,i)
+        print *,'Direction ',i,' indices fin  : ',indmaxglob_chunks(j,i),indmaxglob2_chunks(j,i)
         enddo
-        
+        enddo
         print *,'*********************************************'
         endif
 
+        allocate(parentarray_chunk_decal(nb_chunks,nbdim,2,2))
+        do j=1,nb_chunks
+        if (agrif_debug_update) print *,'CHUNK = ',j
+        if (member_chuncks(j)) then
+            ! call Agrif_GlobalToLocalBounds(parentarray_chunk(j,:,:,:),                               &
+                                           ! lowerbound,  upperbound,                                  &
+                                           ! indminglob2_chunks(j,:), indmaxglob2_chunks(j,:), coords, &
+                                           ! nbdim, local_proc, member_chuncks(j),check_perio=.TRUE.)
+                                           
+            call Agrif_GlobalToLocalBounds(parentarray_chunk(j,:,:,:),                               &
+                                           lowerbound,  upperbound,                                  &
+                                           indminglob2_chunks(j,:), indmaxglob2_chunks(j,:), coords, &
+                                           nbdim, local_proc, member_chuncks(j))
+                                           
+            do i=1,nbdim
+            parentarray_chunk_decal(j,i,:,1) = parentarray_chunk(j,i,:,1)+decal_chunks(j,i)
+            enddo
+            if (agrif_debug_update) then
+            do i=1,nbdim
+            print *,'parentarray = ',i,parentarray_chunk(j,i,1,1),parentarray_chunk(j,i,2,1), &
+                parentarray_chunk(j,i,1,2),parentarray_chunk(j,i,2,2)
+                print *,'parentarraydecal = ',i,parentarray_chunk_decal(j,i,1,1),parentarray_chunk_decal(j,i,2,1)
+            enddo
+            endif
+        endif
+        enddo
+
+!     call Agrif_Childbounds(nbdim, lowerbound, upperbound,                   &
+!                            indminglob,  indmaxglob,  local_proc, coords,    &
+!                            indminglob2, indmaxglob2, member)
+                           
+!         if (agrif_debug_update) then
+!         print *,'************CHILDBOUNDS PARENT*********************************'
+! #ifdef AGRIF_MPI
+!          print *,'Processeur ',Agrif_Procrank
+! #endif
+!         print *,'member ',member
+!         do i = 1 , nbdim
+!         print *,'Direction ',i,' indminglob2 : ',indminglob2(i)
+!         print *,'Direction ',i,' indmaxglob2 : ',indmaxglob2(i)
+!         enddo
+!         print *,'*********************************************'
+!         endif
+!
+!     IF (member) THEN
+!         call Agrif_GlobalToLocalBounds(parentarray, lowerbound, upperbound, &
+!                                        indminglob2, indmaxglob2, coords,    &
+!                                        nbdim, local_proc, member,check_perio=.TRUE.)
+!     ENDIF
+    
+!         if (agrif_debug_update) then
+!         print *,'************GlobalToLocalBounds II******************'
+! #ifdef AGRIF_MPI
+!          print *,'Processeur ',Agrif_Procrank
+! #endif
+!         do i = 1 , nbdim
+!         print *,'Direction ',i,' parentarray global : ',parentarray(i,1,1),parentarray(i,2,1)
+!         print *,'Direction ',i,' parentarray local  : ',parentarray(i,1,2),parentarray(i,2,2)
+!         enddo
+        
+!         print *,'*********************************************'
+!         endif
+
     call Agrif_ParentGrid_to_ChildGrid()
+
+        parentarray(:,1,:)=Huge(1)
+        parentarray(:,2,:)=-Huge(1)
+        indminglob2=Huge(1)
+        indmaxglob2=-Huge(1)
+        member = .FALSE.
+        do j=1,nb_chunks
+          if (member_chuncks(j)) then
+            do i=1,nbdim
+             parentarray(i,1,1) = min(parentarray(i,1,1),parentarray_chunk_decal(j,i,1,1))
+             parentarray(i,1,2) = min(parentarray(i,1,2),parentarray_chunk(j,i,1,2))
+             parentarray(i,2,1) = max(parentarray(i,2,1),parentarray_chunk_decal(j,i,2,1))
+             parentarray(i,2,2) = max(parentarray(i,2,2),parentarray_chunk(j,i,2,2))
+             indminglob2(i)=min(indminglob2(i),indminglob2_chunks(j,i)+decal_chunks(j,i))
+             indmaxglob2(i)=max(indmaxglob2(i),indmaxglob2_chunks(j,i)+decal_chunks(j,i))
+            enddo
+            member = .TRUE.
+          endif          
+        enddo
+        
+        if (agrif_debug_update) then
+        print *,'************ FINAL PARENTARRAY *****************'
+#ifdef AGRIF_MPI
+        print *,'Processeur ',Agrif_Procrank,' MEMBER = ',member
+        do i=1,nbdim
+         print *,'Direction ',i,' indices debut = ',parentarray(i,1,1),parentarray(i,1,2)
+         print *,'Direction ',i,' indices fin = ',parentarray(i,2,1),parentarray(i,2,2)
+        enddo
+#endif
+        endif
+        
+        if (agrif_debug_update) then
+        print *,'************ FINAL INDMINGLOB *****************'
+#ifdef AGRIF_MPI
+        print *,'Processeur ',Agrif_Procrank,' MEMBER = ',member
+        do i=1,nbdim
+         print *,'Direction ',i,' indices debut = ',indminglob2(i)
+         print *,'Direction ',i,' indices fin = ',indmaxglob2(i)
+        enddo
+#endif
+        endif
 
     if (.not.find_list_update) then
         tab3(:,1) = indmin(:)
@@ -1268,8 +1419,62 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
     parentarray(:,2,1) = indmax
     parentarray(:,1,2) = indmin
     parentarray(:,2,2) = indmax
+
+        if (associated(agrif_external_mapping)) then
+          call Agrif_ChildGrid_to_ParentGrid()
+          call agrif_external_mapping(nbdim,child%root_var % posvar(1),child%root_var % posvar(2), &
+                                      parentarray,parentarray_chunk,correction_required,nb_chunks)
+          call Agrif_ParentGrid_to_ChildGrid()
+          allocate(decal_chunks(nb_chunks,nbdim))
+          do i=1,nb_chunks
+            decal_chunks(i,:)=parentarray_chunk(i,:,1,1)-parentarray_chunk(i,:,1,2)
+          enddo
+        else
+            nb_chunks=1
+            allocate(correction_required(nb_chunks))
+            correction_required=.FALSE.
+            allocate(parentarray_chunk(nb_chunks,nbdim,2,2))
+            parentarray_chunk(1,:,:,:)=parentarray
+        endif
+        if (agrif_debug_update) then
+        print *,'AVANT PARENTCHILDBOUNDS'
+        print *,'nombre de chunks ',nb_chunks
+        do i=1,nb_chunks
+          print *,'CHUNK Number : ',i
+          do j=1,nbdim
+           print *,'Direction ',j
+           print *,'MIN MAX (2) = ',parentarray_chunk(i,j,1,2),parentarray_chunk(i,j,2,2)
+           print *,'MIN MAX (1) = ',parentarray_chunk(i,j,1,1),parentarray_chunk(i,j,2,1)
+          enddo
+        enddo
+        print *,'APRES PARENTCHILDBOUNDS'
+        endif
+        allocate(member_chuncks(nb_chunks))
+        allocate(parentarray_chunk_decal(nb_chunks,nbdim,2,2))
+        member_chuncks = .TRUE.
+        member = .TRUE.
+        do j=1,nb_chunks
+        if (agrif_debug_update) print *,'CHUNK = ',j
+        if (member_chuncks(j)) then
+            do i=1,nbdim
+            parentarray_chunk_decal(j,i,:,1) = parentarray_chunk(j,i,:,1)   !+decal_chunks(j,i)
+            enddo
+            if (agrif_debug_update) then
+            do i=1,nbdim
+            print *,'parentarray = ',i,parentarray_chunk(j,i,1,1),parentarray_chunk(j,i,2,1), &
+                parentarray_chunk(j,i,1,2),parentarray_chunk(j,i,2,2)
+                print *,'parentarraydecal = ',i,parentarray_chunk_decal(j,i,1,1),parentarray_chunk_decal(j,i,2,1)
+            enddo
+            endif
+        endif
+        enddo
+
     member = .TRUE.
 #endif
+
+        if (agrif_debug_update .and. nbdim==2) then
+        print *,'MINMAXUPDATEEXTND = ',minval(tempPextend%array2),maxval(tempPextend%array2)
+    endif
 !
 !   Special values on the child grid
     if ( Agrif_UseSpecialValueFineGrid ) then
@@ -1327,121 +1532,160 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
 !
     endif
 !
-    IF (member) THEN
 
-        nb_chunks=1
-        do i=1,2
-          parentarray_chunk(i,:,:,:) = parentarray
-        enddo
-        
-        do i=1,nbdim
-          if (agrif_curgrid%parent%periodicity(i)) then
-            if (parentarray(i,1,2) < 1) then
-              if (parentarray(i,2,2) > 0) then
-                print *,'CHUNK IS REQUIRED IN DIRECTION: ',i,parentarray(i,1,2)
-                nb_chunks=nb_chunks+1
-                parentarray_chunk(1,i,1,2)=parentarray(i,1,2)+agrif_curgrid%parent%periodicity_decal(i)
-                parentarray_chunk(1,i,2,2)=1+agrif_curgrid%parent%periodicity_decal(i)
-                parentarray_chunk(2,i,1,2)=2
-                parentarray_chunk(2,i,2,2)=parentarray(i,2,2)
-                parentarray_chunk(1,i,1,1)=parentarray(i,1,1)
-                parentarray_chunk(1,i,2,1)=parentarray(i,1,1)-parentarray(i,1,2)+1
-                parentarray_chunk(2,i,1,1)=parentarray(i,1,1)-parentarray(i,1,2)+2
-                parentarray_chunk(2,i,2,1)=parentarray(i,2,1)
-              else
-                print *,'CHUNK IS NOT REQUIRED WE JUST TRANSLATE according to periodicity'
-                parentarray_chunk(1,i,1,2)=parentarray(i,1,2)+agrif_curgrid%parent%periodicity_decal(i)
-                parentarray_chunk(1,i,2,2)=parentarray(i,2,2)+agrif_curgrid%parent%periodicity_decal(i)
-                parentarray_chunk(1,i,1,1)=parentarray(i,1,1)
-                parentarray_chunk(1,i,2,1)=parentarray(i,2,1)
-              endif
-            endif
-          endif
-        enddo
         
         call Agrif_ChildGrid_to_ParentGrid()
-        
+
+        if (nb_chunks > 1) then
+            allocate(tempPextend_chunk)
+            SELECT CASE(nbdim)
+            CASE(1)
+                call Agrif_array_allocate(tempPextend_chunk,lbound(tempPextend%array1),ubound(tempPextend%array1),nbdim)
+            CASE(2)
+                call Agrif_array_allocate(tempPextend_chunk,lbound(tempPextend%array2),ubound(tempPextend%array2),nbdim)
+            CASE(3)
+                call Agrif_array_allocate(tempPextend_chunk,lbound(tempPextend%array3),ubound(tempPextend%array3),nbdim)
+            CASE(4)
+                call Agrif_array_allocate(tempPextend_chunk,lbound(tempPextend%array4),ubound(tempPextend%array4),nbdim)
+            CASE(5)
+                call Agrif_array_allocate(tempPextend_chunk,lbound(tempPextend%array5),ubound(tempPextend%array5),nbdim)
+            CASE(6)
+                call Agrif_array_allocate(tempPextend_chunk,lbound(tempPextend%array6),ubound(tempPextend%array6),nbdim)
+            END SELECT
+        else
+            tempPextend_chunk => tempPextend
+        endif
         
         do i=1,nb_chunks
+
+        if (member_chuncks(i)) then
+
+            if (nb_chunks > 1) then
+                call Agrif_var_copy_array (tempPextend_chunk, parentarray_chunk_decal(i,:,1,1), parentarray_chunk_decal(i,:,2,1), &
+                                           tempPextend, parentarray_chunk_decal(i,:,1,1), parentarray_chunk_decal(i,:,2,1), nbdim )
+            endif
 !
         SELECT CASE(nbdim)
         CASE(1)
-            call procname( tempPextend % array1(            &
-                    parentarray(1,1,1):parentarray(1,2,1)), &
-                    parentarray(1,1,2),parentarray(1,2,2),.FALSE.,nbin,ndirin)
+            ! call procname( tempPextend % array1(            &
+            !         parentarray(1,1,1):parentarray(1,2,1)), &
+            !         parentarray(1,1,2),parentarray(1,2,2),.FALSE.,nbin,ndirin)
+
+            call procname(tempPextend_chunk%array1(parentarray_chunk_decal(i,1,1,1):parentarray_chunk_decal(i,1,2,1)),         &
+                      parentarray_chunk(i,1,1,2),parentarray_chunk(i,1,2,2),.FALSE.,nbin,ndirin)
+
         CASE(2)
-            ! call procname( tempPextend % array2(            &
-                    ! parentarray(1,1,1):parentarray(1,2,1),  &
-                    ! parentarray(2,1,1):parentarray(2,2,1)), &
-                    ! parentarray(1,1,2),parentarray(1,2,2),  &
-                    ! parentarray(2,1,2),parentarray(2,2,2),.FALSE.,nbin,ndirin)
-                    
-            call procname(tempPextend%array2(parentarray_chunk(i,1,1,1):parentarray_chunk(i,1,2,1), & 
-                      parentarray_chunk(i,2,1,1):parentarray_chunk(i,2,2,1)),         &
+
+            if (correction_required(i)) then
+              call correct_field(tempPextend_chunk%array2(parentarray_chunk_decal(i,1,1,1):parentarray_chunk_decal(i,1,2,1), & 
+                      parentarray_chunk_decal(i,2,1,1):parentarray_chunk_decal(i,2,2,1)), &
+                      parentarray_chunk_decal(i,1,1,1),parentarray_chunk_decal(i,1,2,1), & 
+                      parentarray_chunk_decal(i,2,1,1),parentarray_chunk_decal(i,2,2,1))           
+            endif
+
+            call procname(tempPextend_chunk%array2(parentarray_chunk_decal(i,1,1,1):parentarray_chunk_decal(i,1,2,1), & 
+                      parentarray_chunk_decal(i,2,1,1):parentarray_chunk_decal(i,2,2,1)),         &
                       parentarray_chunk(i,1,1,2),parentarray_chunk(i,1,2,2),    &
                       parentarray_chunk(i,2,1,2),parentarray_chunk(i,2,2,2),.FALSE.,nbin,ndirin)
                       
         CASE(3)
-            ! call procname( tempPextend % array3(            &
-                    ! parentarray(1,1,1):parentarray(1,2,1),  &
-                    ! parentarray(2,1,1):parentarray(2,2,1),  &
-                    ! parentarray(3,1,1):parentarray(3,2,1)), &
-                    ! parentarray(1,1,2),parentarray(1,2,2),  &
-                    ! parentarray(2,1,2),parentarray(2,2,2),  &
-                    ! parentarray(3,1,2),parentarray(3,2,2),.FALSE.,nbin,ndirin)
-                    
-            call procname(tempPextend%array3(parentarray_chunk(i,1,1,1):parentarray_chunk(i,1,2,1), & 
-                      parentarray_chunk(i,2,1,1):parentarray_chunk(i,2,2,1), & 
-                      parentarray_chunk(i,3,1,1):parentarray_chunk(i,3,2,1)),                 &
+
+            if (correction_required(i)) then
+                do k=parentarray_chunk(i,3,1,2),parentarray_chunk(i,3,2,2)
+              call correct_field(tempPextend_chunk%array3(parentarray_chunk_decal(i,1,1,1):parentarray_chunk_decal(i,1,2,1), & 
+                      parentarray_chunk_decal(i,2,1,1):parentarray_chunk_decal(i,2,2,1),k), &
+                      parentarray_chunk_decal(i,1,1,1),parentarray_chunk_decal(i,1,2,1), & 
+                      parentarray_chunk_decal(i,2,1,1),parentarray_chunk_decal(i,2,2,1))   
+                enddo
+            endif
+
+            call procname(tempPextend_chunk%array3(parentarray_chunk_decal(i,1,1,1):parentarray_chunk_decal(i,1,2,1), & 
+                      parentarray_chunk_decal(i,2,1,1):parentarray_chunk_decal(i,2,2,1), & 
+                      parentarray_chunk_decal(i,3,1,1):parentarray_chunk_decal(i,3,2,1)),         &
                       parentarray_chunk(i,1,1,2),parentarray_chunk(i,1,2,2),    &
                       parentarray_chunk(i,2,1,2),parentarray_chunk(i,2,2,2),    &
                       parentarray_chunk(i,3,1,2),parentarray_chunk(i,3,2,2),.FALSE.,nbin,ndirin)
+
+
+
                       
         CASE(4)
-            call procname( tempPextend % array4(            &
-                    parentarray(1,1,1):parentarray(1,2,1),  &
-                    parentarray(2,1,1):parentarray(2,2,1),  &
-                    parentarray(3,1,1):parentarray(3,2,1),  &
-                    parentarray(4,1,1):parentarray(4,2,1)), &
-                    parentarray(1,1,2),parentarray(1,2,2),  &
-                    parentarray(2,1,2),parentarray(2,2,2),  &
-                    parentarray(3,1,2),parentarray(3,2,2),  &
-                    parentarray(4,1,2),parentarray(4,2,2),.FALSE.,nbin,ndirin)
+
+            if (correction_required(i)) then
+                do l=parentarray_chunk(i,4,1,2),parentarray_chunk(i,4,2,2)
+                do k=parentarray_chunk(i,3,1,2),parentarray_chunk(i,3,2,2)
+              call correct_field(tempPextend_chunk%array4(parentarray_chunk_decal(i,1,1,1):parentarray_chunk_decal(i,1,2,1), & 
+                      parentarray_chunk_decal(i,2,1,1):parentarray_chunk_decal(i,2,2,1),k,l), &
+                      parentarray_chunk_decal(i,1,1,1),parentarray_chunk_decal(i,1,2,1), & 
+                      parentarray_chunk_decal(i,2,1,1),parentarray_chunk_decal(i,2,2,1))   
+                enddo
+            enddo
+            endif
+
+            call procname(tempPextend_chunk%array4(parentarray_chunk_decal(i,1,1,1):parentarray_chunk_decal(i,1,2,1), & 
+                      parentarray_chunk_decal(i,2,1,1):parentarray_chunk_decal(i,2,2,1), & 
+                      parentarray_chunk_decal(i,3,1,1):parentarray_chunk_decal(i,3,2,1), & 
+                      parentarray_chunk_decal(i,4,1,1):parentarray_chunk_decal(i,4,2,1)),         &
+                      parentarray_chunk(i,1,1,2),parentarray_chunk(i,1,2,2),    &
+                      parentarray_chunk(i,2,1,2),parentarray_chunk(i,2,2,2),    &
+                      parentarray_chunk(i,3,1,2),parentarray_chunk(i,3,2,2),    &
+                      parentarray_chunk(i,4,1,2),parentarray_chunk(i,4,2,2),.FALSE.,nbin,ndirin)
+
         CASE(5)
-            call procname( tempPextend % array5(            &
-                    parentarray(1,1,1):parentarray(1,2,1),  &
-                    parentarray(2,1,1):parentarray(2,2,1),  &
-                    parentarray(3,1,1):parentarray(3,2,1),  &
-                    parentarray(4,1,1):parentarray(4,2,1),  &
-                    parentarray(5,1,1):parentarray(5,2,1)), &
-                    parentarray(1,1,2),parentarray(1,2,2),  &
-                    parentarray(2,1,2),parentarray(2,2,2),  &
-                    parentarray(3,1,2),parentarray(3,2,2),  &
-                    parentarray(4,1,2),parentarray(4,2,2),  &
-                    parentarray(5,1,2),parentarray(5,2,2),.FALSE.,nbin,ndirin)
+
+            if (correction_required(i)) then
+                do m=parentarray_chunk(i,5,1,2),parentarray_chunk(i,5,2,2)
+                do l=parentarray_chunk(i,4,1,2),parentarray_chunk(i,4,2,2)
+                do k=parentarray_chunk(i,3,1,2),parentarray_chunk(i,3,2,2)
+              call correct_field(tempPextend_chunk%array5(parentarray_chunk_decal(i,1,1,1):parentarray_chunk_decal(i,1,2,1), & 
+                      parentarray_chunk_decal(i,2,1,1):parentarray_chunk_decal(i,2,2,1),k,l,m), &
+                      parentarray_chunk_decal(i,1,1,1),parentarray_chunk_decal(i,1,2,1), & 
+                      parentarray_chunk_decal(i,2,1,1),parentarray_chunk_decal(i,2,2,1))   
+                enddo
+            enddo
+            enddo
+            endif
+
+            call procname(tempPextend_chunk%array5(parentarray_chunk_decal(i,1,1,1):parentarray_chunk_decal(i,1,2,1), & 
+                      parentarray_chunk_decal(i,2,1,1):parentarray_chunk_decal(i,2,2,1), & 
+                      parentarray_chunk_decal(i,3,1,1):parentarray_chunk_decal(i,3,2,1), & 
+                      parentarray_chunk_decal(i,4,1,1):parentarray_chunk_decal(i,4,2,1), & 
+                      parentarray_chunk_decal(i,5,1,1):parentarray_chunk_decal(i,5,2,1)),         &
+                      parentarray_chunk(i,1,1,2),parentarray_chunk(i,1,2,2),    &
+                      parentarray_chunk(i,2,1,2),parentarray_chunk(i,2,2,2),    &
+                      parentarray_chunk(i,3,1,2),parentarray_chunk(i,3,2,2),    &
+                      parentarray_chunk(i,4,1,2),parentarray_chunk(i,4,2,2),    &
+                      parentarray_chunk(i,5,1,2),parentarray_chunk(i,5,2,2),.FALSE.,nbin,ndirin)
+
         CASE(6)
-            call procname( tempPextend % array6(            &
-                    parentarray(1,1,1):parentarray(1,2,1),  &
-                    parentarray(2,1,1):parentarray(2,2,1),  &
-                    parentarray(3,1,1):parentarray(3,2,1),  &
-                    parentarray(4,1,1):parentarray(4,2,1),  &
-                    parentarray(5,1,1):parentarray(5,2,1),  &
-                    parentarray(6,1,1):parentarray(6,2,1)), &
-                    parentarray(1,1,2),parentarray(1,2,2),  &
-                    parentarray(2,1,2),parentarray(2,2,2),  &
-                    parentarray(3,1,2),parentarray(3,2,2),  &
-                    parentarray(4,1,2),parentarray(4,2,2),  &
-                    parentarray(5,1,2),parentarray(5,2,2),  &
-                    parentarray(6,1,2),parentarray(6,2,2),.FALSE.,nbin,ndirin)
+
+            call procname(tempPextend_chunk%array6(parentarray_chunk_decal(i,1,1,1):parentarray_chunk_decal(i,1,2,1), & 
+                      parentarray_chunk_decal(i,2,1,1):parentarray_chunk_decal(i,2,2,1), & 
+                      parentarray_chunk_decal(i,3,1,1):parentarray_chunk_decal(i,3,2,1), & 
+                      parentarray_chunk_decal(i,4,1,1):parentarray_chunk_decal(i,4,2,1), & 
+                      parentarray_chunk_decal(i,5,1,1):parentarray_chunk_decal(i,5,2,1), & 
+                      parentarray_chunk_decal(i,6,1,1):parentarray_chunk_decal(i,6,2,1)),         &
+                      parentarray_chunk(i,1,1,2),parentarray_chunk(i,1,2,2),    &
+                      parentarray_chunk(i,2,1,2),parentarray_chunk(i,2,2,2),    &
+                      parentarray_chunk(i,3,1,2),parentarray_chunk(i,3,2,2),    &
+                      parentarray_chunk(i,4,1,2),parentarray_chunk(i,4,2,2),    &
+                      parentarray_chunk(i,5,1,2),parentarray_chunk(i,5,2,2),&
+                      parentarray_chunk(i,6,1,2),parentarray_chunk(i,6,2,2),.FALSE.,nbin,ndirin)
+
         END SELECT
-        
+        ENDIF
         enddo ! enddo i=1,nb_chunks
+
+        if (nb_chunks > 1) then
+            call Agrif_array_deallocate(tempPextend_chunk,nbdim)
+            deallocate(tempPextend_chunk)
+        endif
 !
         call Agrif_ParentGrid_to_ChildGrid()
 !
-        call Agrif_array_deallocate(tempPextend,nbdim)
+        if (ANY(member_chuncks)) call Agrif_array_deallocate(tempPextend,nbdim)
 !
-    ENDIF
+
 !
 #if defined AGRIF_MPI
     IF (memberin) THEN
