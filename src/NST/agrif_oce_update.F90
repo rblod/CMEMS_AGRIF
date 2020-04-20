@@ -24,6 +24,7 @@ MODULE agrif_oce_update
    USE in_out_manager ! I/O manager
    USE lib_mpp        ! MPP library
    USE domvvl         ! Need interpolation routines 
+   USE lbclnk 
 
    IMPLICIT NONE
    PRIVATE
@@ -79,6 +80,10 @@ CONTAINS
 
       Agrif_UseSpecialValueInUpdate = .FALSE.
       Agrif_SpecialValueFineGrid = 0.
+
+      use_sign_north = .TRUE.
+      sign_north = -1.
+
       !     
 # if ! defined DECAL_FEEDBACK
       CALL Agrif_Update_Variable(un_update_id,procname = updateU)
@@ -121,6 +126,7 @@ CONTAINS
 #  endif
       END IF
 #endif
+      use_sign_north = .FALSE.
       !
    END SUBROUTINE Agrif_Update_Dyn
 
@@ -145,6 +151,8 @@ CONTAINS
       !
 #  if defined VOL_REFLUX
       IF ( ln_dynspg_ts.AND.ln_bt_fw ) THEN
+         use_sign_north = .TRUE.
+         sign_north = -1.
          ! Refluxing on ssh:
 #  if defined DECAL_FEEDBACK
          CALL Agrif_Update_Variable(ub2b_update_id,locupdate1=(/0, 0/),locupdate2=(/1, 1/),procname = reflux_sshu)
@@ -153,6 +161,7 @@ CONTAINS
          CALL Agrif_Update_Variable(ub2b_update_id,locupdate1=(/-1,-1/),locupdate2=(/ 0, 0/),procname = reflux_sshu)
          CALL Agrif_Update_Variable(vb2b_update_id,locupdate1=(/ 0, 0/),locupdate2=(/-1,-1/),procname = reflux_sshv)
 #  endif
+         use_sign_north = .FALSE.
       END IF
 #  endif
       !
