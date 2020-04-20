@@ -110,6 +110,7 @@ SUBROUTINE agrif_declare_var_dom
    IMPLICIT NONE
    !
    INTEGER :: ind1, ind2, ind3
+   External :: nemo_mapping
       !!----------------------------------------------------------------------
 
       ! 1. Declaration of the type of variable which have to be interpolated
@@ -140,6 +141,8 @@ SUBROUTINE agrif_declare_var_dom
    CALL Agrif_Set_Updatetype(e2v_id,update1 = Agrif_Update_Average, update2=Agrif_Update_Copy)
 #endif
 
+   CALL Agrif_Set_ExternalMapping(nemo_mapping)
+
 END SUBROUTINE agrif_declare_var_dom
 
 
@@ -157,6 +160,7 @@ SUBROUTINE Agrif_InitValues_cont
    USE dom_oce
    USE zdf_oce
    USE nemogcm
+   USE agrif_oce
    !
    USE lib_mpp
    USE in_out_manager
@@ -182,6 +186,8 @@ SUBROUTINE Agrif_InitValues_cont
    ! reset tsa to zero
    tsa(:,:,:,:) = 0.
    Agrif_UseSpecialValue = ln_spc_dyn
+   use_sign_north = .TRUE.
+   sign_north = -1.
    CALL Agrif_Bc_variable(un_interp_id,calledweight=1.,procname=interpun)
    CALL Agrif_Bc_variable(vn_interp_id,calledweight=1.,procname=interpvn)
    tabspongedone_u = .FALSE.
@@ -190,6 +196,7 @@ SUBROUTINE Agrif_InitValues_cont
    tabspongedone_u = .FALSE.
    tabspongedone_v = .FALSE.
    CALL Agrif_Bc_variable(vn_sponge_id,calledweight=1.,procname=interpvn_sponge)
+   use_sign_north = .FALSE.
 
    Agrif_UseSpecialValue = .TRUE.
    CALL Agrif_Bc_variable(sshn_id,calledweight=1., procname=interpsshn )
@@ -198,10 +205,13 @@ SUBROUTINE Agrif_InitValues_cont
 
    IF ( ln_dynspg_ts ) THEN
       Agrif_UseSpecialValue = ln_spc_dyn
+      use_sign_north = .TRUE.
+      sign_north = -1.
       CALL Agrif_Bc_variable(unb_id,calledweight=1.,procname=interpunb)
       CALL Agrif_Bc_variable(vnb_id,calledweight=1.,procname=interpvnb)
       CALL Agrif_Bc_variable(ub2b_interp_id,calledweight=1.,procname=interpub2b)
       CALL Agrif_Bc_variable(vb2b_interp_id,calledweight=1.,procname=interpvb2b)
+      use_sign_north = .FALSE.
       ubdy_w(:,:) = 0.e0 ; vbdy_w(:,:) = 0.e0
       ubdy_e(:,:) = 0.e0 ; vbdy_e(:,:) = 0.e0
       ubdy_n(:,:) = 0.e0 ; vbdy_n(:,:) = 0.e0
@@ -419,6 +429,8 @@ SUBROUTINE agrif_declare_var
    CALL Agrif_Set_bc(  vn_sponge_id, (/-nn_sponge_len*Agrif_irhox()-1,0/) )
 
    CALL Agrif_Set_bc(        sshn_id, (/0,ind1-1/) )
+   CALL Agrif_Set_bc(        sshndia_id, (/0,ind1-1/) )
+
    CALL Agrif_Set_bc(         unb_id, (/0,ind1-1/) )
    CALL Agrif_Set_bc(         vnb_id, (/0,ind1-1/) )
    CALL Agrif_Set_bc( ub2b_interp_id, (/0,ind1-1/) )
@@ -829,6 +841,210 @@ SUBROUTINE Agrif_estimate_parallel_cost(imin, imax,jmin, jmax, nbprocs, grid_cos
 END SUBROUTINE Agrif_estimate_parallel_cost
 
 # endif
+
+      !!----------------------------------------------------------------------
+      !!                   *** ROUTINE Nemo_mapping ***
+      !!----------------------------------------------------------------------
+subroutine nemo_mapping(ndim,ptx,pty,bounds,bounds_chunks,correction_required,nb_chunks)
+use dom_oce
+integer :: ndim
+integer :: ptx, pty
+integer,dimension(ndim,2,2) :: bounds
+integer,dimension(:,:,:,:),allocatable :: bounds_chunks
+logical,dimension(:),allocatable :: correction_required
+integer :: nb_chunks
+integer :: i
+
+if (agrif_debug_interp) then
+do i=1,ndim
+ print *,'direction = ',i,bounds(i,1,2),bounds(i,2,2)
+enddo
+endif
+
+  if (bounds(2,2,2) > jpjglo) then
+   if (bounds(2,1,2) <=jpjglo) then
+    nb_chunks = 2
+    allocate(bounds_chunks(nb_chunks,ndim,2,2))
+    allocate(correction_required(nb_chunks))
+         do i=1,nb_chunks
+          bounds_chunks(i,:,:,:) = bounds
+        enddo
+  
+! FIRST CHUNCK (for j<=jpjglo)   
+
+! Original indices
+    bounds_chunks(1,1,1,1) = bounds(1,1,2)
+    bounds_chunks(1,1,2,1) = bounds(1,2,2)
+    bounds_chunks(1,2,1,1) = bounds(2,1,2)
+    bounds_chunks(1,2,2,1) = jpjglo
+
+
+    bounds_chunks(1,1,1,2) = bounds(1,1,2)
+    bounds_chunks(1,1,2,2) = bounds(1,2,2)
+    bounds_chunks(1,2,1,2) = bounds(2,1,2)
+    bounds_chunks(1,2,2,2) = jpjglo
+
+! Correction required or not
+    correction_required(1)=.FALSE.
+ 
+! SECOND CHUNCK (for j>jpjglo)
+
+! Original indices
+    bounds_chunks(2,1,1,1) = bounds(1,1,2)
+    bounds_chunks(2,1,2,1) = bounds(1,2,2)
+    bounds_chunks(2,2,1,1) = jpjglo-2
+    bounds_chunks(2,2,2,1) = bounds(2,2,2)
+
+! Where to find them
+! We use the relation TAB(ji,jj)=TAB(jpiglo-ji+2,jpjglo-2-(jj-jpjglo))
+
+    if (ptx == 2) then ! T, V points
+      bounds_chunks(2,1,1,2) = jpiglo-bounds(1,2,2)+2
+      bounds_chunks(2,1,2,2) = jpiglo-bounds(1,1,2)+2
+    else ! U, F points
+      bounds_chunks(2,1,1,2) = jpiglo-bounds(1,2,2)+1
+      bounds_chunks(2,1,2,2) = jpiglo-bounds(1,1,2)+1       
+    endif
+
+    if (pty == 2) then ! T, U points
+      bounds_chunks(2,2,1,2) = jpjglo-2-(bounds(2,2,2) -jpjglo)
+      bounds_chunks(2,2,2,2) = jpjglo-2-(jpjglo-2      -jpjglo)
+    else ! V, F points
+      bounds_chunks(2,2,1,2) = jpjglo-3-(bounds(2,2,2) -jpjglo)
+      bounds_chunks(2,2,2,2) = jpjglo-3-(jpjglo-2      -jpjglo)
+    endif
+! Correction required or not
+    correction_required(2)=.TRUE.
+
+   else
+    nb_chunks = 1
+    allocate(bounds_chunks(nb_chunks,ndim,2,2))
+    allocate(correction_required(nb_chunks))
+         do i=1,nb_chunks
+          bounds_chunks(i,:,:,:) = bounds
+        enddo
+
+    bounds_chunks(1,1,1,1) = bounds(1,1,2)
+    bounds_chunks(1,1,2,1) = bounds(1,2,2)
+    bounds_chunks(1,2,1,1) = bounds(2,1,2)
+    bounds_chunks(1,2,2,1) = bounds(2,2,2)
+
+    bounds_chunks(1,1,1,2) = jpiglo-bounds(1,2,2)+2
+    bounds_chunks(1,1,2,2) = jpiglo-bounds(1,1,2)+2
+
+    bounds_chunks(1,2,1,2) = jpjglo-2-(bounds(2,2,2)-jpjglo)
+    bounds_chunks(1,2,2,2) = jpjglo-2-(bounds(2,1,2)-jpjglo)
+
+    if (ptx == 2) then ! T, V points
+      bounds_chunks(1,1,1,2) = jpiglo-bounds(1,2,2)+2
+      bounds_chunks(1,1,2,2) = jpiglo-bounds(1,1,2)+2
+    else ! U, F points
+      bounds_chunks(1,1,1,2) = jpiglo-bounds(1,2,2)+1
+      bounds_chunks(1,1,2,2) = jpiglo-bounds(1,1,2)+1    	
+    endif
+
+    if (pty == 2) then ! T, U points
+      bounds_chunks(1,2,1,2) = jpjglo-2-(bounds(2,2,2) -jpjglo)
+      bounds_chunks(1,2,2,2) = jpjglo-2-(bounds(2,1,2) -jpjglo)
+    else ! V, F points
+      bounds_chunks(1,2,1,2) = jpjglo-3-(bounds(2,2,2) -jpjglo)
+      bounds_chunks(1,2,2,2) = jpjglo-3-(bounds(2,1,2) -jpjglo)
+    endif
+
+    correction_required(1)=.TRUE.
+    
+
+   endif
+  elseif (bounds(1,1,2) < 1) then
+   if (bounds(1,2,2) > 0) then
+    nb_chunks = 2
+    allocate(correction_required(nb_chunks))
+    correction_required=.FALSE.
+    allocate(bounds_chunks(nb_chunks,ndim,2,2))
+         do i=1,nb_chunks
+          bounds_chunks(i,:,:,:) = bounds
+        enddo
+        
+    bounds_chunks(1,1,1,2) = bounds(1,1,2)+jpiglo-2
+    bounds_chunks(1,1,2,2) = 1+jpiglo-2
+    
+    bounds_chunks(1,1,1,1) = bounds(1,1,2)
+    bounds_chunks(1,1,2,1) = 1
+ 
+    bounds_chunks(2,1,1,2) = 2
+    bounds_chunks(2,1,2,2) = bounds(1,2,2)
+    
+    bounds_chunks(2,1,1,1) = 2
+    bounds_chunks(2,1,2,1) = bounds(1,2,2)
+
+   else
+    nb_chunks = 1
+    allocate(correction_required(nb_chunks))
+    correction_required=.FALSE.
+    allocate(bounds_chunks(nb_chunks,ndim,2,2))
+         do i=1,nb_chunks
+          bounds_chunks(i,:,:,:) = bounds
+        enddo    
+    bounds_chunks(1,1,1,2) = bounds(1,1,2)+jpiglo-2
+    bounds_chunks(1,1,2,2) = bounds(1,2,2)+jpiglo-2
+    
+    bounds_chunks(1,1,1,1) = bounds(1,1,2)
+    bounds_chunks(1,1,2,1) = bounds(1,2,2)
+   endif
+  else
+    nb_chunks=1  
+    allocate(correction_required(nb_chunks))
+    correction_required=.FALSE.
+    allocate(bounds_chunks(nb_chunks,ndim,2,2))
+         do i=1,nb_chunks
+          bounds_chunks(i,:,:,:) = bounds
+        enddo
+    bounds_chunks(1,1,1,2) = bounds(1,1,2)
+    bounds_chunks(1,1,2,2) = bounds(1,2,2)
+    bounds_chunks(1,2,1,2) = bounds(2,1,2)
+    bounds_chunks(1,2,2,2) = bounds(2,2,2)
+    
+    bounds_chunks(1,1,1,1) = bounds(1,1,2)
+    bounds_chunks(1,1,2,1) = bounds(1,2,2)
+    bounds_chunks(1,2,1,1) = bounds(2,1,2)
+    bounds_chunks(1,2,2,1) = bounds(2,2,2)    
+    
+  endif
+  
+  
+  
+end subroutine nemo_mapping
+
+      !!----------------------------------------------------------------------
+      !!                   *** ROUTINE Correct_field ***
+      !!----------------------------------------------------------------------
+subroutine Correct_field(tab2d,i1,i2,j1,j2)
+use dom_oce
+use agrif_oce
+integer :: i1,i2,j1,j2
+real,dimension(i1:i2,j1:j2) :: tab2d
+
+integer :: i,j
+real,dimension(i1:i2,j1:j2) :: tab2dtemp
+
+tab2dtemp = tab2d
+
+if (.not.use_sign_north) then
+  do j=j1,j2
+    do i=i1,i2
+      tab2d(i,j)=tab2dtemp(i2-(i-i1),j2-(j-j1))
+    enddo
+  enddo
+else
+  do j=j1,j2
+    do i=i1,i2
+      tab2d(i,j)=sign_north * tab2dtemp(i2-(i-i1),j2-(j-j1))
+    enddo
+  enddo
+endif
+
+
+end subroutine Correct_field
 
 #else
 SUBROUTINE Subcalledbyagrif
