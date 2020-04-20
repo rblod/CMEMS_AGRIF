@@ -66,6 +66,12 @@ MODULE agrif_oce
    INTEGER, PUBLIC :: avt_id, avm_id, en_id                ! TKE related identificators
    INTEGER, PUBLIC :: umsk_id, vmsk_id
    INTEGER, PUBLIC :: kindic_agr
+
+   ! North fold
+!$AGRIF_DO_NOT_TREAT
+   LOGICAL, PUBLIC :: use_sign_north
+   REAL, PUBLIC :: sign_north
+!$AGRIF_END_DO_NOT_TREAT
    
    !!----------------------------------------------------------------------
    !! NEMO/NST 4.0 , NEMO Consortium (2018)
