@@ -42,7 +42,6 @@ MODULE agrif_oce_interp
    PUBLIC   interptsn, interpsshn, interpavm
    PUBLIC   interpunb, interpvnb , interpub2b, interpvb2b
    PUBLIC   interpe3t, interpumsk, interpvmsk
-   PUBLIC   agrif_initts
 
    INTEGER ::   bdy_tinterp = 0
 
@@ -88,8 +87,11 @@ CONTAINS
       Agrif_SpecialValue    = 0._wp
       Agrif_UseSpecialValue = ln_spc_dyn
       !
+      use_sign_north = .TRUE.
+      sign_north = -1.
       CALL Agrif_Bc_variable( un_interp_id, procname=interpun )
       CALL Agrif_Bc_variable( vn_interp_id, procname=interpvn )
+      use_sign_north = .FALSE.
       !
       Agrif_UseSpecialValue = .FALSE.
       !
@@ -472,6 +474,10 @@ CONTAINS
       ! Interpolate barotropic fluxes
       Agrif_SpecialValue=0._wp
       Agrif_UseSpecialValue = ln_spc_dyn
+
+      use_sign_north = .TRUE.
+      sign_north = -1.
+
       !
       IF( ll_int_cons ) THEN  ! Conservative interpolation
          ! order matters here !!!!!!
@@ -493,6 +499,7 @@ CONTAINS
          CALL Agrif_Bc_variable( vnb_id, procname=interpvnb )
       ENDIF
       Agrif_UseSpecialValue = .FALSE.
+      use_sign_north = .FALSE.
       ! 
    END SUBROUTINE Agrif_dta_ts
 
@@ -1081,7 +1088,7 @@ CONTAINS
          ELSE
             ztcoeff = 1
          ENDIF
-         !   
+         !
          IF(western_side)   ubdy_w(1:nbghostcells,j1:j2) = ubdy_w(1:nbghostcells,j1:j2) + ztcoeff * ptab(i1:i2,j1:j2)  
          IF(eastern_side)   ubdy_e(1:nbghostcells,j1:j2) = ubdy_e(1:nbghostcells,j1:j2) + ztcoeff * ptab(i1:i2,j1:j2)  
          IF(southern_side)  ubdy_s(i1:i2,1:nbghostcells) = ubdy_s(i1:i2,1:nbghostcells) + ztcoeff * ptab(i1:i2,j1:j2)
@@ -1300,7 +1307,7 @@ CONTAINS
       !!----------------------------------------------------------------------  
       !    
       IF( before ) THEN
-         ptab(i1:i2,j1:j2,k1:k2) = umask(i1:i2,j1:j2,k1:k2)
+         ptab(i1:i2,j1:j2,k1:k2) = e3u_0(i1:i2,j1:j2,k1:k2) * umask(i1:i2,j1:j2,k1:k2)
       ELSE
          western_side = (nb == 1).AND.(ndir == 1)
          eastern_side = (nb == 1).AND.(ndir == 2)
@@ -1308,7 +1315,7 @@ CONTAINS
             DO jj = j1, j2
                DO ji = i1, i2
                    ! Velocity mask at boundary edge points:
-                  IF (ABS(ptab(ji,jj,jk) - umask(ji,jj,jk)) > 1.D-2) THEN
+                  IF (ABS(ptab(ji,jj,jk) - e3u_0(ji,jj,jk)*umask(ji,jj,jk)) > 1.D-2) THEN
                      IF (western_side) THEN
                         WRITE(numout,*) 'ERROR with umask at the western border ji,jj,jk ', ji+nimpp-1,jj+njmpp-1,jk
                         WRITE(numout,*) '      masks: parent, child ', ptab(ji,jj,jk), umask(ji,jj,jk)
@@ -1342,7 +1349,7 @@ CONTAINS
       !!----------------------------------------------------------------------  
       !    
       IF( before ) THEN
-         ptab(i1:i2,j1:j2,k1:k2) = vmask(i1:i2,j1:j2,k1:k2)
+         ptab(i1:i2,j1:j2,k1:k2) = e3v_0(i1:i2,j1:j2,k1:k2)*vmask(i1:i2,j1:j2,k1:k2)
       ELSE
          southern_side = (nb == 2).AND.(ndir == 1)
          northern_side = (nb == 2).AND.(ndir == 2)
@@ -1350,7 +1357,7 @@ CONTAINS
             DO jj = j1, j2
                DO ji = i1, i2
                    ! Velocity mask at boundary edge points:
-                  IF (ABS(ptab(ji,jj,jk) - vmask(ji,jj,jk)) > 1.D-2) THEN
+                  IF (ABS(ptab(ji,jj,jk) - e3v_0(ji,jj,jk)*vmask(ji,jj,jk)) > 1.D-2) THEN
                      IF (southern_side) THEN
                         WRITE(numout,*) 'ERROR with vmask at the southern border ji,jj,jk ', ji+nimpp-1,jj+njmpp-1,jk
                         WRITE(numout,*) '      masks: parent, child ', ptab(ji,jj,jk), vmask(ji,jj,jk)
