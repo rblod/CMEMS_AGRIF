@@ -286,6 +286,7 @@ type Agrif_Variable_i
     integer, dimension(:,:,:,:)    , allocatable :: iarray4
     integer, dimension(:,:,:,:,:)  , allocatable :: iarray5
     integer, dimension(:,:,:,:,:,:), allocatable :: iarray6
+
 !> @}
 !
 !> \name Arrays containing the values of the grid variables (integer pointers)
@@ -320,6 +321,7 @@ type Agrif_Interp_Loc
     logical, dimension(:),    pointer :: sendtoproc1    => NULL()
     logical, dimension(:),    pointer :: sendtoproc2    => NULL()
     logical, dimension(:),    pointer :: recvfromproc1  => NULL()
+    logical, dimension(:),    pointer :: recvfromproc2  => NULL() 
 #endif
     integer                           :: nb_chunks
     integer, dimension(:,:,:,:), allocatable :: parentarray_chunk
@@ -439,8 +441,6 @@ end type Agrif_Variables_List
 ! External mapping procedure
     Procedure(mapping), pointer :: agrif_external_mapping => NULL()
     abstract interface
-     subroutine mapping(ndim,bounds,bounds_chunks,correction_required,nb_chunks)
-     integer :: ndim
      subroutine mapping(ndim,ptx,pty,bounds,bounds_chunks,correction_required,nb_chunks)
      integer :: ndim, ptx, pty
      integer,dimension(ndim,2,2) :: bounds
