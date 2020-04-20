@@ -414,8 +414,8 @@ SUBROUTINE agrif_declare_var
    CALL Agrif_Set_bcinterp( avm_id, interp=AGRIF_linear )
 
    ! Initial fields
-   CALL Agrif_Set_bcinterp(tsini_id,interp=AGRIF_ppm)
-   CALL Agrif_Set_interp  (tsini_id,interp=AGRIF_ppm)
+   CALL Agrif_Set_bcinterp(tsini_id,interp=AGRIF_linear)
+   CALL Agrif_Set_interp  (tsini_id,interp=AGRIF_linear)
 
    ! 3. Location of interpolation
    !-----------------------------
