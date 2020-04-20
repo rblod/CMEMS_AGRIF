@@ -146,7 +146,7 @@ end subroutine agrif_boundary_connections
              if (e3t_interp(ji,jj,jk) == -10) then ! the connection has not yet been done
                  e3t_interp(ji,jj,jk) = MAX(ptab(ji,jj,jk),MIN(e3zps_min, e3t_1d(jk)*e3zps_rat ))
                  e3t_interp(ji,jj,jk) = MIN(e3t_interp(ji,jj,jk),e3t_1d(jk))
-                 e3t_0(ji,jj,jk) = ztabramp(ji,jj)*e3t_interp(ji,jj,jk)+(1.-ztabramp(ji,jj))*e3t_0(ji,jj,jk)
+                 e3t_0(ji,jj,jk) = ztabramp(ji,jj)*e3t_0(ji,jj,jk)+(1.-ztabramp(ji,jj))*e3t_interp(ji,jj,jk)
              endif
              ENDDO
            ENDDO
