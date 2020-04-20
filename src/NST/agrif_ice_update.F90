@@ -1,5 +1,4 @@
 #define TWO_WAY
-!!#undef TWO_WAY
 #undef DECAL_FEEDBACK  /* SEPARATION of INTERFACES*/
 
 MODULE agrif_ice_update
@@ -68,6 +67,9 @@ CONTAINS
 #else
       CALL Agrif_Update_Variable( tra_ice_id , locupdate=(/1,0/), procname = update_tra_ice  )
 #endif
+      use_sign_north = .TRUE.
+      sign_north = -1.
+
 # if ! defined DECAL_FEEDBACK
       CALL Agrif_Update_Variable( u_ice_id   , procname = update_u_ice    )
       CALL Agrif_Update_Variable( v_ice_id   , procname = update_v_ice    )
@@ -75,6 +77,7 @@ CONTAINS
       CALL Agrif_Update_Variable( u_ice_id   , locupdate1=(/0,-1/),locupdate2=(/1,-2/),procname=update_u_ice) 
       CALL Agrif_Update_Variable( v_ice_id   , locupdate1=(/1,-2/),locupdate2=(/0,-1/),procname=update_v_ice)
 #endif
+      use_sign_north = .FALSE.
 !      CALL Agrif_Update_Variable( tra_ice_id , locupdate=(/0,2/), procname = update_tra_ice  )
 !      CALL Agrif_Update_Variable( u_ice_id   , locupdate=(/0,1/), procname = update_u_ice    )
 !      CALL Agrif_Update_Variable( v_ice_id   , locupdate=(/0,1/), procname = update_v_ice    )
