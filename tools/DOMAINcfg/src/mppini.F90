@@ -98,6 +98,26 @@ CONTAINS
       IF(  jpni /= 1 .OR. jpnj /= 1 .OR. jpnij /= 1 )                                     &
          CALL ctl_stop( 'mpp_init: equality  jpni = jpnj = jpnij = 1 is not satisfied',   &
             &           'the domain is lay out for distributed memory computing!' )
+
+#if defined key_agrif
+      IF( .NOT. Agrif_Root() ) THEN       ! AGRIF children: specific setting (cf. agrif_user.F90)
+         IF( jpiglo /= nbcellsx + 2 + 2*nbghostcells ) THEN
+            IF(lwp) THEN
+               WRITE(numout,*)
+               WRITE(numout,*) 'jpiglo should be: ', nbcellsx + 2 + 2*nbghostcells
+            ENDIF        
+            CALL ctl_stop( 'STOP', 'mpp_init: Agrif children requires jpiglo == nbcellsx + 2 + 2*nbghostcells' )
+         ENDIF   
+         IF( jpjglo /= nbcellsy + 2 + 2*nbghostcells ) THEN
+            IF(lwp) THEN
+               WRITE(numout,*)
+               WRITE(numout,*) 'jpjglo shoud be: ', nbcellsy + 2 + 2*nbghostcells
+            ENDIF        
+            CALL ctl_stop( 'STOP', 'mpp_init: Agrif children requires jpjglo == nbcellsy + 2 + 2*nbghostcells' )
+         ENDIF   
+         IF( ln_use_jattr )   CALL ctl_stop( 'STOP', 'mpp_init:Agrif children requires ln_use_jattr = .false. ' )
+      ENDIF
+#endif
          !
    END SUBROUTINE mpp_init
 
@@ -273,7 +293,7 @@ CONTAINS
          IF( jpiglo /= nbcellsx + 2 + 2*nbghostcells ) THEN
             IF(lwp) THEN
                WRITE(numout,*)
-               WRITE(numout,*) 'jpiglo shoud be: ', nbcellsx + 2 + 2*nbghostcells
+               WRITE(numout,*) 'jpiglo should be: ', nbcellsx + 2 + 2*nbghostcells
             ENDIF        
             CALL ctl_stop( 'STOP', 'mpp_init: Agrif children requires jpiglo == nbcellsx + 2 + 2*nbghostcells' )
          ENDIF   
