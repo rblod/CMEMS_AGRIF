@@ -251,7 +251,7 @@ type Agrif_Variable_l
     logical, dimension(:,:,:,:)    , allocatable :: larray4
     logical, dimension(:,:,:,:,:)  , allocatable :: larray5
     logical, dimension(:,:,:,:,:,:), allocatable :: larray6
-    
+
 !> @}
 !> \name Arrays containing the values of the grid variables (logical pointers)
 !> @{
