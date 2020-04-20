@@ -87,7 +87,6 @@ subroutine Agrif_Childbounds ( nbdim,           &
 #if defined AGRIF_MPI
         call Agrif_InvLoc( lb_var(i), proc_id, coord_i, lb_glob_index )
         call Agrif_InvLoc( ub_var(i), proc_id, coord_i, ub_glob_index )
-        if (agrif_debug_interp) then
         if (agrif_debug_interp .or. agrif_debug_update) then
         print *,'direction ',i,' lblogb ubglob = ',lb_glob_index,ub_glob_index
         endif
@@ -112,7 +111,6 @@ subroutine Agrif_Childbounds ( nbdim,           &
 #endif
         lb_tab_true(i) = max(lb_tab(i), lb_glob_index)
         ub_tab_true(i) = min(ub_tab(i), ub_glob_index)
-        if (agrif_debug_interp) then
         if (agrif_debug_interp .or. agrif_debug_update) then
         print *,'childbounds = ',i,lb_tab(i),lb_glob_index,lb_tab_true(i), &
         ub_tab(i),ub_glob_index,ub_tab_true(i)
