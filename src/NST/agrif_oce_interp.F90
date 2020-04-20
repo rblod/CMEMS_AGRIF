@@ -42,6 +42,7 @@ MODULE agrif_oce_interp
    PUBLIC   interptsn, interpsshn, interpavm
    PUBLIC   interpunb, interpvnb , interpub2b, interpvb2b
    PUBLIC   interpe3t, interpumsk, interpvmsk
+   PUBLIC   agrif_initts
 
    INTEGER ::   bdy_tinterp = 0
 
