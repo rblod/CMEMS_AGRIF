@@ -1029,4 +1029,12 @@ integer :: i_val
 i_val = Agrif_nbfixedgrids
 end function Agrif_Nb_Fine_Grids
 
+! Set the name of the External mapping subroutine (if needed)
+subroutine Agrif_Set_ExternalMapping(external_mapping)
+Procedure(mapping) :: external_mapping
+
+agrif_external_mapping => external_mapping
+
+end subroutine Agrif_Set_ExternalMapping
+
 end module Agrif_CurgridFunctions
