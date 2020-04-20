@@ -22,6 +22,7 @@ MODULE agrif_ice_interp
    USE sbc_oce
    USE ice
    USE agrif_ice
+   USE agrif_oce
    USE phycst , ONLY: rt0
    
    IMPLICIT NONE
@@ -67,6 +68,11 @@ CONTAINS
       !
       Agrif_SpecialValue    = -9999.
       Agrif_UseSpecialValue = .TRUE.
+
+      use_sign_north = .TRUE.
+      sign_north = -1.
+      if (cd_type == 'T') use_sign_north = .FALSE.
+
       SELECT CASE( cd_type )
       CASE('U')   ;   CALL Agrif_Bc_variable( u_ice_id  , procname=interp_u_ice  , calledweight=zbeta )
       CASE('V')   ;   CALL Agrif_Bc_variable( v_ice_id  , procname=interp_v_ice  , calledweight=zbeta )
@@ -74,6 +80,8 @@ CONTAINS
       END SELECT
       Agrif_SpecialValue    = 0._wp
       Agrif_UseSpecialValue = .FALSE.
+      
+      use_sign_north = .FALSE.
       !
    END SUBROUTINE agrif_interp_ice
 
