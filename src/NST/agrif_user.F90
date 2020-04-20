@@ -429,7 +429,6 @@ SUBROUTINE agrif_declare_var
    CALL Agrif_Set_bc(  vn_sponge_id, (/-nn_sponge_len*Agrif_irhox()-1,0/) )
 
    CALL Agrif_Set_bc(        sshn_id, (/0,ind1-1/) )
-   CALL Agrif_Set_bc(        sshndia_id, (/0,ind1-1/) )
 
    CALL Agrif_Set_bc(         unb_id, (/0,ind1-1/) )
    CALL Agrif_Set_bc(         vnb_id, (/0,ind1-1/) )
