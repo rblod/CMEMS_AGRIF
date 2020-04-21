@@ -17,8 +17,10 @@ SUBROUTINE Agrif_InitValues
    USE domain
    !!
    IMPLICIT NONE
-   
- 
+
+   ! No temporal refinement
+   call Agrif_Set_coeffreft(1)
+
    CALL nemo_init       !* Initializations of each fine grid
 
    CALL dom_nam
