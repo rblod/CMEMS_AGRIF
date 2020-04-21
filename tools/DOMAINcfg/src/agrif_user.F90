@@ -131,10 +131,10 @@ endif
 
 CALL agrif_nemo_init  ! specific namelist part if needed
 
-CALL agrif_declare_variable((/2,2,0/),(/ind2,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nx,ny,2/),glamt_id)
-CALL agrif_declare_variable((/1,2,0/),(/ind2-1,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nx,ny,2/),glamu_id)
-CALL agrif_declare_variable((/2,1,0/),(/ind2,ind3-1,0/),(/'x','y','N'/),(/1,1,1/),(/nx,ny,2/),glamv_id)
-CALL agrif_declare_variable((/1,1,0/),(/ind2-1,ind3-1,0/),(/'x','y','N'/),(/1,1,1/),(/nx,ny,2/),glamf_id)
+CALL agrif_declare_variable((/2,2/),(/ind2,ind3/),(/'x','y'/),(/1,1/),(/nx,ny/),glamt_id)
+CALL agrif_declare_variable((/1,2/),(/ind2-1,ind3/),(/'x','y'/),(/1,1/),(/nx,ny/),glamu_id)
+CALL agrif_declare_variable((/2,1/),(/ind2,ind3-1/),(/'x','y'/),(/1,1/),(/nx,ny/),glamv_id)
+CALL agrif_declare_variable((/1,1/),(/ind2-1,ind3-1/),(/'x','y'/),(/1,1/),(/nx,ny/),glamf_id)
 
 CALL agrif_declare_variable((/2,2/),(/ind2,ind3/),(/'x','y'/),(/1,1/),(/nx,ny/),gphit_id)
 CALL agrif_declare_variable((/1,2/),(/ind2-1,ind3/),(/'x','y'/),(/1,1/),(/nx,ny/),gphiu_id)
@@ -465,13 +465,23 @@ end subroutine correct_field
 subroutine agrif_init_lonlat()
 use agrif_profiles
 use agrif_util
+use dom_oce
 external :: init_glamt, init_glamu, init_glamv, init_glamf
 external :: init_gphit, init_gphiu, init_gphiv, init_gphif
+integer :: ji,jj,i1,i2,j1,j2
+real,dimension(jpi,jpj) :: tab2dtemp
+integer :: ind2,ind3
+integer :: irhox, irhoy
+external :: longitude_linear_interp
 
+irhox = agrif_irhox()
+irhoy = agrif_irhoy()
+call Agrif_Set_external_linear_interp(longitude_linear_interp)
 call Agrif_Init_variable(glamt_id, procname = init_glamt)
 call Agrif_Init_variable(glamu_id, procname = init_glamu)
 call Agrif_Init_variable(glamv_id, procname = init_glamv)
 call Agrif_Init_variable(glamf_id, procname = init_glamf)
+call Agrif_UnSet_external_linear_interp()
 
 call Agrif_Init_variable(gphit_id, procname = init_gphit)
 call Agrif_Init_variable(gphiu_id, procname = init_gphiu)
@@ -479,6 +489,23 @@ call Agrif_Init_variable(gphiv_id, procname = init_gphiv)
 call Agrif_Init_variable(gphif_id, procname = init_gphif)
 
 end subroutine agrif_init_lonlat
+
+real function longitude_linear_interp(x1,x2,coeff)
+real :: x1, x2, coeff
+real :: val_interp
+
+if ((x1*x2 <= -50*50)) then
+	if (x1 < 0) then
+		val_interp = coeff *(x1+360.) + (1.-coeff) *x2
+	else
+		val_interp = coeff *x1 + (1.-coeff) *(x2+360.)
+	endif
+	if ((val_interp) >=180.) val_interp = val_interp - 360.
+else
+	val_interp = coeff * x1 + (1.-coeff) * x2
+endif
+longitude_linear_interp = val_interp
+end function longitude_linear_interp
 
 subroutine agrif_init_scales()
 use agrif_profiles
@@ -498,13 +525,13 @@ call Agrif_Init_variable(e2f_id, procname = init_e2f)
 
 end subroutine agrif_init_scales
 
-   SUBROUTINE init_glamt( ptab, i1, i2, j1, j2, k1, k2, before, nb,ndir)
+   SUBROUTINE init_glamt( ptab, i1, i2, j1, j2,  before, nb,ndir)
    use dom_oce
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE interpsshn  ***
       !!----------------------------------------------------------------------  
-      INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2, k1, k2
-      REAL, DIMENSION(i1:i2,j1:j2,k1:k2), INTENT(inout) ::   ptab
+      INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2
+      REAL, DIMENSION(i1:i2,j1:j2), INTENT(inout) ::   ptab
       LOGICAL                         , INTENT(in   ) ::   before
       INTEGER                         , INTENT(in   ) ::   nb , ndir
       LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
@@ -512,142 +539,74 @@ end subroutine agrif_init_scales
       !
       !!----------------------------------------------------------------------  
       !
-      integer :: ji,jj
-      integer :: oneortwo
 
       IF( before) THEN
-         ptab(i1:i2,j1:j2,1) = glamt(i1:i2,j1:j2)
-         ptab(i1:i2,j1:j2,2) = ptab(i1:i2,j1:j2,1)
-         WHERE (ptab(i1:i2,j1:j2,2)<0)
-           ptab(i1:i2,j1:j2,2)=ptab(i1:i2,j1:j2,2)+360.
-         END WhERE
+         ptab(i1:i2,j1:j2) = glamt(i1:i2,j1:j2)
       ELSE
-         do jj=j1,j2
-          oneortwo = 1
-          my_loop: do ji=i1+1,i2
-            if (ptab(ji,jj,1)>=ptab(ji-1,jj,1)) then
-                oneortwo=2
-                exit my_loop
-            endif
-          enddo my_loop
-          do ji=i1,i2
-             glamt(ji,jj)=ptab(ji,jj,oneortwo)
-          enddo
-        enddo
+      	 glamt(i1:i2,j1:j2) = ptab(i1:i2,j1:j2)
       ENDIF
       !
    END SUBROUTINE init_glamt
 
-    SUBROUTINE init_glamu( ptab, i1, i2, j1, j2, k1, k2, before, nb,ndir)
+    SUBROUTINE init_glamu( ptab, i1, i2, j1, j2, before, nb,ndir)
     use dom_oce
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE interpsshn  ***
       !!----------------------------------------------------------------------  
       INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2
-      REAL, DIMENSION(i1:i2,j1:j2,k1:k2), INTENT(inout) ::   ptab
+      REAL, DIMENSION(i1:i2,j1:j2), INTENT(inout) ::   ptab
       LOGICAL                         , INTENT(in   ) ::   before
       INTEGER                         , INTENT(in   ) ::   nb , ndir
       LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
       !
       !!----------------------------------------------------------------------  
       !
-integer :: ji,jj
-      integer :: oneortwo
       IF( before) THEN
-         ptab(i1:i2,j1:j2,1) = glamu(i1:i2,j1:j2)
-         ptab(i1:i2,j1:j2,2) = ptab(i1:i2,j1:j2,1)
-         WHERE (ptab(i1:i2,j1:j2,2)<0)
-           ptab(i1:i2,j1:j2,2)=ptab(i1:i2,j1:j2,2)+360.
-         END WhERE
+         ptab(i1:i2,j1:j2) = glamu(i1:i2,j1:j2)
       ELSE
-         do jj=j1,j2
-          oneortwo = 1
-          my_loop: do ji=i1+1,i2
-            if (ptab(ji,jj,1)>=ptab(ji-1,jj,1)) then
-                oneortwo=2
-                exit my_loop
-            endif
-          enddo my_loop
-          do ji=i1,i2
-             glamu(ji,jj)=ptab(ji,jj,oneortwo)
-          enddo
-        enddo
+      	 glamu(i1:i2,j1:j2) = ptab(i1:i2,j1:j2)
       ENDIF
       !
    END SUBROUTINE init_glamu
 
-   SUBROUTINE init_glamv( ptab, i1, i2, j1, j2, k1, k2, before, nb,ndir)
+   SUBROUTINE init_glamv( ptab, i1, i2, j1, j2, before, nb,ndir)
     use dom_oce
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE interpsshn  ***
       !!----------------------------------------------------------------------  
       INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2
-      REAL, DIMENSION(i1:i2,j1:j2,k1:k2), INTENT(inout) ::   ptab
+      REAL, DIMENSION(i1:i2,j1:j2), INTENT(inout) ::   ptab
       LOGICAL                         , INTENT(in   ) ::   before
       INTEGER                         , INTENT(in   ) ::   nb , ndir
       LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
       !
       !!----------------------------------------------------------------------  
       !
-integer :: ji,jj
-      integer :: oneortwo
       IF( before) THEN
-         ptab(i1:i2,j1:j2,1) = glamv(i1:i2,j1:j2)
-         ptab(i1:i2,j1:j2,2) = ptab(i1:i2,j1:j2,1)
-         WHERE (ptab(i1:i2,j1:j2,2)<0)
-           ptab(i1:i2,j1:j2,2)=ptab(i1:i2,j1:j2,2)+360.
-         END WhERE
+         ptab(i1:i2,j1:j2) = glamv(i1:i2,j1:j2)
       ELSE
-         do jj=j1,j2
-          oneortwo = 1
-          my_loop: do ji=i1+1,i2
-            if (ptab(ji,jj,1)>=ptab(ji-1,jj,1)) then
-                oneortwo=2
-                exit my_loop
-            endif
-          enddo my_loop
-          do ji=i1,i2
-             glamv(ji,jj)=ptab(ji,jj,oneortwo)
-          enddo
-        enddo
+      	 glamv(i1:i2,j1:j2) = ptab(i1:i2,j1:j2)
       ENDIF
       !
    END SUBROUTINE init_glamv
 
-   SUBROUTINE init_glamf( ptab, i1, i2, j1, j2, k1, k2, before, nb,ndir)
+   SUBROUTINE init_glamf( ptab, i1, i2, j1, j2,  before, nb,ndir)
     use dom_oce
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE interpsshn  ***
       !!----------------------------------------------------------------------  
       INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2
-      REAL, DIMENSION(i1:i2,j1:j2,k1:k2), INTENT(inout) ::   ptab
+      REAL, DIMENSION(i1:i2,j1:j2), INTENT(inout) ::   ptab
       LOGICAL                         , INTENT(in   ) ::   before
       INTEGER                         , INTENT(in   ) ::   nb , ndir
       LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
       !
       !!----------------------------------------------------------------------  
       !
-integer :: ji,jj
-      integer :: oneortwo
       IF( before) THEN
-         ptab(i1:i2,j1:j2,1) = glamf(i1:i2,j1:j2)
-         ptab(i1:i2,j1:j2,2) = ptab(i1:i2,j1:j2,1)
-         WHERE (ptab(i1:i2,j1:j2,2)<0)
-           ptab(i1:i2,j1:j2,2)=ptab(i1:i2,j1:j2,2)+360.
-         END WhERE
+         ptab(i1:i2,j1:j2) = glamf(i1:i2,j1:j2)
       ELSE
-         do jj=j1,j2
-          oneortwo = 1
-          my_loop: do ji=i1+1,i2
-            if (ptab(ji,jj,1)>=ptab(ji-1,jj,1)) then
-                oneortwo=2
-                exit my_loop
-            endif
-          enddo my_loop
-          do ji=i1,i2
-             glamf(ji,jj)=ptab(ji,jj,oneortwo)
-          enddo
-        enddo
+      	 glamf(i1:i2,j1:j2) = ptab(i1:i2,j1:j2)
       ENDIF
       !
    END SUBROUTINE init_glamf
