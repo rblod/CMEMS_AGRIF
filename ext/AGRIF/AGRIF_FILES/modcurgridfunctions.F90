@@ -1037,4 +1037,18 @@ agrif_external_mapping => external_mapping
 
 end subroutine Agrif_Set_ExternalMapping
 
+! Set the name of the user linear interp function (if needed)
+subroutine Agrif_Set_external_linear_interp(external_linear_interp)
+Procedure(linear_interp) :: external_linear_interp
+
+agrif_external_linear_interp => external_linear_interp
+
+end subroutine Agrif_Set_external_linear_interp
+
+subroutine Agrif_UnSet_external_linear_interp()
+
+nullify(agrif_external_linear_interp)
+
+end subroutine Agrif_UnSet_external_linear_interp
+
 end module Agrif_CurgridFunctions
