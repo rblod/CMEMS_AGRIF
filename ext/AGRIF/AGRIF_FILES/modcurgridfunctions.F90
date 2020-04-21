@@ -666,6 +666,25 @@ subroutine Agrif_Set_coeffreft_z ( coeffref )
 !---------------------------------------------------------------------------------------------------
 end subroutine Agrif_Set_coeffreft_z
 !===================================================================================================
+!  subroutine Agrif_Set_coeffreft
+!---------------------------------------------------------------------------------------------------
+subroutine Agrif_Set_coeffreft ( coeffref )
+!---------------------------------------------------------------------------------------------------
+    integer, intent(in) :: coeffref
+    integer :: i
+
+    if (coeffref < 0) then
+        write(*,*)'Coefficient of time raffinement should be positive'
+        stop
+    else
+        do i=1,Agrif_Probdim
+          Agrif_coeffreft(i) = coeffref
+          Agrif_Curgrid % timeref(i) = coeffref
+        enddo
+    endif
+!---------------------------------------------------------------------------------------------------
+end subroutine Agrif_Set_coeffreft
+!===================================================================================================
 !
 !===================================================================================================
 !  subroutine Agrif_Set_Minwidth
