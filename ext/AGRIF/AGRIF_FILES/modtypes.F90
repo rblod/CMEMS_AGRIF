@@ -449,6 +449,13 @@ end type Agrif_Variables_List
      integer :: nb_chunks
      end subroutine mapping
     end interface
+
+    Procedure(linear_interp), pointer :: agrif_external_linear_interp => NULL()
+    abstract interface
+     real function linear_interp(x1,x2,coeff)
+     real :: x1, x2, coeff
+     end function linear_interp
+    end interface
 !
 contains
 !
