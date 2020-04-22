@@ -47,6 +47,8 @@ end subroutine agrif_update_all
          
          WHERE (mbkt(i1:i2,j1:j2)==0)
            ssmask(i1:i2,j1:j2) = 0.
+         ELSEWHERE
+           ssmask(i1:i2,j1:j2) = 1.
          END WHERE
            
       ENDIF
