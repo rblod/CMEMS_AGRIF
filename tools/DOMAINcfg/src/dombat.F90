@@ -471,7 +471,7 @@ zshift = 0.
 
          IF( .NOT. identical_grids ) THEN  
             ALLOCATE(masksrc(SIZE(coarsebathy,1),SIZE(coarsebathy,2)))
-            ALLOCATE(bathy_test(jpi,jj))
+            ALLOCATE(bathy_test(jpi,jpj))
             !
             !                    Where(G0%bathy_meter.le.0.00001) 
             !                  masksrc = .false.
@@ -489,7 +489,7 @@ zshift = 0.
             CALL make_remap(coarsebathy,bathy_test,jpi,jpj, &
                  matrix,src_add,dst_add)  
             !                                  
-            bathy= bathy_test               
+            bathy (:,:) = bathy_test (:,:)              
             !            
             DEALLOCATE(masksrc)
             DEALLOCATE(bathy_test) 
