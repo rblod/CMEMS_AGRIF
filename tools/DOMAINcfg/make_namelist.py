@@ -83,6 +83,8 @@ for g in range(len(grid)) :
            	   line = "   jpidta = "+str(jpiglo)+"\n"
            if line.strip().startswith('jpjdta'):
            	   line = "   jpjdta = "+str(jpjglo)+"\n"
+           if line.strip().startswith('cp_cfg'):
+           	   line = "   cp_cfg = 'dumb'\n"      
 
            f2.write(line)
            cnt1 += 1

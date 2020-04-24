@@ -489,7 +489,7 @@ zshift = 0.
             CALL make_remap(coarsebathy,bathy_test,jpi,jpj, &
                  matrix,src_add,dst_add)  
             !                                  
-            bathy (:,:) = bathy_test (:,:)              
+            bathy= bathy_test               
             !            
             DEALLOCATE(masksrc)
             DEALLOCATE(bathy_test) 
