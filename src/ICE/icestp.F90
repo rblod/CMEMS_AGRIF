@@ -85,16 +85,14 @@ MODULE icestp
    PUBLIC   ice_stp    ! called by sbcmod.F90
    PUBLIC   ice_init   ! called by sbcmod.F90
 
-   !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/ICE 4.0 , NEMO Consortium (2018)
-   !! $Id: icestp.F90 10535 2019-01-16 17:36:47Z clem $
+   !! $Id: icestp.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE ice_stp( kt, ksbc )
+   SUBROUTINE ice_stp( kt, Kbb, Kmm, ksbc )
       !!---------------------------------------------------------------------
       !!                  ***  ROUTINE ice_stp  ***
       !!
@@ -114,8 +112,9 @@ CONTAINS
       !!              - update all sbc variables below sea-ice:
       !!                utau, vtau, taum, wndm, qns , qsr, emp , sfx
       !!---------------------------------------------------------------------
-      INTEGER, INTENT(in) ::   kt      ! ocean time step
-      INTEGER, INTENT(in) ::   ksbc    ! flux formulation (user defined, bulk, or Pure Coupled)
+      INTEGER, INTENT(in) ::   kt       ! ocean time step
+      INTEGER, INTENT(in) ::   Kbb, Kmm ! ocean time level indices
+      INTEGER, INTENT(in) ::   ksbc     ! flux formulation (user defined, bulk, or Pure Coupled)
       !
       INTEGER ::   jl   ! dummy loop index
       !!----------------------------------------------------------------------
@@ -159,7 +158,7 @@ CONTAINS
                                         CALL ice_rst_opn( kt )        ! Open Ice restart file (if necessary) 
          !
          IF( ln_icedyn .AND. .NOT.lk_c1d )   &
-            &                           CALL ice_dyn( kt )            ! -- Ice dynamics
+            &                           CALL ice_dyn( kt, Kmm )       ! -- Ice dynamics
          !
          !                          !==  lateral boundary conditions  ==!
          IF( ln_icethd .AND. ln_bdy )   CALL bdy_ice( kt )            ! -- bdy ice thermo
@@ -188,7 +187,7 @@ CONTAINS
          !----------------------------!
          IF( ln_icethd )                CALL ice_thd( kt )            ! -- Ice thermodynamics      
          !
-         IF( ln_icethd )                CALL ice_cor( kt , 2 )        ! -- Corrections
+                                        CALL ice_cor( kt , 2 )        ! -- Corrections
          !
                                         CALL ice_var_glo2eqv          ! necessary calls (at least for coupling)
                                         CALL ice_var_agg( 2 )         ! necessary calls (at least for coupling)
@@ -208,7 +207,7 @@ CONTAINS
       !-------------------------!
       ! --- Ocean time step --- !
       !-------------------------!
-      IF( ln_icedyn )                   CALL ice_update_tau( kt, ub(:,:,1), vb(:,:,1) )   ! -- update surface ocean stresses
+      IF( ln_icedyn )                   CALL ice_update_tau( kt, uu(:,:,1,Kbb), vv(:,:,1,Kbb) )   ! -- update surface ocean stresses
 !!gm   remark, the ocean-ice stress is not saved in ice diag call above .....  find a solution!!!
       !
       IF( ln_timing )   CALL timing_stop('ice_stp')
@@ -216,12 +215,14 @@ CONTAINS
    END SUBROUTINE ice_stp
 
 
-   SUBROUTINE ice_init
+   SUBROUTINE ice_init( Kbb, Kmm, Kaa )
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE ice_init  ***
       !!
       !! ** purpose :   Initialize sea-ice parameters
       !!----------------------------------------------------------------------
+      INTEGER, INTENT(in) :: Kbb, Kmm, Kaa
+      !
       INTEGER :: ji, jj, ierr
       !!----------------------------------------------------------------------
       IF(lwp) WRITE(numout,*)
@@ -231,10 +232,10 @@ CONTAINS
       IF(lwp) WRITE(numout,*) 'ice_init: Arrays allocation & Initialization of all routines & init state' 
       IF(lwp) WRITE(numout,*) '~~~~~~~~'
       !
-      !                                ! Open the reference and configuration namelist files and namelist output file
-      CALL ctl_opn( numnam_ice_ref, 'namelist_ice_ref',    'OLD',     'FORMATTED', 'SEQUENTIAL', -1, numout, lwp )
-      CALL ctl_opn( numnam_ice_cfg, 'namelist_ice_cfg',    'OLD',     'FORMATTED', 'SEQUENTIAL', -1, numout, lwp )
-      IF(lwm) CALL ctl_opn( numoni, 'output.namelist.ice', 'UNKNOWN', 'FORMATTED', 'SEQUENTIAL', -1, numout, lwp, 1 )
+      !                                ! Load the reference and configuration namelist files and open namelist output file
+      CALL load_nml( numnam_ice_ref, 'namelist_ice_ref',    numout, lwm )
+      CALL load_nml( numnam_ice_cfg, 'namelist_ice_cfg',    numout, lwm )
+      IF(lwm) CALL ctl_opn( numoni , 'output.namelist.ice', 'UNKNOWN', 'FORMATTED', 'SEQUENTIAL', -1, numout, lwp, 1 )
       !
       CALL par_init                ! set some ice run parameters
       !
@@ -253,9 +254,9 @@ CONTAINS
       !                                ! Initial sea-ice state
       IF( .NOT. ln_rstart ) THEN              ! start from rest: sea-ice deduced from sst
          CALL ice_istate_init
-         CALL ice_istate
+         CALL ice_istate( nit000, Kbb, Kmm, Kaa )
       ELSE                                    ! start from a restart file
-         CALL ice_rst_read
+         CALL ice_rst_read( Kbb, Kmm, Kaa )
       ENDIF
       CALL ice_var_glo2eqv
       CALL ice_var_agg(1)
@@ -300,12 +301,10 @@ CONTAINS
          &             cn_icerst_in, cn_icerst_indir, cn_icerst_out, cn_icerst_outdir
       !!-------------------------------------------------------------------
       !
-      REWIND( numnam_ice_ref )      ! Namelist nampar in reference namelist : Parameters for ice
       READ  ( numnam_ice_ref, nampar, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'nampar in reference namelist', lwp )
-      REWIND( numnam_ice_cfg )      ! Namelist nampar in configuration namelist : Parameters for ice
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'nampar in reference namelist' )
       READ  ( numnam_ice_cfg, nampar, IOSTAT = ios, ERR = 902 )
-902   IF( ios > 0 )   CALL ctl_nam ( ios , 'nampar in configuration namelist', lwp )
+902   IF( ios > 0 )   CALL ctl_nam ( ios , 'nampar in configuration namelist' )
       IF(lwm) WRITE( numoni, nampar )
       !
       IF(lwp) THEN                  ! control print
@@ -322,6 +321,9 @@ CONTAINS
          WRITE(numout,*) '         maximum ice concentration for NH                              = ', rn_amax_n 
          WRITE(numout,*) '         maximum ice concentration for SH                              = ', rn_amax_s
       ENDIF
+      !                                        !--- change max ice concentration for roundoff errors
+      rn_amax_n = MIN( rn_amax_n, 1._wp - epsi10 )
+      rn_amax_s = MIN( rn_amax_s, 1._wp - epsi10 )
       !                                        !--- check consistency
       IF ( jpl > 1 .AND. ln_virtual_itd ) THEN
          ln_virtual_itd = .FALSE.
@@ -335,10 +337,10 @@ CONTAINS
       !
       IF( ln_bdy .AND. ln_icediachk )   CALL ctl_warn('par_init: online conservation check does not work with BDY')
       !
-      rdt_ice   = REAL(nn_fsbc) * rdt          !--- sea-ice timestep and its inverse
-      r1_rdtice = 1._wp / rdt_ice
+      rDt_ice   = REAL(nn_fsbc) * rn_Dt          !--- sea-ice timestep and its inverse
+      r1_Dt_ice = 1._wp / rDt_ice
       IF(lwp) WRITE(numout,*)
-      IF(lwp) WRITE(numout,*) '      ice timestep rdt_ice = nn_fsbc*rdt = ', rdt_ice
+      IF(lwp) WRITE(numout,*) '      ice timestep rDt_ice = nn_fsbc*rn_Dt = ', rDt_ice
       !
       r1_nlay_i = 1._wp / REAL( nlay_i, wp )   !--- inverse of nlay_i and nlay_s
       r1_nlay_s = 1._wp / REAL( nlay_s, wp )
@@ -421,8 +423,6 @@ CONTAINS
       hfx_err_dif(:,:) = 0._wp
       wfx_err_sub(:,:) = 0._wp
       !
-      afx_tot(:,:) = 0._wp   ;
-      !
       diag_heat(:,:) = 0._wp ;   diag_sice(:,:) = 0._wp
       diag_vice(:,:) = 0._wp ;   diag_vsnw(:,:) = 0._wp
 
@@ -430,9 +430,11 @@ CONTAINS
       qcn_ice_bot(:,:,:) = 0._wp ; qcn_ice_top(:,:,:) = 0._wp ! conductive fluxes
       t_si       (:,:,:) = rt0   ! temp at the ice-snow interface
 
-      tau_icebfr(:,:)   = 0._wp   ! landfast ice param only (clem: important to keep the init here)
-      cnd_ice   (:,:,:) = 0._wp   ! initialisation: effective conductivity at the top of ice/snow (ln_cndflx=T)
-      qtr_ice_bot(:,:,:) = 0._wp  ! initialization: part of solar radiation transmitted through the ice needed at least for outputs
+      tau_icebfr (:,:)   = 0._wp   ! landfast ice param only (clem: important to keep the init here)
+      cnd_ice    (:,:,:) = 0._wp   ! initialisation: effective conductivity at the top of ice/snow (ln_cndflx=T)
+      qcn_ice    (:,:,:) = 0._wp   ! initialisation: conductive flux (ln_cndflx=T & ln_cndemule=T)
+      qtr_ice_bot(:,:,:) = 0._wp   ! initialization: part of solar radiation transmitted through the ice needed at least for outputs
+      qsb_ice_bot(:,:)   = 0._wp   ! (needed if ln_icethd=F)
       !
       ! for control checks (ln_icediachk)
       diag_trp_vi(:,:) = 0._wp   ;   diag_trp_vs(:,:) = 0._wp

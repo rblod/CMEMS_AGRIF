@@ -28,8 +28,7 @@ MODULE iom
    USE in_out_manager  ! I/O manager
    USE lib_mpp           ! MPP library
 #if defined key_iomput
-   USE sbc_oce  , ONLY :   nn_fsbc         ! ocean space and time domain
-   USE trc_oce  , ONLY :   nn_dttrc        !  !: frequency of step on passive tracers
+   USE sbc_oce  , ONLY :   nn_fsbc, ght_abl, ghw_abl, e3t_abl, e3w_abl, jpka, jpkam1
    USE icb_oce  , ONLY :   nclasses, class_num       !  !: iceberg classes
 #if defined key_si3
    USE ice      , ONLY :   jpl
@@ -45,7 +44,7 @@ MODULE iom
    USE trc, ONLY    :  profsed
 #endif
    USE lib_fortran 
-   USE diurnal_bulk, ONLY : ln_diurnal_only, ln_diurnal
+   USE diu_bulk, ONLY : ln_diurnal_only, ln_diurnal
 
    IMPLICIT NONE
    PUBLIC   !   must be public to be able to access iom_def through iom
@@ -55,16 +54,16 @@ MODULE iom
 #else
    LOGICAL, PUBLIC, PARAMETER ::   lk_iomput = .FALSE.       !: iom_put flag
 #endif
-   PUBLIC iom_init, iom_swap, iom_open, iom_close, iom_setkt, iom_varid, iom_get
+   PUBLIC iom_init, iom_init_closedef, iom_swap, iom_open, iom_close, iom_setkt, iom_varid, iom_get, iom_get_var
    PUBLIC iom_chkatt, iom_getatt, iom_putatt, iom_getszuld, iom_rstput, iom_delay_rst, iom_put
-   PUBLIC iom_use, iom_context_finalize
+   PUBLIC iom_use, iom_context_finalize, iom_update_file_name, iom_miss_val
 
    PRIVATE iom_rp0d, iom_rp1d, iom_rp2d, iom_rp3d
    PRIVATE iom_g0d, iom_g1d, iom_g2d, iom_g3d, iom_get_123d
-   PRIVATE iom_p1d, iom_p2d, iom_p3d
+   PRIVATE iom_p1d, iom_p2d, iom_p3d, iom_p4d
 #if defined key_iomput
    PRIVATE iom_set_domain_attr, iom_set_axis_attr, iom_set_field_attr, iom_set_file_attr, iom_get_file_attr, iom_set_grid_attr
-   PRIVATE set_grid, set_grid_bounds, set_scalar, set_xmlatt, set_mooring, iom_update_file_name, iom_sdate
+   PRIVATE set_grid, set_grid_bounds, set_scalar, set_xmlatt, set_mooring, iom_sdate
    PRIVATE iom_set_rst_context, iom_set_rstw_active, iom_set_rstr_active
 # endif
    PUBLIC iom_set_rstw_var_active, iom_set_rstw_core, iom_set_rst_vars
@@ -82,17 +81,19 @@ MODULE iom
       MODULE PROCEDURE iom_rp0d, iom_rp1d, iom_rp2d, iom_rp3d
    END INTERFACE
    INTERFACE iom_put
-      MODULE PROCEDURE iom_p0d, iom_p1d, iom_p2d, iom_p3d
+      MODULE PROCEDURE iom_p0d, iom_p1d, iom_p2d, iom_p3d, iom_p4d
    END INTERFACE iom_put
   
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: iom.F90 10523 2019-01-16 09:36:03Z smasson $
+   !! $Id: iom.F90 12649 2020-04-03 07:11:57Z smasson $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE iom_init( cdname, fname, ld_tmppatch ) 
+   SUBROUTINE iom_init( cdname, fname, ld_tmppatch, ld_closedef ) 
       !!----------------------------------------------------------------------
       !!                     ***  ROUTINE   ***
       !!
@@ -102,18 +103,22 @@ CONTAINS
       CHARACTER(len=*),           INTENT(in)  :: cdname
       CHARACTER(len=*), OPTIONAL, INTENT(in)  :: fname
       LOGICAL         , OPTIONAL, INTENT(in)  :: ld_tmppatch
+      LOGICAL         , OPTIONAL, INTENT(in)  :: ld_closedef
 #if defined key_iomput
       !
       TYPE(xios_duration) :: dtime    = xios_duration(0, 0, 0, 0, 0, 0)
       TYPE(xios_date)     :: start_date
       CHARACTER(len=lc) :: clname
-      INTEGER           :: ji, jkmin
+      INTEGER             :: irefyear, irefmonth, irefday
+      INTEGER           :: ji
       LOGICAL :: llrst_context              ! is context related to restart
       !
       REAL(wp), ALLOCATABLE, DIMENSION(:,:) :: zt_bnds, zw_bnds
+      REAL(wp), DIMENSION(2,jpkam1)         :: za_bnds   ! ABL vertical boundaries
       LOGICAL ::   ll_tmppatch = .TRUE.    !: seb: patch before we remove periodicity
       INTEGER ::   nldi_save, nlei_save    !:      and close boundaries in output files
       INTEGER ::   nldj_save, nlej_save    !:
+      LOGICAL ::   ll_closedef = .TRUE.
       !!----------------------------------------------------------------------
       !
       ! seb: patch before we remove periodicity and close boundaries in output files
@@ -128,6 +133,7 @@ CONTAINS
          IF( njmpp           ==      1 ) nldj = 1
          IF( njmpp + jpj - 1 == jpjglo ) nlej = jpj
       ENDIF
+      IF ( PRESENT(ld_closedef) ) ll_closedef = ld_closedef
       !
       ALLOCATE( zt_bnds(2,jpk), zw_bnds(2,jpk) )
       !
@@ -138,12 +144,16 @@ CONTAINS
       llrst_context =  (TRIM(cdname) == TRIM(crxios_context) .OR. TRIM(cdname) == TRIM(cwxios_context))
 
       ! Calendar type is now defined in xml file 
+      IF (.NOT.(xios_getvar('ref_year' ,irefyear ))) irefyear  = 1900
+      IF (.NOT.(xios_getvar('ref_month',irefmonth))) irefmonth = 01
+      IF (.NOT.(xios_getvar('ref_day'  ,irefday  ))) irefday   = 01
+
       SELECT CASE ( nleapy )        ! Choose calendar for IOIPSL
-      CASE ( 1)   ; CALL xios_define_calendar( TYPE = "Gregorian", time_origin = xios_date(1900,01,01,00,00,00), &
+      CASE ( 1)   ; CALL xios_define_calendar( TYPE = "Gregorian", time_origin = xios_date(irefyear,irefmonth,irefday,00,00,00), &
           &                                    start_date = xios_date(nyear,nmonth,nday,0,0,0) )
-      CASE ( 0)   ; CALL xios_define_calendar( TYPE = "NoLeap"   , time_origin = xios_date(1900,01,01,00,00,00), &
+      CASE ( 0)   ; CALL xios_define_calendar( TYPE = "NoLeap"   , time_origin = xios_date(irefyear,irefmonth,irefday,00,00,00), &
           &                                    start_date = xios_date(nyear,nmonth,nday,0,0,0) )
-      CASE (30)   ; CALL xios_define_calendar( TYPE = "D360"     , time_origin = xios_date(1900,01,01,00,00,00), &
+      CASE (30)   ; CALL xios_define_calendar( TYPE = "D360"     , time_origin = xios_date(irefyear,irefmonth,irefday,00,00,00), &
           &                                    start_date = xios_date(nyear,nmonth,nday,0,0,0) )
       END SELECT
 
@@ -194,38 +204,54 @@ CONTAINS
       !
       ! vertical grid definition
       IF(.NOT.llrst_context) THEN
-          CALL iom_set_axis_attr( "deptht",  paxis = gdept_1d )
-          CALL iom_set_axis_attr( "depthu",  paxis = gdept_1d )
-          CALL iom_set_axis_attr( "depthv",  paxis = gdept_1d )
-          CALL iom_set_axis_attr( "depthw",  paxis = gdepw_1d )
+          CALL iom_set_axis_attr(  "deptht", paxis = gdept_1d )
+          CALL iom_set_axis_attr(  "depthu", paxis = gdept_1d )
+          CALL iom_set_axis_attr(  "depthv", paxis = gdept_1d )
+          CALL iom_set_axis_attr(  "depthw", paxis = gdepw_1d )
 
+          ! ABL
+          IF( .NOT. ALLOCATED(ght_abl) ) THEN   ! force definition for xml files (xios) 
+             ALLOCATE( ght_abl(jpka), ghw_abl(jpka), e3t_abl(jpka), e3w_abl(jpka) )   ! default allocation needed by iom
+             ght_abl(:) = -1._wp   ;   ghw_abl(:) = -1._wp
+             e3t_abl(:) = -1._wp   ;   e3w_abl(:) = -1._wp
+          ENDIF
+          CALL iom_set_axis_attr( "ght_abl", ght_abl(2:jpka) )
+          CALL iom_set_axis_attr( "ghw_abl", ghw_abl(2:jpka) )
+          
           ! Add vertical grid bounds
-          jkmin = MIN(2,jpk)  ! in case jpk=1 (i.e. sas2D)
-          zt_bnds(2,:        ) = gdept_1d(:)
-          zt_bnds(1,jkmin:jpk) = gdept_1d(1:jpkm1)
-          zt_bnds(1,1        ) = gdept_1d(1) - e3w_1d(1)
-          zw_bnds(1,:        ) = gdepw_1d(:)
-          zw_bnds(2,1:jpkm1  ) = gdepw_1d(jkmin:jpk)
-          zw_bnds(2,jpk:     ) = gdepw_1d(jpk) + e3t_1d(jpk)
-          CALL iom_set_axis_attr( "deptht", bounds=zw_bnds )
-          CALL iom_set_axis_attr( "depthu", bounds=zw_bnds )
-          CALL iom_set_axis_attr( "depthv", bounds=zw_bnds )
-          CALL iom_set_axis_attr( "depthw", bounds=zt_bnds )
-          !
-# if defined key_floats
+          zt_bnds(2,:      ) = gdept_1d(:)
+          zt_bnds(1,2:jpk  ) = gdept_1d(1:jpkm1)
+          zt_bnds(1,1      ) = gdept_1d(1) - e3w_1d(1)
+          zw_bnds(1,:      ) = gdepw_1d(:)
+          zw_bnds(2,1:jpkm1) = gdepw_1d(2:jpk)
+          zw_bnds(2,jpk:   ) = gdepw_1d(jpk) + e3t_1d(jpk)
+          CALL iom_set_axis_attr(  "deptht", bounds=zw_bnds )
+          CALL iom_set_axis_attr(  "depthu", bounds=zw_bnds )
+          CALL iom_set_axis_attr(  "depthv", bounds=zw_bnds )
+          CALL iom_set_axis_attr(  "depthw", bounds=zt_bnds )
+
+          ! ABL
+          za_bnds(1,:) = ghw_abl(1:jpkam1)
+          za_bnds(2,:) = ghw_abl(2:jpka  )
+          CALL iom_set_axis_attr( "ght_abl", bounds=za_bnds )
+          za_bnds(1,:) = ght_abl(2:jpka  )
+          za_bnds(2,:) = ght_abl(2:jpka  ) + e3w_abl(2:jpka)
+          CALL iom_set_axis_attr( "ghw_abl", bounds=za_bnds )
+
           CALL iom_set_axis_attr( "nfloat", (/ (REAL(ji,wp), ji=1,jpnfl) /) )
-# endif
 # if defined key_si3
           CALL iom_set_axis_attr( "ncatice", (/ (REAL(ji,wp), ji=1,jpl) /) )
           ! SIMIP diagnostics (4 main arctic straits)
           CALL iom_set_axis_attr( "nstrait", (/ (REAL(ji,wp), ji=1,4) /) )
 # endif
 #if defined key_top
-          CALL iom_set_axis_attr( "profsed", paxis = profsed )
+          IF( ALLOCATED(profsed) ) CALL iom_set_axis_attr( "profsed", paxis = profsed )
 #endif
           CALL iom_set_axis_attr( "icbcla", class_num )
-          CALL iom_set_axis_attr( "iax_20C", (/ REAL(20,wp) /) )
-          CALL iom_set_axis_attr( "iax_28C", (/ REAL(28,wp) /) )
+          CALL iom_set_axis_attr( "iax_20C", (/ REAL(20,wp) /) )   ! strange syntaxe and idea...
+          CALL iom_set_axis_attr( "iax_26C", (/ REAL(26,wp) /) )   ! strange syntaxe and idea...
+          CALL iom_set_axis_attr( "iax_28C", (/ REAL(28,wp) /) )   ! strange syntaxe and idea...
+          CALL iom_set_axis_attr( "basin"  , (/ (REAL(ji,wp), ji=1,5) /) )
       ENDIF
       !
       ! automatic definitions of some of the xml attributs
@@ -245,11 +271,12 @@ CONTAINS
           CALL set_xmlatt
       ENDIF
       !
-      ! end file definition
-      dtime%second = rdt
+      ! set time step length
+      dtime%second = rn_Dt
       CALL xios_set_timestep( dtime )
-      CALL xios_close_context_definition()
-      CALL xios_update_calendar( 0 )
+      !
+      ! conditional closure of context definition
+      IF ( ll_closedef ) CALL iom_init_closedef
       !
       DEALLOCATE( zt_bnds, zw_bnds )
       !
@@ -260,6 +287,24 @@ CONTAINS
 #endif
       !
    END SUBROUTINE iom_init
+
+   SUBROUTINE iom_init_closedef
+      !!----------------------------------------------------------------------
+      !!            ***  SUBROUTINE iom_init_closedef  ***
+      !!----------------------------------------------------------------------
+      !!
+      !! ** Purpose : Closure of context definition
+      !!
+      !!----------------------------------------------------------------------
+
+#if defined key_iomput
+      CALL xios_close_context_definition()
+      CALL xios_update_calendar( 0 )
+#else
+      IF( .FALSE. )   WRITE(numout,*) 'iom_init_closedef: should not see this'   ! useless statement to avoid compilation warnings
+#endif
+
+   END SUBROUTINE iom_init_closedef
 
    SUBROUTINE iom_set_rstw_var_active(field)
       !!---------------------------------------------------------------------
@@ -363,7 +408,7 @@ CONTAINS
 #if defined key_iomput
    IF(cdmdl == "OPA") THEN
 !from restart.F90
-   CALL iom_set_rstw_var_active("rdt")
+   CALL iom_set_rstw_var_active("rn_Dt")
    IF ( .NOT. ln_diurnal_only ) THEN
         CALL iom_set_rstw_var_active('ub'  )
         CALL iom_set_rstw_var_active('vb'  )
@@ -377,17 +422,6 @@ CONTAINS
         CALL iom_set_rstw_var_active('sn'  )
         CALL iom_set_rstw_var_active('sshn')
         CALL iom_set_rstw_var_active('rhop')
-     ! extra variable needed for the ice sheet coupling
-        IF ( ln_iscpl ) THEN
-             CALL iom_set_rstw_var_active('tmask')
-             CALL iom_set_rstw_var_active('umask')
-             CALL iom_set_rstw_var_active('vmask')
-             CALL iom_set_rstw_var_active('smask')
-             CALL iom_set_rstw_var_active('e3t_n')
-             CALL iom_set_rstw_var_active('e3u_n')
-             CALL iom_set_rstw_var_active('e3v_n')
-             CALL iom_set_rstw_var_active('gdepw_n')
-        END IF
       ENDIF
       IF(ln_diurnal) CALL iom_set_rstw_var_active('Dsst')
 !from trasbc.F90
@@ -412,7 +446,7 @@ CONTAINS
    INTEGER :: i
 
         i = 0
-        i = i + 1; fields(i)%vname="rdt";            fields(i)%grid="grid_scalar"
+        i = i + 1; fields(i)%vname="rn_Dt";            fields(i)%grid="grid_scalar"
         i = i + 1; fields(i)%vname="un";             fields(i)%grid="grid_N_3D"
         i = i + 1; fields(i)%vname="ub";             fields(i)%grid="grid_N_3D"
         i = i + 1; fields(i)%vname="vn";             fields(i)%grid="grid_N_3D"
@@ -629,7 +663,7 @@ CONTAINS
    END SUBROUTINE iom_swap
 
 
-   SUBROUTINE iom_open( cdname, kiomid, ldwrt, kdom, ldstop, ldiof, kdlev )
+   SUBROUTINE iom_open( cdname, kiomid, ldwrt, kdom, ldstop, ldiof, kdlev, cdcomp )
       !!---------------------------------------------------------------------
       !!                   ***  SUBROUTINE  iom_open  ***
       !!
@@ -642,6 +676,7 @@ CONTAINS
       LOGICAL         , INTENT(in   ), OPTIONAL ::   ldstop   ! stop if open to read a non-existing file (default = .TRUE.)
       LOGICAL         , INTENT(in   ), OPTIONAL ::   ldiof    ! Interp On the Fly, needed for AGRIF (default = .FALSE.)
       INTEGER         , INTENT(in   ), OPTIONAL ::   kdlev    ! number of vertical levels
+      CHARACTER(len=3), INTENT(in   ), OPTIONAL ::   cdcomp   ! name of component calling iom_nf90_open
       !
       CHARACTER(LEN=256)    ::   clname    ! the name of the file based on cdname [[+clcpu]+clcpu]
       CHARACTER(LEN=256)    ::   cltmpn    ! tempory name to store clname (in writting mode)
@@ -787,7 +822,7 @@ CONTAINS
          ENDIF
       ENDIF
       IF( istop == nstop ) THEN   ! no error within this routine
-         CALL iom_nf90_open( clname, kiomid, llwrt, llok, idompar, kdlev = kdlev )
+         CALL iom_nf90_open( clname, kiomid, llwrt, llok, idompar, kdlev = kdlev, cdcomp = cdcomp )
       ENDIF
       !
    END SUBROUTINE iom_open
@@ -807,6 +842,8 @@ CONTAINS
       INTEGER ::   i_s, i_e   ! temporary integer
       CHARACTER(LEN=100)    ::   clinfo    ! info character
       !---------------------------------------------------------------------
+      !
+      IF( iom_open_init == 0 )   RETURN   ! avoid to use iom_file(jf)%nfid that us not yet initialized
       !
       clinfo = '                    iom_close ~~~  '
       IF( PRESENT(kiomid) ) THEN
@@ -834,7 +871,7 @@ CONTAINS
    END SUBROUTINE iom_close
 
 
-   FUNCTION iom_varid ( kiomid, cdvar, kdimsz, kndims, ldstop )  
+   FUNCTION iom_varid ( kiomid, cdvar, kdimsz, kndims, lduld, ldstop )  
       !!-----------------------------------------------------------------------
       !!                  ***  FUNCTION  iom_varid  ***
       !!
@@ -843,7 +880,8 @@ CONTAINS
       INTEGER              , INTENT(in   )           ::   kiomid   ! file Identifier
       CHARACTER(len=*)     , INTENT(in   )           ::   cdvar    ! name of the variable
       INTEGER, DIMENSION(:), INTENT(  out), OPTIONAL ::   kdimsz   ! size of each dimension
-      INTEGER,               INTENT(  out), OPTIONAL ::   kndims   ! size of the dimensions
+      INTEGER              , INTENT(  out), OPTIONAL ::   kndims   ! number of dimensions
+      LOGICAL              , INTENT(  out), OPTIONAL ::   lduld    ! true if the last dimension is unlimited (time)
       LOGICAL              , INTENT(in   ), OPTIONAL ::   ldstop   ! stop if looking for non-existing variable (default = .TRUE.)
       !
       INTEGER                        ::   iom_varid, iiv, i_nvd
@@ -873,7 +911,7 @@ CONTAINS
             IF( .NOT.ll_fnd ) THEN
                iiv = iiv + 1
                IF( iiv <= jpmax_vars ) THEN
-                  iom_varid = iom_nf90_varid( kiomid, cdvar, iiv, kdimsz, kndims )
+                  iom_varid = iom_nf90_varid( kiomid, cdvar, iiv, kdimsz, kndims, lduld )
                ELSE
                   CALL ctl_stop( trim(clinfo), 'Too many variables in the file '//iom_file(kiomid)%name,   &
                         &                      'increase the parameter jpmax_vars')
@@ -891,6 +929,7 @@ CONTAINS
                   ENDIF
                ENDIF
                IF( PRESENT(kndims) )  kndims = iom_file(kiomid)%ndims(iiv)
+               IF( PRESENT( lduld) )  lduld  = iom_file(kiomid)%luld( iiv)
             ENDIF
          ENDIF
       ENDIF
@@ -1139,10 +1178,12 @@ CONTAINS
             WRITE(clrankpv, fmt='(i1)') irankpv
             WRITE(cldmspc , fmt='(i1)') idmspc
             !
-            IF(     idmspc <  irankpv ) THEN 
-               CALL ctl_stop( TRIM(clinfo), 'The file has only '//cldmspc//' spatial dimension',   &
-                  &                         'it is impossible to read a '//clrankpv//'D array from this file...' )
-            ELSEIF( idmspc == irankpv ) THEN
+            !!GS: we consider 2D data as 3D data with vertical dim size = 1
+            !IF(     idmspc <  irankpv ) THEN 
+            !   CALL ctl_stop( TRIM(clinfo), 'The file has only '//cldmspc//' spatial dimension',   &
+            !      &                         'it is impossible to read a '//clrankpv//'D array from this file...' )
+            !ELSEIF( idmspc == irankpv ) THEN
+            IF( idmspc == irankpv ) THEN
                IF( PRESENT(pv_r1d) .AND. idom /= jpdom_unknown )   &
                   &   CALL ctl_stop( TRIM(clinfo), 'case not coded...You must use jpdom_unknown' )
             ELSEIF( idmspc >  irankpv ) THEN
@@ -1269,11 +1310,11 @@ CONTAINS
              
                !--- overlap areas and extra hallows (mpp)
                IF(     PRESENT(pv_r2d) .AND. idom /= jpdom_unknown ) THEN
-                  CALL lbc_lnk( 'iom', pv_r2d,'Z',-999.,'no0' )
+                  CALL lbc_lnk( 'iom', pv_r2d,'Z', -999., kfillmode = jpfillnothing )
                ELSEIF( PRESENT(pv_r3d) .AND. idom /= jpdom_unknown ) THEN
                   ! this if could be simplified with the new lbc_lnk that works with any size of the 3rd dimension
                   IF( icnt(3) == inlev ) THEN
-                     CALL lbc_lnk( 'iom', pv_r3d,'Z',-999.,'no0' )
+                     CALL lbc_lnk( 'iom', pv_r3d,'Z', -999., kfillmode = jpfillnothing )
                   ELSE   ! put some arbitrary value (a call to lbc_lnk will be done later...)
                      DO jj = nlcj+1, jpj   ;   pv_r3d(1:nlci, jj, :) = pv_r3d(1:nlci, nlej, :)   ;   END DO
                      DO ji = nlci+1, jpi   ;   pv_r3d(ji    , : , :) = pv_r3d(nlei  , :   , :)   ;   END DO
@@ -1298,14 +1339,14 @@ CONTAINS
             if(lwp) write(numout,*) 'XIOS RST READ (3D): ',trim(cdvar)
             CALL xios_recv_field( trim(cdvar), pv_r3d)
             IF(idom /= jpdom_unknown ) then
-                CALL lbc_lnk( 'iom', pv_r3d,'Z',-999.,'no0' )
+                CALL lbc_lnk( 'iom', pv_r3d,'Z', -999., kfillmode = jpfillnothing)
             ENDIF
          ELSEIF( PRESENT(pv_r2d) ) THEN
             pv_r2d(:, :) = 0.
             if(lwp) write(numout,*) 'XIOS RST READ (2D): ', trim(cdvar)
             CALL xios_recv_field( trim(cdvar), pv_r2d)
             IF(idom /= jpdom_unknown ) THEN
-                CALL lbc_lnk('iom', pv_r2d,'Z',-999.,'no0')
+                CALL lbc_lnk('iom', pv_r2d,'Z',-999., kfillmode = jpfillnothing)
             ENDIF
          ELSEIF( PRESENT(pv_r1d) ) THEN
             pv_r1d(:) = 0.
@@ -1338,6 +1379,19 @@ CONTAINS
       ENDIF
       !
    END SUBROUTINE iom_get_123d
+
+   SUBROUTINE iom_get_var( cdname, z2d)
+      CHARACTER(LEN=*), INTENT(in ) ::   cdname
+      REAL(wp), DIMENSION(jpi,jpj) ::   z2d 
+#if defined key_iomput
+      IF( xios_field_is_active( cdname, at_current_timestep_arg = .TRUE. ) ) THEN
+         z2d(:,:) = 0._wp
+         CALL xios_recv_field( cdname, z2d)
+      ENDIF
+#else
+      IF( .FALSE. )   WRITE(numout,*) cdname, z2d ! useless test to avoid compilation warnings
+#endif
+   END SUBROUTINE iom_get_var
 
 
    FUNCTION iom_getszuld ( kiomid )  
@@ -1668,11 +1722,11 @@ CONTAINS
    SUBROUTINE iom_p0d( cdname, pfield0d )
       CHARACTER(LEN=*), INTENT(in) ::   cdname
       REAL(wp)        , INTENT(in) ::   pfield0d
-      REAL(wp)        , DIMENSION(jpi,jpj) ::   zz     ! masson
+!!      REAL(wp)        , DIMENSION(jpi,jpj) ::   zz     ! masson
 #if defined key_iomput
-      zz(:,:)=pfield0d
-      CALL xios_send_field(cdname, zz)
-      !CALL xios_send_field(cdname, (/pfield0d/)) 
+!!clem      zz(:,:)=pfield0d
+!!clem      CALL xios_send_field(cdname, zz)
+      CALL xios_send_field(cdname, (/pfield0d/)) 
 #else
       IF( .FALSE. )   WRITE(numout,*) cdname, pfield0d   ! useless test to avoid compilation warnings
 #endif
@@ -1707,6 +1761,17 @@ CONTAINS
       IF( .FALSE. )   WRITE(numout,*) cdname, pfield3d   ! useless test to avoid compilation warnings
 #endif
    END SUBROUTINE iom_p3d
+
+   SUBROUTINE iom_p4d( cdname, pfield4d )
+      CHARACTER(LEN=*)                , INTENT(in) ::   cdname
+      REAL(wp),       DIMENSION(:,:,:,:), INTENT(in) ::   pfield4d
+#if defined key_iomput
+      CALL xios_send_field(cdname, pfield4d)
+#else
+      IF( .FALSE. )   WRITE(numout,*) cdname, pfield4d   ! useless test to avoid compilation warnings
+#endif
+   END SUBROUTINE iom_p4d
+
 
 #if defined key_iomput
    !!----------------------------------------------------------------------
@@ -1940,8 +2005,8 @@ CONTAINS
       REAL(wp), DIMENSION(jpi,jpj), OPTIONAL, INTENT(in) :: plon_pnt, plat_pnt  ! Lat/lon coord. of the point of cell (i,j)
       !
       INTEGER :: ji, jj, jn, ni, nj
-      INTEGER :: icnr, jcnr                                    ! Offset such that the vertex coordinate (i+icnr,j+jcnr)
-      !                                                        ! represents the bottom-left corner of cell (i,j)
+      INTEGER :: icnr, jcnr                             ! Offset such that the vertex coordinate (i+icnr,j+jcnr)
+      !                                                 ! represents the bottom-left corner of cell (i,j)
       REAL(wp), ALLOCATABLE, DIMENSION(:,:,:,:) :: z_bnds      ! Lat/lon coordinates of the vertices of cell (i,j)
       REAL(wp), ALLOCATABLE, DIMENSION(:,:)     :: z_fld       ! Working array to determine where to rotate cells
       REAL(wp), ALLOCATABLE, DIMENSION(:,:)     :: z_rot       ! Lat/lon working array for rotation of cells
@@ -1978,8 +2043,8 @@ CONTAINS
       !
       ! Cell vertices on boundries
       DO jn = 1, 4
-         CALL lbc_lnk( 'iom', z_bnds(jn,:,:,1), cdgrd, 1., pval=999._wp )
-         CALL lbc_lnk( 'iom', z_bnds(jn,:,:,2), cdgrd, 1., pval=999._wp )
+         CALL lbc_lnk( 'iom', z_bnds(jn,:,:,1), cdgrd, 1., pfillval=999._wp )
+         CALL lbc_lnk( 'iom', z_bnds(jn,:,:,2), cdgrd, 1., pfillval=999._wp )
       END DO
       !
       ! Zero-size cells at closed boundaries if cell points provided,
@@ -2050,14 +2115,13 @@ CONTAINS
       nj=nlej-nldj+1
       ALLOCATE( zlon(ni*nj) )       ;       zlon(:) = 0._wp
       !
-      CALL dom_ngb( -168.53, 65.03, ix, iy, 'T' ) !  i-line that passes through Bering Strait: Reference latitude (used in plots)
-!      CALL dom_ngb( 180., 90., ix, iy, 'T' ) !  i-line that passes near the North Pole : Reference latitude (used in plots)
+!      CALL dom_ngb( -168.53, 65.03, ix, iy, 'T' ) !  i-line that passes through Bering Strait: Reference latitude (used in plots)
+      CALL dom_ngb( 180., 90., ix, iy, 'T' ) !  i-line that passes near the North Pole : Reference latitude (used in plots)
       CALL iom_set_domain_attr("gznl", ni_glo=jpiglo, nj_glo=jpjglo, ibegin=nimpp+nldi-2, jbegin=njmpp+nldj-2, ni=ni, nj=nj)
       CALL iom_set_domain_attr("gznl", data_dim=2, data_ibegin = 1-nldi, data_ni = jpi, data_jbegin = 1-nldj, data_nj = jpj)
       CALL iom_set_domain_attr("gznl", lonvalue = zlon,   &
          &                             latvalue = RESHAPE(plat(nldi:nlei, nldj:nlej),(/ ni*nj /)))  
-      CALL iom_set_zoom_domain_attr("znl_T", ibegin=ix-1, jbegin=0, ni=1, nj=jpjglo)
-      CALL iom_set_zoom_domain_attr("znl_W", ibegin=ix-1, jbegin=0, ni=1, nj=jpjglo)
+      CALL iom_set_zoom_domain_attr("ptr", ibegin=ix-1, jbegin=0, ni=1, nj=jpjglo)
       !
       CALL iom_update_file_name('ptr')
       !
@@ -2112,8 +2176,7 @@ CONTAINS
       f_op%timestep = 2        ;  f_of%timestep = -1  ; CALL iom_set_field_attr('trendT_odd'      , freq_op=f_op, freq_offset=f_of)
       f_op%timestep = nn_fsbc  ;  f_of%timestep =  0  ; CALL iom_set_field_attr('SBC'             , freq_op=f_op, freq_offset=f_of)
       f_op%timestep = nn_fsbc  ;  f_of%timestep =  0  ; CALL iom_set_field_attr('SBC_scalar'      , freq_op=f_op, freq_offset=f_of)
-      f_op%timestep = nn_dttrc ;  f_of%timestep =  0  ; CALL iom_set_field_attr('ptrc_T'          , freq_op=f_op, freq_offset=f_of)
-      f_op%timestep = nn_dttrc ;  f_of%timestep =  0  ; CALL iom_set_field_attr('diad_T'          , freq_op=f_op, freq_offset=f_of)
+      f_op%timestep = nn_fsbc  ;  f_of%timestep =  0  ; CALL iom_set_field_attr('ABL'             , freq_op=f_op, freq_offset=f_of)
 
       ! output file names (attribut: name)
       DO ji = 1, 9
@@ -2294,28 +2357,28 @@ CONTAINS
             !
             idx = INDEX(clname,'@startdate@') + INDEX(clname,'@STARTDATE@')
             DO WHILE ( idx /= 0 ) 
-               cldate = iom_sdate( fjulday - rdt / rday )
+               cldate = iom_sdate( fjulday - rn_Dt / rday )
                clname = clname(1:idx-1)//TRIM(cldate)//clname(idx+11:LEN_TRIM(clname))
                idx = INDEX(clname,'@startdate@') + INDEX(clname,'@STARTDATE@')
             END DO
             !
             idx = INDEX(clname,'@startdatefull@') + INDEX(clname,'@STARTDATEFULL@')
             DO WHILE ( idx /= 0 ) 
-               cldate = iom_sdate( fjulday - rdt / rday, ldfull = .TRUE. )
+               cldate = iom_sdate( fjulday - rn_Dt / rday, ldfull = .TRUE. )
                clname = clname(1:idx-1)//TRIM(cldate)//clname(idx+15:LEN_TRIM(clname))
                idx = INDEX(clname,'@startdatefull@') + INDEX(clname,'@STARTDATEFULL@')
             END DO
             !
             idx = INDEX(clname,'@enddate@') + INDEX(clname,'@ENDDATE@')
             DO WHILE ( idx /= 0 ) 
-               cldate = iom_sdate( fjulday + rdt / rday * REAL( nitend - nit000, wp ), ld24 = .TRUE. )
+               cldate = iom_sdate( fjulday + rn_Dt / rday * REAL( nitend - nit000, wp ), ld24 = .TRUE. )
                clname = clname(1:idx-1)//TRIM(cldate)//clname(idx+9:LEN_TRIM(clname))
                idx = INDEX(clname,'@enddate@') + INDEX(clname,'@ENDDATE@')
             END DO
             !
             idx = INDEX(clname,'@enddatefull@') + INDEX(clname,'@ENDDATEFULL@')
             DO WHILE ( idx /= 0 ) 
-               cldate = iom_sdate( fjulday + rdt / rday * REAL( nitend - nit000, wp ), ld24 = .TRUE., ldfull = .TRUE. )
+               cldate = iom_sdate( fjulday + rn_Dt / rday * REAL( nitend - nit000, wp ), ld24 = .TRUE., ldfull = .TRUE. )
                clname = clname(1:idx-1)//TRIM(cldate)//clname(idx+13:LEN_TRIM(clname))
                idx = INDEX(clname,'@enddatefull@') + INDEX(clname,'@ENDDATEFULL@')
             END DO
@@ -2388,7 +2451,6 @@ CONTAINS
    !!----------------------------------------------------------------------
    !!   NOT 'key_iomput'                               a few dummy routines
    !!----------------------------------------------------------------------
-
    SUBROUTINE iom_setkt( kt, cdname )
       INTEGER         , INTENT(in)::   kt 
       CHARACTER(LEN=*), INTENT(in) ::   cdname
@@ -2400,19 +2462,33 @@ CONTAINS
       IF( .FALSE. )   WRITE(numout,*)  cdname   ! useless test to avoid compilation warnings
    END SUBROUTINE iom_context_finalize
 
+   SUBROUTINE iom_update_file_name( cdid )
+      CHARACTER(LEN=*), INTENT(in) ::   cdid
+      IF( .FALSE. )   WRITE(numout,*)  cdid   ! useless test to avoid compilation warnings
+   END SUBROUTINE iom_update_file_name
+
 #endif
 
    LOGICAL FUNCTION iom_use( cdname )
-      !!----------------------------------------------------------------------
-      !!----------------------------------------------------------------------
       CHARACTER(LEN=*), INTENT(in) ::   cdname
-      !!----------------------------------------------------------------------
 #if defined key_iomput
       iom_use = xios_field_is_active( cdname )
 #else
       iom_use = .FALSE.
 #endif
    END FUNCTION iom_use
-   
+
+   SUBROUTINE iom_miss_val( cdname, pmiss_val )
+      CHARACTER(LEN=*), INTENT(in ) ::   cdname
+      REAL(wp)        , INTENT(out) ::   pmiss_val   
+#if defined key_iomput
+      ! get missing value
+      CALL xios_get_field_attr( cdname, default_value = pmiss_val )
+#else
+      IF( .FALSE. )   WRITE(numout,*) cdname, pmiss_val   ! useless test to avoid compilation warnings
+      IF( .FALSE. )   pmiss_val = 0._wp                   ! useless assignment to avoid compilation warnings
+#endif
+   END SUBROUTINE iom_miss_val
+  
    !!======================================================================
 END MODULE iom

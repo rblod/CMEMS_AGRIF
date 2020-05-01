@@ -36,17 +36,17 @@ MODULE traldf_lap_blp
    LOGICAL  ::   l_hst   ! flag to compute heat transport
 
    !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: traldf_lap_blp.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: traldf_lap_blp.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE tra_ldf_lap( kt, kit000, cdtype, pahu, pahv, pgu , pgv ,   &
-      &                                                    pgui, pgvi,   &
-      &                                        ptb , pta , kjpt, kpass ) 
+   SUBROUTINE tra_ldf_lap( kt, Kmm, kit000, cdtype, pahu, pahv  ,               &
+      &                                             pgu , pgv   , pgui, pgvi,   &
+      &                                             pt  , pt_rhs, kjpt, kpass ) 
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE tra_ldf_lap  ***
       !!                   
@@ -58,10 +58,10 @@ CONTAINS
       !!      the tracer is given by:
       !!          difft = 1/(e1e2t*e3t) {  di-1[ pahu e2u*e3u/e1u di(tb) ]
       !!                                 + dj-1[ pahv e1v*e3v/e2v dj(tb) ] }
-      !!      Add this trend to the general tracer trend pta :
-      !!          pta = pta + difft
+      !!      Add this trend to the general tracer trend pt_rhs :
+      !!          pt_rhs = pt_rhs + difft
       !!
-      !! ** Action  : - Update pta arrays with the before iso-level 
+      !! ** Action  : - Update pt_rhs arrays with the before iso-level 
       !!                harmonic mixing trend.
       !!----------------------------------------------------------------------
       INTEGER                              , INTENT(in   ) ::   kt         ! ocean time-step index
@@ -69,11 +69,12 @@ CONTAINS
       CHARACTER(len=3)                     , INTENT(in   ) ::   cdtype     ! =TRA or TRC (tracer indicator)
       INTEGER                              , INTENT(in   ) ::   kjpt       ! number of tracers
       INTEGER                              , INTENT(in   ) ::   kpass      ! =1/2 first or second passage
+      INTEGER                              , INTENT(in   ) ::   Kmm        ! ocean time level index
       REAL(wp), DIMENSION(jpi,jpj,jpk)     , INTENT(in   ) ::   pahu, pahv ! eddy diffusivity at u- and v-points  [m2/s]
       REAL(wp), DIMENSION(jpi,jpj    ,kjpt), INTENT(in   ) ::   pgu, pgv   ! tracer gradient at pstep levels
       REAL(wp), DIMENSION(jpi,jpj,    kjpt), INTENT(in   ) ::   pgui, pgvi ! tracer gradient at top   levels
-      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt), INTENT(in   ) ::   ptb        ! before and now tracer fields
-      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt), INTENT(inout) ::   pta        ! tracer trend 
+      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt), INTENT(in   ) ::   pt         ! before tracer fields
+      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt), INTENT(inout) ::   pt_rhs     ! tracer trend 
       !
       INTEGER  ::   ji, jj, jk, jn   ! dummy loop indices
       REAL(wp) ::   zsign            ! local scalars
@@ -88,7 +89,7 @@ CONTAINS
       !
       l_hst = .FALSE.
       l_ptr = .FALSE.
-      IF( cdtype == 'TRA' .AND. ln_diaptr )                                                l_ptr = .TRUE. 
+      IF( cdtype == 'TRA' .AND. ( iom_use( 'sophtldf' ) .OR. iom_use( 'sopstldf' ) ) )     l_ptr = .TRUE.
       IF( cdtype == 'TRA' .AND. ( iom_use("uadv_heattr") .OR. iom_use("vadv_heattr") .OR. &
          &                        iom_use("uadv_salttr") .OR. iom_use("vadv_salttr")  ) )  l_hst = .TRUE.
       !
@@ -96,53 +97,37 @@ CONTAINS
       IF( kpass == 1 ) THEN   ;   zsign =  1._wp      ! bilaplacian operator require a minus sign (eddy diffusivity >0)
       ELSE                    ;   zsign = -1._wp
       ENDIF
-      DO jk = 1, jpkm1
-         DO jj = 1, jpjm1
-            DO ji = 1, fs_jpim1   ! vector opt.
-               zaheeu(ji,jj,jk) = zsign * pahu(ji,jj,jk) * e2_e1u(ji,jj) * e3u_n(ji,jj,jk)   !!gm   * umask(ji,jj,jk) pah masked!
-               zaheev(ji,jj,jk) = zsign * pahv(ji,jj,jk) * e1_e2v(ji,jj) * e3v_n(ji,jj,jk)   !!gm   * vmask(ji,jj,jk)
-            END DO
-         END DO
-      END DO
+      DO_3D_10_10( 1, jpkm1 )
+         zaheeu(ji,jj,jk) = zsign * pahu(ji,jj,jk) * e2_e1u(ji,jj) * e3u(ji,jj,jk,Kmm)   !!gm   * umask(ji,jj,jk) pah masked!
+         zaheev(ji,jj,jk) = zsign * pahv(ji,jj,jk) * e1_e2v(ji,jj) * e3v(ji,jj,jk,Kmm)   !!gm   * vmask(ji,jj,jk)
+      END_3D
       !
       !                             ! =========== !
       DO jn = 1, kjpt               ! tracer loop !
          !                          ! =========== !    
          !                               
-         DO jk = 1, jpkm1              !== First derivative (gradient)  ==!
-            DO jj = 1, jpjm1
-               DO ji = 1, fs_jpim1
-                  ztu(ji,jj,jk) = zaheeu(ji,jj,jk) * ( ptb(ji+1,jj  ,jk,jn) - ptb(ji,jj,jk,jn) )
-                  ztv(ji,jj,jk) = zaheev(ji,jj,jk) * ( ptb(ji  ,jj+1,jk,jn) - ptb(ji,jj,jk,jn) )
-               END DO
-            END DO
-         END DO  
+         DO_3D_10_10( 1, jpkm1 )
+            ztu(ji,jj,jk) = zaheeu(ji,jj,jk) * ( pt(ji+1,jj  ,jk,jn) - pt(ji,jj,jk,jn) )
+            ztv(ji,jj,jk) = zaheev(ji,jj,jk) * ( pt(ji  ,jj+1,jk,jn) - pt(ji,jj,jk,jn) )
+         END_3D
          IF( ln_zps ) THEN                ! set gradient at bottom/top ocean level
-            DO jj = 1, jpjm1                    ! bottom
-               DO ji = 1, fs_jpim1
-                  ztu(ji,jj,mbku(ji,jj)) = zaheeu(ji,jj,mbku(ji,jj)) * pgu(ji,jj,jn)
-                  ztv(ji,jj,mbkv(ji,jj)) = zaheev(ji,jj,mbkv(ji,jj)) * pgv(ji,jj,jn)
-               END DO
-            END DO  
+            DO_2D_10_10
+               ztu(ji,jj,mbku(ji,jj)) = zaheeu(ji,jj,mbku(ji,jj)) * pgu(ji,jj,jn)
+               ztv(ji,jj,mbkv(ji,jj)) = zaheev(ji,jj,mbkv(ji,jj)) * pgv(ji,jj,jn)
+            END_2D
             IF( ln_isfcav ) THEN                ! top in ocean cavities only
-               DO jj = 1, jpjm1
-                  DO ji = 1, fs_jpim1   ! vector opt.
-                     IF( miku(ji,jj) > 1 )   ztu(ji,jj,miku(ji,jj)) = zaheeu(ji,jj,miku(ji,jj)) * pgui(ji,jj,jn) 
-                     IF( mikv(ji,jj) > 1 )   ztv(ji,jj,mikv(ji,jj)) = zaheev(ji,jj,mikv(ji,jj)) * pgvi(ji,jj,jn) 
-                  END DO
-               END DO
+               DO_2D_10_10
+                  IF( miku(ji,jj) > 1 )   ztu(ji,jj,miku(ji,jj)) = zaheeu(ji,jj,miku(ji,jj)) * pgui(ji,jj,jn) 
+                  IF( mikv(ji,jj) > 1 )   ztv(ji,jj,mikv(ji,jj)) = zaheev(ji,jj,mikv(ji,jj)) * pgvi(ji,jj,jn) 
+               END_2D
             ENDIF
          ENDIF
          !
-         DO jk = 1, jpkm1              !== Second derivative (divergence) added to the general tracer trends  ==!
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1
-                  pta(ji,jj,jk,jn) = pta(ji,jj,jk,jn) + (  ztu(ji,jj,jk) - ztu(ji-1,jj,jk)     &
-                     &                                   + ztv(ji,jj,jk) - ztv(ji,jj-1,jk) )   &
-                     &                                / ( e1e2t(ji,jj) * e3t_n(ji,jj,jk) )
-               END DO
-            END DO
-         END DO  
+         DO_3D_00_00( 1, jpkm1 )
+            pt_rhs(ji,jj,jk,jn) = pt_rhs(ji,jj,jk,jn) + (  ztu(ji,jj,jk) - ztu(ji-1,jj,jk)     &
+               &                                      +    ztv(ji,jj,jk) - ztv(ji,jj-1,jk) )   &
+               &                                      / ( e1e2t(ji,jj) * e3t(ji,jj,jk,Kmm) )
+         END_3D
          !
          !                             !== "Poleward" diffusive heat or salt transports  ==!
          IF( ( kpass == 1 .AND. .NOT.ln_traldf_blp ) .OR.  &     !==  first pass only (  laplacian)  ==!
@@ -158,9 +143,9 @@ CONTAINS
    END SUBROUTINE tra_ldf_lap
    
 
-   SUBROUTINE tra_ldf_blp( kt, kit000, cdtype, pahu, pahv, pgu , pgv ,   &
-      &                                                    pgui, pgvi,   &
-      &                                                    ptb , pta , kjpt, kldf )
+   SUBROUTINE tra_ldf_blp( kt, Kmm, kit000, cdtype, pahu, pahv  ,             &
+      &                                             pgu , pgv   , pgui, pgvi, &
+      &                                             pt  , pt_rhs, kjpt, kldf )
       !!----------------------------------------------------------------------
       !!                 ***  ROUTINE tra_ldf_blp  ***
       !!                    
@@ -178,11 +163,12 @@ CONTAINS
       CHARACTER(len=3)                     , INTENT(in   ) ::   cdtype     ! =TRA or TRC (tracer indicator)
       INTEGER                              , INTENT(in   ) ::   kjpt       ! number of tracers
       INTEGER                              , INTENT(in   ) ::   kldf       ! type of operator used
+      INTEGER                              , INTENT(in   ) ::   Kmm        ! ocean time level indices
       REAL(wp), DIMENSION(jpi,jpj,jpk)     , INTENT(in   ) ::   pahu, pahv ! eddy diffusivity at u- and v-points  [m2/s]
       REAL(wp), DIMENSION(jpi,jpj    ,kjpt), INTENT(in   ) ::   pgu, pgv   ! tracer gradient at pstep levels
       REAL(wp), DIMENSION(jpi,jpj,    kjpt), INTENT(in   ) ::   pgui, pgvi ! tracer gradient at top levels
-      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt), INTENT(in   ) ::   ptb        ! before and now tracer fields
-      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt), INTENT(inout) ::   pta        ! tracer trend
+      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt), INTENT(in   ) ::   pt         ! before and now tracer fields
+      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt), INTENT(inout) ::   pt_rhs     ! tracer trend
       !
       INTEGER ::   ji, jj, jk, jn   ! dummy loop indices
       REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt) :: zlap         ! laplacian at t-point
@@ -202,30 +188,30 @@ CONTAINS
 
       zlap(:,:,:,:) = 0._wp
       !
-      SELECT CASE ( kldf )       !==  1st laplacian applied to ptb (output in zlap)  ==!
+      SELECT CASE ( kldf )       !==  1st laplacian applied to pt (output in zlap)  ==!
       !
       CASE ( np_blp    )               ! iso-level bilaplacian
-         CALL tra_ldf_lap  ( kt, kit000, cdtype, pahu, pahv, pgu, pgv, pgui, pgvi, ptb,      zlap, kjpt, 1 )
+         CALL tra_ldf_lap  ( kt, Kmm, kit000, cdtype, pahu, pahv, pgu, pgv, pgui, pgvi, pt,     zlap, kjpt, 1 )
       CASE ( np_blp_i  )               ! rotated   bilaplacian : standard operator (Madec)
-         CALL tra_ldf_iso  ( kt, kit000, cdtype, pahu, pahv, pgu, pgv, pgui, pgvi, ptb, ptb, zlap, kjpt, 1 )
+         CALL tra_ldf_iso  ( kt, Kmm, kit000, cdtype, pahu, pahv, pgu, pgv, pgui, pgvi, pt, pt, zlap, kjpt, 1 )
       CASE ( np_blp_it )               ! rotated  bilaplacian : triad operator (griffies)
-         CALL tra_ldf_triad( kt, kit000, cdtype, pahu, pahv, pgu, pgv, pgui, pgvi, ptb, ptb, zlap, kjpt, 1 )
+         CALL tra_ldf_triad( kt, Kmm, kit000, cdtype, pahu, pahv, pgu, pgv, pgui, pgvi, pt, pt, zlap, kjpt, 1 )
       END SELECT
       !
       CALL lbc_lnk( 'traldf_lap_blp', zlap(:,:,:,:) , 'T', 1. )     ! Lateral boundary conditions (unchanged sign)
       !                                               ! Partial top/bottom cell: GRADh( zlap )  
-      IF( ln_isfcav .AND. ln_zps ) THEN   ;   CALL zps_hde_isf( kt, kjpt, zlap, zglu, zglv, zgui, zgvi )  ! both top & bottom
-      ELSEIF(             ln_zps ) THEN   ;   CALL zps_hde    ( kt, kjpt, zlap, zglu, zglv )              ! only bottom 
+      IF( ln_isfcav .AND. ln_zps ) THEN   ;   CALL zps_hde_isf( kt, Kmm, kjpt, zlap, zglu, zglv, zgui, zgvi )  ! both top & bottom
+      ELSEIF(             ln_zps ) THEN   ;   CALL zps_hde    ( kt, Kmm, kjpt, zlap, zglu, zglv )              ! only bottom 
       ENDIF
       !
-      SELECT CASE ( kldf )       !==  2nd laplacian applied to zlap (output in pta)  ==!
+      SELECT CASE ( kldf )       !==  2nd laplacian applied to zlap (output in pt_rhs)  ==!
       !
       CASE ( np_blp    )               ! iso-level bilaplacian
-         CALL tra_ldf_lap  ( kt, kit000, cdtype, pahu, pahv, zglu, zglv, zgui, zgvi, zlap, pta,      kjpt, 2 )
+         CALL tra_ldf_lap  ( kt, Kmm, kit000, cdtype, pahu, pahv, zglu, zglv, zgui, zgvi, zlap, pt_rhs,         kjpt, 2 )
       CASE ( np_blp_i  )               ! rotated   bilaplacian : standard operator (Madec)
-         CALL tra_ldf_iso  ( kt, kit000, cdtype, pahu, pahv, zglu, zglv, zgui, zgvi, zlap, ptb, pta, kjpt, 2 )
+         CALL tra_ldf_iso  ( kt, Kmm, kit000, cdtype, pahu, pahv, zglu, zglv, zgui, zgvi, zlap, pt    , pt_rhs, kjpt, 2 )
       CASE ( np_blp_it )               ! rotated  bilaplacian : triad operator (griffies)
-         CALL tra_ldf_triad( kt, kit000, cdtype, pahu, pahv, zglu, zglv, zgui, zgvi, zlap, ptb, pta, kjpt, 2 )
+         CALL tra_ldf_triad( kt, Kmm, kit000, cdtype, pahu, pahv, zglu, zglv, zgui, zgvi, zlap, pt    , pt_rhs, kjpt, 2 )
       END SELECT
       !
    END SUBROUTINE tra_ldf_blp

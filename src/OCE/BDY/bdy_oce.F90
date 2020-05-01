@@ -21,10 +21,12 @@ MODULE bdy_oce
    TYPE, PUBLIC ::   OBC_INDEX    !: Indices and weights which define the open boundary
       INTEGER ,          DIMENSION(jpbgrd) ::  nblen
       INTEGER ,          DIMENSION(jpbgrd) ::  nblenrim
+      INTEGER ,          DIMENSION(jpbgrd) ::  nblenrim0
       INTEGER , POINTER, DIMENSION(:,:)    ::  nbi
       INTEGER , POINTER, DIMENSION(:,:)    ::  nbj
       INTEGER , POINTER, DIMENSION(:,:)    ::  nbr
       INTEGER , POINTER, DIMENSION(:,:)    ::  nbmap
+      INTEGER , POINTER, DIMENSION(:,:)    ::  ntreat
       REAL(wp), POINTER, DIMENSION(:,:)    ::  nbw
       REAL(wp), POINTER, DIMENSION(:,:)    ::  nbd
       REAL(wp), POINTER, DIMENSION(:,:)    ::  nbdout
@@ -39,14 +41,11 @@ MODULE bdy_oce
 
    TYPE, PUBLIC ::   OBC_DATA     !: Storage for external data
       INTEGER          , DIMENSION(2)   ::  nread
-      LOGICAL                           ::  ll_ssh
-      LOGICAL                           ::  ll_u2d
-      LOGICAL                           ::  ll_v2d
-      LOGICAL                           ::  ll_u3d
-      LOGICAL                           ::  ll_v3d
-      LOGICAL                           ::  ll_tem
-      LOGICAL                           ::  ll_sal
-      LOGICAL                           ::  ll_fvl
+      LOGICAL                           ::  lneed_ssh
+      LOGICAL                           ::  lneed_dyn2d
+      LOGICAL                           ::  lneed_dyn3d
+      LOGICAL                           ::  lneed_tra
+      LOGICAL                           ::  lneed_ice
       REAL(wp), POINTER, DIMENSION(:)   ::  ssh
       REAL(wp), POINTER, DIMENSION(:)   ::  u2d
       REAL(wp), POINTER, DIMENSION(:)   ::  v2d
@@ -54,14 +53,15 @@ MODULE bdy_oce
       REAL(wp), POINTER, DIMENSION(:,:) ::  v3d
       REAL(wp), POINTER, DIMENSION(:,:) ::  tem
       REAL(wp), POINTER, DIMENSION(:,:) ::  sal
-#if defined key_si3
-      LOGICAL                           ::   ll_a_i
-      LOGICAL                           ::   ll_h_i
-      LOGICAL                           ::   ll_h_s
-      REAL(wp), POINTER, DIMENSION(:,:) ::   a_i    !: now ice leads fraction climatology
-      REAL(wp), POINTER, DIMENSION(:,:) ::   h_i    !: Now ice  thickness climatology
-      REAL(wp), POINTER, DIMENSION(:,:) ::   h_s    !: now snow thickness
-#endif
+      REAL(wp), POINTER, DIMENSION(:,:) ::  a_i    !: now ice leads fraction climatology
+      REAL(wp), POINTER, DIMENSION(:,:) ::  h_i    !: Now ice  thickness climatology
+      REAL(wp), POINTER, DIMENSION(:,:) ::  h_s    !: now snow thickness
+      REAL(wp), POINTER, DIMENSION(:,:) ::  t_i    !: now ice  temperature
+      REAL(wp), POINTER, DIMENSION(:,:) ::  t_s    !: now snow temperature
+      REAL(wp), POINTER, DIMENSION(:,:) ::  tsu    !: now surf temperature
+      REAL(wp), POINTER, DIMENSION(:,:) ::  s_i    !: now ice  salinity
+      REAL(wp), POINTER, DIMENSION(:,:) ::  aip    !: now ice  pond concentration
+      REAL(wp), POINTER, DIMENSION(:,:) ::  hip    !: now ice  pond depth
 #if defined key_top
       CHARACTER(LEN=20)                   :: cn_obc  !: type of boundary condition to apply
       REAL(wp)                            :: rn_fac  !: multiplicative scaling factor
@@ -73,6 +73,7 @@ MODULE bdy_oce
    !!----------------------------------------------------------------------
    !! Namelist variables
    !!----------------------------------------------------------------------
+   !                                                   !!** nambdy **
    LOGICAL, PUBLIC            ::   ln_bdy                   !: Unstructured Ocean Boundary Condition
 
    CHARACTER(len=80), DIMENSION(jp_bdy) ::   cn_coords_file !: Name of bdy coordinates file
@@ -84,7 +85,6 @@ MODULE bdy_oce
    LOGICAL                    ::   ln_vol                   !: =T volume correction             
    !
    INTEGER                    ::   nb_bdy                   !: number of open boundary sets
-   INTEGER                    ::   nb_jpk_bdy               !: number of levels in the bdy data (set < 0 if consistent with planned run)
    INTEGER, DIMENSION(jp_bdy) ::   nn_rimwidth              !: boundary rim width for Flow Relaxation Scheme
    INTEGER                    ::   nn_volctl                !: = 0 the total volume will have the variability of the surface Flux E-P 
    !                                                        !  = 1 the volume will be constant during all the integration.
@@ -107,11 +107,14 @@ MODULE bdy_oce
    CHARACTER(len=20), DIMENSION(jp_bdy) ::   cn_ice         ! Choice of boundary condition for sea ice variables 
    INTEGER , DIMENSION(jp_bdy)          ::   nn_ice_dta     !: = 0 use the initial state as bdy dta ; 
                                                             !: = 1 read it in a NetCDF file
-   REAL(wp), DIMENSION(jp_bdy) ::   rn_ice_tem              !: choice of the temperature of incoming sea ice
-   REAL(wp), DIMENSION(jp_bdy) ::   rn_ice_sal              !: choice of the salinity    of incoming sea ice
-   REAL(wp), DIMENSION(jp_bdy) ::   rn_ice_age              !: choice of the age         of incoming sea ice
+   ! 
+   !                                                   !!** nambdy_dta **
+   REAL(wp), DIMENSION(jp_bdy) ::   rice_tem                !: temperature of incoming sea ice
+   REAL(wp), DIMENSION(jp_bdy) ::   rice_sal                !: salinity    of incoming sea ice
+   REAL(wp), DIMENSION(jp_bdy) ::   rice_age                !: age         of incoming sea ice
+   REAL(wp), DIMENSION(jp_bdy) ::   rice_apnd               !: pond conc.  of incoming sea ice
+   REAL(wp), DIMENSION(jp_bdy) ::   rice_hpnd               !: pond thick. of incoming sea ice
    !
-   
    !!----------------------------------------------------------------------
    !! Global variables
    !!----------------------------------------------------------------------
@@ -127,19 +130,21 @@ MODULE bdy_oce
 
    INTEGER,  DIMENSION(jp_bdy)                     ::   nn_dta            !: =0 => *all* data is set to initial conditions
                                                                           !: =1 => some data to be read in from data files
-   REAL(wp), ALLOCATABLE, DIMENSION(:,:,:), TARGET ::   dta_global        !: workspace for reading in global data arrays (unstr.  bdy)
-   REAL(wp), ALLOCATABLE, DIMENSION(:,:,:), TARGET ::   dta_global_z      !: workspace for reading in global depth arrays (unstr.  bdy)
-   REAL(wp), ALLOCATABLE, DIMENSION(:,:,:), TARGET ::   dta_global_dz     !: workspace for reading in global depth arrays (unstr.  bdy)
-   REAL(wp), ALLOCATABLE, DIMENSION(:,:,:), TARGET ::   dta_global2       !: workspace for reading in global data arrays (struct. bdy)
-   REAL(wp), ALLOCATABLE, DIMENSION(:,:,:), TARGET ::   dta_global2_z     !: workspace for reading in global depth arrays (struct. bdy)
-   REAL(wp), ALLOCATABLE, DIMENSION(:,:,:), TARGET ::   dta_global2_dz    !: workspace for reading in global depth arrays (struct. bdy)
 !$AGRIF_DO_NOT_TREAT
    TYPE(OBC_INDEX), DIMENSION(jp_bdy), TARGET      ::   idx_bdy           !: bdy indices (local process)
    TYPE(OBC_DATA) , DIMENSION(jp_bdy), TARGET      ::   dta_bdy           !: bdy external data (local process)
 !$AGRIF_END_DO_NOT_TREAT
+   LOGICAL, ALLOCATABLE, DIMENSION(:,:,:,:) ::   lsend_bdy      !: mark needed communication for given boundary, grid and neighbour
+   LOGICAL, ALLOCATABLE, DIMENSION(:,:,:,:) ::   lrecv_bdy      !:  when searching in any direction
+   LOGICAL, ALLOCATABLE, DIMENSION(:,:,:,:) ::   lsend_bdyint   !: mark needed communication for given boundary, grid and neighbour
+   LOGICAL, ALLOCATABLE, DIMENSION(:,:,:,:) ::   lrecv_bdyint   !:  when searching towards the interior of the computational domain
+   LOGICAL, ALLOCATABLE, DIMENSION(:,:,:,:) ::   lsend_bdyext   !: mark needed communication for given boundary, grid and neighbour
+   LOGICAL, ALLOCATABLE, DIMENSION(:,:,:,:) ::   lrecv_bdyext   !:  when searching towards the exterior of the computational domain
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: bdy_oce.F90 10425 2018-12-19 21:54:16Z smasson $ 
+   !! $Id: bdy_oce.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS

@@ -47,7 +47,7 @@ MODULE icbtrj
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: icbtrj.F90 10068 2018-08-28 14:09:04Z nicolasmartin $
+   !! $Id: icbtrj.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -73,7 +73,7 @@ CONTAINS
       WRITE(cldate_ini, '(i4.4,2i2.2)') iyear, imonth, iday
 
       ! compute end time step date
-      zfjulday = fjulday + rdt / rday * REAL( nitend - nit000 + 1 , wp)
+      zfjulday = fjulday + rn_Dt / rday * REAL( nitend - nit000 + 1 , wp)
       IF( ABS(zfjulday - REAL(NINT(zfjulday),wp)) < 0.1 / rday )   zfjulday = REAL(NINT(zfjulday),wp)   ! avoid truncation error
       CALL ju2ymds( zfjulday, iyear, imonth, iday, zsec )
       WRITE(cldate_end, '(i4.4,2i2.2)') iyear, imonth, iday

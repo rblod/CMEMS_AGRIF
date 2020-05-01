@@ -65,110 +65,106 @@ MODULE traadv
    INTEGER, PARAMETER ::   np_UBS     = 4   ! 3rd order Upstream Biased Scheme
    INTEGER, PARAMETER ::   np_QCK     = 5   ! QUICK scheme
    
-   !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: traadv.F90 10068 2018-08-28 14:09:04Z nicolasmartin $
+   !! $Id: traadv.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE tra_adv( kt )
+   SUBROUTINE tra_adv( kt, Kbb, Kmm, pts, Krhs )
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE tra_adv  ***
       !!
       !! ** Purpose :   compute the ocean tracer advection trend.
       !!
-      !! ** Method  : - Update (ua,va) with the advection term following nadv
+      !! ** Method  : - Update (uu(:,:,:,Krhs),vv(:,:,:,Krhs)) with the advection term following nadv
       !!----------------------------------------------------------------------
-      INTEGER, INTENT(in) ::   kt   ! ocean time-step index
+      INTEGER                                  , INTENT(in)    :: kt             ! ocean time-step index
+      INTEGER                                  , INTENT(in)    :: Kbb, Kmm, Krhs ! time level indices
+      REAL(wp), DIMENSION(jpi,jpj,jpk,jpts,jpt), INTENT(inout) :: pts            ! active tracers and RHS of tracer equation
       !
       INTEGER ::   jk   ! dummy loop index
-      REAL(wp), DIMENSION(jpi,jpj,jpk)        :: zun, zvn, zwn   ! 3D workspace
+      REAL(wp), DIMENSION(jpi,jpj,jpk)        :: zuu, zvv, zww   ! 3D workspace
       REAL(wp), DIMENSION(:,:,:), ALLOCATABLE ::   ztrdt, ztrds
       !!----------------------------------------------------------------------
       !
       IF( ln_timing )   CALL timing_start('tra_adv')
       !
-      !                                          ! set time step
-      IF( neuler == 0 .AND. kt == nit000 ) THEN   ;   r2dt =         rdt   ! at nit000             (Euler)
-      ELSEIF( kt <= nit000 + 1 )           THEN   ;   r2dt = 2._wp * rdt   ! at nit000 or nit000+1 (Leapfrog)
-      ENDIF
-      !
       !                                         !==  effective transport  ==!
-      zun(:,:,jpk) = 0._wp
-      zvn(:,:,jpk) = 0._wp
-      zwn(:,:,jpk) = 0._wp
+      zuu(:,:,jpk) = 0._wp
+      zvv(:,:,jpk) = 0._wp
+      zww(:,:,jpk) = 0._wp
       IF( ln_wave .AND. ln_sdw )  THEN
          DO jk = 1, jpkm1                                                       ! eulerian transport + Stokes Drift
-            zun(:,:,jk) = e2u  (:,:) * e3u_n(:,:,jk) * ( un(:,:,jk) + usd(:,:,jk) )
-            zvn(:,:,jk) = e1v  (:,:) * e3v_n(:,:,jk) * ( vn(:,:,jk) + vsd(:,:,jk) )
-            zwn(:,:,jk) = e1e2t(:,:)                 * ( wn(:,:,jk) + wsd(:,:,jk) )
+            zuu(:,:,jk) = e2u  (:,:) * e3u(:,:,jk,Kmm) * ( uu(:,:,jk,Kmm) + usd(:,:,jk) )
+            zvv(:,:,jk) = e1v  (:,:) * e3v(:,:,jk,Kmm) * ( vv(:,:,jk,Kmm) + vsd(:,:,jk) )
+            zww(:,:,jk) = e1e2t(:,:)                 * ( ww(:,:,jk) + wsd(:,:,jk) )
          END DO
       ELSE
          DO jk = 1, jpkm1
-            zun(:,:,jk) = e2u  (:,:) * e3u_n(:,:,jk) * un(:,:,jk)               ! eulerian transport only
-            zvn(:,:,jk) = e1v  (:,:) * e3v_n(:,:,jk) * vn(:,:,jk)
-            zwn(:,:,jk) = e1e2t(:,:)                 * wn(:,:,jk)
+            zuu(:,:,jk) = e2u  (:,:) * e3u(:,:,jk,Kmm) * uu(:,:,jk,Kmm)               ! eulerian transport only
+            zvv(:,:,jk) = e1v  (:,:) * e3v(:,:,jk,Kmm) * vv(:,:,jk,Kmm)
+            zww(:,:,jk) = e1e2t(:,:)                 * ww(:,:,jk)
          END DO
       ENDIF
       !
       IF( ln_vvl_ztilde .OR. ln_vvl_layer ) THEN                                ! add z-tilde and/or vvl corrections
-         zun(:,:,:) = zun(:,:,:) + un_td(:,:,:)
-         zvn(:,:,:) = zvn(:,:,:) + vn_td(:,:,:)
+         zuu(:,:,:) = zuu(:,:,:) + un_td(:,:,:)
+         zvv(:,:,:) = zvv(:,:,:) + vn_td(:,:,:)
       ENDIF
       !
-      zun(:,:,jpk) = 0._wp                                                      ! no transport trough the bottom
-      zvn(:,:,jpk) = 0._wp
-      zwn(:,:,jpk) = 0._wp
+      zuu(:,:,jpk) = 0._wp                                                      ! no transport trough the bottom
+      zvv(:,:,jpk) = 0._wp
+      zww(:,:,jpk) = 0._wp
       !
       IF( ln_ldfeiv .AND. .NOT. ln_traldf_triad )   &
-         &              CALL ldf_eiv_trp( kt, nit000, zun, zvn, zwn, 'TRA' )   ! add the eiv transport (if necessary)
+         &              CALL ldf_eiv_trp( kt, nit000, zuu, zvv, zww, 'TRA', Kmm, Krhs )   ! add the eiv transport (if necessary)
       !
-      IF( ln_mle    )   CALL tra_mle_trp( kt, nit000, zun, zvn, zwn, 'TRA' )   ! add the mle transport (if necessary)
+      IF( ln_mle    )   CALL tra_mle_trp( kt, nit000, zuu, zvv, zww, 'TRA', Kmm       )   ! add the mle transport (if necessary)
       !
-      CALL iom_put( "uocetr_eff", zun )                                        ! output effective transport      
-      CALL iom_put( "vocetr_eff", zvn )
-      CALL iom_put( "wocetr_eff", zwn )
+      CALL iom_put( "uocetr_eff", zuu )                                        ! output effective transport      
+      CALL iom_put( "vocetr_eff", zvv )
+      CALL iom_put( "wocetr_eff", zww )
       !
 !!gm ???
-      IF( ln_diaptr )   CALL dia_ptr( zvn )                                    ! diagnose the effective MSF 
+      CALL dia_ptr( kt, Kmm, zvv )                                    ! diagnose the effective MSF 
 !!gm ???
       !
+
       IF( l_trdtra )   THEN                    !* Save ta and sa trends
          ALLOCATE( ztrdt(jpi,jpj,jpk), ztrds(jpi,jpj,jpk) )
-         ztrdt(:,:,:) = tsa(:,:,:,jp_tem)
-         ztrds(:,:,:) = tsa(:,:,:,jp_sal)
+         ztrdt(:,:,:) = pts(:,:,:,jp_tem,Krhs)
+         ztrds(:,:,:) = pts(:,:,:,jp_sal,Krhs)
       ENDIF
       !
       SELECT CASE ( nadv )                      !==  compute advection trend and add it to general trend  ==!
       !
       CASE ( np_CEN )                                 ! Centered scheme : 2nd / 4th order
-         CALL tra_adv_cen    ( kt, nit000, 'TRA',         zun, zvn, zwn     , tsn, tsa, jpts, nn_cen_h, nn_cen_v )
+         CALL tra_adv_cen    ( kt, nit000, 'TRA',         zuu, zvv, zww, Kmm, pts, jpts, Krhs, nn_cen_h, nn_cen_v )
       CASE ( np_FCT )                                 ! FCT scheme      : 2nd / 4th order
-         CALL tra_adv_fct    ( kt, nit000, 'TRA', r2dt, zun, zvn, zwn, tsb, tsn, tsa, jpts, nn_fct_h, nn_fct_v )
+         CALL tra_adv_fct    ( kt, nit000, 'TRA', rDt, zuu, zvv, zww, Kbb, Kmm, pts, jpts, Krhs, nn_fct_h, nn_fct_v )
       CASE ( np_MUS )                                 ! MUSCL
-         CALL tra_adv_mus    ( kt, nit000, 'TRA', r2dt, zun, zvn, zwn, tsb,      tsa, jpts        , ln_mus_ups ) 
+         CALL tra_adv_mus    ( kt, nit000, 'TRA', rDt, zuu, zvv, zww, Kbb, Kmm, pts, jpts, Krhs, ln_mus_ups ) 
       CASE ( np_UBS )                                 ! UBS
-         CALL tra_adv_ubs    ( kt, nit000, 'TRA', r2dt, zun, zvn, zwn, tsb, tsn, tsa, jpts        , nn_ubs_v   )
+         CALL tra_adv_ubs    ( kt, nit000, 'TRA', rDt, zuu, zvv, zww, Kbb, Kmm, pts, jpts, Krhs, nn_ubs_v   )
       CASE ( np_QCK )                                 ! QUICKEST
-         CALL tra_adv_qck    ( kt, nit000, 'TRA', r2dt, zun, zvn, zwn, tsb, tsn, tsa, jpts                     )
+         CALL tra_adv_qck    ( kt, nit000, 'TRA', rDt, zuu, zvv, zww, Kbb, Kmm, pts, jpts, Krhs )
       !
       END SELECT
       !
       IF( l_trdtra )   THEN                      ! save the advective trends for further diagnostics
          DO jk = 1, jpkm1
-            ztrdt(:,:,jk) = tsa(:,:,jk,jp_tem) - ztrdt(:,:,jk)
-            ztrds(:,:,jk) = tsa(:,:,jk,jp_sal) - ztrds(:,:,jk)
+            ztrdt(:,:,jk) = pts(:,:,jk,jp_tem,Krhs) - ztrdt(:,:,jk)
+            ztrds(:,:,jk) = pts(:,:,jk,jp_sal,Krhs) - ztrds(:,:,jk)
          END DO
-         CALL trd_tra( kt, 'TRA', jp_tem, jptra_totad, ztrdt )
-         CALL trd_tra( kt, 'TRA', jp_sal, jptra_totad, ztrds )
+         CALL trd_tra( kt, Kmm, Krhs, 'TRA', jp_tem, jptra_totad, ztrdt )
+         CALL trd_tra( kt, Kmm, Krhs, 'TRA', jp_sal, jptra_totad, ztrds )
          DEALLOCATE( ztrdt, ztrds )
       ENDIF
       !                                              ! print mean trends (used for debugging)
-      IF(ln_ctl)   CALL prt_ctl( tab3d_1=tsa(:,:,:,jp_tem), clinfo1=' adv  - Ta: ', mask1=tmask,               &
-         &                       tab3d_2=tsa(:,:,:,jp_sal), clinfo2=       ' Sa: ', mask2=tmask, clinfo3='tra' )
+      IF(sn_cfctl%l_prtctl)   CALL prt_ctl( tab3d_1=pts(:,:,:,jp_tem,Krhs), clinfo1=' adv  - Ta: ', mask1=tmask,               &
+         &                                  tab3d_2=pts(:,:,:,jp_sal,Krhs), clinfo2=       ' Sa: ', mask2=tmask, clinfo3='tra' )
       !
       IF( ln_timing )   CALL timing_stop( 'tra_adv' )
       !
@@ -193,13 +189,11 @@ CONTAINS
       !!----------------------------------------------------------------------
       !
       !                                !==  Namelist  ==!
-      REWIND( numnam_ref )                   ! Namelist namtra_adv in reference namelist : Tracer advection scheme
       READ  ( numnam_ref, namtra_adv, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namtra_adv in reference namelist', lwp )
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namtra_adv in reference namelist' )
       !
-      REWIND( numnam_cfg )                   ! Namelist namtra_adv in configuration namelist : Tracer advection scheme
       READ  ( numnam_cfg, namtra_adv, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namtra_adv in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namtra_adv in configuration namelist' )
       IF(lwm) WRITE( numond, namtra_adv )
       !
       IF(lwp) THEN                           ! Namelist print

@@ -2,8 +2,6 @@
 ! NEMO system team, System and Interface for oceanic RElocable Nesting
 !----------------------------------------------------------------------
 !
-! MODULE: iom_rstdimg
-!
 ! DESCRIPTION:
 !> @brief
 !> This module is a library to read/write dimg file.
@@ -58,12 +56,15 @@
 !>
 !> @author
 !> J.Paul
-! REVISION HISTORY:
+!>
 !> @date November, 2013 - Initial Version
-!
-!> @note Software governed by the CeCILL licence     (./LICENSE)
+!> @date August, 2017 
+!> - handle use of domain decomposition for monoproc file
+!>
+!> @note Software governed by the CeCILL licence     (NEMOGCM/NEMO_CeCILL.txt)
 !----------------------------------------------------------------------
 MODULE iom_rstdimg
+
    USE netcdf                          ! nf90 library
    USE global                          ! global parameter
    USE kind                            ! F90 kind parameter
@@ -73,6 +74,7 @@ MODULE iom_rstdimg
    USE dim                             ! dimension manager
    USE var                             ! variable manager
    USE file                            ! file manager
+
    IMPLICIT NONE
    ! NOTE_avoid_public_variables_if_possible
 
@@ -84,7 +86,8 @@ MODULE iom_rstdimg
    PUBLIC :: iom_rstdimg_close       !< close dimg file
    PUBLIC :: iom_rstdimg_read_dim    !< read one dimension in an opened dimg file, return variable structure
    PUBLIC :: iom_rstdimg_read_var    !< read one variable  in an opened dimg file, return dimension structure
-   PUBLIC :: iom_rstdimg_write_file  !< write file structure contents in an opened dimg file
+   PUBLIC :: iom_rstdimg_write_header!< write header in an opened dimg file
+   PUBLIC :: iom_rstdimg_write_var   !< write variable in an opened dimg file
    PUBLIC :: iom_rstdimg_get_mpp     !< get sub domain decomppistion in a dimg file
 
    PRIVATE :: iom_rstdimg__get_info        ! get global information in an opened dimg file
@@ -116,6 +119,8 @@ MODULE iom_rstdimg
    END INTERFACE iom_rstdimg_read_var
 
 CONTAINS
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_rstdimg_open(td_file)
    !-------------------------------------------------------------------
    !> @brief This subroutine open a dimg file in read or write mode.
    !> @details
@@ -131,11 +136,12 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] td_file   file structure
    !-------------------------------------------------------------------
-   SUBROUTINE iom_rstdimg_open(td_file)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TFILE), INTENT(INOUT)  :: td_file
 
@@ -279,16 +285,19 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE iom_rstdimg_open
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_rstdimg_close(td_file)
    !-------------------------------------------------------------------
    !> @brief This subroutine close dimg file.
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] td_file   file structure
    !-------------------------------------------------------------------
-   SUBROUTINE iom_rstdimg_close(td_file)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TFILE), INTENT(INOUT) :: td_file
 
@@ -317,6 +326,8 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE iom_rstdimg_close
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_rstdimg__get_info(td_file)
    !-------------------------------------------------------------------
    !> @brief This subroutine get global information in an opened dimg 
    !> file.
@@ -328,11 +339,14 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !> @date January,2019
+   !> - clean dimension structure
+   !>
    !> @param[inout] td_file   file structure
    !-------------------------------------------------------------------
-   SUBROUTINE iom_rstdimg__get_info(td_file)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TFILE), INTENT(INOUT) :: td_file
 
@@ -386,7 +400,12 @@ CONTAINS
       ! record header infos
       td_file%i_rhd=il_rhd
 
+      ! clean
+      CALL dim_clean(tl_dim)
+
    END SUBROUTINE iom_rstdimg__get_info
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_rstdimg_get_mpp(td_file)
    !-------------------------------------------------------------------
    !> @brief This subroutine get sub domain decomposition in a dimg file.
    !> @details
@@ -399,8 +418,9 @@ CONTAINS
    !>
    !> @param[inout] td_file   file structure
    !-------------------------------------------------------------------
-   SUBROUTINE iom_rstdimg_get_mpp(td_file)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TFILE), INTENT(INOUT) :: td_file
 
@@ -524,6 +544,8 @@ CONTAINS
       &           il_lei,  il_lej  )
 
    END SUBROUTINE iom_rstdimg_get_mpp
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_rstdimg__get_file_var(td_file)
    !-------------------------------------------------------------------
    !> @brief This subroutine read information about variable on an 
    !> opened dimg file.
@@ -531,14 +553,15 @@ CONTAINS
    !> The variables structures inside file structure are then completed.
    !> Variables no0d, no1d, no2d, no3d are deleted from file strucutre.
    !> @note variable value are read only for scalar variable (0d).
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] td_file   file structure
    !-------------------------------------------------------------------
-   SUBROUTINE iom_rstdimg__get_file_var(td_file)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TFILE), INTENT(INOUT) :: td_file
 
@@ -550,7 +573,6 @@ CONTAINS
       INTEGER(i4)                                      :: il_status
       INTEGER(i4)          , DIMENSION(:), ALLOCATABLE :: il_start
       INTEGER(i4)          , DIMENSION(:), ALLOCATABLE :: il_count
-
       !----------------------------------------------------------------
 
       IF( td_file%i_nvar > 0 )THEN
@@ -620,19 +642,22 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE iom_rstdimg__get_file_var
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_rstdimg__get_file_var_0d(td_file, cd_name, dd_value)
    !-------------------------------------------------------------------
    !> @brief This subroutine put informations about scalar variable 
    !> inside file structure.
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] td_file   file structure
    !> @param[in] cd_name      array of variable name
    !> @param[in] dd_value     array of variable value
    !-------------------------------------------------------------------
-   SUBROUTINE iom_rstdimg__get_file_var_0d(td_file, cd_name, dd_value)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TFILE),                         INTENT(INOUT) :: td_file
       CHARACTER(LEN=im_vnl), DIMENSION(:), INTENT(IN)    :: cd_name
@@ -672,19 +697,24 @@ CONTAINS
       CALL dim_clean(tl_dim(:))
 
    END SUBROUTINE iom_rstdimg__get_file_var_0d
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_rstdimg__get_file_var_1d(td_file, cd_name, dd_value)
    !-------------------------------------------------------------------
    !> @brief This subroutine put informations about variable 1D 
    !> inside file structure.
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !> @date July, 2016
+   !>    - change right dimension struct 
+   !>
    !> @param[inout] td_file   file structure
    !> @param[in] cd_name      array of variable name
    !> @param[in] dd_value     array of variable record
    !-------------------------------------------------------------------
-   SUBROUTINE iom_rstdimg__get_file_var_1d(td_file, cd_name, dd_value)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TFILE),                         INTENT(INOUT) :: td_file
       CHARACTER(LEN=im_vnl), DIMENSION(:), INTENT(IN)    :: cd_name
@@ -704,8 +734,8 @@ CONTAINS
          ! define same dimension as in file
          tl_dim(:)=dim_copy(td_file%t_dim(:))
          ! do not use X and Y dimension
-         td_file%t_var(ji)%t_dim(1:2)%l_use=.FALSE.
-         td_file%t_var(ji)%t_dim(1:2)%i_len=1
+         tl_dim(1:2)%l_use=.FALSE.
+         tl_dim(1:2)%i_len=1
       
          td_file%t_var(ji)=var_init( TRIM(cd_name(ji)), NF90_DOUBLE, &
          &                           tl_dim(:), dd_fill=0._dp,       &
@@ -717,19 +747,22 @@ CONTAINS
       ENDDO
 
    END SUBROUTINE iom_rstdimg__get_file_var_1d
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_rstdimg__get_file_var_2d(td_file, cd_name, dd_value)
    !-------------------------------------------------------------------
    !> @brief This subroutine put informations about variable 2D 
    !> inside file structure.
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] td_file   file structure
    !> @param[in] cd_name      array of variable name
    !> @param[in] dd_value     array of variable record
    !-------------------------------------------------------------------
-   SUBROUTINE iom_rstdimg__get_file_var_2d(td_file, cd_name, dd_value)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TFILE),                         INTENT(INOUT) :: td_file
       CHARACTER(LEN=im_vnl), DIMENSION(:), INTENT(IN)    :: cd_name
@@ -762,19 +795,22 @@ CONTAINS
       ENDDO
 
    END SUBROUTINE iom_rstdimg__get_file_var_2d
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_rstdimg__get_file_var_3d(td_file, cd_name, dd_value)
    !-------------------------------------------------------------------
    !> @brief This subroutine put informations about variable 3D 
    !> inside file structure.
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] td_file   file structure
    !> @param[in] cd_name      array of variable name
    !> @param[in] dd_value     array of variable record
    !-------------------------------------------------------------------
-   SUBROUTINE iom_rstdimg__get_file_var_3d(td_file, cd_name, dd_value)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TFILE),                         INTENT(INOUT) :: td_file
       CHARACTER(LEN=im_vnl), DIMENSION(:), INTENT(IN)    :: cd_name
@@ -804,22 +840,29 @@ CONTAINS
       ENDDO
 
    END SUBROUTINE iom_rstdimg__get_file_var_3d
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION iom_rstdimg__read_dim_id(td_file, id_dimid) &
+         & RESULT (tf_dim)
    !-------------------------------------------------------------------
    !> @brief This function read one dimension in an opened netcdf file, 
    !> given dimension id.
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] td_file   file structure
    !> @param[in] id_dimid  dimension id
    !> @return  dimension structure 
    !-------------------------------------------------------------------
-   TYPE(TDIM) FUNCTION iom_rstdimg__read_dim_id(td_file, id_dimid)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TFILE), INTENT(IN) :: td_file
       INTEGER(i4), INTENT(IN) :: id_dimid
+
+      ! function
+      TYPE(TDIM)              :: tf_dim
       !----------------------------------------------------------------
 
       ! check if file opened
@@ -830,14 +873,14 @@ CONTAINS
 
       ELSE      
 
-         iom_rstdimg__read_dim_id%i_id=id_dimid
+         tf_dim%i_id=id_dimid
 
          CALL logger_debug( &
          &  " READ DIM: dimension "//TRIM(fct_str(id_dimid))//&
          &  " in file "//TRIM(td_file%c_name))
 
          IF( id_dimid <= 4 )THEN
-            iom_rstdimg__read_dim_id=td_file%t_dim(id_dimid)
+            tf_dim=td_file%t_dim(id_dimid)
          ELSE
             CALL logger_error( &
             &  " READ DIM: no dimension with id "//TRIM(fct_str(id_dimid))//&
@@ -847,22 +890,29 @@ CONTAINS
       ENDIF
 
    END FUNCTION iom_rstdimg__read_dim_id
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION iom_rstdimg__read_dim_name(td_file, cd_name) &
+         & RESULT (tf_dim)
    !-------------------------------------------------------------------
    !> @brief This function read one dimension in an opened netcdf file, 
    !> given dimension name.
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] td_file   file structure
    !> @param[in] cd_name   dimension name
    !> @return  dimension structure 
    !-------------------------------------------------------------------
-   TYPE(TDIM) FUNCTION iom_rstdimg__read_dim_name(td_file, cd_name)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TFILE),      INTENT(IN) :: td_file
       CHARACTER(LEN=*), INTENT(IN) :: cd_name
+
+      ! function
+      TYPE(TDIM)                   :: tf_dim
 
       ! local variable
       INTEGER(i4) :: il_dimid
@@ -878,7 +928,7 @@ CONTAINS
 
          il_dimid=dim_get_id(td_file%t_dim(:), TRIM(cd_name))
          IF( il_dimid /= 0 )THEN
-            iom_rstdimg__read_dim_name=iom_rstdimg_read_dim(td_file, il_dimid)
+            tf_dim=iom_rstdimg_read_dim(td_file, il_dimid)
          ELSE
             CALL logger_error( &
             &  " READ DIM: no dimension "//TRIM(cd_name)//&
@@ -888,16 +938,19 @@ CONTAINS
       ENDIF
 
    END FUNCTION iom_rstdimg__read_dim_name
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION iom_rstdimg__read_var_id(td_file, id_varid, id_start, id_count) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function read variable value in an opened 
    !> dimg file, given variable id.
    !> @details
    !> Optionaly, start indices and number of indices selected along each dimension 
    !> could be specify in a 4 dimension array (/'x','y','z','t'/)
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] td_file   file structure
    !> @param[in] id_varid  variable id
    !> @param[in] id_start  index in the variable from which the data values 
@@ -905,14 +958,17 @@ CONTAINS
    !> @param[in] id_count  number of indices selected along each dimension
    !> @return  variable structure 
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION iom_rstdimg__read_var_id(td_file, id_varid,&
-   &                                            id_start, id_count)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TFILE),               INTENT(IN) :: td_file
       INTEGER(i4),               INTENT(IN) :: id_varid
       INTEGER(i4), DIMENSION(:), INTENT(IN), OPTIONAL :: id_start
       INTEGER(i4), DIMENSION(:), INTENT(IN), OPTIONAL :: id_count
+
+      ! function
+      TYPE(TVAR)                            :: tf_var
 
       ! local variable
       INTEGER(i4), DIMENSION(1) :: il_varid
@@ -929,13 +985,11 @@ CONTAINS
          il_varid(:)=MINLOC(td_file%t_var(:)%i_id,mask=(td_file%t_var(:)%i_id==id_varid))
          IF( il_varid(1) /= 0 )THEN
 
-            iom_rstdimg__read_var_id=var_copy(td_file%t_var(il_varid(1)))
+            tf_var=var_copy(td_file%t_var(il_varid(1)))
 
-            IF( iom_rstdimg__read_var_id%i_ndim /= 0 )THEN
+            IF( tf_var%i_ndim /= 0 )THEN
                !!! read variable value
-               CALL iom_rstdimg__read_var_value( td_file, &
-               &                                 iom_rstdimg__read_var_id, &
-               &                                 id_start, id_count)
+               CALL iom_rstdimg__read_var_value( td_file, tf_var, id_start, id_count)
             ELSE
                CALL logger_debug( " READ VAR: variable 0d "//&
                &               TRIM(td_file%t_var(il_varid(1))%c_name)//&
@@ -950,19 +1004,22 @@ CONTAINS
 
       ENDIF
    END FUNCTION iom_rstdimg__read_var_id
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION iom_rstdimg__read_var_name(td_file, cd_name, id_start, id_count) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function read variable value in an opened 
    !> dimg file, given variable name or standard name.
    !> @details
    !> Optionaly, start indices and number of indices selected along each dimension 
    !> could be specify in a 4 dimension array (/'x','y','z','t'/)
-   !
+   !>
    !> look first for variable name. If it doesn't
    !> exist in file, look for variable standard name.<br/>
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] td_file   file structure
    !> @param[in] cd_name   variable name or standard name 
    !> @param[in] id_start  index in the variable from which the data values 
@@ -970,14 +1027,17 @@ CONTAINS
    !> @param[in] id_count  number of indices selected along each dimension
    !> @return  variable structure 
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION iom_rstdimg__read_var_name(td_file, cd_name,   &
-   &                                              id_start, id_count  )
+
       IMPLICIT NONE
+
       ! Argument 
       TYPE(TFILE),                     INTENT(IN) :: td_file
       CHARACTER(LEN=*),                INTENT(IN) :: cd_name
       INTEGER(i4),      DIMENSION(:),  INTENT(IN), OPTIONAL :: id_start
       INTEGER(i4),      DIMENSION(:),  INTENT(IN), OPTIONAL :: id_count
+
+      ! function
+      TYPE(TVAR)                                  :: tf_var
 
       ! local variable
       INTEGER(i4)       :: il_varid
@@ -993,13 +1053,11 @@ CONTAINS
          il_varid=var_get_index(td_file%t_var(:), cd_name)
          IF( il_varid /= 0 )THEN
 
-            iom_rstdimg__read_var_name=var_copy(td_file%t_var(il_varid))
+            tf_var=var_copy(td_file%t_var(il_varid))
 
             IF( td_file%t_var(il_varid)%i_ndim /= 0 )THEN
                !!! read variable value
-               CALL iom_rstdimg__read_var_value( td_file, &
-               &                                 iom_rstdimg__read_var_name, &
-               &                                 id_start, id_count)
+               CALL iom_rstdimg__read_var_value( td_file, tf_var, id_start, id_count)
             ELSE
                CALL logger_debug( " READ VAR: variable 0d "//&
                &               TRIM(td_file%t_var(il_varid)%c_name)//&
@@ -1018,6 +1076,8 @@ CONTAINS
       ENDIF
       
    END FUNCTION iom_rstdimg__read_var_name
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_rstdimg__read_var_value(td_file, td_var, id_start, id_count)
    !-------------------------------------------------------------------
    !> @brief This subroutine read variable value in an opened dimg file, for
    !> variable 1,2,3d.
@@ -1029,15 +1089,15 @@ CONTAINS
    !> @date November, 2013 - Initial Version
    !> @date February, 2016
    !> - use temporary array to read value from file
-   !
+   !>
    !> @param[in] td_file   file structure
    !> @param[inout] td_var variable structure
    !> @param[in] id_start  index in the variable from which the data values will be read
    !> @param[in] id_count  number of indices selected along each dimension
    !-------------------------------------------------------------------
-   SUBROUTINE iom_rstdimg__read_var_value(td_file, td_var, &
-   &                                      id_start, id_count )
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TFILE),               INTENT(IN)    :: td_file
       TYPE(TVAR) ,               INTENT(INOUT) :: td_var
@@ -1215,9 +1275,11 @@ CONTAINS
       END WHERE
 
    END SUBROUTINE iom_rstdimg__read_var_value
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_rstdimg_write_header(td_file)
    !-------------------------------------------------------------------
-   !> @brief This subroutine write dimg file from file structure.
-   !
+   !> @brief This subroutine write header of dimg file from file structure.
+   !>
    !> @details
    !> dimg file have to be already opened in write mode.
    !>
@@ -1225,11 +1287,14 @@ CONTAINS
    !> @date November, 2013 - Initial Version
    !> @date September, 2014
    !> - use iom_rstdimg__get_rec
-   !
+   !> @date August, 2017
+   !> - split in write_header and write_var 
+   !>
    !> @param[inout] td_file   file structure
    !-------------------------------------------------------------------
-   SUBROUTINE iom_rstdimg_write_file(td_file)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TFILE), INTENT(INOUT) :: td_file
 
@@ -1298,6 +1363,50 @@ CONTAINS
             ! write header
             CALL iom_rstdimg__write_header(td_file)
 
+         ELSE
+
+            CALL logger_error( &
+            &  " WRITE FILE: try to write in file "//TRIM(td_file%c_name)//&
+            &  ", not opened in write mode")
+
+         ENDIF
+      ENDIF
+
+   END SUBROUTINE iom_rstdimg_write_header
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_rstdimg_write_var(td_file)
+   !-------------------------------------------------------------------
+   !> @brief This subroutine write variable in dimg file from file structure.
+   !>
+   !> @details
+   !> dimg file have to be already opened in write mode.
+   !>
+   !> @author J.Paul
+   !> @date November, 2013 - Initial Version
+   !> @date September, 2014
+   !> - use iom_rstdimg__get_rec
+   !> @date August, 2017
+   !> - split in write_header and write_var 
+   !>
+   !> @param[inout] td_file   file structure
+   !-------------------------------------------------------------------
+
+      IMPLICIT NONE
+
+      ! Argument      
+      TYPE(TFILE), INTENT(INOUT) :: td_file
+
+      ! local variable
+      !----------------------------------------------------------------
+      ! check if file opened
+      IF( td_file%i_id == 0 )THEN
+
+         CALL logger_error( &
+         &  " WRITE FILE: no id associated to file "//TRIM(td_file%c_name))
+
+      ELSE
+         IF( td_file%l_wrt )THEN
+
             ! write variable in file
             CALL iom_rstdimg__write_var(td_file) 
 
@@ -1310,7 +1419,9 @@ CONTAINS
          ENDIF
       ENDIF
 
-   END SUBROUTINE iom_rstdimg_write_file
+   END SUBROUTINE iom_rstdimg_write_var
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_rstdimg__get_rec(td_file)
    !-------------------------------------------------------------------
    !> @brief This subroutine compute record number to be used.
    !>
@@ -1319,11 +1430,12 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date September, 2014 - Initial Version
-   !
+   !>
    !> @param[inout] td_file   file structure
    !-------------------------------------------------------------------
-   SUBROUTINE iom_rstdimg__get_rec(td_file)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TFILE), INTENT(INOUT) :: td_file
 
@@ -1417,11 +1529,13 @@ CONTAINS
       ENDDO
       td_file%i_rhd  = il_rec
 
-      END SUBROUTINE iom_rstdimg__get_rec
+   END SUBROUTINE iom_rstdimg__get_rec
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_rstdimg__write_header(td_file)
    !-------------------------------------------------------------------
    !> @brief This subroutine write header in an opened dimg 
    !> file in write mode.
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date January, 2016
@@ -1429,8 +1543,9 @@ CONTAINS
    !>
    !> @param[inout] td_file   file structure
    !-------------------------------------------------------------------
-   SUBROUTINE iom_rstdimg__write_header(td_file)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TFILE), INTENT(INOUT) :: td_file
 
@@ -1637,7 +1752,9 @@ CONTAINS
       &           il_ldi,  il_ldj, &
       &           il_lei,  il_lej  )
 
-      END SUBROUTINE iom_rstdimg__write_header
+   END SUBROUTINE iom_rstdimg__write_header 
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_rstdimg__write_var(td_file)
    !-------------------------------------------------------------------
    !> @brief This subroutine write variables in an opened dimg file.
    !>
@@ -1648,8 +1765,9 @@ CONTAINS
    !>
    !> @param[in] td_file file structure
    !-------------------------------------------------------------------
-   SUBROUTINE iom_rstdimg__write_var(td_file)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TFILE), INTENT(INOUT) :: td_file
 
@@ -1745,4 +1863,5 @@ CONTAINS
       DEALLOCATE( il_start, il_count )
 
    END SUBROUTINE iom_rstdimg__write_var
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 END MODULE iom_rstdimg

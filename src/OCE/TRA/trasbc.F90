@@ -9,6 +9,7 @@ MODULE trasbc
    !!            3.3  !  2010-04  (M. Leclair, G. Madec)  Forcing averaged over 2 time steps
    !!             -   !  2010-09  (C. Ethe, G. Madec) Merge TRA-TRC
    !!            3.6  !  2014-11  (P. Mathiot) isf melting forcing 
+   !!            4.1  !  2019-09  (P. Mathiot) isf moved in traisf
    !!----------------------------------------------------------------------
 
    !!----------------------------------------------------------------------
@@ -21,8 +22,6 @@ MODULE trasbc
    USE eosbn2         ! Equation Of State
    USE sbcmod         ! ln_rnf  
    USE sbcrnf         ! River runoff  
-   USE sbcisf         ! Ice shelf   
-   USE iscplini       ! Ice sheet coupling
    USE traqsr         ! solar radiation penetration
    USE trd_oce        ! trends: ocean variables
    USE trdtra         ! trends manager: tracers 
@@ -42,15 +41,15 @@ MODULE trasbc
    PUBLIC   tra_sbc   ! routine called by step.F90
 
    !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: trasbc.F90 10499 2019-01-10 15:12:24Z deazer $
+   !! $Id: trasbc.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE tra_sbc ( kt )
+   SUBROUTINE tra_sbc ( kt, Kmm, pts, Krhs )
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE tra_sbc  ***
       !!                   
@@ -61,17 +60,19 @@ CONTAINS
       !! ** Method :   The (air+ice)-sea flux has two components: 
       !!      (1) Fext, external forcing (i.e. flux through the (air+ice)-sea interface); 
       !!      (2) Fwe , tracer carried with the water that is exchanged with air+ice. 
-      !!               The input forcing fields (emp, rnf, sfx, isf) contain Fext+Fwe,
-      !!             they are simply added to the tracer trend (tsa).
+      !!               The input forcing fields (emp, rnf, sfx) contain Fext+Fwe,
+      !!             they are simply added to the tracer trend (ts(Krhs)).
       !!               In linear free surface case (ln_linssh=T), the volume of the
       !!             ocean does not change with the water exchanges at the (air+ice)-sea
       !!             interface. Therefore another term has to be added, to mimic the
       !!             concentration/dilution effect associated with water exchanges.
       !!
-      !! ** Action  : - Update tsa with the surface boundary condition trend 
+      !! ** Action  : - Update ts(Krhs) with the surface boundary condition trend 
       !!              - send trends to trdtra module for further diagnostics(l_trdtra=T)
       !!----------------------------------------------------------------------
-      INTEGER, INTENT(in) ::   kt   ! ocean time-step index
+      INTEGER,                                   INTENT(in   ) :: kt         ! ocean time-step index
+      INTEGER,                                   INTENT(in   ) :: Kmm, Krhs  ! time level indices
+      REAL(wp), DIMENSION(jpi,jpj,jpk,jpts,jpt), INTENT(inout) :: pts        ! active tracers and RHS of tracer equation
       !
       INTEGER  ::   ji, jj, jk, jn              ! dummy loop indices  
       INTEGER  ::   ikt, ikb                    ! local integers
@@ -89,8 +90,8 @@ CONTAINS
       !
       IF( l_trdtra ) THEN                    !* Save ta and sa trends
          ALLOCATE( ztrdt(jpi,jpj,jpk) , ztrds(jpi,jpj,jpk) ) 
-         ztrdt(:,:,:) = tsa(:,:,:,jp_tem)
-         ztrds(:,:,:) = tsa(:,:,:,jp_sal)
+         ztrdt(:,:,:) = pts(:,:,:,jp_tem,Krhs)
+         ztrds(:,:,:) = pts(:,:,:,jp_sal,Krhs)
       ENDIF
       !
 !!gm  This should be moved into sbcmod.F90 module ? (especially now that ln_traqsr is read in namsbc namelist)
@@ -121,29 +122,23 @@ CONTAINS
          sbc_tsc_b(:,:,:) = sbc_tsc(:,:,:)
       ENDIF
       !                             !==  Now sbc tracer content fields  ==!
-      DO jj = 2, jpj
-         DO ji = fs_2, fs_jpim1   ! vector opt.
-            sbc_tsc(ji,jj,jp_tem) = r1_rau0_rcp * qns(ji,jj)   ! non solar heat flux
-            sbc_tsc(ji,jj,jp_sal) = r1_rau0     * sfx(ji,jj)   ! salt flux due to freezing/melting
-         END DO
-      END DO
+      DO_2D_01_00
+         sbc_tsc(ji,jj,jp_tem) = r1_rho0_rcp * qns(ji,jj)   ! non solar heat flux
+         sbc_tsc(ji,jj,jp_sal) = r1_rho0     * sfx(ji,jj)   ! salt flux due to freezing/melting
+      END_2D
       IF( ln_linssh ) THEN                !* linear free surface  
-         DO jj = 2, jpj                         !==>> add concentration/dilution effect due to constant volume cell
-            DO ji = fs_2, fs_jpim1   ! vector opt.
-               sbc_tsc(ji,jj,jp_tem) = sbc_tsc(ji,jj,jp_tem) + r1_rau0 * emp(ji,jj) * tsn(ji,jj,1,jp_tem)
-               sbc_tsc(ji,jj,jp_sal) = sbc_tsc(ji,jj,jp_sal) + r1_rau0 * emp(ji,jj) * tsn(ji,jj,1,jp_sal)
-            END DO
-         END DO                                 !==>> output c./d. term
-         IF( iom_use('emp_x_sst') )   CALL iom_put( "emp_x_sst", emp (:,:) * tsn(:,:,1,jp_tem) )
-         IF( iom_use('emp_x_sss') )   CALL iom_put( "emp_x_sss", emp (:,:) * tsn(:,:,1,jp_sal) )
+         DO_2D_01_00
+            sbc_tsc(ji,jj,jp_tem) = sbc_tsc(ji,jj,jp_tem) + r1_rho0 * emp(ji,jj) * pts(ji,jj,1,jp_tem,Kmm)
+            sbc_tsc(ji,jj,jp_sal) = sbc_tsc(ji,jj,jp_sal) + r1_rho0 * emp(ji,jj) * pts(ji,jj,1,jp_sal,Kmm)
+         END_2D
+         IF( iom_use('emp_x_sst') )   CALL iom_put( "emp_x_sst", emp (:,:) * pts(:,:,1,jp_tem,Kmm) )
+         IF( iom_use('emp_x_sss') )   CALL iom_put( "emp_x_sss", emp (:,:) * pts(:,:,1,jp_sal,Kmm) )
       ENDIF
       !
       DO jn = 1, jpts               !==  update tracer trend  ==!
-         DO jj = 2, jpj
-            DO ji = fs_2, fs_jpim1   ! vector opt.  
-               tsa(ji,jj,1,jn) = tsa(ji,jj,1,jn) + zfact * ( sbc_tsc_b(ji,jj,jn) + sbc_tsc(ji,jj,jn) ) / e3t_n(ji,jj,1)
-            END DO
-         END DO
+         DO_2D_01_00
+            pts(ji,jj,1,jn,Krhs) = pts(ji,jj,1,jn,Krhs) + zfact * ( sbc_tsc_b(ji,jj,jn) + sbc_tsc(ji,jj,jn) ) / e3t(ji,jj,1,Kmm)
+         END_2D
       END DO
       !                  
       IF( lrst_oce ) THEN           !==  write sbc_tsc in the ocean restart file  ==!
@@ -154,62 +149,26 @@ CONTAINS
       ENDIF
       !
       !----------------------------------------
-      !       Ice Shelf effects (ISF)
-      !     tbl treated as in Losh (2008) JGR
-      !----------------------------------------
-      !
-!!gm BUG ?   Why no differences between non-linear and linear free surface ?
-!!gm         probably taken into account in r1_hisf_tbl : to be verified
-      IF( ln_isf ) THEN
-         zfact = 0.5_wp
-         DO jj = 2, jpj
-            DO ji = fs_2, fs_jpim1
-               !
-               ikt = misfkt(ji,jj)
-               ikb = misfkb(ji,jj)
-               !
-               ! level fully include in the ice shelf boundary layer
-               ! sign - because fwf sign of evapo (rnf sign of precip)
-               DO jk = ikt, ikb - 1
-               ! compute trend
-                  tsa(ji,jj,jk,jp_tem) = tsa(ji,jj,jk,jp_tem)                                                &
-                     &           + zfact * ( risf_tsc_b(ji,jj,jp_tem) + risf_tsc(ji,jj,jp_tem) )             &
-                     &           * r1_hisf_tbl(ji,jj)
-               END DO
-   
-               ! level partially include in ice shelf boundary layer 
-               ! compute trend
-               tsa(ji,jj,ikb,jp_tem) = tsa(ji,jj,ikb,jp_tem)                                                 &
-                  &              + zfact * ( risf_tsc_b(ji,jj,jp_tem) + risf_tsc(ji,jj,jp_tem) )             &
-                  &              * r1_hisf_tbl(ji,jj) * ralpha(ji,jj)
-
-            END DO
-         END DO
-      END IF
-      !
-      !----------------------------------------
       !        River Runoff effects
       !----------------------------------------
       !
       IF( ln_rnf ) THEN         ! input of heat and salt due to river runoff 
          zfact = 0.5_wp
-         DO jj = 2, jpj 
-            DO ji = fs_2, fs_jpim1
-               IF( rnf(ji,jj) /= 0._wp ) THEN
-                  zdep = zfact / h_rnf(ji,jj)
-                  DO jk = 1, nk_rnf(ji,jj)
-                                        tsa(ji,jj,jk,jp_tem) = tsa(ji,jj,jk,jp_tem)                                 &
-                                           &                 +  ( rnf_tsc_b(ji,jj,jp_tem) + rnf_tsc(ji,jj,jp_tem) ) * zdep
-                     IF( ln_rnf_sal )   tsa(ji,jj,jk,jp_sal) = tsa(ji,jj,jk,jp_sal)                                 &
-                                           &                 +  ( rnf_tsc_b(ji,jj,jp_sal) + rnf_tsc(ji,jj,jp_sal) ) * zdep 
-                  END DO
-               ENDIF
-            END DO  
-         END DO  
+         DO_2D_01_00
+            IF( rnf(ji,jj) /= 0._wp ) THEN
+               zdep = zfact / h_rnf(ji,jj)
+               DO jk = 1, nk_rnf(ji,jj)
+                                     pts(ji,jj,jk,jp_tem,Krhs) = pts(ji,jj,jk,jp_tem,Krhs)                                  &
+                                        &                      +  ( rnf_tsc_b(ji,jj,jp_tem) + rnf_tsc(ji,jj,jp_tem) ) * zdep
+                  IF( ln_rnf_sal )   pts(ji,jj,jk,jp_sal,Krhs) = pts(ji,jj,jk,jp_sal,Krhs)                                  &
+                                        &                      +  ( rnf_tsc_b(ji,jj,jp_sal) + rnf_tsc(ji,jj,jp_sal) ) * zdep 
+               END DO
+            ENDIF
+         END_2D
       ENDIF
 
-      IF( iom_use('rnf_x_sst') )   CALL iom_put( "rnf_x_sst", rnf*tsn(:,:,1,jp_tem) )   ! runoff term on sst
-      IF( iom_use('rnf_x_sss') )   CALL iom_put( "rnf_x_sss", rnf*tsn(:,:,1,jp_sal) )   ! runoff term on sss
+      IF( iom_use('rnf_x_sst') )   CALL iom_put( "rnf_x_sst", rnf*pts(:,:,1,jp_tem,Kmm) )   ! runoff term on sst
+      IF( iom_use('rnf_x_sss') )   CALL iom_put( "rnf_x_sss", rnf*pts(:,:,1,jp_sal,Kmm) )   ! runoff term on sss
 
 #if defined key_asminc
       !
@@ -220,53 +179,33 @@ CONTAINS
       IF( ln_sshinc ) THEN         ! input of heat and salt due to assimilation
       	 !
          IF( ln_linssh ) THEN 
-            DO jj = 2, jpj 
-               DO ji = fs_2, fs_jpim1
-                  ztim = ssh_iau(ji,jj) / e3t_n(ji,jj,1)
-                  tsa(ji,jj,1,jp_tem) = tsa(ji,jj,1,jp_tem) + tsn(ji,jj,1,jp_tem) * ztim
-                  tsa(ji,jj,1,jp_sal) = tsa(ji,jj,1,jp_sal) + tsn(ji,jj,1,jp_sal) * ztim
-               END DO
-            END DO
+            DO_2D_01_00
+               ztim = ssh_iau(ji,jj) / e3t(ji,jj,1,Kmm)
+               pts(ji,jj,1,jp_tem,Krhs) = pts(ji,jj,1,jp_tem,Krhs) + pts(ji,jj,1,jp_tem,Kmm) * ztim
+               pts(ji,jj,1,jp_sal,Krhs) = pts(ji,jj,1,jp_sal,Krhs) + pts(ji,jj,1,jp_sal,Kmm) * ztim
+            END_2D
          ELSE
-            DO jj = 2, jpj 
-               DO ji = fs_2, fs_jpim1
-                  ztim = ssh_iau(ji,jj) / ( ht_n(ji,jj) + 1. - ssmask(ji, jj) )
-                  tsa(ji,jj,:,jp_tem) = tsa(ji,jj,:,jp_tem) + tsn(ji,jj,:,jp_tem) * ztim
-                  tsa(ji,jj,:,jp_sal) = tsa(ji,jj,:,jp_sal) + tsn(ji,jj,:,jp_sal) * ztim
-               END DO  
-            END DO  
+            DO_2D_01_00
+               ztim = ssh_iau(ji,jj) / ( ht(ji,jj) + 1. - ssmask(ji, jj) )
+               pts(ji,jj,:,jp_tem,Krhs) = pts(ji,jj,:,jp_tem,Krhs) + pts(ji,jj,:,jp_tem,Kmm) * ztim
+               pts(ji,jj,:,jp_sal,Krhs) = pts(ji,jj,:,jp_sal,Krhs) + pts(ji,jj,:,jp_sal,Kmm) * ztim
+            END_2D
          ENDIF
          !
       ENDIF
       !
 #endif
       !
-      !----------------------------------------
-      !        Ice Sheet coupling imbalance correction to have conservation
-      !----------------------------------------
-      !
-      IF( ln_iscpl .AND. ln_hsb) THEN         ! input of heat and salt due to river runoff 
-         DO jk = 1,jpk
-            DO jj = 2, jpj 
-               DO ji = fs_2, fs_jpim1
-                  zdep = 1._wp / e3t_n(ji,jj,jk) 
-                  tsa(ji,jj,jk,jp_tem) = tsa(ji,jj,jk,jp_tem) - htsc_iscpl(ji,jj,jk,jp_tem) * zdep
-                  tsa(ji,jj,jk,jp_sal) = tsa(ji,jj,jk,jp_sal) - htsc_iscpl(ji,jj,jk,jp_sal) * zdep  
-               END DO  
-            END DO  
-         END DO
-      ENDIF
-
       IF( l_trdtra )   THEN                      ! save the horizontal diffusive trends for further diagnostics
-         ztrdt(:,:,:) = tsa(:,:,:,jp_tem) - ztrdt(:,:,:)
-         ztrds(:,:,:) = tsa(:,:,:,jp_sal) - ztrds(:,:,:)
-         CALL trd_tra( kt, 'TRA', jp_tem, jptra_nsr, ztrdt )
-         CALL trd_tra( kt, 'TRA', jp_sal, jptra_nsr, ztrds )
+         ztrdt(:,:,:) = pts(:,:,:,jp_tem,Krhs) - ztrdt(:,:,:)
+         ztrds(:,:,:) = pts(:,:,:,jp_sal,Krhs) - ztrds(:,:,:)
+         CALL trd_tra( kt, Kmm, Krhs, 'TRA', jp_tem, jptra_nsr, ztrdt )
+         CALL trd_tra( kt, Kmm, Krhs, 'TRA', jp_sal, jptra_nsr, ztrds )
          DEALLOCATE( ztrdt , ztrds ) 
       ENDIF
       !
-      IF(ln_ctl)   CALL prt_ctl( tab3d_1=tsa(:,:,:,jp_tem), clinfo1=' sbc  - Ta: ', mask1=tmask,   &
-         &                       tab3d_2=tsa(:,:,:,jp_sal), clinfo2=       ' Sa: ', mask2=tmask, clinfo3='tra' )
+      IF(sn_cfctl%l_prtctl)   CALL prt_ctl( tab3d_1=pts(:,:,:,jp_tem,Krhs), clinfo1=' sbc  - Ta: ', mask1=tmask,   &
+         &                                  tab3d_2=pts(:,:,:,jp_sal,Krhs), clinfo2=       ' Sa: ', mask2=tmask, clinfo3='tra' )
       !
       IF( ln_timing )   CALL timing_stop('tra_sbc')
       !

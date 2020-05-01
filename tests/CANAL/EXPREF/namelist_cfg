@@ -58,7 +58,7 @@
 &namdom        !   time and space domain
 !-----------------------------------------------------------------------
    ln_linssh   =  .false.  !  =T  linear free surface  ==>>  model level are fixed in time
-   rn_rdt      =   1440.   !  time step for the dynamics (and tracer if nn_acc=0)
+   rn_Dt      =   1440.   !  time step for the dynamics (and tracer if nn_acc=0)
    rn_atfp     =   0.05    !  asselin time filter parameter
 /
 !!======================================================================
@@ -207,10 +207,10 @@
       ln_bt_fw      = .true.     ! Forward integration of barotropic Eqs.
       ln_bt_av      = .true.     ! Time filtering of barotropic variables
          nn_bt_flt     = 1          ! Time filter choice  = 0 None
-         !                          !                     = 1 Boxcar over   nn_baro sub-steps
-         !                          !                     = 2 Boxcar over 2*nn_baro  "    "
+         !                          !                     = 1 Boxcar over   nn_e sub-steps
+         !                          !                     = 2 Boxcar over 2*nn_e  "    "
       ln_bt_auto    = .false.    ! Number of sub-step defined from:
-         nn_baro      =  24         ! =F : the number of sub-step in rn_rdt seconds
+         nn_e      =  24         ! =F : the number of sub-step in rn_Dt seconds
 /
 !-----------------------------------------------------------------------
 &namdyn_ldf    !   lateral diffusion on momentum                        (default: NO selection)
@@ -274,10 +274,8 @@
 !!   namhsb       Heat and salt budgets                                 (default: OFF)
 !!   namdiu       Cool skin and warm layer models                       (default: OFF)
 !!   namdiu       Cool skin and warm layer models                       (default: OFF)
-!!   namflo       float parameters                                      ("key_float")
-!!   nam_diaharm  Harmonic analysis of tidal constituents               ("key_diaharm")
-!!   namdct       transports through some sections                      ("key_diadct")
-!!   nam_diatmb   Top Middle Bottom Output                              (default: OFF)
+!!   namflo       float parameters                                      (default: OFF)
+!!   nam_diadct   transports through some sections                      (default: OFF)
 !!   nam_dia25h   25h Mean Output                                       (default: OFF)
 !!   namnc4       netcdf4 chunking and compression settings             ("key_netcdf4")
 !!======================================================================

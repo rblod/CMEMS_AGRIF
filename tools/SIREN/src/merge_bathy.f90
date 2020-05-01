@@ -2,128 +2,210 @@
 ! NEMO system team, System and Interface for oceanic RElocable Nesting
 !----------------------------------------------------------------------
 !
-!
-! PROGRAM: merge_bathy
-!
 ! DESCRIPTION:
 !> @file
 !> @brief 
-!> This program merges bathymetry file at boundaries.
+!> this program merges bathymetry file at boundaries.
 !>
 !> @details
 !> @section sec1 method
-!> Coarse grid Bathymetry is interpolated on fine grid 
-!> (nearest interpolation method is used).  
-!> Then fine Bathymetry and refined coarse bathymetry are merged at boundaries.<br/>
+!> coarse grid bathymetry is interpolated on fine grid 
+!> (nearest interpolation method is used).<br/>  
+!> then fine bathymetry and refined coarse bathymetry are merged at boundaries.<br/>
 !>    @f[BathyFine= Weight * BathyCoarse + (1-Weight)*BathyFine@f]
-!> The weight function used is :<br/>
+!> the weight function used is :<br/>
 !>       @f[Weight = 0.5 + 0.5*COS( \frac{\pi*dist}{width} )@f]<br/>
 !> with
 !> - dist : number of point to border 
 !> - width : boundary size
 !>
 !> @section sec2 how to
-!>    to merge bathymetry file:<br/>
-!> @code{.sh}
-!>    ./SIREN/bin/merge_bathy merge_bathy.nam
-!> @endcode
-!>    
-!> @note 
-!>    you could find a template of the namelist in templates directory.
+!> USAGE: merge_bathy merge_bathy.nam [-v] [-h]<br/>
+!>    - positional arguments:<br/>
+!>       - merge_bathy.nam<br/>
+!>          namelist of merge_bathy
+!>          @note
+!>             a template of the namelist could be created running (in templates directory):
+!>             @code{.sh}
+!>                python create_templates.py merge_bathy
+!>             @endcode
 !>
+!>    - optional arguments:<br/>
+!>       - -h, --help<br/>
+!>          show this help message (and exit)<br/>
+!>       - -v, --version<br/>
+!>          show Siren's version   (and exit)
+!>
+!> @section sec_merge merge_bathy.nam
 !>    merge_bathy.nam contains 7 namelists:
-!>       - logger namelist (namlog)
-!>       - config namelist (namcfg)
-!>       - coarse grid namelist (namcrs)
-!>       - fine grid namelist (namfin)
-!       - variable namelist (namvar)
-!>       - nesting namelist (namnst)
-!>       - boundary namelist (nambdy)
-!>       - output namelist (namout)
-!> 
-!>    * _logger namelist (namlog)_:
-!>       - cn_logfile   : logger filename
-!>       - cn_verbosity : verbosity ('trace','debug','info',
-!>  'warning','error','fatal','none')
-!>       - in_maxerror  : maximum number of error allowed
+!>       - **namlog** to set logger parameters
+!>       - **namcfg** to set configuration file parameters
+!>       - **namsrc** to set source/coarse grid parameters
+!>       - **namtgt** to set target/fine grid parameters
+!>       - **namnst** to set sub domain and nesting paramters
+!>       - **nambdy** to set boundary parameters
+!>       - **namout** to set output parameters
 !>
-!>    * _config namelist (namcfg)_:
-!>       - cn_varcfg : variable configuration file 
-!> (see ./SIREN/cfg/variable.cfg)
-!>       - cn_dimcfg : dimension configuration file. define dimensions allowed
-!> (see ./SIREN/cfg/dimension.cfg).
-!>       - cn_dumcfg : useless (dummy) configuration file, for useless 
-!> dimension or variable (see ./SIREN/cfg/dummy.cfg).
+!>    here after, each sub-namelist parameters is detailed.
+!>    @note 
+!>       default values are specified between brackets
 !>
-!>    * _coarse grid namelist (namcrs)_:
-!>       - cn_bathy0 : bathymetry file
-!>       - in_perio0 : NEMO periodicity index (see Model Boundary Condition in
-!> [NEMO documentation](http://www.nemo-ocean.eu/About-NEMO/Reference-manuals))
+!> @subsection sublog namlog
+!>    the logger sub-namelist parameters are :
 !>
-!>    * _fine grid namelist (namfin)_:
-!>       - cn_bathy1 : bathymetry file
-!>       - in_perio1 : NEMO periodicity index
+!>    - **cn_logfile** [@a merge_bathy.log]<br/>
+!>       logger filename
 !>
-!    * _variable namelist (namvar)_:
-!       - cn_varinfo : list of variable and extra information about request(s) 
-!       to be used (separated by ',').<br/>
-!          each elements of *cn_varinfo* is a string character.<br/>
-!          it is composed of the variable name follow by ':', 
-!          then request(s) to be used on this variable.<br/> 
-!          request could be:
-!             - int = interpolation method
-! 
-!                requests must be separated by ';'.<br/>
-!                order of requests does not matter.<br/>
-!
-!          informations about available method could be find in 
-!          @ref interp modules.<br/>
-!          Example: 'bathymetry: int=cubic'
-!          @note 
-!             If you do not specify a method which is required, 
-!             default one is apply.
-!          @warning 
-!             variable name must be __Bathymetry__ here.
+!>    - **cn_verbosity** [@a warning]<br/>
+!>       verbosity level, choose between :
+!>          - trace
+!>          - debug
+!>          - info
+!>          - warning
+!>          - error
+!>          - fatal
+!>          - none
 !>
-!>    * _nesting namelist (namnst)_:
-!>       - in_rhoi  : refinement factor in i-direction
-!>       - in_rhoj  : refinement factor in j-direction
+!>    - **in_maxerror** [@a 5]<br/> 
+!>       maximum number of error allowed
 !>
-!>    * _boundary namelist (nambdy)_:
-!>       - ln_north : use north boundary or not
-!>       - ln_south : use south boundary or not
-!>       - ln_east  : use east  boundary or not
-!>       - ln_west  : use west  boundary or not
-!>       - cn_north : north boundary indices on fine grid<br/>
-!>          *cn_north* is a string character defining boundary
-!>          segmentation.<br/>
-!>          segments are separated by '|'.<br/>
-!>          each segments of the boundary is composed of:
-!>             - indice of velocity (orthogonal to boundary .ie. 
-!>                for north boundary, J-indice). 
-!>             - indice of segment start (I-indice for north boundary) 
-!>             - indice of segment end   (I-indice for north boundary)<br/>
-!>                indices must be separated by ':' .<br/>
-!>             - optionally, boundary size could be added between '(' and ')' 
-!>             in the first segment defined.
-!>                @note 
-!>                   boundary size is the same for all segments of one boundary.
+!> @subsection subcfg namcfg
+!>    the configuration sub-namelist parameters are : 
 !>
-!>          Examples:
-!>             - cn_north='index1,first1:last1(width)'
-!>             - cn_north='index1(width),first1:last1|index2,first2:last2'
+!>    - **cn_varcfg** [@a ./cfg/variable.cfg]<br/>
+!>       path to the variable configuration file.<br/>
+!>       the variable configuration file defines standard name, 
+!>       default interpolation method, axis,... 
+!>       to be used for some known variables.<br/> 
 !>
-!>       - cn_south : south boundary indices on fine grid<br/>
-!>       - cn_east  : east  boundary indices on fine grid<br/>
-!>       - cn_west  : west  boundary indices on fine grid<br/>
-!>       - in_ncrs  : number of point(s) with coarse value save at boundaries<br/>
-!>       - ln_oneseg: use only one segment for each boundary or not
+!>    - **cn_dimcfg** [@a ./cfg/dimension.cfg]<br/> 
+!>       path to the dimension configuration file.<br/> 
+!>       the dimension configuration file defines dimensions allowed.<br/> 
 !>
-!>    * _output namelist (namout)_:
-!>       - cn_fileout : merged bathymetry file
+!>    - **cn_dumcfg** [@a ./cfg/dummy.cfg]<br/> 
+!>       path to the useless (dummy) configuration file.<br/>
+!>       the dummy configuration file defines useless 
+!>       dimension or variable. these dimension(s) or variable(s) will not be
+!>       processed.<br/>
 !>
+!> @subsection subsrc namsrc 
+!>    the source/coarse grid sub-namelist parameters are :
+!>
+!>    - **cn_bathy0** [@a ]<br/> 
+!>       path to the bathymetry file
+!>       @warning 
+!>          variable name must be __Bathymetry__ here.
+!>
+!>    - **in_perio0** [@a ]<br/> 
+!>       NEMO periodicity index<br/> 
+!>       the NEMO periodicity could be choose between 0 to 6:
+!>       <dl>
+!>          <dt>in_perio=0</dt>
+!>          <dd>standard regional model</dd>
+!>          <dt>in_perio=1</dt>
+!>          <dd>east-west cyclic model</dd>
+!>          <dt>in_perio=2</dt>
+!>          <dd>model with symmetric boundary condition across the equator</dd>
+!>          <dt>in_perio=3</dt>
+!>          <dd>regional model with North fold boundary and T-point pivot</dd>
+!>          <dt>in_perio=4</dt>
+!>          <dd>global model with a T-point pivot.<br/>
+!>          example: ORCA2, ORCA025, ORCA12</dd>
+!>          <dt>in_perio=5</dt>
+!>          <dd>regional model with North fold boundary and F-point pivot</dd>
+!>          <dt>in_perio=6</dt>
+!>          <dd>global model with a F-point pivot<br/>
+!>          example: ORCA05</dd>
+!>          </dd>
+!>       </dl>
+!>       @sa For more information see @ref md_src_docsrc_6_perio
+!>       and Model Boundary Condition paragraph in the 
+!>       [NEMO documentation](https://forge.ipsl.jussieu.fr/nemo/chrome/site/doc/NEMO/manual/pdf/NEMO_manual.pdf)
+!>
+!> @subsection subtgt namtgt 
+!>    the target/fine grid sub-namelist parameters are :
+!>
+!>    - **cn_bathy1** [@a ]<br/> 
+!>       path to bathymetry file
+!>       @warning 
+!>          variable name must be __Bathymetry__ here.
+!>
+!>    - **in_perio1** [@a ]<br/>
+!>       NEMO periodicity index (see above)
+!>    @note if the fine/target coordinates file (cn_coord1) was created by SIREN, you do
+!>    not need to fill this parameter. SIREN will read it on the global attributes of
+!>    the coordinates file.
+!>
+!> @subsection subnst namnst 
+!>    the nesting sub-namelist parameters are (default value are specified between brackets):
+!>    - **in_rhoi**  [@a 1]<br/> 
+!>       refinement factor in i-direction
+!>
+!>    - **in_rhoj**  [@a 1]<br/> 
+!>       refinement factor in j-direction
+!>
+!>    @note 
+!>       coarse grid indices will be deduced from fine grid
+!>       coordinate file.
+!>
+!> @subsection subbdy nambdy
+!>    the boundary sub-namelist parameters are :
+!>
+!>    - **ln_north** [@a .TRUE.]<br/> 
+!>       logical to use north boundary or not
+!>    - **ln_south** [@a .TRUE.]<br/>
+!>       logical to use south boundary or not
+!>    - **ln_east**  [@a .TRUE.]<br/>
+!>       logical to use east boundary or not
+!>    - **ln_west**  [@a .TRUE.]<br/>
+!>       logical to use west  boundary or not
+!>    <br/> <br/>
+!>    - **cn_north** [@a ]<br/>
+!>       north boundary indices on fine grid<br/>
+!>    - **cn_south** [@a ]<br/>
+!>       south boundary indices on fine grid<br/>
+!>    - **cn_east**  [@a ]<br/>
+!>       east  boundary indices on fine grid<br/>
+!>    - **cn_west**  [@a ]<br/>
+!>       west  boundary indices on fine grid<br/>
+!>
+!>       *cn_north* is a string character defining boundary
+!>       segmentation.<br/>
+!>       segments are separated by '|'.<br/>
+!>       each segments of the boundary is composed of:
+!>          - indice of velocity (orthogonal to boundary .ie. 
+!>             for north boundary, J-indice). 
+!>          - indice of segment start (I-indice for north boundary) 
+!>          - indice of segment end   (I-indice for north boundary)<br/>
+!>             indices must be separated by ':' .<br/>
+!>          - optionally, boundary size could be added between '(' and ')' 
+!>          in the first segment defined.
+!>             @note 
+!>                boundary size is the same for all segments of one boundary.
+!>
+!>       Examples:
+!>          - cn_north='index1,first1:last1(width)'
+!>          - cn_north='index1(width),first1:last1|index2,first2:last2'
+!>
+!>       @image html  boundary_50.png 
+!>       <center>@image latex boundary_50.png
+!>       </center>
+!>
+!>    - **in_ncrs**  [@a 2]<br/> 
+!>       number of point(s) with coarse value save at boundaries
+!>
+!>    - **ln_oneseg** [@a .TRUE.]<br/>
+!>       logical to use only one segment for each boundary or not
+!>
+!> @subsection subout namout 
+!>    the output sub-namelist parameter is :
+!>
+!>    - **cn_fileout** [@a bathy_merged.nc]<br/>
+!>       output bathymetry filename
+!>
+!> <hr>
 !> @author J.Paul
-! REVISION HISTORY:
+!>
 !> @date November, 2013 - Initial Version
 !> @date Sepember, 2014 
 !> - add header for user
@@ -135,8 +217,18 @@
 !> @date October, 2016
 !> - allow to choose the number of boundary point with coarse grid value.
 !> - dimension to be used select from configuration file
+!> @date January, 2019
+!> - add url path to global attributes of output file(s)
+!> @date February, 2019
+!> - rename sub namelist namcrs to namsrc
+!> - rename sub namelist namfin to namtgt
+!> @date May, 2019
+!> - create and clean file structure to avoid memory leaks
+!> @date Ocober, 2019
+!> - add help and version optional arguments
 !>
-!> @note Software governed by the CeCILL licence     (./LICENSE)
+!>
+!> @note Software governed by the CeCILL licence     (NEMOGCM/NEMO_CeCILL.txt)
 !----------------------------------------------------------------------
 PROGRAM merge_bathy
 
@@ -164,10 +256,16 @@ PROGRAM merge_bathy
 
    IMPLICIT NONE
 
+   ! parameters
+   CHARACTER(LEN=lc), PARAMETER  :: cp_myname = "merge_bathy"
+
    ! local variable
+   CHARACTER(LEN=lc)                                  :: cl_arg
    CHARACTER(LEN=lc)                                  :: cl_namelist
    CHARACTER(LEN=lc)                                  :: cl_date
    CHARACTER(LEN=lc)                                  :: cl_tmp
+   CHARACTER(LEN=lc)                                  :: cl_url
+   CHARACTER(LEN=lc)                                  :: cl_errormsg
 
    INTEGER(i4)                                        :: il_narg
    INTEGER(i4)                                        :: il_status
@@ -189,6 +287,8 @@ PROGRAM merge_bathy
 
    TYPE(TMPP)                                         :: tl_bathy0
    TYPE(TMPP)                                         :: tl_bathy1
+
+   TYPE(TFILE)                                        :: tl_file
    TYPE(TFILE)                                        :: tl_fileout
    
    TYPE(TATT)                                         :: tl_att
@@ -217,11 +317,11 @@ PROGRAM merge_bathy
    CHARACTER(LEN=lc)                       :: cn_dimcfg = './cfg/dimension.cfg'
    CHARACTER(LEN=lc)                       :: cn_dumcfg = './cfg/dummy.cfg'
 
-   ! namcrs
+   ! namsrc
    CHARACTER(LEN=lc)                       :: cn_bathy0 = '' 
    INTEGER(i4)                             :: in_perio0 = -1
 
-   ! namfin
+   ! namtgt
    CHARACTER(LEN=lc)                       :: cn_bathy1 = '' 
    INTEGER(i4)                             :: in_perio1 = -1
 
@@ -229,8 +329,8 @@ PROGRAM merge_bathy
 !   CHARACTER(LEN=lc), DIMENSION(ip_maxvar) :: cn_varinfo = ''
 
    ! namnst
-   INTEGER(i4)                             :: in_rhoi  = 0
-   INTEGER(i4)                             :: in_rhoj  = 0
+   INTEGER(i4)                             :: in_rhoi  = 1
+   INTEGER(i4)                             :: in_rhoj  = 1
 
    ! nambdy
    LOGICAL                                 :: ln_north = .TRUE.
@@ -248,23 +348,23 @@ PROGRAM merge_bathy
    CHARACTER(LEN=lc)                       :: cn_fileout = 'bathy_merged.nc' 
    !-------------------------------------------------------------------
 
-   NAMELIST /namlog/ &  !< logger namelist
-   &  cn_logfile,    &  !< log file
-   &  cn_verbosity,  &  !< log verbosity
-   &  in_maxerror       !< logger maximum error
+   NAMELIST /namlog/ &   !< logger namelist
+   &  cn_logfile,    &   !< log file
+   &  cn_verbosity,  &   !< log verbosity
+   &  in_maxerror        !< logger maximum error
 
-   NAMELIST /namcfg/ &  !< config namelist
+   NAMELIST /namcfg/ &   !< configuration namelist
    &  cn_varcfg, &       !< variable configuration file
    &  cn_dimcfg, &       !< dimension configuration file
    &  cn_dumcfg          !< dummy configuration file
 
-   NAMELIST /namcrs/ &  !< coarse grid namelist
-   &  cn_bathy0,  &     !< bathymetry file
-   &  in_perio0         !< periodicity index
+   NAMELIST /namsrc/ &   !< source/coarse grid namelist
+   &  cn_bathy0,  &      !< bathymetry file
+   &  in_perio0          !< periodicity index
    
-   NAMELIST /namfin/ &  !< fine grid namelist
-   &  cn_bathy1,     &  !< bathymetry file
-   &  in_perio1         !< periodicity index
+   NAMELIST /namtgt/ &   !< target/fine grid namelist
+   &  cn_bathy1,     &   !< bathymetry file
+   &  in_perio1          !< periodicity index
  
 !   NAMELIST /namvar/ &  !< variable namelist
 !   &  cn_varinfo        !< list of variable and interpolation 
@@ -291,79 +391,108 @@ PROGRAM merge_bathy
    &  cn_fileout        !< fine grid merged bathymetry file   
    !-------------------------------------------------------------------
 
-   ! namelist
-   ! get namelist
+   !
+   ! Initialisation
+   ! --------------
+   !
    il_narg=COMMAND_ARGUMENT_COUNT() !f03 intrinsec
-   IF( il_narg/=1 )THEN
-      PRINT *,"MERGE BATHY: ERROR. need a namelist"
-      STOP
-   ELSE
-      CALL GET_COMMAND_ARGUMENT(1,cl_namelist) !f03 intrinsec
-   ENDIF
-   
-   ! read namelist
-   INQUIRE(FILE=TRIM(cl_namelist), EXIST=ll_exist)
-   IF( ll_exist )THEN
-      
-      il_fileid=fct_getunit()
 
-      OPEN( il_fileid, FILE=TRIM(cl_namelist), &
-      &                FORM='FORMATTED',       &
-      &                ACCESS='SEQUENTIAL',    &
-      &                STATUS='OLD',           &
-      &                ACTION='READ',          &
-      &                IOSTAT=il_status)
-      CALL fct_err(il_status)
-      IF( il_status /= 0 )THEN
-         PRINT *,"MERGE BATHY: ERROR opening "//TRIM(cl_namelist)
-         STOP
-      ENDIF
-
-      READ( il_fileid, NML = namlog )
-      ! define log file
-      CALL logger_open(TRIM(cn_logfile),TRIM(cn_verbosity),in_maxerror)
-      CALL logger_header()
-
-      READ( il_fileid, NML = namcfg )
-      ! get variable extra information
-      CALL var_def_extra(TRIM(cn_varcfg))
-
-      ! get dimension allowed
-      CALL dim_def_extra(TRIM(cn_dimcfg))
-
-      ! get dummy variable
-      CALL var_get_dummy(TRIM(cn_dumcfg))
-      ! get dummy dimension
-      CALL dim_get_dummy(TRIM(cn_dumcfg))
-      ! get dummy attribute
-      CALL att_get_dummy(TRIM(cn_dumcfg))
-
-      READ( il_fileid, NML = namcrs )
-      READ( il_fileid, NML = namfin )
-!      READ( il_fileid, NML = namvar )
-!      ! add user change in extra information
-!      CALL var_chg_extra(cn_varinfo)
-
-      READ( il_fileid, NML = namnst )
-      READ( il_fileid, NML = nambdy )
-
-      READ( il_fileid, NML = namout )
-
-      CLOSE( il_fileid, IOSTAT=il_status )
-      CALL fct_err(il_status)
-      IF( il_status /= 0 )THEN
-         CALL logger_error("MERGE BATHY: ERROR closing "//TRIM(cl_namelist))
-      ENDIF
-
+   ! Traitement des arguments fournis
+   ! --------------------------------
+   IF( il_narg /= 1 )THEN
+      WRITE(cl_errormsg,*) ' ERROR : one argument is needed '
+      CALL fct_help(cp_myname,cl_errormsg) 
+      CALL EXIT(1)
    ELSE
 
-      PRINT *,"MERGE BATHY: ERROR. can not find "//TRIM(cl_namelist)
+      CALL GET_COMMAND_ARGUMENT(1,cl_arg) !f03 intrinsec
+      SELECT CASE (cl_arg)
+         CASE ('-v', '--version')
 
+            CALL fct_version(cp_myname)
+            CALL EXIT(0)
+
+         CASE ('-h', '--help')
+
+            CALL fct_help(cp_myname)
+            CALL EXIT(0)
+
+         CASE DEFAULT
+
+            cl_namelist=cl_arg
+
+            ! read namelist
+            INQUIRE(FILE=TRIM(cl_namelist), EXIST=ll_exist)
+            IF( ll_exist )THEN
+
+               il_fileid=fct_getunit()
+
+               OPEN( il_fileid, FILE=TRIM(cl_namelist),  &
+               &                FORM='FORMATTED',        &
+               &                ACCESS='SEQUENTIAL',     &
+               &                STATUS='OLD',            &
+               &                ACTION='READ',           &
+               &                IOSTAT=il_status)
+               CALL fct_err(il_status)
+               IF( il_status /= 0 )THEN
+                  WRITE(cl_errormsg,*) " ERROR : error opening "//TRIM(cl_namelist)
+                  CALL fct_help(cp_myname,cl_errormsg) 
+                  CALL EXIT(1)
+               ENDIF
+
+               READ( il_fileid, NML = namlog )
+               ! define log file
+               CALL logger_open(TRIM(cn_logfile),TRIM(cn_verbosity),in_maxerror)
+               CALL logger_header()
+
+               READ( il_fileid, NML = namcfg )
+               ! get variable extra information
+               CALL var_def_extra(TRIM(cn_varcfg))
+
+               ! get dimension allowed
+               CALL dim_def_extra(TRIM(cn_dimcfg))
+
+               ! get dummy variable
+               CALL var_get_dummy(TRIM(cn_dumcfg))
+               ! get dummy dimension
+               CALL dim_get_dummy(TRIM(cn_dumcfg))
+               ! get dummy attribute
+               CALL att_get_dummy(TRIM(cn_dumcfg))
+
+               READ( il_fileid, NML = namsrc )
+               READ( il_fileid, NML = namtgt )
+!               READ( il_fileid, NML = namvar )
+!               ! add user change in extra information
+!               CALL var_chg_extra(cn_varinfo)
+
+               READ( il_fileid, NML = namnst )
+               READ( il_fileid, NML = nambdy )
+
+               READ( il_fileid, NML = namout )
+
+               CLOSE( il_fileid, IOSTAT=il_status )
+               CALL fct_err(il_status)
+               IF( il_status /= 0 )THEN
+                  CALL logger_error("MERGE BATHY: ERROR closing "//TRIM(cl_namelist))
+               ENDIF
+
+            ELSE
+
+               WRITE(cl_errormsg,*) " ERROR : can't find "//TRIM(cl_namelist)
+               CALL fct_help(cp_myname,cl_errormsg) 
+               CALL EXIT(1)
+
+            ENDIF
+
+      END SELECT
    ENDIF
 
    ! open files
    IF( TRIM(cn_bathy0) /= '' )THEN
-      tl_bathy0=mpp_init( file_init(TRIM(cn_bathy0)), id_perio=in_perio0)
+      tl_file=file_init(TRIM(cn_bathy0))
+      tl_bathy0=mpp_init( tl_file, id_perio=in_perio0)
+      ! clean
+      CALL file_clean(tl_file)
       CALL grid_get_info(tl_bathy0)
    ELSE
       CALL logger_fatal("MERGE BATHY: can not find coarse grid bathymetry "//&
@@ -371,7 +500,10 @@ PROGRAM merge_bathy
    ENDIF
 
    IF( TRIM(cn_bathy1) /= '' )THEN
-      tl_bathy1=mpp_init( file_init(TRIM(cn_bathy1)), id_perio=in_perio1)
+      tl_file=file_init(TRIM(cn_bathy1))
+      tl_bathy1=mpp_init( tl_file, id_perio=in_perio1)
+      ! clean
+      CALL file_clean(tl_file)
       CALL grid_get_info(tl_bathy1)
    ELSE
       CALL logger_fatal("MERGE BATHY: can not find fine grid bathymetry "//&
@@ -514,6 +646,12 @@ PROGRAM merge_bathy
    tl_att=att_init("Created_by","SIREN merge_bathy")
    CALL file_add_att(tl_fileout, tl_att)
 
+   !add source url
+   cl_url=fct_split(fct_split(cp_url,2,'$'),2,'URL:')
+   tl_att=att_init("SIREN_url",cl_url)
+   CALL file_add_att(tl_fileout, tl_att)
+
+   ! add date of creation
    cl_date=date_print(date_now())
    tl_att=att_init("Creation_date",cl_date)
    CALL file_add_att(tl_fileout, tl_att)
@@ -640,6 +778,10 @@ PROGRAM merge_bathy
    CALL logger_close()
 
 CONTAINS
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE merge_bathy_get_boundary(td_bathy0, td_bathy1, td_bdy, &
+         &                             id_rho, id_ncrs,              &
+         &                             dd_refined, dd_weight, dd_fill)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute refined bathymetry on boundary from coarse grid.
@@ -657,9 +799,6 @@ CONTAINS
    !> @param[in] dd_fill         fillValue
    !>
    !-------------------------------------------------------------------
-   SUBROUTINE merge_bathy_get_boundary( td_bathy0, td_bathy1, td_bdy, &
-   &                                    id_rho, id_ncrs,              &
-   &                                    dd_refined, dd_weight, dd_fill )
 
       IMPLICIT NONE
 
@@ -864,7 +1003,6 @@ CONTAINS
                dl_tmp1d(:)= 0.5 + 0.5*COS( (dp_pi*dl_tmp1d(:)) / &
                &                           (il_width) )
 
-
                ALLOCATE( dl_wseg(tl_dom1%t_dim(1)%i_len, &
                &                 tl_dom1%t_dim(2)%i_len) )
                dl_wseg(:,:)=dd_fill
@@ -882,7 +1020,6 @@ CONTAINS
                ! compute weight on segment
                dl_tmp1d(:)= 0.5 + 0.5*COS( (dp_pi*dl_tmp1d(:)) / &
                &                           (il_width) )
-
 
                ALLOCATE( dl_wseg(tl_dom1%t_dim(1)%i_len, &
                &                 tl_dom1%t_dim(2)%i_len) )
@@ -902,7 +1039,6 @@ CONTAINS
                dl_tmp1d(:)= 0.5 + 0.5*COS( (dp_pi*dl_tmp1d(:)) / &
                &                           (il_width) )
 
-
                ALLOCATE( dl_wseg(tl_dom1%t_dim(1)%i_len, &
                &                 tl_dom1%t_dim(2)%i_len) )
                dl_wseg(:,:)=dd_fill
@@ -920,7 +1056,6 @@ CONTAINS
                ! compute weight on segment
                dl_tmp1d(:)= 0.5 + 0.5*COS( (dp_pi*dl_tmp1d(:)) / &
                &                           (il_width) )
-
 
                ALLOCATE( dl_wseg(tl_dom1%t_dim(1)%i_len, &
                &                 tl_dom1%t_dim(2)%i_len) )
@@ -957,6 +1092,8 @@ CONTAINS
          ENDDO
       ENDIF
    END SUBROUTINE merge_bathy_get_boundary
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE merge_bathy_interp(td_var, id_rho, id_offset, id_iext, id_jext)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine interpolate variable.
@@ -970,10 +1107,6 @@ CONTAINS
    !> @param[in] id_iext   i-direction size of extra bands (default=im_minext) 
    !> @param[in] id_jext   j-direction size of extra bands (default=im_minext)
    !-------------------------------------------------------------------
-   SUBROUTINE merge_bathy_interp( td_var,          &
-   &                              id_rho,          &
-   &                              id_offset,       &
-   &                              id_iext, id_jext)
 
       IMPLICIT NONE
 
@@ -1061,4 +1194,5 @@ CONTAINS
       END WHERE
 
    END SUBROUTINE merge_bathy_interp
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 END PROGRAM merge_bathy

@@ -26,7 +26,7 @@
 !-----------------------------------------------------------------------
 &namdom        !   time and space domain
 !-----------------------------------------------------------------------
-   rn_rdt      =  720.     !  time step for the dynamics and tracer
+   rn_Dt      =  720.     !  time step for the dynamics and tracer
    !
 /
 !-----------------------------------------------------------------------
@@ -46,8 +46,8 @@
    !___________!_________________________!___________________!___________!_____________!________!___________!__________________!__________!_______________!
    !           !  file name              ! frequency (hours) ! variable  ! time interp.!  clim  ! 'yearly'/ ! weights filename ! rotation ! land/sea mask !
    !           !                         !  (if <0  months)  !   name    !   (logical) !  (T/F) ! 'monthly' !                  ! pairing  !    filename   !
-   sn_tem    = 'T_SPITZ12'   ,  24           ,'votemper',    .false.   , .false., 'daily'   , ''      , '' ,    ''
-   sn_sal    = 'S_SPITZ12'   ,  24           ,'vosaline',    .false.   , .false., 'daily'   , ''      , '' ,    ''
+   sn_tem    = 'T_SPITZ12'   ,  24.          ,'votemper',    .false.   , .false., 'daily'   , ''      , '' ,    ''
+   sn_sal    = 'S_SPITZ12'   ,  24.          ,'vosaline',    .false.   , .false., 'daily'   , ''      , '' ,    ''
 /
 !!======================================================================
 !!            ***  Surface Boundary Condition namelists  ***          !!
@@ -79,6 +79,8 @@
    ln_blk      = .true.    !  Bulk formulation                          (T => fill namsbc_blk )
                      ! Sea-ice :
    nn_ice      = 2         !  SI3
+   ln_ice_embd = .false.   !  =T embedded sea-ice (pressure + mass and salt exchanges)
+      !                    !  =F levitating ice (no pressure, mass and salt exchanges)
                      ! Misc. options of sbc :
    ln_traqsr   = .true.    !  Light penetration in the ocean            (T => fill namtra_qsr )
 /
@@ -89,34 +91,21 @@
    ln_NCAR    = .true.     ! "NCAR"      algorithm   (Large and Yeager 2008)
       !
       ln_Cd_L12   = .false.   !  air-ice drags = F(ice concentration) (Lupkes et al. 2012)
-      ln_Cd_L15   = .false.   !  air-ice drags = F(ice concentration) (Lupkes et al. 2015)
+      ln_Cd_L15   = .true.    !  air-ice drags = F(ice concentration) (Lupkes et al. 2015)
       !
    cn_dir = './'  !  root directory for the bulk data location
    !___________!_________________________!___________________!___________!_____________!________!___________!______________________________________!__________!_______________!
    !           !  file name              ! frequency (hours) ! variable  ! time interp.!  clim  ! 'yearly'/ !          weights filename            ! rotation ! land/sea mask !
    !           !                         !  (if <0  months)  !   name    !   (logical) !  (T/F) ! 'monthly' !                                      ! pairing  !    filename   !
-!! ERAI
-!   sn_wndi     = 'u10_era_spitz'               ,         6         , 'u10'     ,   .true.    , .false. , 'yearly'  , 'weights_bicub', 'Uwnd' , ''
-!   sn_wndj     = 'v10_era_spitz'               ,         6         , 'v10'     ,   .true.    , .false. , 'yearly'  , 'weights_bicub', 'Vwnd' , ''
-!   sn_qsr      = 'ssrd_era_spitz'              ,         6         , 'ssrd'    ,   .true.    , .false. , 'yearly'  , 'weights_bilin', '' , ''
-!   sn_qlw      = 'strd_era_spitz'              ,         6         , 'strd'    ,   .true.    , .false. , 'yearly'  , 'weights_bilin', '' , ''
-!   sn_tair     = 't2_era_spitz'                ,         6         , 't2'      ,   .true.    , .false. , 'yearly'  , 'weights_bilin', '' , ''
-!   sn_humi     = 'humi_era_spitz'              ,         6         , 'humi'    ,   .true.    , .false. , 'yearly'  , 'weights_bilin', '' , ''
-!   sn_prec     = 'precip_era_spitz'            ,         6         , 'precip'  ,   .true.    , .false. , 'yearly'  , 'weights_bilin', '' , ''
-!   sn_snow     = 'snow_era_spitz'              ,         6         , 'snow'    ,   .true.    , .false. , 'yearly'  , 'weights_bilin', '' , ''
-!   sn_tdif     = 'taudif'                      ,         6         , 'taudif'  ,   .true.    , .false. , 'yearly'  , ''             , '' , ''
-!      rn_zqt      = 10.       !  Air temperature & humidity reference height (m)
-!! MAR
-   sn_wndi     = 'MARv3.6-9km-Svalbard-2hourly_spitz' ,   2 ,  'u10'     ,   .true.    , .false. , 'yearly'  , 'weights_bicub', 'Uwnd' , ''
-   sn_wndj     = 'MARv3.6-9km-Svalbard-2hourly_spitz' ,   2 ,  'v10'     ,   .true.    , .false. , 'yearly'  , 'weights_bicub', 'Vwnd' , ''
-   sn_qsr      = 'MARv3.6-9km-Svalbard-2hourly_spitz' ,   2 ,  'ssrd'    ,   .true.    , .false. , 'yearly'  , 'weights_bilin', '' , ''
-   sn_qlw      = 'MARv3.6-9km-Svalbard-2hourly_spitz' ,   2 ,  'strd'    ,   .true.    , .false. , 'yearly'  , 'weights_bilin', '' , ''
-   sn_tair     = 'MARv3.6-9km-Svalbard-2hourly_spitz' ,   2 ,  't10'     ,   .true.    , .false. , 'yearly'  , 'weights_bilin', '' , ''
-   sn_humi     = 'MARv3.6-9km-Svalbard-2hourly_spitz' ,   2 ,  'humi'    ,   .true.    , .false. , 'yearly'  , 'weights_bilin', '' , ''
-   sn_prec     = 'MARv3.6-9km-Svalbard-2hourly_spitz' ,   2 ,  'precip'  ,   .true.    , .false. , 'yearly'  , 'weights_bilin', '' , ''
-   sn_snow     = 'MARv3.6-9km-Svalbard-2hourly_spitz' ,   2 ,  'snow'    ,   .true.    , .false. , 'yearly'  , 'weights_bilin', '' , ''
-   sn_slp      = 'MARv3.6-9km-Svalbard-2hourly_spitz' ,   2 ,  'slp'     ,   .true.    , .false. , 'yearly'  , 'weights_bilin', '' , ''
-   sn_tdif     = 'MARv3.6-9km-Svalbard-2hourly_spitz' ,   2 ,  'tdif'    ,   .true.    , .false. , 'yearly'  , 'weights_bilin', '' , ''
+   sn_wndi     = 'MARv3.6-9km-Svalbard-2hourly_spitz' ,  2. ,  'u10'     ,   .true.    , .false. , 'yearly'  , 'weights_bicub', 'Uwnd' , ''
+   sn_wndj     = 'MARv3.6-9km-Svalbard-2hourly_spitz' ,  2. ,  'v10'     ,   .true.    , .false. , 'yearly'  , 'weights_bicub', 'Vwnd' , ''
+   sn_qsr      = 'MARv3.6-9km-Svalbard-2hourly_spitz' ,  2. ,  'ssrd'    ,   .true.    , .false. , 'yearly'  , 'weights_bilin', '' , ''
+   sn_qlw      = 'MARv3.6-9km-Svalbard-2hourly_spitz' ,  2. ,  'strd'    ,   .true.    , .false. , 'yearly'  , 'weights_bilin', '' , ''
+   sn_tair     = 'MARv3.6-9km-Svalbard-2hourly_spitz' ,  2. ,  't10'     ,   .true.    , .false. , 'yearly'  , 'weights_bilin', '' , ''
+   sn_humi     = 'MARv3.6-9km-Svalbard-2hourly_spitz' ,  2. ,  'humi'    ,   .true.    , .false. , 'yearly'  , 'weights_bilin', '' , ''
+   sn_prec     = 'MARv3.6-9km-Svalbard-2hourly_spitz' ,  2. ,  'precip'  ,   .true.    , .false. , 'yearly'  , 'weights_bilin', '' , ''
+   sn_snow     = 'MARv3.6-9km-Svalbard-2hourly_spitz' ,  2. ,  'snow'    ,   .true.    , .false. , 'yearly'  , 'weights_bilin', '' , ''
+   sn_slp      = 'MARv3.6-9km-Svalbard-2hourly_spitz' ,  2. ,  'slp'     ,   .true.    , .false. , 'yearly'  , 'weights_bilin', '' , ''
 /
 !-----------------------------------------------------------------------
 &namsbc_sas    !   Stand-Alone Surface module: ocean data               (SAS_SRC  only)
@@ -128,14 +117,6 @@
 !-----------------------------------------------------------------------
    !                       ! type of penetration                        (default: NO selection)
    ln_qsr_rgb  = .true.       !  RGB light penetration (Red-Green-Blue)
-/
-!-----------------------------------------------------------------------
-&namsbc_ssr    !   surface boundary condition : sea surface restoring   (ln_ssr =T)
-!-----------------------------------------------------------------------
-/
-!-----------------------------------------------------------------------
-&namsbc_rnf    !   runoffs                                              (ln_rnf =T)
-!-----------------------------------------------------------------------
 /
 !!======================================================================
 !!               ***  Lateral boundary condition  ***                 !!
@@ -156,16 +137,16 @@
 !-----------------------------------------------------------------------
 &nam_tide      !   tide parameters                                      (default: OFF)
 !-----------------------------------------------------------------------
-   ln_tide     = .true.      ! Activate tides
-      ln_tide_pot   = .false.                !  use tidal potential forcing
-      clname(1)     =   'M2'    !  name of constituent
-      clname(2)     =   'S2'
-      clname(3)     =   'N2'
-      clname(4)     =   'K2'
-      clname(5)     =   'K1'
-      clname(6)     =   'O1'
-      clname(7)     =   'P1'
-      clname(8)     =   'Q1'
+   ln_tide     = .true.           ! Activate tides
+      ln_tide_pot       = .false. !  use tidal potential forcing
+      sn_tide_cnames(1) =   'M2'  !  name of constituent
+      sn_tide_cnames(2) =   'S2'
+      sn_tide_cnames(3) =   'N2'
+      sn_tide_cnames(4) =   'K2'
+      sn_tide_cnames(5) =   'K1'
+      sn_tide_cnames(6) =   'O1'
+      sn_tide_cnames(7) =   'P1'
+      sn_tide_cnames(8) =   'Q1'
 /
 !-----------------------------------------------------------------------
 &nambdy        !  unstructured open boundaries                          (default: OFF)
@@ -188,32 +169,30 @@
    cn_ice        =  'frs'     !
    nn_ice_dta    =  1         !  = 0, bdy data are equal to the initial state
    !                          !  = 1, bdy data are read in 'bdydata   .nc' files
-   rn_ice_tem    = 267.       !  si3 only: arbitrary temperature of incoming sea ice
-   rn_ice_sal    =   6.       !  si3 only:      --   salinity           --
-   rn_ice_age    = 365.       !  si3 only:      --   age                --
-   !
    nn_rimwidth   = 1          !  width of the relaxation zone
    ln_vol        = .false.    !  total volume correction (see nn_volctl parameter)
-   nb_jpk_bdy    = -1         ! number of levels in the bdy data (set < 0 if consistent with planned run)
 /
 !-----------------------------------------------------------------------
 &nambdy_dta    !  open boundaries - external data                       (see nam_bdy)
 !-----------------------------------------------------------------------
-   ln_full_vel = .false.      !  ???
-
+   ln_zinterp  = .false.      !  T if a vertical interpolation is required. Variables gdep[tuv] and e3[tuv] must exist in the file
+   !                          !  automatically defined to T if the number of vertical levels in bdy dta /= jpk
+   ln_full_vel = .false.      !  T if [uv]3d are "full" velocities and not only its baroclinic components
+   !                          !  in this case, baroclinic and barotropic velocities will be recomputed -> [uv]2d not needed
+   !
    cn_dir  =  './'
 !              !  file name      ! frequency (hours) ! variable  ! time interp. !  clim   ! 'yearly'/ ! weights  ! rotation ! land/sea mask !
 !              !                 !  (if <0  months)  !   name    !  (logical)   !  (T/F ) ! 'monthly' ! filename ! pairing  ! filename      !
-   bn_ssh =   'bdyT_u2d_grid12' ,         72       , 'sossheig' ,     .true.     , .false. ,  'yearly'  ,    ''    ,   ''   , ''
-   bn_u2d =   'bdyU_u2d_grid12' ,         72       , 'vobtcrtx' ,     .true.     , .false. ,  'yearly'  ,    ''    ,   ''   , ''
-   bn_v2d =   'bdyV_u2d_grid12' ,         72       , 'vobtcrty' ,     .true.     , .false. ,  'yearly'  ,    ''    ,   ''   , ''
-   bn_u3d  =  'bdyU_u3d_grid12' ,         72       , 'vozocrtx' ,     .true.     , .false. ,  'yearly'  ,    ''    ,   ''   , ''
-   bn_v3d  =  'bdyV_u3d_grid12' ,         72       , 'vomecrty' ,     .true.     , .false. ,  'yearly'  ,    ''    ,   ''   , ''
-   bn_tem  =  'bdyT_tem_grid12' ,         72       , 'votemper' ,     .true.     , .false. ,  'yearly'  ,    ''    ,   ''   , ''
-   bn_sal  =  'bdyT_sal_grid12' ,         72       , 'vosaline' ,     .true.     , .false. ,  'yearly'  ,    ''    ,   ''   , ''
-   bn_a_i  =  'bdyT_ice_grid12' ,         72       , 'ileadfra' ,     .true.     , .false. ,  'yearly'  ,    ''    ,   ''   , ''
-   bn_h_i  =  'bdyT_ice_grid12' ,         72       , 'iicethic' ,     .true.     , .false. ,  'yearly'  ,    ''    ,   ''   , ''
-   bn_h_s  =  'bdyT_ice_grid12' ,         72       , 'isnowthi' ,     .true.     , .false. ,  'yearly'  ,    ''    ,   ''   , ''
+   bn_ssh =   'bdyT_u2d_grid12' ,         72.      , 'sossheig' ,     .true.     , .false. ,  'yearly'  ,    ''    ,   ''   , ''
+   bn_u2d =   'bdyU_u2d_grid12' ,         72.      , 'vobtcrtx' ,     .true.     , .false. ,  'yearly'  ,    ''    ,   ''   , ''
+   bn_v2d =   'bdyV_u2d_grid12' ,         72.      , 'vobtcrty' ,     .true.     , .false. ,  'yearly'  ,    ''    ,   ''   , ''
+   bn_u3d  =  'bdyU_u3d_grid12' ,         72.      , 'vozocrtx' ,     .true.     , .false. ,  'yearly'  ,    ''    ,   ''   , ''
+   bn_v3d  =  'bdyV_u3d_grid12' ,         72.      , 'vomecrty' ,     .true.     , .false. ,  'yearly'  ,    ''    ,   ''   , ''
+   bn_tem  =  'bdyT_tem_grid12' ,         72.      , 'votemper' ,     .true.     , .false. ,  'yearly'  ,    ''    ,   ''   , ''
+   bn_sal  =  'bdyT_sal_grid12' ,         72.      , 'vosaline' ,     .true.     , .false. ,  'yearly'  ,    ''    ,   ''   , ''
+   bn_a_i  =  'bdyT_ice_grid12' ,         72.      , 'ileadfra' ,     .true.     , .false. ,  'yearly'  ,    ''    ,   ''   , ''
+   bn_h_i  =  'bdyT_ice_grid12' ,         72.      , 'iicethic' ,     .true.     , .false. ,  'yearly'  ,    ''    ,   ''   , ''
+   bn_h_s  =  'bdyT_ice_grid12' ,         72.      , 'isnowthi' ,     .true.     , .false. ,  'yearly'  ,    ''    ,   ''   , ''
 /
 !-----------------------------------------------------------------------
 &nambdy_tide   !  tidal forcing at open boundaries                      (default: OFF)
@@ -235,21 +214,15 @@
 &namdrg        !   top/bottom drag coefficient                          (default: NO selection)
 !-----------------------------------------------------------------------
    ln_loglayer = .true.   !  logarithmic drag: Cd = vkarmn/log(z/z0) |U|
+   ln_drgimp   = .true.   !  implicit top/bottom friction flag
 /
 !-----------------------------------------------------------------------
 &namdrg_bot    !   BOTTOM friction                                      (ln_OFF =F)
 !-----------------------------------------------------------------------
-   rn_Cd0      =  2.5e-3   !!1.e-3    !  drag coefficient [-]
-   rn_Cdmax    =  0.01     !!0.1      !  drag value maximum [-] (logarithmic drag)
-   rn_ke0      =  0.       !!2.5e-3   !  background kinetic energy  [m2/s2] (non-linear cases)
+   rn_Cd0      =  2.5e-3   !  drag coefficient [-]
+   rn_Cdmax    =  0.1      !  drag value maximum [-] (logarithmic drag)
+   rn_ke0      =  0.       !  background kinetic energy  [m2/s2] (non-linear cases)
    rn_z0       =  3.e-3    !  roughness [m] (ln_loglayer=T)
-   ln_boost    = .false.   !  =T regional boost of Cd0 ; =F constant
-      rn_boost =  50.         !  local boost factor  [-]
-/
-!-----------------------------------------------------------------------
-&nambbc        !   bottom temperature boundary condition                (default: OFF)
-!-----------------------------------------------------------------------
-   ln_trabbc   = .false.    !  Apply a geothermal heating at the ocean bottom
 /
 !-----------------------------------------------------------------------
 &nambbl        !   bottom boundary layer scheme                         (default: OFF)
@@ -257,8 +230,6 @@
    ln_trabbl   = .true.    !  Bottom Boundary Layer parameterisation flag
       nn_bbl_ldf  =  1        !  diffusive bbl (=1)   or not (=0)
       nn_bbl_adv  =  0        !  advective bbl (=1/2) or not (=0)
-      rn_ahtbbl   =  1000.    !  lateral mixing coefficient in the bbl  [m2/s]
-      rn_gambbl   =  10.      !  advective bbl coefficient                 [s]
 /
 !!======================================================================
 !!                        Tracer (T-S) namelists                      !!
@@ -292,7 +263,7 @@
    ln_traldf_msc   = .true.    !  Method of Stabilizing Correction      (both operators)
    !                       !  Coefficients:
    nn_aht_ijk_t    = 31        !  space/time variation of eddy coefficient:
-      !                             !   = 31 F(i,j,k,t)=F(local velocity and grid-spacing)
+   !                                !   = 31 F(i,j,k,t)=F(local velocity and grid-spacing)
 /
 !!======================================================================
 !!                      ***  Dynamics namelists  ***                  !!
@@ -319,7 +290,7 @@
 !-----------------------------------------------------------------------
 &namdyn_vor    !   Vorticity / Coriolis scheme                          (default: NO selection)
 !-----------------------------------------------------------------------
-   ln_dynvor_enT = .true. !  energy conserving scheme (T-point)
+   ln_dynvor_eeT = .true.  !  energy conserving scheme (een using e3t)
 /
 !-----------------------------------------------------------------------
 &namdyn_hpg    !   Hydrostatic pressure gradient option                 (default: NO selection)
@@ -351,10 +322,16 @@
 !-----------------------------------------------------------------------
 &namzdf        !   vertical physics manager                             (default: NO selection)
 !-----------------------------------------------------------------------
+   !                       ! adaptive-implicit vertical advection
+   ln_zad_Aimp = .true.      !  Courant number dependent scheme (Shchepetkin 2015)
    !                       ! type of vertical closure (required)
    ln_zdftke   = .true.       !  Turbulent Kinetic Energy closure       (T =>   fill namzdf_tke)
    ln_zdfgls   = .false.      !  Generic Length Scale closure           (T =>   fill namzdf_gls)
+   !                       ! convection
+   ln_zdfevd   = .true.       !  enhanced vertical diffusion
+   !
    ln_zdfddm   = .true.    ! double diffusive mixing
+   !
    !                       !  Coefficients
    rn_avm0     =   1.2e-4     !  vertical eddy viscosity   [m2/s]       (background Kz if ln_zdfcst=F)
    rn_avt0     =   2.0e-6     !  vertical eddy diffusivity [m2/s]       (background Kz if ln_zdfcst=F)
@@ -369,10 +346,8 @@
 !!   namhsb       Heat and salt budgets                                 (default: OFF)
 !!   namdiu       Cool skin and warm layer models                       (default: OFF)
 !!   namdiu       Cool skin and warm layer models                       (default: OFF)
-!!   namflo       float parameters                                      ("key_float")
-!!   nam_diaharm  Harmonic analysis of tidal constituents               ("key_diaharm")
-!!   namdct       transports through some sections                      ("key_diadct")
-!!   nam_diatmb   Top Middle Bottom Output                              (default: OFF)
+!!   namflo       float parameters                                      (default: OFF)
+!!   nam_diadct   transports through some sections                      (default: OFF)
 !!   nam_dia25h   25h Mean Output                                       (default: OFF)
 !!   namnc4       netcdf4 chunking and compression settings             ("key_netcdf4")
 !!======================================================================
@@ -381,10 +356,6 @@
 &namhsb        !  Heat and salt budgets                                 (default: OFF)
 !-----------------------------------------------------------------------
    ln_diahsb   = .false.   !  check the heat and salt budgets (T) or not (F)
-/
-!-----------------------------------------------------------------------
-&nam_diaharm   !   Harmonic analysis of tidal constituents              ('key_diaharm')
-!-----------------------------------------------------------------------
 /
 !-----------------------------------------------------------------------
 &namnc4        !   netcdf4 chunking and compression settings            ("key_netcdf4")

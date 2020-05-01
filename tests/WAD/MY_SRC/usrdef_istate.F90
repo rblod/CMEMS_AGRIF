@@ -25,9 +25,11 @@ MODULE usrdef_istate
 
    PUBLIC   usr_def_istate   ! called in istate.F90
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: usrdef_istate.F90 10074 2018-08-28 16:15:49Z nicolasmartin $ 
+   !! $Id: usrdef_istate.F90 12740 2020-04-12 09:03:06Z smasson $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -173,13 +175,11 @@ CONTAINS
       !
       ! Apply minimum wetdepth criterion
       !
-      do jj = 1,jpj
-         do ji = 1,jpi
-            IF( ht_0(ji,jj) + pssh(ji,jj) < rn_wdmin1 ) THEN
-               pssh(ji,jj) = ptmask(ji,jj,1)*( rn_wdmin1 - ht_0(ji,jj) )
-            ENDIF
-         end do
-      end do
+      DO_2D_11_11
+         IF( ht_0(ji,jj) + pssh(ji,jj) < rn_wdmin1 ) THEN
+            pssh(ji,jj) = ptmask(ji,jj,1)*( rn_wdmin1 - ht_0(ji,jj) )
+         ENDIF
+      END_2D
       !
    END SUBROUTINE usr_def_istate
 

@@ -18,10 +18,14 @@ MODULE step_oce
    USE sbcrnf          ! surface boundary condition: runoff variables
    USE sbccpl          ! surface boundary condition: coupled formulation (call send at end of step)
    USE sbcapr          ! surface boundary condition: atmospheric pressure
-   USE sbctide         ! Tide initialisation
+   USE tide_mod, ONLY : ln_tide, tide_update
    USE sbcwave         ! Wave intialisation
 
+   USE isf_oce         ! ice shelf boundary condition
+   USE isfstp          ! ice shelf boundary condition     (isf_stp routine)
+
    USE traqsr          ! solar radiation penetration      (tra_qsr routine)
+   USE traisf          ! ice shelf                        (tra_isf routine)
    USE trasbc          ! surface boundary condition       (tra_sbc routine)
    USE trabbc          ! bottom boundary condition        (tra_bbc routine)
    USE trabbl          ! bottom boundary layer            (tra_bbl routine)
@@ -29,7 +33,7 @@ MODULE step_oce
    USE traadv          ! advection scheme control     (tra_adv_ctl routine)
    USE traldf          ! lateral mixing                   (tra_ldf routine)
    USE trazdf          ! vertical mixing                  (tra_zdf routine)
-   USE tranxt          ! time-stepping                    (tra_nxt routine)
+   USE traatf          ! time filtering                   (tra_atf routine)
    USE tranpc          ! non-penetrative convection       (tra_npc routine)
 
    USE eosbn2          ! equation of state                (eos_bn2 routine)
@@ -42,7 +46,7 @@ MODULE step_oce
    USE dynzdf          ! vertical diffusion               (dyn_zdf routine)
    USE dynspg          ! surface pressure gradient        (dyn_spg routine)
 
-   USE dynnxt          ! time-stepping                    (dyn_nxt routine)
+   USE dynatf          ! time-filtering                   (dyn_atf routine)
 
    USE stopar          ! Stochastic parametrization       (sto_par routine)
    USE stopts 
@@ -65,9 +69,7 @@ MODULE step_oce
    USE zdfphy          ! vertical physics manager      (zdf_phy_init routine)
    USE zdfosm  , ONLY : osm_rst, dyn_osm, tra_osm      ! OSMOSIS routines used in step.F90
 
-   USE step_diu        ! Time stepping for diurnal sst
-   USE diurnal_bulk    ! diurnal SST bulk routines  (diurnal_sst_takaya routine) 
-   USE cool_skin       ! diurnal cool skin correction (diurnal_sst_coolskin routine)   
+   USE diu_layers      ! diurnal SST bulk and coolskin routines
    USE sbc_oce         ! surface fluxes  
    
    USE zpshde          ! partial step: hor. derivative     (zps_hde routine)
@@ -78,9 +80,10 @@ MODULE step_oce
    USE diaar5          ! AR5 diagnosics                   (dia_ar5 routine)
    USE diahth          ! thermocline depth                (dia_hth routine)
    USE diahsb          ! heat, salt and volume budgets    (dia_hsb routine)
-   USE diaharm
    USE diacfl
    USE diaobs          ! Observation operator
+   USE diadetide       ! Weights computation for daily detiding of model diagnostics
+   USE diamlr          ! IOM context management for multiple-linear-regression analysis
    USE flo_oce         ! floats variables
    USE floats          ! floats computation               (flo_stp routine)
 
@@ -106,11 +109,11 @@ MODULE step_oce
    USE agrif_all_update ! Main update driver
 #endif
 #if defined key_top
-   USE trcstp           ! passive tracer time-stepping      (trc_stp routine)
+   USE trcstp, ONLY : trc_stp    ! passive tracer time-stepping      (trc_stp routine)
 #endif
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: step_oce.F90 10068 2018-08-28 14:09:04Z nicolasmartin $
+   !! $Id: step_oce.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!======================================================================
 END MODULE step_oce

@@ -6,7 +6,7 @@ SIREN is a software to set up regional configuration with
  [NEMO](http://www.nemo-ocean.eu).<br/> 
 Actually SIREN creates all the input files you need to run a NEMO regional configuration.<br/>
  
-SIREN is composed of a set of 6 Fortran programs :
+SIREN is composed of a set of Fortran programs :
 <ul>
  <li>create_coord.f90 to create regional grid coordinates.</li>
  <li>create_bathy.f90 to create regional grid bathymetry.</li>
@@ -16,6 +16,7 @@ SIREN is composed of a set of 6 Fortran programs :
  This break may cause inconsistency between forcing fields  at boundary and regional fields.
  </li>
  <li>create_meshmask.f90 to create meshmask or domain_cfg file(s) which contain(s) all the ocean domain informations.</li>
+ <li>create_layout.f90 to create/compute the domain layout of your configuration.</li>
  <li>create_restart.f90 to create initial state file from coarse grid restart
  or standard outputs.
  @note this program could also be used to refined other input fields from a wider
@@ -35,7 +36,7 @@ SIREN is composed of a set of 6 Fortran programs :
 
 Here after we briefly describe how to use each programs,
 and so how to create your own regional configuration.
-@note As demonstrator for a first start a set of GLORYS files (global reanalysis on *ORCA025* grid), as well as examples of namelists are available [here](https://atlas.mercator-ocean.fr/s/Zgkb65Yrgw3wWQo).
+@note As demonstrator for a first start a set of GLORYS files (global reanalysis on *ORCA025* grid), as well as examples of namelists are available [here](https://cloud.mercator-ocean.fr/public.php?service=files&t=acf44730538cdda0da548ffc5f99fb55).
 
 <!-- ######################################################################  -->
 # Create coordinates file # {#coord}
@@ -60,9 +61,10 @@ This new coordinates file is refined from an extraction of *coordinates_ORCA025.
 &namcfg
    cn_varcfg = "PATH/NEMOGCM/TOOLS/SIREN/cfg/variable.cfg"
    cn_dimcfg = "PATH/NEMOGCM/TOOLS/SIREN/cfg/dimension.cfg"
+   cn_dumcfg = "PATH/NEMOGCM/TOOLS/SIREN/cfg/dummy.cfg"
 /
 
-&namcrs
+&namsrc
    cn_coord0 = "PATH/coordinates_ORCA025.nc"
    in_perio0 = 4
 /
@@ -85,22 +87,27 @@ This new coordinates file is refined from an extraction of *coordinates_ORCA025.
 /
 ~~~~~~~~~~~
 
+@note you could define sub domain with coarse grid indices or with coordinates.
+
 Let's get describe this namelist.<br/>
 First we have the **namlog** sub-namelist. This sub-namelist set parameters of the log
 file.<br/>
 All the parameters of this sub-namelist have default value, so you could let it
 empty, as done here.<br/> This will create a log file named *create_coord.log*
 
+## namcfg
 The **namcfg** sub-namelist defines where found SIREN configuration files.<br/>
 - The variable configuration file defines standard name, default interpolation method,
 axis,... to be used for some known variables.<br/>
 Obviously, you could add other variables to those already list, in this file.
 - The dimension configuration file defines dimensions allowed.
+- The dummy configuration file defines useless dimension or variable. these dimension(s) or variable(s) will not be processed.
 
-@note You could find the generic version of those configuration files in the directory *NEMOGCM/TOOLS/SIREN/cfg*.
+@note You could find the generic version of those configuration files in the directory *SIREN/cfg*.
 
-The **namcrs** sub-namelist set parameters of the wide
-coordinates file, as path to find it, and NEMO periodicity of the wide grid.<br/>
+## namsrc
+The **namsrc** sub-namelist set parameters of the coarse/source
+coordinates file name, path to find it, and the NEMO periodicity of the grid.<br/>
 
 @note the NEMO periodicity could be choose between 0 to 6:
 <dl>
@@ -120,26 +127,48 @@ example: ORCA2, ORCA025, ORCA12</dd>
 <dt>in_perio=6</dt>
 <dd>global model with a F-point pivot<br/>
 example: ORCA05</dd>
-</dl>
-@sa For more information see @ref md_src_docsrc_6_perio
 </dd>
 </dl>
+@sa For more information see @ref md_src_docsrc_6_perio
 
+## namvar
 The **namvar** sub-namelist lists variables to be used.<br/>
-By default all the variables of the wider coordinates file are used to create
+By default all the variables of the coarse/source coordinates file are used to create
 the new coordinates file.<br/> 
 The interpolation methods to be used are defined in the configuration variables file (see
-below). So you do not need to fill this sub-namelist too.
+above). So you do not need to fill this sub-namelist too.
 
+## namnst
 The **namnst** sub-namelist defines the subdomain to be used as well as refinment factor.<br/>
-@note Subdomain is defined by indices of the coarse/wide grid.<br/>
 
 <ul>
+<li> you could define sub domain with coarse grid indices</li> 
+
+~~~~~~~~~~~
+&namnst
+   in_imin0 = 1070
+   in_imax0 = 1072
+   in_jmin0 = 607
+   in_jmax0 = 609
+/
+~~~~~~~~~~~
+
+<li>or with coordinates</li>
+
+~~~~~~~~~~~
+&namnst
+   rn_lonmin0 = -97.9 
+   rn_lonmax0 = -62.3 
+   rn_latmin0 =   7.7
+   rn_latmax0 =  30.8
+/
+~~~~~~~~~~~
+
 <li>you can select area quite every where (excepted too close from the North
 pole), and use the refinment factor you want.</li>
 
 ~~~~~~~~~~~
-&namvar
+&namnst
    in_imin0 = 1070
    in_imax0 = 1072
    in_jmin0 = 607
@@ -157,7 +186,7 @@ pole), and use the refinment factor you want.</li>
 <li>you can select area crossing the east-west overlap of the global ORCA grid.</li>
 
 ~~~~~~~~~~~
-&namvar          
+&namnst          
    in_imin0 = 1402 
    in_imax0 = 62
    in_jmin0 = 490 
@@ -175,7 +204,7 @@ pole), and use the refinment factor you want.</li>
 <li>you can select east-west cyclic area.</li>
 
 ~~~~~~~~~~~
-&namvar
+&namnst
    in_imin0 = 0
    in_imax0 = 0
    in_jmin0 = 390
@@ -196,7 +225,7 @@ Finally the **namout** sub-namelist defines the output file.<br/>
 @note All the output files created by SIREN include information about NEMO
 periodicity, as well as source file, indices and refinment used.
 
-@sa For more information about how to create coordinates, see create_coord.f90
+@sa For more information and options to create coordinates, see create_coord.f90
 
 <!-- ######################################################################  -->
 # Create bathymetry file # {#bathy}
@@ -223,12 +252,12 @@ Moreover a minimum value of 5m is imposed to the output Bathymetry.
    cn_dimcfg = "PATH/NEMOGCM/TOOLS/SIREN/cfg/dimension.cfg"
 /
 
-&namcrs
+&namsrc
    cn_coord0 = "PATH/coordinates_ORCA025.nc"
    in_perio0 = 4
 /
 
-&namfin
+&namtgt
    cn_coord1 = "PATH/coord_fine.nc"
 /
 
@@ -249,22 +278,26 @@ Moreover a minimum value of 5m is imposed to the output Bathymetry.
 
 Let's get describe this namelist.<br/>
 
+## namlog, namcfg
 First as previously, we have the **namlog** and **namcfg** sub-namelist (see above for more
 explanation).<br/>
 
-Then the **namcrs** sub-namelist set parameters of the wide
+## namsrc
+Then the **namsrc** sub-namelist set parameters of the source/wide
 coordinates file.<br/>
 @note in all SIREN namelist: <br/>
 **0** referred to the coarse/wide grid.<br/>
 **1** referred to the fine grid.
 
-In the same way, the **namfin** sub-namelist  set parameters of the fine
+## namtgt
+In the same way, the **namtgt** sub-namelist  set parameters of the target/fine
 coordinates file.<br/>
 @note in this namelist example, there is no need to set the variable *in_perio1* to define the NEMO
 periodicity of the fine grid. Indeed, if this variable is not inform, SIREN tries to read it 
 in the global attributes of the file. So if you created the fine coordinates with SIREN, you do not have to
 fill it. In other case, you should add it to the namelist.
 
+## namvar
 The **namvar** sub-namelist lists variables to be used:
 <dl>
    <dt>cn_varfile</dt>
@@ -285,18 +318,20 @@ The **namvar** sub-namelist lists variables to be used:
       </dd>
 </dl>
 
+## namnst
 The **namnst** sub-namelist defines the subdomain refinment factor.<br/>
 Of course those refinment factors have to be convenient with refinment
 from coarse grid *cn_coord0* to fine grid *cn_coord1*.
 @note subdomain indices are automatically deduced from fine and coarse grid
 coordinates.
 
+## namout
 Finally, this **namout** sub-namelist defines the output file.<br/>
 
 @note All the output files create by SIREN include information about 
 source file, indices, refinment and interpolation method used.
 
-@sa For more information about how to create bathymetry, see
+@sa For more information and options to create bathymetry, see
 create_bathy.f90
 
 <!-- ######################################################################  -->
@@ -321,12 +356,12 @@ Here after is an example of namelist for *merge_bathy.exe*.<br/>
    cn_dimcfg = "PATH/NEMOGCM/TOOLS/SIREN/cfg/dimension.cfg"
 /
 
-&namcrs
+&namsrc
    cn_bathy0 = "PATH/bathy_meter_ORCA025.nc"
    in_perio0 = 4
 /
 
-&namfin
+&namtgt
    cn_bathy1 = "PATH/bathy_fine.nc"
 /
 
@@ -342,25 +377,31 @@ Here after is an example of namelist for *merge_bathy.exe*.<br/>
    cn_fileout = "PATH/bathy_merged.nc"      
 /
 ~~~~~~~~~~~~~~~~~~
+
+## namlog, namcfg
 In this namelist, you find again the **namlog**, **namcfg** describe above.
 
-Then the **namcrs** sub-namelist sets parameters of the wider grid.
-However this time, this is the coarse/wide grid Bathymetry wich have to be informed.
+## namsrc
+Then the **namsrc** sub-namelist sets parameters of the source/wide grid.
+However this time, this is the source/wide grid Bathymetry wich have to be informed.
 
-The **namfin** sub-namelist defines parameters of the fine grid Bathymetry.
+## namtgt
+The **namtgt** sub-namelist defines parameters of the target/fine grid Bathymetry.
 @note here again you could add the *in_perio1* parameter if need be i.e. if your
 fine grid Bathymetry was not created by SIREN.
 
+## namnst
 The **namnst** sub-namelist defines the subdomain refinment factor.
 
-
+## nambdy
 The **nambdy** sub-namelist defines the subdomain boundaries.<br/>
 By default SIREN tries to create boundaries for each side. Boundary exist if there is at least one sea point on the second row of each side. So you could let this namelist empty.
 @sa For more information about boundaries, see @ref boundary
 
+## namout
 Finally, this **namout** sub-namelist defines the output file.<br/>
 
-@sa For more information about how to merge bathymetry, see
+@sa For more information and options to merge bathymetry, see
 merge_bathy.f90
 
 <!-- ######################################################################  -->
@@ -389,7 +430,7 @@ The minimum depth of the final Bathymetry is 10m.
    cn_dimcfg = "PATH/NEMOGCM/TOOLS/SIREN/cfg/dimension.cfg"
 /
 
-&namin
+&namsrc
    cn_bathy = "PATH/bathy_merged.nc"
    cn_coord = "PATH/coord_fine.nc"
    in_perio = 4
@@ -446,9 +487,11 @@ The minimum depth of the final Bathymetry is 10m.
 
 Let's get describe this namelist more accurately.<br/>
 
+## namlog, namcfg
 As previously, we have the **namlog** and **namcfg** describe above.<br/>
 
-The **namin** sub-namelist defines the Bathymetry to be used.
+## namsrc
+The **namsrc** sub-namelist defines the Bathymetry to be used.
 Mainly SIREN need Bathymetry to create meshmask.
 Here we also read coordinates directly on a file. 
 @note 
@@ -456,7 +499,7 @@ Here we also read coordinates directly on a file.
 Bathymetry was not created by SIREN.
  2. by default SIREN suppress closed sea/lake from the ORCA domain.
 
-
+## namhgr
 The **namhgr** sub-namelist defines the horizontal grid.
 the type of horizontal mesh is choose between :<ul>
 <li> in_mshhgr=0 : curvilinear coordinate on the sphere read in coordinate.nc</li>
@@ -467,29 +510,83 @@ the type of horizontal mesh is choose between :<ul>
 <li> in_mshhgr=5 : beta-plane with regular grid-spacing and rotated domain (GYRE configuration)</li>
 </ul>
 
+## namzgr
 The **namzgr** sub-namelist allows to choose the type of vertical grid (z-coordinate full steps, partial steps, sigma or hybrid coordinates) and the number of level.
 
+## namdmin
 The **namdmin** sub-namelist defines the minimum ocean depth. It could be defines in meter (>0) or in number of level (<0).
 
+## namzco
 The **namzco** sub-namelist defines parameters to compute z-coordinate vertical grid (**needed for all type of vertical grid**)
 <!-- By default, those parameters are defined the same way than in GLORYS (i.e. 75 vertical levels).<br/> -->
 
+## namzps
 The **namzps** sub-namelist defines extra parameters needed to define z-coordinates partial steps.
 
+## namsco
 The **namsco** sub-namelist defines extra parameters needed to define sigma or hybrid coordinates (not needed here).
 
 <!--The **namcla** sub-namelist defines cross land advection for exchanges through some straits only used for ORCA2 (see namgrd).-->
 
+## namlbc
 The **namlbc** sub-namelist defines lateral boundary conditions at the coast. It is needed to modify the fmask.
 
+## namwd
 The **namwd** sub-namelist defines the wetting and drying parameters if activated (see namzgr sub-namelist)
 
+## namgrd
 The **namgrd** sub-namelist allows to use configuration 1D or to choose vertical scale factors (e3.=dk or old definition).
 
+## namout
 Finally, this **namout** sub-namelist defines the number output file(s).<br/>
 @note To create the domain_cfg file, you should put **in_msh=0**.
 
 @sa For more information about how to create meshmask, see create_meshmask.f90
+
+<!-- ######################################################################  -->
+# Create layout (domain layout) # {#layout}
+
+To run faster your configuration you may need to run it on multiprocessor. To do so you first need to know on which domain layout and so on how many processor you could do it.
+.<br/>
+
+To create/compute the domain layout, you have to run :
+~~~~~~~~~~~~~~~~~~
+./SIREN/create_layout.exe create_layout.nam
+~~~~~~~~~~~~~~~~~~
+
+Here after is an example of namelist for *create_layout.exe*.<br/>
+In this example, you compute the domain layout on 40 processors.<br/>
+~~~~~~~~~~~
+&namlog
+/
+
+&namcfg
+   cn_varcfg = "PATH/NEMOGCM/TOOLS/SIREN/cfg/variable.cfg"
+   cn_dimcfg = "PATH/NEMOGCM/TOOLS/SIREN/cfg/dimension.cfg"
+/
+
+&namvar
+   cn_varfile = "Bathymetry:PATH/bathy_merged.nc"
+/
+
+&namout
+   in_nproc = 40
+/
+~~~~~~~~~~~
+
+Let's get describe this namelist more accurately.<br/>
+
+## namlog, namcfg
+As previously, we have the **namlog** and **namcfg** describe above.<br/>
+
+## namvar
+The **namvar** sub-namelist lists variables to be used.
+Mainly SIREN need Bathymetry to compute the domain layout, or at least the mask of your domain.
+
+## namout
+The **namout** sub-namelist defines the number of processor you want to work on.
+
+@sa For more information and options to create layout, see create_layout.f90
 
 <!-- ######################################################################  -->
 # Create initial state # {#restart}
@@ -516,12 +613,12 @@ The initial state is composed of temperature and salinity refined from an extrac
    cn_dimcfg = "PATH/NEMOGCM/TOOLS/SIREN/cfg/dimension.cfg"
 /
 
-&namcrs
+&namsrc
    cn_coord0 = "PATH/coordinates_ORCA025.nc"
    in_perio0 = 4
 /
 
-&namfin
+&namtgt
    cn_coord1 = "PATH/coord_fine.nc"
    cn_bathy1 = "PATH/bathy_merged.nc"
 /
@@ -549,19 +646,25 @@ The initial state is composed of temperature and salinity refined from an extrac
 ~~~~~~~~~~~~~~~~~~
 Let's get describe this namelist more accurately.<br/>
 
+## namlog, namcfg
 As previously, we have the **namlog** and **namcfg** sub-namelists, as well as 
-the **namcrs** sub-namelist to set parameters of the wide coordinates file (see above for more
+
+## namsrc
+the **namsrc** sub-namelist to set parameters of the source/wide coordinates file (see above for more
 explanation).<br/>
 
-Then the **namfin** sub-namelist set parameters of the fine
+## namtgt
+Then the **namtgt** sub-namelist set parameters of the target/fine
 grid coordinates and bathymetry.<br/>
 
+## namzgr, namzps
 The **namzgr** and **namzps** sub-namelists define respectively parameters for vertical grid
 and partial step.<br>
 By default, those parameters are defined the same way than in GLORYS (i.e. 75 vertical levels).<br/>
 So you could let it empty.
 @note If you use forcing fields other than GLORYS, you have to be sure it uses the same vertical grid. In other case, you need to get information about the parametrisation use, and to put it in those sub-namelist (see create_restart.f90).
 
+## namvar
 the **namvar** sub-namelist lists variables to be used.<br/>
 Here we use *votemper* (temperature) get from *GLORYS_gridT.nc* file, and *vosaline*
 (salinity) get from *GLORYS_gridS.nc* file.
@@ -570,8 +673,10 @@ Here we use *votemper* (temperature) get from *GLORYS_gridT.nc* file, and *vosal
 cn_varfile = "all:PATH/restart.dimg"
 ~~~~~~~~~~~~~~~~~~
 
+## namnst
 The **namnst** sub-namelist defines the subdomain refinment factor, as seen previously.<br/>
 
+## namout
 Finally, this **namout** sub-namelist defines the output files.<br/>
 Here we ask for output on 81 processors, with *restart_out.nc* as file "basename".<br/>
 So SIREN computes the optimal layout for 81 processors
@@ -588,7 +693,7 @@ cn_varfile = "sorunoff:PATH/runoff_GLORYS.nc"
 cn_fileout = "PATH/runoff_out.nc"
 ~~~~~~~~~~~~~~~~~~
 
-@sa For more information about how to create initial state or other fields, see
+@sa For more information and options to create initial state or other fields, see
 create_restart.f90
 
 <!-- ######################################################################  -->
@@ -616,12 +721,12 @@ The boundaries contain information about temperature, salinity, currents and sea
    cn_dimcfg = "PATH/NEMOGCM/TOOLS/SIREN/cfg/dimension.cfg"
 /
 
-&namcrs
+&namsrc
    cn_coord0 = "PATH/coordinates_ORCA025.nc"
    in_perio0 = 4
 /
 
-&namfin
+&namtgt
    cn_coord1 = "PATH/coord_fine.nc"
    cn_bathy1 = "PATH/bathy_fine.nc"
 /
@@ -655,27 +760,35 @@ The boundaries contain information about temperature, salinity, currents and sea
 
 Let's get describe this namelist more accurately.<br/>
 
+## namlog, namcfg
 As previously, we have the **namlog** and **namcfg** sub-namelists, as well as 
-the **namcrs** sub-namelist to set parameters of the wide coordinates file (see above for more
+
+## namsrc
+the **namcrs** sub-namelist to set parameters of the source/wide coordinates file (see above for more
 explanation).<br/>
 
-Then the **namfin** sub-namelist set parameters of the fine
+## namtgt
+Then the **namtgt** sub-namelist set parameters of the target/fine
 grid coordinates and bathymetry.<br/>
 
+## namzgr, namzps
 The **namzgr** and **namzps** sub-namelists define respectively parameters for vertical grid
 and partial step.<br>
 By default, those parameters are defined the same way than in GLORYS (i.e. 75 vertical levels).<br/>
 So you could let it empty.
 @note If you use forcing fields other than GLORYS, you have to be sure it uses the same vertical grid. In other case, you need to get information about the parametrisation use, and to put it in those sub-namelist (see create_boundary.F90).
 
+## namvar
 the **namvar** sub-namelist lists variables to be used.<br/>
 Here we get *votemper* (temperature) from *GLORYS_gridT.nc* file, *vosaline*
 (salinity) from *GLORYS_gridS.nc* file, *vozocrtx* (zonal velocity) from
 *GLORYS_gridU.nc*, *vomecrty* (meridional velocity) from *GLORYS_gridV.nc*, and sossheig (sea surface
 height) from *GLORYS_grid2D.nc*.
 
+## namnst
 The **namnst** sub-namelist defines the subdomain refinment factor.<br/>
 
+## nambdy
 The **nambdy** sub-namelist defines the subdomain boundaries.<br/>
 By default SIREN tries to create boundaries for each side (Boundary is created if sea point exist on the second row of each side).<br/>
 So you could let this namelist empty.
@@ -690,13 +803,14 @@ So to define a north boundary, you have to add in the sub-namelist *nambdy*, the
 cn_north="index,first:last(width)"
 ~~~~~~~~~~~~~~~~~~
 
+## namout
 Finally, this **namout** sub-namelist defines the output files.<br/>
 Here we ask for output with *boundary_out.nc* as file "basename".<br/>
 So SIREN creates output files named *boundary_out_west.nc*,
 *boundary_out_east.nc*, *boundary_out_north.nc*, and *boundary_out_south.nc*
 depending if boundary exist or not.
 
-@sa For more information about how to create boundaries condition, see
+@sa For more information and options to create boundaries condition, see
 create_boundary.F90
 
 # Create and run NEMO configuration # {#NEMOconf}
@@ -704,7 +818,7 @@ create_boundary.F90
 So now you created all the input files you need for your physical configuration, you have to create the "NEMO configuration".<br/>
 To do so, go to the directory *NEMOGCM/CONFIG/*, and run:
 ~~~~~~~~~~~~~~~~~~
-./makenemo -n MY_CONFIG -d "OCE_SRC"
+./makenemo -n MY_CONFIG -d "OPA_SRC"
 ~~~~~~~~~~~~~~~~~~
 This creates your configuration "MY_CONFIG" in the directory *NEMOGCM/CONFIG*.<br/>
 you could check the cpp_keys used in file *cpp_MY_CONFIG.fcm*, and re-run *makenemo*

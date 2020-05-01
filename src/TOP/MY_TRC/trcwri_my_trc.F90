@@ -19,17 +19,18 @@ MODULE trcwri_my_trc
 
    !!----------------------------------------------------------------------
    !! NEMO/TOP 4.0 , NEMO Consortium (2018)
-   !! $Id: trcwri_my_trc.F90 10069 2018-08-28 14:12:24Z nicolasmartin $
+   !! $Id: trcwri_my_trc.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE trc_wri_my_trc
+   SUBROUTINE trc_wri_my_trc( Kmm )
       !!---------------------------------------------------------------------
       !!                     ***  ROUTINE trc_wri_trc  ***
       !!
       !! ** Purpose :   output passive tracers fields 
       !!---------------------------------------------------------------------
+      INTEGER, INTENT(in)  :: Kmm   ! time level indices
       CHARACTER (len=20)   :: cltra
       INTEGER              :: jn
       !!---------------------------------------------------------------------
@@ -38,7 +39,7 @@ CONTAINS
       ! ---------------------------------------
       DO jn = jp_myt0, jp_myt1
          cltra = TRIM( ctrcnm(jn) )                  ! short title for tracer
-         CALL iom_put( cltra, trn(:,:,:,jn) )
+         CALL iom_put( cltra, tr(:,:,:,jn,Kmm) )
       END DO
       !
    END SUBROUTINE trc_wri_my_trc

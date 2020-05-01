@@ -17,8 +17,6 @@ MODULE in_out_manager
    IMPLICIT NONE
    PUBLIC
 
- 
-   !
    !!----------------------------------------------------------------------
    !!                   namrun namelist parameters
    !!----------------------------------------------------------------------
@@ -29,7 +27,6 @@ MODULE in_out_manager
    CHARACTER(lc) ::   cn_ocerst_outdir !: restart output directory
    LOGICAL       ::   ln_rstart        !: start from (F) rest or (T) a restart file
    LOGICAL       ::   ln_rst_list      !: output restarts at list of times (T) or by frequency (F)
-   INTEGER       ::   nn_no            !: job number
    INTEGER       ::   nn_rstctl        !: control of the time step (0, 1 or 2)
    INTEGER       ::   nn_rstssh   = 0  !: hand made initilization of ssh or not (1/0)
    INTEGER       ::   nn_it000         !: index of the first time step
@@ -45,6 +42,28 @@ MODULE in_out_manager
    LOGICAL       ::   ln_cfmeta        !: output additional data to netCDF files required for compliance with the CF metadata standard
    LOGICAL       ::   ln_clobber       !: clobber (overwrite) an existing file
    INTEGER       ::   nn_chunksz       !: chunksize (bytes) for NetCDF file (works only with iom_nf90 routines)
+   LOGICAL       ::   ln_xios_read     !: use xios to read single file restart
+   INTEGER       ::   nn_wxios         !: write resart using xios 0 - no, 1 - single, 2 - multiple file output
+   INTEGER       ::   nn_no            !: Assimilation cycle
+
+#if defined key_netcdf4
+   !!----------------------------------------------------------------------
+   !!                   namnc4 namelist parameters                         (key_netcdf4)
+   !!----------------------------------------------------------------------
+   ! The following four values determine the partitioning of the output fields
+   ! into netcdf4 chunks. They are unrelated to the nn_chunk_sz setting which is
+   ! for runtime optimisation. The individual netcdf4 chunks can be optionally 
+   ! gzipped (recommended) leading to significant reductions in I/O volumes 
+   !                         !!!**  variables only used with iom_nf90 routines and key_netcdf4 **
+   INTEGER ::   nn_nchunks_i   !: number of chunks required in the i-dimension 
+   INTEGER ::   nn_nchunks_j   !: number of chunks required in the j-dimension 
+   INTEGER ::   nn_nchunks_k   !: number of chunks required in the k-dimension 
+   INTEGER ::   nn_nchunks_t   !: number of chunks required in the t-dimension 
+   LOGICAL ::   ln_nc4zip      !: netcdf4 usage: (T) chunk and compress output using the HDF5 sublayers of netcdf4
+   !                           !                 (F) ignore chunking request and use the netcdf4 library 
+   !                           !                     to produce netcdf3-compatible files 
+#endif
+
 !$AGRIF_DO_NOT_TREAT
    TYPE(snc4_ctl)     :: snc4set        !: netcdf4 chunking control structure (always needed for decision making)
 !$AGRIF_END_DO_NOT_TREAT
@@ -54,7 +73,6 @@ MODULE in_out_manager
    !! (this should disappear in a near futur)
 
    CHARACTER(lc) ::   cexper                      !: experiment name used for output filename
-   INTEGER       ::   no                          !: job number
    INTEGER       ::   nrstdt                      !: control of the time step (0, 1 or 2)
    INTEGER       ::   nit000                      !: index of the first time step
    INTEGER       ::   nitend                      !: index of the last time step
@@ -70,28 +88,51 @@ MODULE in_out_manager
    !!----------------------------------------------------------------------
    INTEGER ::   nitrst                !: time step at which restart file should be written
    LOGICAL ::   lrst_oce              !: logical to control the oce restart write 
+   LOGICAL ::   lrst_ice              !: logical to control the ice restart write 
    INTEGER ::   numror = 0            !: logical unit for ocean restart (read). Init to 0 is needed for SAS (in daymod.F90)
+   INTEGER ::   numrir                !: logical unit for ice   restart (read)
    INTEGER ::   numrow                !: logical unit for ocean restart (write)
+   INTEGER ::   numriw                !: logical unit for ice   restart (write)
    INTEGER ::   nrst_lst              !: number of restart to output next
 
    !!----------------------------------------------------------------------
    !!                    output monitoring
    !!----------------------------------------------------------------------
-   LOGICAL ::   ln_ctl       !: run control for debugging
-   INTEGER ::   nn_timing    !: run control for timing
-   INTEGER ::   nn_diacfl    !: flag whether to create CFL diagnostics
-   INTEGER ::   nn_print     !: level of print (0 no print)
-   INTEGER ::   nn_ictls     !: Start i indice for the SUM control
-   INTEGER ::   nn_ictle     !: End   i indice for the SUM control
-   INTEGER ::   nn_jctls     !: Start j indice for the SUM control
-   INTEGER ::   nn_jctle     !: End   j indice for the SUM control
-   INTEGER ::   nn_isplt     !: number of processors following i
-   INTEGER ::   nn_jsplt     !: number of processors following j
-   INTEGER ::   nn_bench     !: benchmark parameter (0/1)
-   INTEGER ::   nn_bit_cmp   =    0    !: bit reproducibility  (0/1)
+   LOGICAL ::   ln_ctl           !: run control for debugging
+   TYPE :: sn_ctl                !: optional use structure for finer control over output selection
+      LOGICAL :: l_config  = .FALSE.  !: activate/deactivate finer control
+                                      !  Note if l_config is True then ln_ctl is ignored.
+                                      !  Otherwise setting ln_ctl True is equivalent to setting
+                                      !  all the following logicals in this structure True
+      LOGICAL :: l_runstat = .FALSE.  !: Produce/do not produce run.stat file (T/F)
+      LOGICAL :: l_trcstat = .FALSE.  !: Produce/do not produce tracer.stat file (T/F)
+      LOGICAL :: l_oceout  = .FALSE.  !: Produce all ocean.outputs    (T) or just one (F)
+      LOGICAL :: l_layout  = .FALSE.  !: Produce all layout.dat files (T) or just one (F)
+      LOGICAL :: l_mppout  = .FALSE.  !: Produce/do not produce mpp.output_XXXX files (T/F)
+      LOGICAL :: l_mpptop  = .FALSE.  !: Produce/do not produce mpp.top.output_XXXX files (T/F)
+                                      !  Optional subsetting of processor report files
+                                      !  Default settings of 0/1000000/1 should ensure all areas report.
+                                      !  Set to a more restrictive range to select specific areas
+      INTEGER :: procmin   = 0        !: Minimum narea to output
+      INTEGER :: procmax   = 1000000  !: Maximum narea to output
+      INTEGER :: procincr  = 1        !: narea increment to output
+      INTEGER :: ptimincr  = 1        !: timestep increment to output (time.step and run.stat)
+   END TYPE sn_ctl
 
+   TYPE (sn_ctl) :: sn_cfctl     !: run control structure for selective output
+   LOGICAL ::   ln_timing        !: run control for timing
+   LOGICAL ::   ln_diacfl        !: flag whether to create CFL diagnostics
+   INTEGER ::   nn_print         !: level of print (0 no print)
+   INTEGER ::   nn_ictls         !: Start i indice for the SUM control
+   INTEGER ::   nn_ictle         !: End   i indice for the SUM control
+   INTEGER ::   nn_jctls         !: Start j indice for the SUM control
+   INTEGER ::   nn_jctle         !: End   j indice for the SUM control
+   INTEGER ::   nn_isplt         !: number of processors following i
+   INTEGER ::   nn_jsplt         !: number of processors following j
+   INTEGER ::   nn_bench         !: benchmark parameter (0/1)
+   INTEGER ::   nn_bit_cmp = 0   !: bit reproducibility  (0/1)
    !                                          
-   INTEGER ::   nprint, nictls, nictle, njctls, njctle, isplt, jsplt, nbench    !: OLD namelist names
+   INTEGER ::   nprint, nictls, nictle, njctls, njctle, isplt, jsplt    !: OLD namelist names
 
    INTEGER ::   ijsplt     =    1      !: nb of local domain = nb of processors
 
@@ -100,8 +141,9 @@ MODULE in_out_manager
    !!----------------------------------------------------------------------
    INTEGER ::   numstp          =   -1      !: logical unit for time step
    INTEGER ::   numtime         =   -1      !: logical unit for timing
-   INTEGER ::   numout          =    6      !: logical unit for output print; Set to stdout to ensure any early
-                                            !  output can be collected; do not change
+   INTEGER ::   numout          =    6      !: logical unit for output print; Set to stdout to ensure any
+   INTEGER ::   numnul          =   -1      !: logical unit for /dev/null
+      !                                     !  early output can be collected; do not change
    INTEGER ::   numnam_ref      =   -1      !: logical unit for reference namelist
    INTEGER ::   numnam_cfg      =   -1      !: logical unit for configuration specific namelist
    INTEGER ::   numond          =   -1      !: logical unit for Output Namelist Dynamics
@@ -109,7 +151,7 @@ MODULE in_out_manager
    INTEGER ::   numnam_ice_cfg  =   -1      !: logical unit for ice reference namelist
    INTEGER ::   numoni          =   -1      !: logical unit for Output Namelist Ice
    INTEGER ::   numevo_ice      =   -1      !: logical unit for ice variables (temp. evolution)
-   INTEGER ::   numsol          =   -1      !: logical unit for solver statistics
+   INTEGER ::   numrun          =   -1      !: logical unit for run statistics
    INTEGER ::   numdct_in       =   -1      !: logical unit for transports computing
    INTEGER ::   numdct_vol      =   -1      !: logical unit for voulume transports output
    INTEGER ::   numdct_heat     =   -1      !: logical unit for heat    transports output
@@ -120,6 +162,7 @@ MODULE in_out_manager
    !!----------------------------------------------------------------------
    !!                          Run control  
    !!----------------------------------------------------------------------
+   INTEGER       ::   no_print = 0          !: optional argument of fld_fill (if present, suppress some control print)
    INTEGER       ::   nstop = 0             !: error flag (=number of reason for a premature stop run)
    INTEGER       ::   nwarn = 0             !: warning flag (=number of warning found during the run)
    CHARACTER(lc) ::   ctmp1, ctmp2, ctmp3   !: temporary characters 1 to 3
@@ -131,10 +174,13 @@ MODULE in_out_manager
    LOGICAL       ::   lwm      = .FALSE.    !: boolean : true on the 1st processor only (always)
    LOGICAL       ::   lwp      = .FALSE.    !: boolean : true on the 1st processor only .OR. ln_ctl
    LOGICAL       ::   lsp_area = .TRUE.     !: to make a control print over a specific area
+   CHARACTER(lc) ::   cxios_context         !: context name used in xios
+   CHARACTER(lc) ::   crxios_context         !: context name used in xios to read restart
+   CHARACTER(lc) ::   cwxios_context        !: context name used in xios to write restart file
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: in_out_manager.F90 6140 2015-12-21 11:35:23Z timgraham $
-   !! Software governed by the CeCILL licence     (./LICENSE)
+   !! $Id: in_out_manager.F90 10570 2019-01-24 15:14:49Z acc $
+   !! Software governed by the CeCILL license (see ./LICENSE)
    !!=====================================================================
 END MODULE in_out_manager

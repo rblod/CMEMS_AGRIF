@@ -153,6 +153,7 @@ type Agrif_Variable_c
 !> \name Arrays containing the values of the grid variables (character)
 !> @{
     character(2400)                             :: carray0
+    character(:)  ,                 allocatable :: carrayu
     character(200), dimension(:)  , allocatable :: carray1
     character(200), dimension(:,:), allocatable :: carray2
 !> @}

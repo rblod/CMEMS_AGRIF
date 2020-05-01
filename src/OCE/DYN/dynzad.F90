@@ -27,15 +27,15 @@ MODULE dynzad
    PUBLIC   dyn_zad       ! routine called by dynadv.F90
 
    !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: dynzad.F90 10068 2018-08-28 14:09:04Z nicolasmartin $
+   !! $Id: dynzad.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE dyn_zad ( kt )
+   SUBROUTINE dyn_zad ( kt, Kmm, puu, pvv, Krhs )
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE dynzad  ***
       !! 
@@ -43,15 +43,17 @@ CONTAINS
       !!      add it to the general trend of momentum equation.
       !!
       !! ** Method  :   The now vertical advection of momentum is given by:
-      !!         w dz(u) = ua + 1/(e1e2u*e3u) mk+1[ mi(e1e2t*wn) dk(un) ]
-      !!         w dz(v) = va + 1/(e1e2v*e3v) mk+1[ mj(e1e2t*wn) dk(vn) ]
-      !!      Add this trend to the general trend (ua,va):
-      !!         (ua,va) = (ua,va) + w dz(u,v)
+      !!         w dz(u) = u(rhs) + 1/(e1e2u*e3u) mk+1[ mi(e1e2t*ww) dk(u) ]
+      !!         w dz(v) = v(rhs) + 1/(e1e2v*e3v) mk+1[ mj(e1e2t*ww) dk(v) ]
+      !!      Add this trend to the general trend (puu(:,:,:,Krhs),pvv(:,:,:,Krhs)):
+      !!         (u(rhs),v(rhs)) = (u(rhs),v(rhs)) + w dz(u,v)
       !!
-      !! ** Action  : - Update (ua,va) with the vert. momentum adv. trends
+      !! ** Action  : - Update (puu(:,:,:,Krhs),pvv(:,:,:,Krhs)) with the vert. momentum adv. trends
       !!              - Send the trends to trddyn for diagnostics (l_trddyn=T)
       !!----------------------------------------------------------------------
-      INTEGER, INTENT(in) ::   kt   ! ocean time-step inedx
+      INTEGER                             , INTENT( in )  ::  kt               ! ocean time-step inedx
+      INTEGER                             , INTENT( in )  ::  Kmm, Krhs        ! ocean time level indices
+      REAL(wp), DIMENSION(jpi,jpj,jpk,jpt), INTENT(inout) ::  puu, pvv         ! ocean velocities and RHS of momentum equation
       !
       INTEGER  ::   ji, jj, jk   ! dummy loop indices
       REAL(wp) ::   zua, zva     ! local scalars
@@ -67,54 +69,44 @@ CONTAINS
          IF(lwp) WRITE(numout,*) 'dyn_zad : 2nd order vertical advection scheme'
       ENDIF
 
-      IF( l_trddyn )   THEN         ! Save ua and va trends
+      IF( l_trddyn )   THEN         ! Save puu(:,:,:,Krhs) and pvv(:,:,:,Krhs) trends
          ALLOCATE( ztrdu(jpi,jpj,jpk) , ztrdv(jpi,jpj,jpk) ) 
-         ztrdu(:,:,:) = ua(:,:,:) 
-         ztrdv(:,:,:) = va(:,:,:) 
+         ztrdu(:,:,:) = puu(:,:,:,Krhs) 
+         ztrdv(:,:,:) = pvv(:,:,:,Krhs) 
       ENDIF
       
       DO jk = 2, jpkm1              ! Vertical momentum advection at level w and u- and v- vertical
-         DO jj = 2, jpj                   ! vertical fluxes 
-            DO ji = fs_2, jpi             ! vector opt.
-               zww(ji,jj) = 0.25_wp * e1e2t(ji,jj) * wn(ji,jj,jk)
-            END DO
-         END DO
-         DO jj = 2, jpjm1                 ! vertical momentum advection at w-point
-            DO ji = fs_2, fs_jpim1        ! vector opt.
-               zwuw(ji,jj,jk) = ( zww(ji+1,jj  ) + zww(ji,jj) ) * ( un(ji,jj,jk-1) - un(ji,jj,jk) )
-               zwvw(ji,jj,jk) = ( zww(ji  ,jj+1) + zww(ji,jj) ) * ( vn(ji,jj,jk-1) - vn(ji,jj,jk) )
-            END DO  
-         END DO   
+         DO_2D_01_01
+            zww(ji,jj) = 0.25_wp * e1e2t(ji,jj) * ww(ji,jj,jk)
+         END_2D
+         DO_2D_00_00
+            zwuw(ji,jj,jk) = ( zww(ji+1,jj  ) + zww(ji,jj) ) * ( puu(ji,jj,jk-1,Kmm) - puu(ji,jj,jk,Kmm) )
+            zwvw(ji,jj,jk) = ( zww(ji  ,jj+1) + zww(ji,jj) ) * ( pvv(ji,jj,jk-1,Kmm) - pvv(ji,jj,jk,Kmm) )
+         END_2D
       END DO
       !
       ! Surface and bottom advective fluxes set to zero
-      DO jj = 2, jpjm1        
-         DO ji = fs_2, fs_jpim1           ! vector opt.
-            zwuw(ji,jj, 1 ) = 0._wp
-            zwvw(ji,jj, 1 ) = 0._wp
-            zwuw(ji,jj,jpk) = 0._wp
-            zwvw(ji,jj,jpk) = 0._wp
-         END DO  
-      END DO
+      DO_2D_00_00
+         zwuw(ji,jj, 1 ) = 0._wp
+         zwvw(ji,jj, 1 ) = 0._wp
+         zwuw(ji,jj,jpk) = 0._wp
+         zwvw(ji,jj,jpk) = 0._wp
+      END_2D
       !
-      DO jk = 1, jpkm1              ! Vertical momentum advection at u- and v-points
-         DO jj = 2, jpjm1
-            DO ji = fs_2, fs_jpim1       ! vector opt.
-               ua(ji,jj,jk) = ua(ji,jj,jk) - ( zwuw(ji,jj,jk) + zwuw(ji,jj,jk+1) ) * r1_e1e2u(ji,jj) / e3u_n(ji,jj,jk)
-               va(ji,jj,jk) = va(ji,jj,jk) - ( zwvw(ji,jj,jk) + zwvw(ji,jj,jk+1) ) * r1_e1e2v(ji,jj) / e3v_n(ji,jj,jk)
-            END DO  
-         END DO  
-      END DO
+      DO_3D_00_00( 1, jpkm1 )
+         puu(ji,jj,jk,Krhs) = puu(ji,jj,jk,Krhs) - ( zwuw(ji,jj,jk) + zwuw(ji,jj,jk+1) ) * r1_e1e2u(ji,jj) / e3u(ji,jj,jk,Kmm)
+         pvv(ji,jj,jk,Krhs) = pvv(ji,jj,jk,Krhs) - ( zwvw(ji,jj,jk) + zwvw(ji,jj,jk+1) ) * r1_e1e2v(ji,jj) / e3v(ji,jj,jk,Kmm)
+      END_3D
 
       IF( l_trddyn ) THEN           ! save the vertical advection trends for diagnostic
-         ztrdu(:,:,:) = ua(:,:,:) - ztrdu(:,:,:)
-         ztrdv(:,:,:) = va(:,:,:) - ztrdv(:,:,:)
-         CALL trd_dyn( ztrdu, ztrdv, jpdyn_zad, kt )
+         ztrdu(:,:,:) = puu(:,:,:,Krhs) - ztrdu(:,:,:)
+         ztrdv(:,:,:) = pvv(:,:,:,Krhs) - ztrdv(:,:,:)
+         CALL trd_dyn( ztrdu, ztrdv, jpdyn_zad, kt, Kmm )
          DEALLOCATE( ztrdu, ztrdv ) 
       ENDIF
       !                             ! Control print
-      IF(ln_ctl)   CALL prt_ctl( tab3d_1=ua, clinfo1=' zad  - Ua: ', mask1=umask,   &
-         &                       tab3d_2=va, clinfo2=       ' Va: ', mask2=vmask, clinfo3='dyn' )
+      IF(sn_cfctl%l_prtctl)   CALL prt_ctl( tab3d_1=puu(:,:,:,Krhs), clinfo1=' zad  - Ua: ', mask1=umask,   &
+         &                                  tab3d_2=pvv(:,:,:,Krhs), clinfo2=       ' Va: ', mask2=vmask, clinfo3='dyn' )
       !
       IF( ln_timing )   CALL timing_stop('dyn_zad')
       !

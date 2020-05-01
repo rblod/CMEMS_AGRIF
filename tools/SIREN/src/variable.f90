@@ -2,14 +2,12 @@
 ! NEMO system team, System and Interface for oceanic RElocable Nesting
 !----------------------------------------------------------------------
 !
-! MODULE: var
-!
 ! DESCRIPTION:
 !> @brief 
 !> This module manage variable structure.
 !>
 !> @details
-!>    define type TVAR:<br/>
+!> to define type TVAR:<br/>
 !> @code
 !>    TYPE(TVAR) :: tl_var
 !> @endcode
@@ -18,7 +16,7 @@
 !>    However the variable value could be initialised with
 !>    array of real(4), real(8), integer(4) or integer(8).
 !>        
-!>    to initialise a variable structure:<br/>
+!> to initialise a variable structure:<br/>
 !> @code
 !>    tl_var=var_init( cd_name, [value,] [id_start, [id_count,]] [id_type,] [td_dim,] [td_att]... )
 !> @endcode
@@ -41,14 +39,14 @@
 !>    CALL var_print(td_var [,ld_more])
 !> @endcode
 !>       - td_var is the variable structure
-!>       - ld_more to print more infomration about variable
+!>       - ld_more to print more information about variable
 !>
-!>    to clean variable structure:<br/>
+!> to clean variable structure:<br/>
 !> @code
 !>    CALL var_clean(tl_var)
 !> @endcode
 !>
-!>    to copy variable structure in another one (using different memory cell):<br/>
+!> to copy variable structure in another one (using different memory cell):<br/>
 !> @code
 !>    tl_var2=var_copy(tl_var1) 
 !> @endcode
@@ -57,66 +55,66 @@
 !>    create a pointer on the same array. 
 !>    This is not the case with this copy function.
 !>
-!>    to get variable name:<br/>
+!> to get variable name:<br/>
 !>    - tl_var\%c_name
 !>
-!>    to get grid point of the variable:<br/>
+!> to get grid point of the variable
 !>    - tl_var\%c_point
 !>
-!>    to get EW overlap:<br/>
+!> to get EW overlap:<br/>
 !>    - tl_var\%i_ew
 !>
-!>    to get variable value:<br/>
+!> to get variable value:<br/>
 !>    - tl_var\%d_value(:,:,:,:)
 !>    
-!>    to get the type number (based on NETCDF type constants) of the variable 
+!> to get the type number (based on NETCDF type constants) of the variable 
 !>    (as define initially or read in file):<br/>
 !>    - tl_var\%i_type
 !>
-!>    to get variable id (read from a file):<br/>
+!> to get variable id (read from a file):<br/>
 !>    - tl_var\%i_id
 !>
-!>    Variable dimension<br/>
-!>    to get the number of dimension used in the variable:<br/>
+!> **Variable dimension**<br/>
+!> to get the number of dimension used in the variable:<br/>
 !>    - tl_var\%i_ndim
 !>
-!>    to get the array of dimension structure (4 elts) associated to the
-!>    variable:<br/>
+!> to get the array of dimension structure (4 elts) associated to the
+!> variable:<br/>
 !>    - tl_var\%t_dim(:)
 !>
-!>    Variable attributes<br/>
-!>    @note attribue value are always character or real(8) 1D array.<br/>
+!> **Variable attributes**<br/>
+!> @note attribue value are always character or real(8) 1D array.<br/>
 !>
-!>    to get the number of attributes of the variable:<br/>
+!> to get the number of attributes of the variable:<br/>
 !>    - tl_var\%i_natt
 !>
-!>    to get the array of attribute structure associated to the
-!>    variable:<br/>
+!> to get the array of attribute structure associated to the
+!> variable:<br/>
 !>    - tl_var\%t_att(:)
 !>
-!>    Some attribute are highlight, to be easily used.
-!>    to get variable standard name:<br/>
+!> Some attribute are highlight, to be easily used.
+!> to get variable standard name:<br/>
 !>    - tl_var\%c_stdname
 !>
-!>    to get variable longname:<br/>
+!> to get variable longname:<br/>
 !>    - tl_var\%c_longname
 !>
-!>    to get variable units:<br/>
+!> to get variable units:<br/>
 !>    - tl_var\%c_units
 !>
-!>    to get variable axis:<br/>
+!> to get variable axis:<br/>
 !>    - tl_var\%c_axis
 !>
-!>    to get variable scale factor:<br/>
+!> to get variable scale factor:<br/>
 !>    - tl_var\%d_scf
 !>
-!>    to get variable add offset:<br/>
+!> to get variable add offset:<br/>
 !>    - tl_var\%d_ofs
 !>
-!>    to get variable FillValue:<br/>
+!> to get variable FillValue:<br/>
 !>    - tl_var\%d_fill
 !>
-!>    to add value to a variable structure:<br/>
+!> to add value to a variable structure:<br/>
 !> @code
 !>    CALL var_add_value(tl_var, value, [id_type,] [id_start, [id_count]]) 
 !> @endcode
@@ -128,24 +126,24 @@
 !>       - id_count : 1D array of the number of indices selected along each 
 !>       dimension (integer(4), optional)
 !>
-!>    to add attribute to a variable structure:<br/>
+!> to add attribute to a variable structure:<br/>
 !> @code
 !>    CALL var_add_att(tl_var, td_att)
 !> @endcode
 !>       - td_att is an attribute structure, or array of attribute structure 
 !>
-!>    to add dimension to a variable structure:<br/>
+!> to add dimension to a variable structure:<br/>
 !> @code
 !>    CALL var_add_dim(tl_var, td_dim)
 !> @endcode
 !>       - td_dim is a dimension structure, or array of dimension structure
 !> 
-!>    to delete value of a variable structure:<br/>
+!> to delete value of a variable structure:<br/>
 !> @code
 !>    CALL var_del_value(tl_var)
 !> @endcode
 !>
-!>    to delete one attribute of a variable structure:<br/>
+!> to delete one attribute of a variable structure:<br/>
 !> @code
 !>    CALL var_del_att(tl_var, td_att)
 !> @endcode
@@ -156,36 +154,36 @@
 !> @endcode
 !>       - cd_name is attribute name 
 !>
-!>    to delete one dimension of a variable structure:<br/>
+!> to delete one dimension of a variable structure:<br/>
 !> @code
 !>    CALL var_del_dim(tl_var, td_dim)
 !> @endcode
 !>       - td_dim is a dimension structure
 !>
-!>    to overwrite one attribute structure in variable structure:<br/>
+!> to overwrite one attribute structure in variable structure:<br/>
 !> @code
 !>    CALL var_move_att(tl_var, td_att)
 !> @endcode
 !>       - td_att is an attribute structure
 !>
-!>    to overwrite one dimension structure in variable structure:<br/>
+!> to overwrite one dimension structure in variable structure:<br/>
 !> @code
 !>    CALL var_move_dim(tl_var, td_dim)
 !> @endcode
 !>       - td_dim is a dimension structure
 !>
-!>    to get the mask of a variable strucutre, (based on its FillValue):<br/>
+!> to get the mask of a variable strucutre, (based on its FillValue):<br/>
 !> @code
 !>    mask(:,:)=var_get_mask(tl_var)
 !> @endcode
 !>
-!>    to change FillValue to standard NETCDF Fill Value:<br/>
+!> to change FillValue to standard NETCDF Fill Value:<br/>
 !> @code
 !>    CALL  var_chg_FillValue(tl_var, [dd_fill])
 !> @endcode
 !>       - dd_fill is the FillValue to be used [optional]
 !>
-!>    to concatenate two variables:<br/>
+!> to concatenate two variables:<br/>
 !> @code
 !>    tl_var=var_concat(tl_var1, tl_var2, [DIM])
 !> @endcode
@@ -193,24 +191,24 @@
 !>       - tl_var2 : variable structure 
 !>       - DIM : number of the dimension following which concatenate (1=>I, 2=>J, 3=>Z, 4=>T) [optional, default=4]
 !>
-!>    to forced min and max value of a variable:<br/>
-!>    define min and max value of the variable:<br/>
-!>    tl_var\%d_min=min<br/>
-!>    tl_var\%d_max=max<br/>
-!>    then<br/>
+!> to forced min and max value of a variable:<br/>
+!>    - define min and max value of the variable:<br/>
+!>       - tl_var\%d_min=min<br/>
+!>       - tl_var\%d_max=max<br/>
+!>          - min and max : real(8) value
+!>    - then <br/>
 !> @code
 !>    CALL  var_limit_value( tl_var )
 !> @endcode
-!>       - min and max : real(8) value
 !>
-!>    to get the biggest dimensions use in a array of variable:<br/>
+!> to get the biggest dimensions use in a array of variable:<br/>
 !> @code
 !>    tl_dim(:)=var_max_dim(tl_var(:))
 !> @endcode
 !>       - tl_var(:) : array of variable structure
 !>       - tl_dim(:) : array (4 elts) of dimension structure
 !>
-!>    to reorder dimension of a variable (default 'x','y','z','t'):<br/>
+!> to reorder dimension of a variable (default 'x','y','z','t'):<br/>
 !> @code
 !>    CALL var_reorder( td_var, cd_dimorder )
 !> @endcode
@@ -218,68 +216,68 @@
 !>       - cd_dimorder string character(LEN=4) of dimension order to be used (example:
 !> 'yxzt') [optional]
 !>
-!>    to get variable index, in an array of variable structure:<br/>
+!> to get variable index, in an array of variable structure:<br/>
 !> @code
 !>   il_index=var_get_index( td_var, cd_name )
 !> @endcode
 !>    - td_var array of variable structure
 !>    - cd_name variable name
 !> 
-!>    to get variable id, read from a file:<br/>
-!>@code
+!> to get variable id, read from a file:<br/>
+!> @code
 !>  il_id=var_get_id( td_var, cd_name )
-!>@endcode
+!> @endcode
 !>    - td_var array of variable structure
 !>    - cd_name variable name
 !>
-!>    to get free variable unit in an array of variable structure:<br/>
-!>@code
+!> to get free variable unit in an array of variable structure:<br/>
+!> @code
 !>  il_unit=var_get_unit(td_var)
-!>@endcode
+!> @endcode
 !>    - td_var array of variable structure
 !>
-!>    to convert time variable structure in date structure:<br/>
-!>@code
+!> to convert time variable structure in date structure:<br/>
+!> @code
 !>   tl_date=var_to_date(td_var) 
-!>@endcode
+!> @endcode
 !>    - td_var is time variable structure
 !>    - tl_date is date structure
 !>
-!>    to read matrix value from character string in namelist
-!>@code
+!> to read matrix value from character string in namelist
+!> @code
 !>    CALL var_read_matrix(td_var, cd_matrix)
-!>@endcode
+!> @endcode
 !>    - td_var is variable structure
 !>    - cd_matrix is matrix value
 !>
-!>    to read variable configuration file ('variable.cfg') and fill global array
+!> to read variable configuration file ('variable.cfg') and fill global array
 !> of variable structure:<br/>
-!>@code
+!> @code
 !>    CALL var_def_extra( cd_file )
-!>@endcode
+!> @endcode
 !>    - cd_file is filename
 !>
-!>    to add variable information get from namelist, in global array of variable 
+!> to add variable information get from namelist, in global array of variable 
 !> structure:
-!>@code
+!> @code
 !>    CALL var_chg_extra( cd_varinfo )
-!>@endcode
+!> @endcode
 !>    - cd_varinfo is variable information from namelist
 !>
-!>    to clean global array of variable structure:<br/>
-!>@code
+!> to clean global array of variable structure:<br/>
+!> @code
 !>    CALL var_clean_extra( )
-!>@endcode
+!> @endcode
 !>
-!>    to check variable dimension expected, as defined in file 'variable.cfg':<br/>
-!>@code
+!> to check variable dimension expected, as defined in file 'variable.cfg':<br/>
+!> @code
 !>    CALL var_check_dim( td_var )
-!>@endcode
+!> @endcode
 !>    - td_var is variable structure
 !> 
 !> @author
 !> J.Paul
-! REVISION HISTORY:
+!>
 !> @date November, 2013 - Initial Version
 !> @date September, 2014
 !>  - add var_reorder
@@ -294,10 +292,17 @@
 !> @date October, 2016
 !> - add subroutine to clean global array of extra information.
 !> - define logical for variable to be used
+!> @date May, 2019
+!> - read number of element for each dummy array in configuration file
 !>
-!> @note Software governed by the CeCILL licence     (./LICENSE)
+!> @todo
+!> - var_copy_value qui copie le tableau de valeur mais verifie que tous les
+!> attribut sont egaux
+!>
+!> @note Software governed by the CeCILL licence     (NEMOGCM/NEMO_CeCILL.txt)
 !----------------------------------------------------------------------
 MODULE var
+
    USE netcdf                          ! nf90 library
    USE global                          ! global variable
    USE kind                            ! F90 kind parameter
@@ -307,6 +312,7 @@ MODULE var
    USE att                             ! attribute manager
    USE dim                             ! dimension manager
    USE math                            ! mathematical function
+
    IMPLICIT NONE
    ! NOTE_avoid_public_variables_if_possible
 
@@ -315,6 +321,7 @@ MODULE var
 
    PUBLIC :: tg_varextra !< array of variable structure with extra information.
 
+   PRIVATE :: im_ndumvar !< number of elt in dummy variable array
    PRIVATE :: cm_dumvar  !< dummy variable array
 
    ! function and subroutine
@@ -335,6 +342,7 @@ MODULE var
    PUBLIC :: var_concat        !< concatenate two variables
    PUBLIC :: var_limit_value   !< forced min and max value
    PUBLIC :: var_chg_unit      !< change variable unit and value
+   PUBLIC :: var_chg_name      !< change variable name
    PUBLIC :: var_max_dim       !< get array of maximum dimension use
    PUBLIC :: var_reorder       !< reorder table of value in variable structure
    PUBLIC :: var_get_index     !< return the variable index, in an array of variable structure 
@@ -374,8 +382,8 @@ MODULE var
    PRIVATE :: var__init_1D_i8    ! initialize variable structure with integer(8) 1D array of value
    PRIVATE :: var__init_2D_i8    ! initialize variable structure with integer(8) 2D array of value
    PRIVATE :: var__init_3D_i8    ! initialize variable structure with integer(8) 3D array of value
-   PRIVATE :: var__print_unit ! print information on one variable
-   PRIVATE :: var__print_arr  ! print information on a array of variables
+   PRIVATE :: var__print_unit    ! print information on one variable
+   PRIVATE :: var__print_arr     ! print information on a array of variables
    PRIVATE :: var__clean_unit    ! clean variable structure
    PRIVATE :: var__clean_arr_1D  ! clean 1D array of variable structure
    PRIVATE :: var__clean_arr_2D  ! clean 2D array of variable structure
@@ -403,7 +411,8 @@ MODULE var
    PRIVATE :: var__get_max       ! get maximum value from namelist 
    PRIVATE :: var__get_min       ! get minimum value from namelist
    PRIVATE :: var__get_unf       ! get scale factor value from namelist
-   PRIVATE :: var__get_unt       ! get unit from namelist
+   PRIVATE :: var__get_unt       ! get output unit from namelist
+   PRIVATE :: var__get_namout    ! get output variable name from namelist
    PRIVATE :: var__get_interp    ! get interpolation method from namelist
    PRIVATE :: var__get_extrap    ! get extrapolation method from namelist
    PRIVATE :: var__get_filter    ! get filter method from namelist
@@ -438,8 +447,11 @@ MODULE var
       REAL(dp)          :: d_min = dp_fill      !< minimum value 
       REAL(dp)          :: d_max = dp_fill      !< maximum value 
  
-      CHARACTER(LEN=lc) :: c_unt = ''           !< new variables units (linked to units factor)
-      REAL(dp)          :: d_unf = 1._dp        !< units factor
+      ! will be changed in output
+      CHARACTER(LEN=lc) :: c_unt = ''           !< output variable unit (linked to unit factor)
+      REAL(dp)          :: d_unf = 1._dp        !< unit factor
+
+      CHARACTER(LEN=lc) :: c_namout = ''        !< output variable name (renamed variable)
 
       !!! netcdf4
       LOGICAL           :: l_contiguous = .FALSE. !< use contiguous storage or not
@@ -460,7 +472,8 @@ MODULE var
    TYPE(TVAR), DIMENSION(:), ALLOCATABLE :: tg_varextra !< array of variable structure with extra information.
                                                         !< fill when running var_def_extra() 
 
-   CHARACTER(LEN=lc), DIMENSION(ip_maxdumcfg), SAVE :: cm_dumvar !< dummy variable
+   INTEGER(i4)                               , SAVE :: im_ndumvar !< number of elt in dummy variable array
+   CHARACTER(LEN=lc), DIMENSION(ip_maxdumcfg), SAVE :: cm_dumvar  !< dummy variable
 
    INTERFACE var_init
       MODULE PROCEDURE var__init       ! initialize variable structure without array of value
@@ -531,12 +544,15 @@ MODULE var
       MODULE PROCEDURE var__copy_arr    ! copy variable structure
    END INTERFACE
 CONTAINS
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__copy_unit(td_var, ld_value) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine copy variable structure in another one
    !> @details 
-   !> variable value are copied in a temporary array, so input and output
-   !> variable structure value do not point on the same "memory cell", and so
+   !> variable values are copied in a transitional variable, so input and output
+   !> variable structure values do not point on the same "memory cell", and so
    !> are independant. 
    !>
    !> @warning do not use on the output of a function who create or read an
@@ -549,106 +565,129 @@ CONTAINS
    !> @date November, 2013 - Initial Version
    !> @date November, 2014
    !> - use function instead of overload assignment operator (to avoid memory leak)
-   !
+   !> @date July, 2017
+   !> - permit to copy variable structure without value
+   !> @date January, 2019
+   !> - use scalar instead of array, as transitional variable
+   !> @date February, 2019
+   !> - copy namout
+   !>
    !> @param[in] td_var   variable structure
+   !> @param[in] ld_value copy variable value (default .TRUE.)
    !> @return copy of input variable structure
    !-------------------------------------------------------------------
-   FUNCTION var__copy_unit( td_var )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR), INTENT(IN) :: td_var
+      LOGICAL   , INTENT(IN), OPTIONAL :: ld_value
+
       ! function
-      TYPE(TVAR) :: var__copy_unit
+      TYPE(TVAR)             :: tf_var
 
       ! local variable
-      TYPE(TATT)                                :: tl_att
-      REAL(dp), DIMENSION(:,:,:,:), ALLOCATABLE :: dl_value
+      TYPE(TATT) :: tl_att
+      REAL(dp)   :: dl_value
+      LOGICAL    :: ll_value
 
       ! loop indices
       INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
+      INTEGER(i4) :: jk
+      INTEGER(i4) :: jl
       !----------------------------------------------------------------
 
+      ll_value=.TRUE.
+      IF( PRESENT(ld_value) ) ll_value=ld_value
       ! copy variable name, id, ..
-      var__copy_unit%c_name     = TRIM(td_var%c_name)
-      var__copy_unit%c_point    = TRIM(td_var%c_point)
-      var__copy_unit%i_id       = td_var%i_id
-      var__copy_unit%i_ew       = td_var%i_ew
+      tf_var%c_name     = TRIM(td_var%c_name)
+      tf_var%c_point    = TRIM(td_var%c_point)
+      tf_var%i_id       = td_var%i_id
+      tf_var%i_ew       = td_var%i_ew
 
-      var__copy_unit%d_min      = td_var%d_min
-      var__copy_unit%d_max      = td_var%d_max
+      tf_var%d_min      = td_var%d_min
+      tf_var%d_max      = td_var%d_max
 
-      var__copy_unit%c_unt      = TRIM(td_var%c_unt)
-      var__copy_unit%d_unf      = td_var%d_unf
+      tf_var%c_unt      = TRIM(td_var%c_unt)
+      tf_var%d_unf      = td_var%d_unf
 
-      var__copy_unit%i_type     = td_var%i_type
-      var__copy_unit%i_natt     = td_var%i_natt
-      var__copy_unit%i_ndim     = td_var%i_ndim
-      var__copy_unit%i_ndim     = td_var%i_ndim
+      tf_var%c_namout   = TRIM(td_var%c_namout)
+
+      tf_var%i_type     = td_var%i_type
+      tf_var%i_natt     = td_var%i_natt
+      tf_var%i_ndim     = td_var%i_ndim
+      tf_var%i_ndim     = td_var%i_ndim
 
       ! copy dimension
-      var__copy_unit%t_dim(:)   = dim_copy(td_var%t_dim(:))
+      tf_var%t_dim(:)   = dim_copy(td_var%t_dim(:))
 
       ! copy attribute
-      IF( ASSOCIATED(var__copy_unit%t_att) )THEN
-         CALL att_clean( var__copy_unit%t_att(:) )
-         DEALLOCATE(var__copy_unit%t_att)
+      IF( ASSOCIATED(tf_var%t_att) )THEN
+         CALL att_clean( tf_var%t_att(:) )
+         DEALLOCATE(tf_var%t_att)
       ENDIF
-      IF( ASSOCIATED(td_var%t_att) .AND. var__copy_unit%i_natt > 0 )THEN
-         ALLOCATE( var__copy_unit%t_att(var__copy_unit%i_natt) )
-         DO ji=1,var__copy_unit%i_natt
+      IF( ASSOCIATED(td_var%t_att) .AND. tf_var%i_natt > 0 )THEN
+         ALLOCATE( tf_var%t_att(tf_var%i_natt) )
+         DO ji=1,tf_var%i_natt
             tl_att=att_copy(td_var%t_att(ji))
-            var__copy_unit%t_att(ji)=att_copy(tl_att)
+            tf_var%t_att(ji)=att_copy(tl_att)
          ENDDO
          ! clean
          CALL att_clean(tl_att)
       ENDIF
 
-      var__copy_unit%l_file     = td_var%l_file
-      var__copy_unit%l_use      = td_var%l_use
+      tf_var%l_file     = td_var%l_file
+      tf_var%l_use      = td_var%l_use
 
       ! copy highlight attribute
-      var__copy_unit%c_stdname  = TRIM(td_var%c_stdname)
-      var__copy_unit%c_longname = TRIM(td_var%c_longname)
-      var__copy_unit%c_units    = TRIM(td_var%c_units)
-      var__copy_unit%c_axis     = TRIM(td_var%c_axis)
-      var__copy_unit%d_unf      = td_var%d_unf
-      var__copy_unit%d_scf      = td_var%d_scf
-      var__copy_unit%d_ofs      = td_var%d_ofs
-      var__copy_unit%d_fill     = td_var%d_fill
+      tf_var%c_stdname  = TRIM(td_var%c_stdname)
+      tf_var%c_longname = TRIM(td_var%c_longname)
+      tf_var%c_units    = TRIM(td_var%c_units)
+      tf_var%c_axis     = TRIM(td_var%c_axis)
+      tf_var%d_unf      = td_var%d_unf
+      tf_var%d_scf      = td_var%d_scf
+      tf_var%d_ofs      = td_var%d_ofs
+      tf_var%d_fill     = td_var%d_fill
       
       ! copy netcdf4 variable
-      var__copy_unit%l_contiguous  = td_var%l_contiguous
-      var__copy_unit%l_shuffle     = td_var%l_shuffle
-      var__copy_unit%l_fletcher32  = td_var%l_fletcher32 
-      var__copy_unit%i_deflvl      = td_var%i_deflvl
-      var__copy_unit%i_chunksz(:)  = td_var%i_chunksz(:)
+      tf_var%l_contiguous  = td_var%l_contiguous
+      tf_var%l_shuffle     = td_var%l_shuffle
+      tf_var%l_fletcher32  = td_var%l_fletcher32 
+      tf_var%i_deflvl      = td_var%i_deflvl
+      tf_var%i_chunksz(:)  = td_var%i_chunksz(:)
       
       ! copy dimg variable
-      var__copy_unit%i_rec = td_var%i_rec
+      tf_var%i_rec = td_var%i_rec
 
       ! copy pointer in an independant variable
-      IF( ASSOCIATED(var__copy_unit%d_value) ) DEALLOCATE(var__copy_unit%d_value)
-      IF( ASSOCIATED(td_var%d_value) )THEN
-         ALLOCATE( dl_value( td_var%t_dim(1)%i_len, &
-         &                   td_var%t_dim(2)%i_len, &
-         &                   td_var%t_dim(3)%i_len, &
-         &                   td_var%t_dim(4)%i_len ) )
-         dl_value(:,:,:,:)=td_var%d_value(:,:,:,:)
+      IF( ASSOCIATED(tf_var%d_value) ) DEALLOCATE(tf_var%d_value)
+      IF( ll_value .AND. ASSOCIATED(td_var%d_value) )THEN
+         ALLOCATE( tf_var%d_value( tf_var%t_dim(1)%i_len, &
+            &                      tf_var%t_dim(2)%i_len, &
+            &                      tf_var%t_dim(3)%i_len, &
+            &                      tf_var%t_dim(4)%i_len ) )
+         DO jl=1,td_var%t_dim(4)%i_len
+            DO jk=1,td_var%t_dim(3)%i_len
+               DO jj=1,td_var%t_dim(2)%i_len
+                  DO ji=1,td_var%t_dim(1)%i_len
+                     dl_value=td_var%d_value(ji,jj,jk,jl)
+                     tf_var%d_value(ji,jj,jk,jl)=dl_value
+                  ENDDO
+               ENDDO
+            ENDDO
+         ENDDO
 
-         ALLOCATE( var__copy_unit%d_value( var__copy_unit%t_dim(1)%i_len, &
-         &                          var__copy_unit%t_dim(2)%i_len, &
-         &                          var__copy_unit%t_dim(3)%i_len, &
-         &                          var__copy_unit%t_dim(4)%i_len ) )
-         var__copy_unit%d_value(:,:,:,:)=dl_value(:,:,:,:)
-
-         DEALLOCATE( dl_value )
       ENDIF
 
-      var__copy_unit%c_interp(:)=td_var%c_interp(:)
-      var__copy_unit%c_extrap(:)=td_var%c_extrap(:)
-      var__copy_unit%c_filter(:)=td_var%c_filter(:)
+      tf_var%c_interp(:)=td_var%c_interp(:)
+      tf_var%c_extrap(:)=td_var%c_extrap(:)
+      tf_var%c_filter(:)=td_var%c_filter(:)
 
    END FUNCTION var__copy_unit
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__copy_arr(td_var) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine copy a array of variable structure in another one
@@ -666,16 +705,18 @@ CONTAINS
    !> @date November, 2014
    !> - use function instead of overload assignment operator 
    !> (to avoid memory leak)
-   !
+   !>
    !> @param[in] td_var   array of variable structure
    !> @return copy of input array of variable structure
    !-------------------------------------------------------------------
-   FUNCTION var__copy_arr( td_var )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR), DIMENSION(:), INTENT(IN   ) :: td_var
+
       ! function
-      TYPE(TVAR), DIMENSION(SIZE(td_var(:))) :: var__copy_arr
+      TYPE(TVAR), DIMENSION(SIZE(td_var(:)))  :: tf_var
 
       ! local variable
       ! loop indices
@@ -683,20 +724,25 @@ CONTAINS
       !----------------------------------------------------------------
 
       DO ji=1,SIZE(td_var(:))
-         var__copy_arr(ji)=var_copy(td_var(ji))
+         tf_var(ji)=var_copy(td_var(ji))
       ENDDO
 
    END FUNCTION var__copy_arr
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var__clean_unit(td_var)
    !-------------------------------------------------------------------
    !> @brief This subroutine clean variable structure
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
+   !> @date January, 2019
+   !> - nullify attributes structure inside variable strcuture
    !>
    !> @param[inout] td_var variable strucutre
    !-------------------------------------------------------------------
-   SUBROUTINE var__clean_unit( td_var )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR), INTENT(INOUT) :: td_var
 
@@ -710,6 +756,7 @@ CONTAINS
       IF( ASSOCIATED(td_var%t_att) )THEN
          CALL att_clean( td_var%t_att(:) )
          DEALLOCATE(td_var%t_att)
+         NULLIFY(td_var%t_att)
       ENDIF
 
       ! del dimension
@@ -726,16 +773,19 @@ CONTAINS
       td_var=var_copy(tl_var)
 
    END SUBROUTINE var__clean_unit
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var__clean_arr_1D(td_var)
    !-------------------------------------------------------------------
    !> @brief This subroutine clean 1D array of variable structure
-   !
+   !>
    !> @author J.Paul
    !> @date September, 2014 - Initial Version
-   !
+   !>
    !> @param[inout] td_var array of variable strucutre
    !-------------------------------------------------------------------
-   SUBROUTINE var__clean_arr_1D( td_var )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR), DIMENSION(:), INTENT(INOUT) :: td_var
 
@@ -749,16 +799,19 @@ CONTAINS
       ENDDO
 
    END SUBROUTINE var__clean_arr_1D
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var__clean_arr_2D(td_var)
    !-------------------------------------------------------------------
    !> @brief This subroutine clean 2D array of variable structure
-   !
+   !>
    !> @author J.Paul
    !> @date September, 2014 - Initial Version
-   !
+   !>
    !> @param[inout] td_var array of variable strucutre
    !-------------------------------------------------------------------
-   SUBROUTINE var__clean_arr_2D( td_var )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR), DIMENSION(:,:), INTENT(INOUT) :: td_var
 
@@ -775,16 +828,19 @@ CONTAINS
       ENDDO
 
    END SUBROUTINE var__clean_arr_2D
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var__clean_arr_3D(td_var)
    !-------------------------------------------------------------------
    !> @brief This subroutine clean 3D array of variable structure
-   !
+   !>
    !> @author J.Paul
    !> @date September, 2014 - Initial Version
-   !
+   !>
    !> @param[inout] td_var array of variable strucutre
    !-------------------------------------------------------------------
-   SUBROUTINE var__clean_arr_3D( td_var )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR), DIMENSION(:,:,:), INTENT(INOUT) :: td_var
 
@@ -804,9 +860,22 @@ CONTAINS
       ENDDO
 
    END SUBROUTINE var__clean_arr_3D
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__init(cd_name, id_type, td_dim,             &
+         &            td_att, dd_fill, cd_units, cd_axis,   &
+         &            cd_stdname, cd_longname,              &
+         &            cd_point, id_id, id_ew,               &
+         &            dd_scf, dd_ofs,  id_rec,              &
+         &            dd_min, dd_max,                       &
+         &            ld_contiguous, ld_shuffle,            &
+         &            ld_fletcher32, id_deflvl, id_chunksz, &
+         &            cd_interp, cd_extrap, cd_filter,      &
+         &            cd_unt, dd_unf,                       &
+         &            cd_namout) &
+         &  RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function initialize a variable structure, given variable name.
-   !
+   !>
    !> @details
    !> Optionally you could add 1D,2D,3D or 4D array of value, 
    !> see var__init_1D_dp, var__init_2D_dp... for more information.
@@ -849,6 +918,8 @@ CONTAINS
    !> - Bug fix: conversion of the FillValue type (float case)
    !> @date June, 2015 
    !> - add unit factor (to change unit)
+   !> @date February, 2019
+   !> - add output name (to change name)
    !>
    !> @param[in] cd_name         variable name
    !> @param[in] id_type         variable type 
@@ -875,21 +946,14 @@ CONTAINS
    !> @param[in] cd_interp       interpolation method
    !> @param[in] cd_extrap       extrapolation method
    !> @param[in] cd_filter       filter method
-   !> @param[in] cd_unt          new units (linked to units factor)
+   !> @param[in] cd_unt          output unit (linked to units factor)
    !> @param[in] dd_unf          units factor
+   !> @param[in] cd_namout       output name (renamed variable)
    !> @return variable structure
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION var__init( cd_name, id_type, td_dim, &
-   &                              td_att, dd_fill, cd_units, cd_axis, &
-   &                              cd_stdname, cd_longname,  &
-   &                              cd_point, id_id, id_ew,   &
-   &                              dd_scf, dd_ofs,  id_rec,  &
-   &                              dd_min, dd_max,           &
-   &                              ld_contiguous, ld_shuffle,&
-   &                              ld_fletcher32, id_deflvl, id_chunksz, &
-   &                              cd_interp, cd_extrap, cd_filter, &
-   &                              cd_unt, dd_unf )
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),                       INTENT(IN) :: cd_name
       INTEGER(i4)     ,                       INTENT(IN), OPTIONAL :: id_type 
@@ -918,7 +982,10 @@ CONTAINS
       CHARACTER(LEN=*), DIMENSION(5)        , INTENT(IN), OPTIONAL :: cd_filter
       CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_unt
       REAL(dp)        ,                       INTENT(IN), OPTIONAL :: dd_unf
+      CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_namout
 
+      ! function
+      TYPE(TVAR)                                         :: tf_var
 
       ! local variable
       INTEGER(i4) :: il_ind
@@ -929,50 +996,50 @@ CONTAINS
       !----------------------------------------------------------------
 
       ! clean variable
-      CALL var_clean(var__init)
+      CALL var_clean(tf_var)
 
-      var__init%c_name=TRIM(ADJUSTL(cd_name))
+      tf_var%c_name=TRIM(ADJUSTL(cd_name))
 
       ! standard name
       IF( PRESENT(cd_stdname) )THEN
-         var__init%c_stdname=TRIM(ADJUSTL(cd_stdname))
+         tf_var%c_stdname=TRIM(ADJUSTL(cd_stdname))
       ENDIF
 
       ! long name
       IF( PRESENT(cd_longname) )THEN
-         var__init%c_longname=TRIM(ADJUSTL(cd_longname))
+         tf_var%c_longname=TRIM(ADJUSTL(cd_longname))
       ENDIF
 
       ! point
       IF( PRESENT(cd_point) )THEN
-         var__init%c_point=TRIM(ADJUSTL(cd_point))
+         tf_var%c_point=TRIM(ADJUSTL(cd_point))
       ENDIF
 
       ! variable id
       IF( PRESENT(id_id) )THEN
-         var__init%i_id=id_id
+         tf_var%i_id=id_id
       ENDIF
 
       ! east west wrap
       IF( PRESENT(id_ew) )THEN
-         var__init%i_ew=id_ew
+         tf_var%i_ew=id_ew
       ENDIF
 
       ! type
       IF( PRESENT(id_type) )THEN
-         var__init%i_type=id_type
+         tf_var%i_type=id_type
       ELSE
-         var__init%i_type=NF90_DOUBLE
+         tf_var%i_type=NF90_DOUBLE
       ENDIF
 
       ! add attribute
       IF( PRESENT(td_att) )THEN
-         CALL var_add_att(var__init, td_att(:))
+         CALL var_add_att(tf_var, td_att(:))
       ENDIF
 
       ! add _FillValue
       IF( PRESENT(dd_fill) )THEN
-         SELECT CASE( var__init%i_type )
+         SELECT CASE( tf_var%i_type )
             CASE(NF90_BYTE)
                tl_att=att_init('_FillValue', INT(dd_fill,i1) )
             CASE(NF90_SHORT)
@@ -984,14 +1051,14 @@ CONTAINS
             CASE DEFAULT ! NF90_DOUBLE
                tl_att=att_init('_FillValue', dd_fill )
          END SELECT
-         CALL var_move_att(var__init, tl_att)
+         CALL var_move_att(tf_var, tl_att)
       ELSE
          il_ind=0
-         IF( ASSOCIATED(var__init%t_att) )THEN
-            il_ind=att_get_index(var__init%t_att(:),'_FillValue')
+         IF( ASSOCIATED(tf_var%t_att) )THEN
+            il_ind=att_get_index(tf_var%t_att(:),'_FillValue')
          ENDIF
          IF( il_ind == 0 )THEN
-            SELECT CASE( var__init%i_type )
+            SELECT CASE( tf_var%i_type )
                CASE(NF90_BYTE)
                   tl_att=att_init('_FillValue',NF90_FILL_BYTE)
                CASE(NF90_SHORT)
@@ -1003,119 +1070,139 @@ CONTAINS
                CASE DEFAULT ! NF90_DOUBLE
                   tl_att=att_init('_FillValue',NF90_FILL_DOUBLE)
             END SELECT         
-            CALL var_add_att(var__init, tl_att)
+            CALL var_add_att(tf_var, tl_att)
          ENDIF
       ENDIF
 
       ! scale factor
       IF( PRESENT(dd_scf) )THEN
          tl_att=att_init('scale_factor',dd_scf)
-         CALL var_move_att(var__init, tl_att)
+         CALL var_move_att(tf_var, tl_att)
       ENDIF
 
       ! add offset
       IF( PRESENT(dd_ofs) )THEN
          tl_att=att_init('add_offset',dd_ofs)
-         CALL var_move_att(var__init, tl_att)
+         CALL var_move_att(tf_var, tl_att)
       ENDIF
 
       IF( PRESENT(cd_units) )THEN
          tl_att=att_init('units',cd_units)
-         CALL var_move_att(var__init, tl_att)
+         CALL var_move_att(tf_var, tl_att)
       ENDIF
 
       IF( PRESENT(cd_axis) )THEN
-         var__init%c_axis=TRIM(cd_axis)
+         tf_var%c_axis=TRIM(cd_axis)
       ENDIF
 
       ! add dimension
       IF( PRESENT(td_dim) )THEN
-         CALL var_add_dim(var__init, td_dim(:))
+         CALL var_add_dim(tf_var, td_dim(:))
       ELSE
-         CALL var_add_dim(var__init, dim_fill_unused())
+         CALL var_add_dim(tf_var, dim_fill_unused())
       ENDIF
 
       IF( PRESENT(id_rec) )THEN
-         var__init%i_rec=id_rec
+         tf_var%i_rec=id_rec
       ENDIF
 
       ! add minimum value
       IF( PRESENT(dd_min) )THEN
-         var__init%d_min=dd_min
+         tf_var%d_min=dd_min
       ENDIF
 
       ! add maximum value
       IF( PRESENT(dd_max) )THEN
-         var__init%d_max=dd_max
+         tf_var%d_max=dd_max
       ENDIF
 
       ! netcdf4
       IF( PRESENT(ld_contiguous) )THEN
-         var__init%l_contiguous=ld_contiguous
+         tf_var%l_contiguous=ld_contiguous
       ENDIF
 
       IF( PRESENT(ld_shuffle) )THEN
-         var__init%l_shuffle=ld_shuffle
+         tf_var%l_shuffle=ld_shuffle
       ENDIF
 
       IF( PRESENT(ld_fletcher32) )THEN
-         var__init%l_fletcher32=ld_fletcher32
+         tf_var%l_fletcher32=ld_fletcher32
       ENDIF
 
        IF( PRESENT(id_deflvl) )THEN
-         var__init%i_deflvl=id_deflvl
+         tf_var%i_deflvl=id_deflvl
       ENDIF     
       
       IF( PRESENT(id_chunksz) )THEN
-         var__init%i_chunksz(:)=id_chunksz(:)
+         tf_var%i_chunksz(:)=id_chunksz(:)
       ENDIF
 
       ! interp
       IF( PRESENT(cd_interp) )THEN
-         var__init%c_interp(:)=cd_interp(:)
+         tf_var%c_interp(:)=cd_interp(:)
       ENDIF
 
       !extrap
       IF( PRESENT(cd_extrap) )THEN
-         var__init%c_extrap(:)=cd_extrap(:)
+         tf_var%c_extrap(:)=cd_extrap(:)
       ENDIF
 
       !filter
       IF( PRESENT(cd_filter) )THEN
-         var__init%c_filter(:)=cd_filter(:)
+         tf_var%c_filter(:)=cd_filter(:)
       ENDIF
 
-      ! units factor
+      ! unit factor
       IF( PRESENT(dd_unf) )THEN
          tl_att=att_init('units_factor',dd_unf)
-         CALL var_move_att(var__init, tl_att)
+         CALL var_move_att(tf_var, tl_att)
       ENDIF
 
-      ! new units (linked to units factor)
+      ! output unit (linked to unit factor)
       IF( PRESENT(cd_unt) )THEN
-         tl_att=att_init('new_units',cd_units)
-         CALL var_move_att(var__init, tl_att)
+         tl_att=att_init('new_units',cd_unt)
+         CALL var_move_att(tf_var, tl_att)
+      ENDIF
+
+      ! output name (renamed variable)
+      IF( PRESENT(cd_unt) )THEN
+         tl_att=att_init('output_name',cd_namout)
+         CALL var_move_att(tf_var, tl_att)
       ENDIF
 
       ! add extra information
-      CALL var__get_extra(var__init)
+      CALL var__get_extra(tf_var)
 
       ! delete some attribute cause linked to file where variable come from
-      CALL var_del_att(var__init, 'refinment_factor')
-      CALL var_del_att(var__init, 'interpolation')
-      CALL var_del_att(var__init, 'extrapolation')
-      CALL var_del_att(var__init, 'filter')
-      CALL var_del_att(var__init, 'src_file')
-      CALL var_del_att(var__init, 'src_i_indices')
-      CALL var_del_att(var__init, 'src_j_indices')
-      CALL var_del_att(var__init, 'valid_min')
-      CALL var_del_att(var__init, 'valid_max')
-      CALL var_del_att(var__init, 'missing_value')
+      CALL var_del_att(tf_var, 'refinment_factor')
+      CALL var_del_att(tf_var, 'interpolation')
+      CALL var_del_att(tf_var, 'extrapolation')
+      CALL var_del_att(tf_var, 'filter')
+      CALL var_del_att(tf_var, 'src_file')
+      CALL var_del_att(tf_var, 'src_i_indices')
+      CALL var_del_att(tf_var, 'src_j_indices')
+      CALL var_del_att(tf_var, 'valid_min')
+      CALL var_del_att(tf_var, 'valid_max')
+      CALL var_del_att(tf_var, 'missing_value')
 
       ! clean
       CALL att_clean(tl_att)
 
    END FUNCTION var__init
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__init_1D_dp(cd_name, dd_value,                    &
+         &                  id_start, id_count, id_type, td_dim,  &
+         &                  td_att, dd_fill, cd_units, cd_axis,   &
+         &                  cd_stdname, cd_longname,              &
+         &                  cd_point, id_id, id_ew,               &
+         &                  dd_scf, dd_ofs,  id_rec,              &
+         &                  dd_min, dd_max,                       &
+         &                  ld_contiguous, ld_shuffle,            &
+         &                  ld_fletcher32, id_deflvl, id_chunksz, &
+         &                  cd_interp, cd_extrap, cd_filter,      &
+         &                  cd_unt, dd_unf,                       &
+         &                  cd_namout) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function initialize a variable structure,
    !> with a real(8) 1D array of value.
@@ -1123,7 +1210,7 @@ CONTAINS
    !> Optionally could be added:<br/>
    !> - dimension structure.
    !> - attribute structure.
-   !
+   !>
    !> Dimension structure is needed to put value in variable structure. 
    !> If none is given, we assume array is ordered as ('z') and we 
    !> use array size as lentgh dimension. 
@@ -1131,7 +1218,7 @@ CONTAINS
    !> indices in the variable where value will be written could be specify if
    !> start and count array are given. Dimension structure is needed in that 
    !> case.    
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date June, 2015
@@ -1140,6 +1227,8 @@ CONTAINS
    !> - add unit factor (to change unit)
    !> @date November, 2016
    !> - allow to add scalar value
+   !> @date February, 2019
+   !> - add output name (to change name)
    !>
    !> @param[in] cd_name         variable name
    !> @param[in] dd_value        1D array of real(8) value
@@ -1172,20 +1261,12 @@ CONTAINS
    !> @param[in] cd_filter       filter method
    !> @param[in] cd_unt          new units (linked to units factor)
    !> @param[in] dd_unf          units factor
+   !> @param[in] cd_namout       output name (renamed variable)
    !> @return variable structure
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION var__init_1D_dp( cd_name, dd_value,        &
-   &                                    id_start, id_count, id_type, td_dim, &
-   &                                    td_att, dd_fill, cd_units, cd_axis, &
-   &                                    cd_stdname, cd_longname,  &
-   &                                    cd_point, id_id, id_ew,   &
-   &                                    dd_scf, dd_ofs,  id_rec,  &
-   &                                    dd_min, dd_max,           &
-   &                                    ld_contiguous, ld_shuffle,&
-   &                                    ld_fletcher32, id_deflvl, id_chunksz, &
-   &                                    cd_interp, cd_extrap, cd_filter, &
-   &                                    cd_unt, dd_unf)
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),                       INTENT(IN) :: cd_name
       REAL(dp)        , DIMENSION(:)        , INTENT(IN) :: dd_value
@@ -1217,6 +1298,10 @@ CONTAINS
       CHARACTER(LEN=*), DIMENSION(5)        , INTENT(IN), OPTIONAL :: cd_filter
       CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_unt
       REAL(dp)        ,                       INTENT(IN), OPTIONAL :: dd_unf
+      CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_namout
+
+      ! function
+      TYPE(TVAR)                                         :: tf_var
 
       ! local variable
       INTEGER(i4)                                    :: il_type
@@ -1231,7 +1316,7 @@ CONTAINS
       !----------------------------------------------------------------
 
       ! clean variable
-      CALL var_clean(var__init_1D_dp)
+      CALL var_clean(tf_var)
 
       ! dummy call to avoid warning
       il_type=NF90_DOUBLE
@@ -1258,25 +1343,26 @@ CONTAINS
       il_start(:)=dim_reorder_2xyzt(tl_dim(:),il_start(:))
       il_count(:)=dim_reorder_2xyzt(tl_dim(:),il_count(:))
 
-      var__init_1D_dp=var__init( cd_name, id_type=il_type,           &
-      &                          td_dim=tl_dim(:), td_att=td_att,    &
-      &                          dd_fill=dd_fill, cd_units=cd_units, &
-      &                          cd_axis=cd_axis,                    &
-      &                          cd_stdname=cd_stdname,              &
-      &                          cd_longname=cd_longname,            &
-      &                          cd_point=cd_point, id_id=id_id,     &
-      &                          id_ew=id_ew, dd_scf=dd_scf,         &
-      &                          dd_ofs=dd_ofs,  id_rec=id_rec,      &
-      &                          dd_min=dd_min, dd_max=dd_max,       &
-      &                          ld_contiguous=ld_contiguous,        &
-      &                          ld_shuffle=ld_shuffle,              &
-      &                          ld_fletcher32=ld_fletcher32,        &
-      &                          id_deflvl=id_deflvl,                &
-      &                          id_chunksz=id_chunksz(:),           &
-      &                          cd_interp=cd_interp(:),             &
-      &                          cd_extrap=cd_extrap(:),             &
-      &                          cd_filter=cd_filter(:),             &
-      &                          cd_unt=cd_unt, dd_unf=dd_unf )
+      tf_var=var__init( cd_name, id_type=il_type,           &
+         &              td_dim=tl_dim(:), td_att=td_att,    &
+         &              dd_fill=dd_fill, cd_units=cd_units, &
+         &              cd_axis=cd_axis,                    &
+         &              cd_stdname=cd_stdname,              &
+         &              cd_longname=cd_longname,            &
+         &              cd_point=cd_point, id_id=id_id,     &
+         &              id_ew=id_ew, dd_scf=dd_scf,         &
+         &              dd_ofs=dd_ofs,  id_rec=id_rec,      &
+         &              dd_min=dd_min, dd_max=dd_max,       &
+         &              ld_contiguous=ld_contiguous,        &
+         &              ld_shuffle=ld_shuffle,              &
+         &              ld_fletcher32=ld_fletcher32,        &
+         &              id_deflvl=id_deflvl,                &
+         &              id_chunksz=id_chunksz(:),           &
+         &              cd_interp=cd_interp(:),             &
+         &              cd_extrap=cd_extrap(:),             &
+         &              cd_filter=cd_filter(:),             &
+         &              cd_unt=cd_unt, dd_unf=dd_unf,       &
+         &              cd_namout=cd_namout )
    
       ! add value
       ALLOCATE( dl_value(tl_dim(1)%i_len, &
@@ -1304,21 +1390,35 @@ CONTAINS
          ENDIF
       ENDIF
 
-      CALL var_add_value( var__init_1D_dp, dl_value(:,:,:,:), &
-      &                   il_type, il_start(:), il_count(:) )
+      CALL var_add_value( tf_var, dl_value(:,:,:,:), il_type, &
+         &                il_start(:), il_count(:) )
 
       ! clean
       DEALLOCATE( dl_value )
       CALL dim_clean(tl_dim)
 
    END FUNCTION var__init_1D_dp
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__init_2D_dp(cd_name, dd_value,                    &
+         &                  id_start, id_count, id_type, td_dim,  &
+         &                  td_att, dd_fill, cd_units, cd_axis,   &
+         &                  cd_stdname, cd_longname,              &
+         &                  cd_point, id_id, id_ew,               &
+         &                  dd_scf, dd_ofs,  id_rec,              &
+         &                  dd_min, dd_max,                       &
+         &                  ld_contiguous, ld_shuffle,            &
+         &                  ld_fletcher32, id_deflvl, id_chunksz, &
+         &                  cd_interp, cd_extrap, cd_filter,      &
+         &                  cd_unt, dd_unf,                       &
+         &                  cd_namout) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function initialize a variable structure,
    !> with a real(8) 2D array of value. 
    !> optionally could be added:<br/>
    !> - dimension structure.
    !> - attribute structure.
-   !
+   !>
    !> @details 
    !> array of 2 dimension structure is needed to put value in variable structure. 
    !> If none is given, we assume array is ordered as ('x','y') and we 
@@ -1327,7 +1427,7 @@ CONTAINS
    !> indices in the variable where value will be written could be specify if
    !> start and count array are given. Dimension structure is needed in that 
    !> case.    
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date February, 2015 
@@ -1338,7 +1438,9 @@ CONTAINS
    !> - Bux fix: dimension array initialise not only one value
    !> @date July, 2015
    !> - add unit factor (to change unit)
-   !
+   !> @date February, 2019
+   !> - add output name (to change name)
+   !>
    !> @param[in] cd_name         variable name
    !> @param[in] dd_value        1D array of real(8) value
    !> @param[in] id_start        index in the variable from which the 
@@ -1372,20 +1474,12 @@ CONTAINS
    !> @param[in] cd_filter       filter method
    !> @param[in] cd_unt          new units (linked to units factor)
    !> @param[in] dd_unf          units factor
+   !> @param[in] cd_namout       output name (renamed variable)
    !> @return variable structure
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION var__init_2D_dp( cd_name, dd_value,        &
-   &                                    id_start, id_count, id_type, td_dim, &
-   &                                    td_att, dd_fill, cd_units, cd_axis,&
-   &                                    cd_stdname, cd_longname,  &
-   &                                    cd_point, id_id, id_ew,   &
-   &                                    dd_scf, dd_ofs,  id_rec,  &
-   &                                    dd_min, dd_max,           &
-   &                                    ld_contiguous, ld_shuffle,&
-   &                                    ld_fletcher32, id_deflvl, id_chunksz, &
-   &                                    cd_interp, cd_extrap, cd_filter, &
-   &                                    cd_unt, dd_unf)
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),                       INTENT(IN) :: cd_name
       REAL(dp)        , DIMENSION(:,:)      , INTENT(IN) :: dd_value
@@ -1417,6 +1511,10 @@ CONTAINS
       CHARACTER(LEN=*), DIMENSION(5)        , INTENT(IN), OPTIONAL :: cd_filter
       CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_unt
       REAL(dp)        ,                       INTENT(IN), OPTIONAL :: dd_unf
+      CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_namout
+
+      ! function
+      TYPE(TVAR)                                         :: tf_var
 
       ! local variable
       INTEGER(i4)                                    :: il_type
@@ -1431,7 +1529,7 @@ CONTAINS
       !----------------------------------------------------------------
 
       ! clean variable
-      CALL var_clean(var__init_2D_dp)
+      CALL var_clean(tf_var)
 
       ! dummy call to avoid warning
       il_type=NF90_DOUBLE
@@ -1477,31 +1575,32 @@ CONTAINS
       il_start(:)=dim_reorder_2xyzt(tl_dim(:),il_start(:))
       il_count(:)=dim_reorder_2xyzt(tl_dim(:),il_count(:))
 
-      var__init_2D_dp=var__init( cd_name, id_type=il_type,           &
-      &                          td_dim=tl_dim(:), td_att=td_att,    &
-      &                          dd_fill=dd_fill, cd_units=cd_units, &
-      &                          cd_axis=cd_axis,                    &
-      &                          cd_stdname=cd_stdname,              &
-      &                          cd_longname=cd_longname,            &
-      &                          cd_point=cd_point, id_id=id_id,     &
-      &                          id_ew=id_ew, dd_scf=dd_scf,         &
-      &                          dd_ofs=dd_ofs,  id_rec=id_rec,      &
-      &                          dd_min=dd_min, dd_max=dd_max,       &
-      &                          ld_contiguous=ld_contiguous,        &
-      &                          ld_shuffle=ld_shuffle,              &
-      &                          ld_fletcher32=ld_fletcher32,        &
-      &                          id_deflvl=id_deflvl,                &
-      &                          id_chunksz=id_chunksz(:),           &
-      &                          cd_interp=cd_interp(:),             &
-      &                          cd_extrap=cd_extrap(:),             &
-      &                          cd_filter=cd_filter(:),             &
-      &                          cd_unt=cd_unt, dd_unf=dd_unf )
+      tf_var=var__init( cd_name, id_type=il_type,           &
+         &              td_dim=tl_dim(:), td_att=td_att,    &
+         &              dd_fill=dd_fill, cd_units=cd_units, &
+         &              cd_axis=cd_axis,                    &
+         &              cd_stdname=cd_stdname,              &
+         &              cd_longname=cd_longname,            &
+         &              cd_point=cd_point, id_id=id_id,     &
+         &              id_ew=id_ew, dd_scf=dd_scf,         &
+         &              dd_ofs=dd_ofs,  id_rec=id_rec,      &
+         &              dd_min=dd_min, dd_max=dd_max,       &
+         &              ld_contiguous=ld_contiguous,        &
+         &              ld_shuffle=ld_shuffle,              &
+         &              ld_fletcher32=ld_fletcher32,        &
+         &              id_deflvl=id_deflvl,                &
+         &              id_chunksz=id_chunksz(:),           &
+         &              cd_interp=cd_interp(:),             &
+         &              cd_extrap=cd_extrap(:),             &
+         &              cd_filter=cd_filter(:),             &
+         &              cd_unt=cd_unt, dd_unf=dd_unf,       &
+         &              cd_namout=cd_namout )
    
       ! add value
       ALLOCATE( dl_value(tl_dim(1)%i_len, &
-      &                  tl_dim(2)%i_len, &
-      &                  tl_dim(3)%i_len, &
-      &                  tl_dim(4)%i_len) )
+         &               tl_dim(2)%i_len, &
+         &               tl_dim(3)%i_len, &
+         &               tl_dim(4)%i_len) )
 
       IF( tl_dim(1)%l_use .AND. tl_dim(2)%l_use )THEN
          dl_value(:,:,1,1)=dd_value(:,:)
@@ -1520,14 +1619,28 @@ CONTAINS
          &  TRIM(cd_name)//". invalid dimension to be used")
       ENDIF
 
-      CALL var_add_value( var__init_2D_dp, dl_value(:,:,:,:), &
-      &                   il_type, il_start(:), il_count(:) )
+      CALL var_add_value( tf_var, dl_value(:,:,:,:), il_type, &
+         &                il_start(:), il_count(:) )
 
       ! clean
       DEALLOCATE( dl_value )
       CALL dim_clean(tl_dim)
 
    END FUNCTION var__init_2D_dp
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__init_3D_dp(cd_name, dd_value,                    &
+         &                  id_start, id_count, id_type, td_dim,  &
+         &                  td_att, dd_fill, cd_units, cd_axis,   &
+         &                  cd_stdname, cd_longname,              &
+         &                  cd_point, id_id, id_ew,               &
+         &                  dd_scf, dd_ofs,  id_rec,              &
+         &                  dd_min, dd_max,                       &
+         &                  ld_contiguous, ld_shuffle,            &
+         &                  ld_fletcher32, id_deflvl, id_chunksz, &
+         &                  cd_interp, cd_extrap, cd_filter,      &
+         &                  cd_unt, dd_unf,                       &
+         &                  cd_namout) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function initialize a variable structure,
    !> with a real(8) 3D array of value.
@@ -1543,13 +1656,15 @@ CONTAINS
    !> indices in the variable where value will be written could be specify if
    !> start and count array are given. Dimension structure is needed in that 
    !> case.    
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date June, 2015
    !> - add interp, extrap, and filter argument
    !> @date July, 2015
    !> - add unit factor (to change unit)
+   !> @date February, 2019
+   !> - add output name (to change name)
    !>
    !> @param[in] cd_name         variable name
    !> @param[in] dd_value        1D array of real(8) value
@@ -1584,20 +1699,12 @@ CONTAINS
    !> @param[in] cd_filter       filter method
    !> @param[in] cd_unt          new units (linked to units factor)
    !> @param[in] dd_unf          units factor
+   !> @param[in] cd_namout       output name (renamed variable)
    !> @return variable structure
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION var__init_3D_dp( cd_name, dd_value,        &
-   &                                    id_start, id_count, id_type, td_dim, &
-   &                                    td_att, dd_fill, cd_units, cd_axis,&
-   &                                    cd_stdname, cd_longname,  &
-   &                                    cd_point, id_id, id_ew,   &
-   &                                    dd_scf, dd_ofs,  id_rec,  &
-   &                                    dd_min, dd_max,           &
-   &                                    ld_contiguous, ld_shuffle,&
-   &                                    ld_fletcher32, id_deflvl, id_chunksz, &
-   &                                    cd_interp, cd_extrap, cd_filter, &
-   &                                    cd_unt, dd_unf)
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),                       INTENT(IN) :: cd_name
       REAL(dp)        , DIMENSION(:,:,:)    , INTENT(IN) :: dd_value
@@ -1629,6 +1736,10 @@ CONTAINS
       CHARACTER(LEN=*), DIMENSION(5)        , INTENT(IN), OPTIONAL :: cd_filter
       CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_unt
       REAL(dp)        ,                       INTENT(IN), OPTIONAL :: dd_unf
+      CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_namout
+
+      ! function
+      TYPE(TVAR)                                         :: tf_var
 
       ! local variable
       INTEGER(i4)                                    :: il_type
@@ -1643,7 +1754,7 @@ CONTAINS
       !----------------------------------------------------------------
 
       ! clean variable
-      CALL var_clean(var__init_3D_dp)
+      CALL var_clean(tf_var)
 
       ! dummy call to avoid warning
       il_type=NF90_DOUBLE
@@ -1693,25 +1804,26 @@ CONTAINS
       il_start(:)=dim_reorder_2xyzt(tl_dim(:),il_start(:))
       il_count(:)=dim_reorder_2xyzt(tl_dim(:),il_count(:))
 
-      var__init_3D_dp=var__init( cd_name, id_type=il_type,           &
-      &                          td_dim=tl_dim(:), td_att=td_att,    &
-      &                          dd_fill=dd_fill, cd_units=cd_units, &
-      &                          cd_axis=cd_axis,                    &
-      &                          cd_stdname=cd_stdname,              &
-      &                          cd_longname=cd_longname,            &
-      &                          cd_point=cd_point, id_id=id_id,     &
-      &                          id_ew=id_ew, dd_scf=dd_scf,         &
-      &                          dd_ofs=dd_ofs,  id_rec=id_rec,      &
-      &                          dd_min=dd_min, dd_max=dd_max,       &
-      &                          ld_contiguous=ld_contiguous,        &
-      &                          ld_shuffle=ld_shuffle,              &
-      &                          ld_fletcher32=ld_fletcher32,        &
-      &                          id_deflvl=id_deflvl,                &
-      &                          id_chunksz=id_chunksz(:),           &
-      &                          cd_interp=cd_interp(:),             &
-      &                          cd_extrap=cd_extrap(:),             &
-      &                          cd_filter=cd_filter(:),             &
-      &                          cd_unt=cd_unt, dd_unf=dd_unf )
+      tf_var=var__init( cd_name, id_type=il_type,           &
+         &              td_dim=tl_dim(:), td_att=td_att,    &
+         &              dd_fill=dd_fill, cd_units=cd_units, &
+         &              cd_axis=cd_axis,                    &
+         &              cd_stdname=cd_stdname,              &
+         &              cd_longname=cd_longname,            &
+         &              cd_point=cd_point, id_id=id_id,     &
+         &              id_ew=id_ew, dd_scf=dd_scf,         &
+         &              dd_ofs=dd_ofs,  id_rec=id_rec,      &
+         &              dd_min=dd_min, dd_max=dd_max,       &
+         &              ld_contiguous=ld_contiguous,        &
+         &              ld_shuffle=ld_shuffle,              &
+         &              ld_fletcher32=ld_fletcher32,        &
+         &              id_deflvl=id_deflvl,                &
+         &              id_chunksz=id_chunksz(:),           &
+         &              cd_interp=cd_interp(:),             &
+         &              cd_extrap=cd_extrap(:),             &
+         &              cd_filter=cd_filter(:),             &
+         &              cd_unt=cd_unt, dd_unf=dd_unf,       &
+         &              cd_namout=cd_namout )
    
       ! add value
       ALLOCATE( dl_value(tl_dim(1)%i_len, &
@@ -1732,14 +1844,28 @@ CONTAINS
          &  TRIM(cd_name)//". invalid dimension to be used")
       ENDIF
 
-      CALL var_add_value( var__init_3D_dp, dl_value(:,:,:,:), &
-      &                   il_type, il_start(:), il_count(:) )
+      CALL var_add_value( tf_var, dl_value(:,:,:,:), il_type, &
+         &                il_start(:), il_count(:) )
 
       ! clean
       DEALLOCATE( dl_value )
       CALL dim_clean(tl_dim)
 
    END FUNCTION var__init_3D_dp
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__init_dp(cd_name, dd_value,                    &
+         &               id_start, id_count, id_type, td_dim,  &
+         &               td_att, dd_fill, cd_units, cd_axis,   &
+         &               cd_stdname, cd_longname,              &
+         &               cd_point, id_id, id_ew,               &
+         &               dd_scf, dd_ofs,  id_rec,              &
+         &               dd_min, dd_max,                       &
+         &               ld_contiguous, ld_shuffle,            &
+         &               ld_fletcher32, id_deflvl, id_chunksz, &
+         &               cd_interp, cd_extrap, cd_filter,      &
+         &               cd_unt, dd_unf,                       &
+         &               cd_namout) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function initialize a variable structure,
    !> with a real(8) 4D array of value.
@@ -1755,13 +1881,15 @@ CONTAINS
    !> indices in the variable where value will be written could be specify if
    !> start and count array are given. Dimension structure is needed in that 
    !> case.    
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date June, 2015
    !> - add interp, extrap, and filter argument
    !> @date July, 2015
    !> - add unit factor (to change unit)
+   !> @date February, 2019
+   !> - add output name (to change name)
    !>
    !> @param[in] cd_name         variable name
    !> @param[in] dd_value        4D array of real(8) value
@@ -1796,20 +1924,12 @@ CONTAINS
    !> @param[in] cd_filter       filter method
    !> @param[in] cd_unt          new units (linked to units factor)
    !> @param[in] dd_unf          units factor
+   !> @param[in] cd_namout       output name (renamed variable)
    !> @return variable structure
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION var__init_dp( cd_name, dd_value,        &
-   &                                 id_start, id_count, id_type, td_dim, &
-   &                                 td_att, dd_fill, cd_units, cd_axis,&
-   &                                 cd_stdname, cd_longname,  &
-   &                                 cd_point, id_id, id_ew,   &
-   &                                 dd_scf, dd_ofs,  id_rec,  &
-   &                                 dd_min, dd_max,           &
-   &                                 ld_contiguous, ld_shuffle,&
-   &                                 ld_fletcher32, id_deflvl, id_chunksz, &
-   &                                 cd_interp, cd_extrap, cd_filter, &
-   &                                 cd_unt, dd_unf )
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),                       INTENT(IN) :: cd_name
       REAL(dp)        , DIMENSION(:,:,:,:),   INTENT(IN) :: dd_value
@@ -1841,6 +1961,10 @@ CONTAINS
       CHARACTER(LEN=*), DIMENSION(5)        , INTENT(IN), OPTIONAL :: cd_filter
       CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_unt
       REAL(dp)        ,                       INTENT(IN), OPTIONAL :: dd_unf
+      CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_namout
+
+      ! function
+      TYPE(TVAR)                                         :: tf_var
 
       ! local variable
       INTEGER(i4), DIMENSION(ip_maxdim) :: il_shape
@@ -1853,48 +1977,63 @@ CONTAINS
       !----------------------------------------------------------------
 
       ! clean variable
-      CALL var_clean(var__init_dp)
+      CALL var_clean(tf_var)
 
       ! dummy call to avoid warning
       il_type=NF90_DOUBLE
       IF( PRESENT(id_type) ) il_type=id_type
 
-      var__init_dp=var__init( cd_name, id_type=il_type,           &
-      &                       td_dim=td_dim, td_att=td_att,       &
-      &                       dd_fill=dd_fill, cd_units=cd_units, &
-      &                       cd_axis=cd_axis,                    &
-      &                       cd_stdname=cd_stdname,              &
-      &                       cd_longname=cd_longname,            &
-      &                       cd_point=cd_point, id_id=id_id,     &
-      &                       id_ew=id_ew, dd_scf=dd_scf,         &
-      &                       dd_ofs=dd_ofs,  id_rec=id_rec,      &
-      &                       dd_min=dd_min, dd_max=dd_max,       &
-      &                       ld_contiguous=ld_contiguous,        &
-      &                       ld_shuffle=ld_shuffle,              &
-      &                       ld_fletcher32=ld_fletcher32,        &
-      &                       id_deflvl=id_deflvl,                &
-      &                       id_chunksz=id_chunksz(:),           &
-      &                       cd_interp=cd_interp(:),             &
-      &                       cd_extrap=cd_extrap(:),             &
-      &                       cd_filter=cd_filter(:),             &
-      &                       cd_unt=cd_unt, dd_unf=dd_unf )
+      tf_var=var__init( cd_name, id_type=il_type,           &
+         &              td_dim=td_dim, td_att=td_att,       &
+         &              dd_fill=dd_fill, cd_units=cd_units, &
+         &              cd_axis=cd_axis,                    &
+         &              cd_stdname=cd_stdname,              &
+         &              cd_longname=cd_longname,            &
+         &              cd_point=cd_point, id_id=id_id,     &
+         &              id_ew=id_ew, dd_scf=dd_scf,         &
+         &              dd_ofs=dd_ofs,  id_rec=id_rec,      &
+         &              dd_min=dd_min, dd_max=dd_max,       &
+         &              ld_contiguous=ld_contiguous,        &
+         &              ld_shuffle=ld_shuffle,              &
+         &              ld_fletcher32=ld_fletcher32,        &
+         &              id_deflvl=id_deflvl,                &
+         &              id_chunksz=id_chunksz(:),           &
+         &              cd_interp=cd_interp(:),             &
+         &              cd_extrap=cd_extrap(:),             &
+         &              cd_filter=cd_filter(:),             &
+         &              cd_unt=cd_unt, dd_unf=dd_unf,       &
+         &              cd_namout=cd_namout )
  
       ! add value
       IF( .NOT. PRESENT(td_dim) )THEN
          il_shape(:)=SHAPE(dd_value(:,:,:,:)) 
          DO ji=1,ip_maxdim
             tl_dim=dim_init( cp_dimorder(ji:ji), id_len=il_shape(ji)) 
-            CALL var_add_dim(var__init_dp, tl_dim)
+            CALL var_add_dim(tf_var, tl_dim)
          ENDDO
       ENDIF
 
-      CALL var_add_value( var__init_dp, dd_value(:,:,:,:), &
-      &                   il_type, id_start(:), id_count(:) )
+      CALL var_add_value( tf_var, dd_value(:,:,:,:), il_type, &
+         &                id_start(:), id_count(:) )
 
       ! clean
       CALL dim_clean(tl_dim)
 
    END FUNCTION var__init_dp
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__init_1D_sp(cd_name, rd_value,                    &
+         &                  id_start, id_count, id_type, td_dim,  &
+         &                  td_att, rd_fill, cd_units, cd_axis,   &
+         &                  cd_stdname, cd_longname,              &
+         &                  cd_point, id_id, id_ew,               &
+         &                  dd_scf, dd_ofs,  id_rec,              &
+         &                  dd_min, dd_max,                       &
+         &                  ld_contiguous, ld_shuffle,            &
+         &                  ld_fletcher32, id_deflvl, id_chunksz, &
+         &                  cd_interp, cd_extrap, cd_filter,      &
+         &                  cd_unt, dd_unf,                       &
+         &                  cd_namout) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function initialize a variable structure,
    !> with a real(4) 1D array of value.
@@ -1910,14 +2049,18 @@ CONTAINS
    !> indices in the variable where value will be written could be specify if
    !> start and count array are given. Dimension structure is needed in that 
    !> case.    
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date June, 2015
    !> - add interp, extrap, and filter argument
    !> @date July, 2015
    !> - add unit factor (to change unit)
-   !
+   !> @date January, 2019
+   !> - decompose array conversion on each dimension
+   !> @date February, 2019
+   !> - add output name (to change name)
+   !>
    !> @param[in] cd_name         variable name
    !> @param[in] rd_value        1D array of real(4) value
    !> @param[in] id_start        index in the variable from which the 
@@ -1951,21 +2094,12 @@ CONTAINS
    !> @param[in] cd_filter       filter method
    !> @param[in] cd_unt          new units (linked to units factor)
    !> @param[in] dd_unf          units factor
+   !> @param[in] cd_namout       output name (renamed variable)
    !> @return variable structure
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION var__init_1D_sp( cd_name, rd_value,        &
-   &                                    id_start, id_count, id_type, td_dim, &
-   &                                    td_att, rd_fill, cd_units, cd_axis,&
-   &                                    cd_stdname, cd_longname,  &
-   &                                    cd_point, id_id, id_ew,   &
-   &                                    dd_scf, dd_ofs,  id_rec,  &
-   &                                    dd_min, dd_max,           &
-   &                                    ld_contiguous, ld_shuffle,&
-   &                                    ld_fletcher32, id_deflvl, id_chunksz, &
-   &                                    cd_interp, cd_extrap, cd_filter, &
-   &                                    cd_unt, dd_unf)
 
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),                       INTENT(IN) :: cd_name
       REAL(sp)        , DIMENSION(:)        , INTENT(IN) :: rd_value
@@ -1997,7 +2131,10 @@ CONTAINS
       CHARACTER(LEN=*), DIMENSION(5)        , INTENT(IN), OPTIONAL :: cd_filter
       CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_unt
       REAL(dp)        ,                       INTENT(IN), OPTIONAL :: dd_unf
+      CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_namout
 
+      ! function
+      TYPE(TVAR)                                         :: tf_var
 
       ! local variable
       INTEGER(i4)                                       :: il_type
@@ -2007,10 +2144,11 @@ CONTAINS
       REAL(dp)        , DIMENSION(:)      , ALLOCATABLE :: dl_value
 
       ! loop indices
+      INTEGER(i4) :: ji
       !----------------------------------------------------------------
 
       ! clean variable
-      CALL var_clean(var__init_1D_sp)      
+      CALL var_clean(tf_var)      
 
       il_type=NF90_FLOAT
       IF( PRESENT(id_type) ) il_type=id_type
@@ -2021,35 +2159,52 @@ CONTAINS
       il_shape=SIZE(rd_value(:))
       ALLOCATE( dl_value( il_shape) )
 
-      dl_value(:)=REAL(rd_value(:),dp)
+      DO ji=1,il_shape
+         dl_value(ji)=REAL(rd_value(ji),dp)
+      ENDDO
 
-      var__init_1D_sp=var_init( cd_name, dl_value(:),               &
-      &                         id_start=id_start,                  &
-      &                         id_count=id_count,                  &
-      &                         id_type=il_type,                    &
-      &                         td_dim=td_dim, td_att=td_att,       &
-      &                         dd_fill=dl_fill,                    &
-      &                         cd_units=cd_units,                  &
-      &                         cd_axis=cd_axis,                    &
-      &                         cd_stdname=cd_stdname,              &
-      &                         cd_longname=cd_longname,            &
-      &                         cd_point=cd_point, id_id=id_id,     &
-      &                         id_ew=id_ew, dd_scf=dd_scf,         &
-      &                         dd_ofs=dd_ofs,  id_rec=id_rec,      &
-      &                         dd_min=dd_min, dd_max=dd_max,       &
-      &                         ld_contiguous=ld_contiguous,        &
-      &                         ld_shuffle=ld_shuffle,              &
-      &                         ld_fletcher32=ld_fletcher32,        &
-      &                         id_deflvl=id_deflvl,                &
-      &                         id_chunksz=id_chunksz(:),           &
-      &                         cd_interp=cd_interp(:),             &
-      &                         cd_extrap=cd_extrap(:),             &
-      &                         cd_filter=cd_filter(:),             &
-      &                         cd_unt=cd_unt, dd_unf=dd_unf )
+      tf_var=var_init( cd_name, dl_value(:),               &
+         &             id_start=id_start,                  &
+         &             id_count=id_count,                  &
+         &             id_type=il_type,                    &
+         &             td_dim=td_dim, td_att=td_att,       &
+         &             dd_fill=dl_fill,                    &
+         &             cd_units=cd_units,                  &
+         &             cd_axis=cd_axis,                    &
+         &             cd_stdname=cd_stdname,              &
+         &             cd_longname=cd_longname,            &
+         &             cd_point=cd_point, id_id=id_id,     &
+         &             id_ew=id_ew, dd_scf=dd_scf,         &
+         &             dd_ofs=dd_ofs,  id_rec=id_rec,      &
+         &             dd_min=dd_min, dd_max=dd_max,       &
+         &             ld_contiguous=ld_contiguous,        &
+         &             ld_shuffle=ld_shuffle,              &
+         &             ld_fletcher32=ld_fletcher32,        &
+         &             id_deflvl=id_deflvl,                &
+         &             id_chunksz=id_chunksz(:),           &
+         &             cd_interp=cd_interp(:),             &
+         &             cd_extrap=cd_extrap(:),             &
+         &             cd_filter=cd_filter(:),             &
+         &             cd_unt=cd_unt, dd_unf=dd_unf,       &
+         &             cd_namout=cd_namout )
  
       DEALLOCATE( dl_value )
  
    END FUNCTION var__init_1D_sp
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__init_2D_sp(cd_name, rd_value,                    &
+         &                  id_start, id_count, id_type, td_dim,  &
+         &                  td_att, rd_fill, cd_units, cd_axis,   &
+         &                  cd_stdname, cd_longname,              &
+         &                  cd_point, id_id, id_ew,               &
+         &                  dd_scf, dd_ofs,  id_rec,              &
+         &                  dd_min, dd_max,                       &
+         &                  ld_contiguous, ld_shuffle,            &
+         &                  ld_fletcher32, id_deflvl, id_chunksz, &
+         &                  cd_interp, cd_extrap, cd_filter,      &
+         &                  cd_unt, dd_unf,                       &
+         &                  cd_namout) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function initialize a variable structure,
    !> with a real(4) 2D array of value.
@@ -2065,14 +2220,18 @@ CONTAINS
    !> indices in the variable where value will be written could be specify if
    !> start and count array are given. Dimension structure is needed in that 
    !> case.    
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date June, 2015
    !> - add interp, extrap, and filter argument
    !> @date July, 2015
    !> - add unit factor (to change unit)
-   !
+   !> @date January, 2019
+   !> - decompose array conversion on each dimension
+   !> @date February, 2019
+   !> - add output name (to change name)
+   !>
    !> @param[in] cd_name         : variable name
    !> @param[in] rd_value        : 2D array of real(4) value
    !> @param[in] id_start        : index in the variable from which the 
@@ -2106,21 +2265,12 @@ CONTAINS
    !> @param[in] cd_filter       filter method
    !> @param[in] cd_unt          new units (linked to units factor)
    !> @param[in] dd_unf          units factor
+   !> @param[in] cd_namout       output name (renamed variable)
    !> @return variable structure
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION var__init_2D_sp( cd_name, rd_value,        &
-   &                                    id_start, id_count, id_type, td_dim, &
-   &                                    td_att, rd_fill, cd_units, cd_axis,&
-   &                                    cd_stdname, cd_longname,  &
-   &                                    cd_point, id_id, id_ew,   &
-   &                                    dd_scf, dd_ofs,  id_rec,  &
-   &                                    dd_min, dd_max,           &
-   &                                    ld_contiguous, ld_shuffle,&
-   &                                    ld_fletcher32, id_deflvl, id_chunksz, &
-   &                                    cd_interp, cd_extrap, cd_filter, &
-   &                                    cd_unt, dd_unf)
 
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),                       INTENT(IN) :: cd_name
       REAL(sp)        , DIMENSION(:,:)     ,  INTENT(IN) :: rd_value
@@ -2152,6 +2302,10 @@ CONTAINS
       CHARACTER(LEN=*), DIMENSION(5)        , INTENT(IN), OPTIONAL :: cd_filter
       CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_unt
       REAL(dp)        ,                       INTENT(IN), OPTIONAL :: dd_unf
+      CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_namout
+
+      ! function
+      TYPE(TVAR)                                         :: tf_var
 
       ! local variable
       INTEGER(i4)                                  :: il_type
@@ -2161,10 +2315,12 @@ CONTAINS
       REAL(dp)   , DIMENSION(:,:)    , ALLOCATABLE :: dl_value
 
       ! loop indices
+      INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
       !----------------------------------------------------------------
 
       ! clean variable
-      CALL var_clean(var__init_2D_sp)      
+      CALL var_clean(tf_var)      
 
       il_type=NF90_FLOAT
       IF( PRESENT(id_type) ) il_type=id_type
@@ -2175,37 +2331,56 @@ CONTAINS
       il_shape(:)=SHAPE(rd_value(:,:))
 
       ALLOCATE( dl_value( il_shape(1), &
-      &                   il_shape(2)) )
+         &                il_shape(2)) )
 
-      dl_value(:,:)=REAL(rd_value(:,:),dp)
+      DO jj=1,il_shape(2)
+         DO ji=1,il_shape(1)
+            dl_value(ji,jj)=REAL(rd_value(ji,jj),dp)
+         ENDDO
+      ENDDO
 
-      var__init_2D_sp=var_init( cd_name, dl_value(:,:),             &
-      &                         id_start=id_start,                  &
-      &                         id_count=id_count,                  &
-      &                         id_type=il_type,                    &
-      &                         td_dim=td_dim, td_att=td_att,       &
-      &                         dd_fill=dl_fill,                    &
-      &                         cd_units=cd_units,                  &
-      &                         cd_axis=cd_axis,                    &
-      &                         cd_stdname=cd_stdname,              &
-      &                         cd_longname=cd_longname,            &
-      &                         cd_point=cd_point, id_id=id_id,     &
-      &                         id_ew=id_ew, dd_scf=dd_scf,         &
-      &                         dd_ofs=dd_ofs,  id_rec=id_rec,      &
-      &                         dd_min=dd_min, dd_max=dd_max,       &
-      &                         ld_contiguous=ld_contiguous,        &
-      &                         ld_shuffle=ld_shuffle,              &
-      &                         ld_fletcher32=ld_fletcher32,        &
-      &                         id_deflvl=id_deflvl,                &
-      &                         id_chunksz=id_chunksz(:),           &
-      &                         cd_interp=cd_interp(:),             &
-      &                         cd_extrap=cd_extrap(:),             &
-      &                         cd_filter=cd_filter(:),             &
-      &                         cd_unt=cd_unt, dd_unf=dd_unf )
+      tf_var=var_init( cd_name, dl_value(:,:),             &
+         &             id_start=id_start,                  &
+         &             id_count=id_count,                  &
+         &             id_type=il_type,                    &
+         &             td_dim=td_dim, td_att=td_att,       &
+         &             dd_fill=dl_fill,                    &
+         &             cd_units=cd_units,                  &
+         &             cd_axis=cd_axis,                    &
+         &             cd_stdname=cd_stdname,              &
+         &             cd_longname=cd_longname,            &
+         &             cd_point=cd_point, id_id=id_id,     &
+         &             id_ew=id_ew, dd_scf=dd_scf,         &
+         &             dd_ofs=dd_ofs,  id_rec=id_rec,      &
+         &             dd_min=dd_min, dd_max=dd_max,       &
+         &             ld_contiguous=ld_contiguous,        &
+         &             ld_shuffle=ld_shuffle,              &
+         &             ld_fletcher32=ld_fletcher32,        &
+         &             id_deflvl=id_deflvl,                &
+         &             id_chunksz=id_chunksz(:),           &
+         &             cd_interp=cd_interp(:),             &
+         &             cd_extrap=cd_extrap(:),             &
+         &             cd_filter=cd_filter(:),             &
+         &             cd_unt=cd_unt, dd_unf=dd_unf,       &
+         &             cd_namout=cd_namout )
       
       DEALLOCATE( dl_value )
       
    END FUNCTION var__init_2D_sp
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__init_3D_sp(cd_name, rd_value,        &
+         &                             id_start, id_count, id_type, td_dim, &
+         &                             td_att, rd_fill, cd_units, cd_axis,&
+         &                             cd_stdname, cd_longname,  &
+         &                             cd_point, id_id, id_ew,   &
+         &                             dd_scf, dd_ofs,  id_rec,  &
+         &                             dd_min, dd_max,           &
+         &                             ld_contiguous, ld_shuffle,&
+         &                             ld_fletcher32, id_deflvl, id_chunksz, &
+         &                             cd_interp, cd_extrap, cd_filter, &
+         &                             cd_unt, dd_unf, &
+         &                             cd_namout) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function initialize a variable structure,
    !> with a real(4) 3D array of value.
@@ -2221,14 +2396,18 @@ CONTAINS
    !> indices in the variable where value will be written could be specify if
    !> start and count array are given. Dimension structure is needed in that 
    !> case.    
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date June, 2015
    !> - add interp, extrap, and filter argument
    !> @date July, 2015
    !> - add unit factor (to change unit)
-   !
+   !> @date January, 2019
+   !> - decompose array conversion on each dimension
+   !> @date February, 2019
+   !> - add output name (to change name)
+   !>
    !> @param[in] cd_name         : variable name
    !> @param[in] rd_value        : 2D array of real(4) value
    !> @param[in] id_start        : index in the variable from which the 
@@ -2262,21 +2441,12 @@ CONTAINS
    !> @param[in] cd_filter       filter method
    !> @param[in] cd_unt          new units (linked to units factor)
    !> @param[in] dd_unf          units factor
+   !> @param[in] cd_namout       output name (renamed variable)
    !> @return variable structure
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION var__init_3D_sp( cd_name, rd_value,        &
-   &                                    id_start, id_count, id_type, td_dim, &
-   &                                    td_att, rd_fill, cd_units, cd_axis,&
-   &                                    cd_stdname, cd_longname,  &
-   &                                    cd_point, id_id, id_ew,   &
-   &                                    dd_scf, dd_ofs,  id_rec,  &
-   &                                    dd_min, dd_max,           &
-   &                                    ld_contiguous, ld_shuffle,&
-   &                                    ld_fletcher32, id_deflvl, id_chunksz, &
-   &                                    cd_interp, cd_extrap, cd_filter, &
-   &                                    cd_unt, dd_unf)
 
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),                       INTENT(IN) :: cd_name
       REAL(sp)        , DIMENSION(:,:,:)   ,  INTENT(IN) :: rd_value
@@ -2308,6 +2478,10 @@ CONTAINS
       CHARACTER(LEN=*), DIMENSION(5)        , INTENT(IN), OPTIONAL :: cd_filter
       CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_unt
       REAL(dp)        ,                       INTENT(IN), OPTIONAL :: dd_unf
+      CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_namout
+
+      ! function
+      TYPE(TVAR)                                         :: tf_var
 
       ! local variable
       INTEGER(i4)                                  :: il_type
@@ -2317,10 +2491,13 @@ CONTAINS
       REAL(dp)   , DIMENSION(:,:,:)  , ALLOCATABLE :: dl_value
 
       ! loop indices
+      INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
+      INTEGER(i4) :: jk
       !----------------------------------------------------------------
 
       ! clean variable
-      CALL var_clean(var__init_3D_sp)      
+      CALL var_clean(tf_var)      
 
       il_type=NF90_FLOAT
       IF( PRESENT(id_type) ) il_type=id_type
@@ -2331,38 +2508,59 @@ CONTAINS
       il_shape(:)=SHAPE(rd_value(:,:,:))
 
       ALLOCATE( dl_value( il_shape(1), &
-      &                   il_shape(2), &
-      &                   il_shape(3)) )
+         &                il_shape(2), &
+         &                il_shape(3)) )
 
-      dl_value(:,:,:)=REAL(rd_value(:,:,:),dp)
+      DO jk=1,il_shape(3)
+         DO jj=1,il_shape(2)
+            DO ji=1,il_shape(1)
+               dl_value(ji,jj,jk)=REAL(rd_value(ji,jj,jk),dp)
+            ENDDO
+         ENDDO
+      ENDDO
 
-      var__init_3D_sp=var_init( cd_name, dl_value(:,:,:),           &
-      &                         id_start=id_start,                  &
-      &                         id_count=id_count,                  &
-      &                         id_type=il_type,                    &
-      &                         td_dim=td_dim, td_att=td_att,       &
-      &                         dd_fill=dl_fill,                    &
-      &                         cd_units=cd_units,                  &
-      &                         cd_axis=cd_axis,                    &
-      &                         cd_stdname=cd_stdname,              &
-      &                         cd_longname=cd_longname,            &
-      &                         cd_point=cd_point, id_id=id_id,     &
-      &                         id_ew=id_ew, dd_scf=dd_scf,         &
-      &                         dd_ofs=dd_ofs,  id_rec=id_rec,      &
-      &                         dd_min=dd_min, dd_max=dd_max,       &
-      &                         ld_contiguous=ld_contiguous,        &
-      &                         ld_shuffle=ld_shuffle,              &
-      &                         ld_fletcher32=ld_fletcher32,        &
-      &                         id_deflvl=id_deflvl,                &
-      &                         id_chunksz=id_chunksz(:),           &
-      &                         cd_interp=cd_interp(:),             &
-      &                         cd_extrap=cd_extrap(:),             &
-      &                         cd_filter=cd_filter(:),             &
-      &                         cd_unt=cd_unt, dd_unf=dd_unf)
+      tf_var=var_init( cd_name, dl_value(:,:,:),           &
+         &             id_start=id_start,                  &
+         &             id_count=id_count,                  &
+         &             id_type=il_type,                    &
+         &             td_dim=td_dim, td_att=td_att,       &
+         &             dd_fill=dl_fill,                    &
+         &             cd_units=cd_units,                  &
+         &             cd_axis=cd_axis,                    &
+         &             cd_stdname=cd_stdname,              &
+         &             cd_longname=cd_longname,            &
+         &             cd_point=cd_point, id_id=id_id,     &
+         &             id_ew=id_ew, dd_scf=dd_scf,         &
+         &             dd_ofs=dd_ofs,  id_rec=id_rec,      &
+         &             dd_min=dd_min, dd_max=dd_max,       &
+         &             ld_contiguous=ld_contiguous,        &
+         &             ld_shuffle=ld_shuffle,              &
+         &             ld_fletcher32=ld_fletcher32,        &
+         &             id_deflvl=id_deflvl,                &
+         &             id_chunksz=id_chunksz(:),           &
+         &             cd_interp=cd_interp(:),             &
+         &             cd_extrap=cd_extrap(:),             &
+         &             cd_filter=cd_filter(:),             &
+         &             cd_unt=cd_unt, dd_unf=dd_unf,       &
+         &             cd_namout=cd_namout )
       
       DEALLOCATE( dl_value )
       
    END FUNCTION var__init_3D_sp
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__init_sp(cd_name, rd_value,                    &
+         &               id_start, id_count, id_type, td_dim,  &
+         &               td_att, rd_fill, cd_units, cd_axis,   &
+         &               cd_stdname, cd_longname,              &
+         &               cd_point, id_id, id_ew,               &
+         &               dd_scf, dd_ofs,  id_rec,              &
+         &               dd_min, dd_max,                       &
+         &               ld_contiguous, ld_shuffle,            &
+         &               ld_fletcher32, id_deflvl, id_chunksz, &
+         &               cd_interp, cd_extrap, cd_filter,      &
+         &               cd_unt, dd_unf,                       &
+         &               cd_namout) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function initialize a variable structure,
    !> with a real(4) 4D array of value.
@@ -2378,14 +2576,18 @@ CONTAINS
    !> indices in the variable where value will be written could be specify if
    !> start and count array are given. Dimension structure is needed in that 
    !> case.    
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date June, 2015
    !> - add interp, extrap, and filter argument
    !> @date July, 2015
    !> - add unit factor (to change unit)
-   !
+   !> @date January, 2019
+   !> - decompose array conversion on each dimension
+   !> @date February, 2019
+   !> - add output name (to change name)
+   !>
    !> @param[in] cd_name         variable name
    !> @param[in] rd_value        4D array of real(4) value
    !> @param[in] id_start        index in the variable from which the 
@@ -2419,21 +2621,12 @@ CONTAINS
    !> @param[in] cd_filter       filter method
    !> @param[in] cd_unt          new units (linked to units factor)
    !> @param[in] dd_unf          units factor
+   !> @param[in] cd_namout       output name (renamed variable)
    !> @return variable structure
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION var__init_sp( cd_name, rd_value,        &
-   &                                 id_start, id_count, id_type, td_dim, &
-   &                                 td_att, rd_fill, cd_units, cd_axis,&
-   &                                 cd_stdname, cd_longname,  &
-   &                                 cd_point, id_id, id_ew,   &
-   &                                 dd_scf, dd_ofs,  id_rec,  &
-   &                                 dd_min, dd_max,           &
-   &                                 ld_contiguous, ld_shuffle,&
-   &                                 ld_fletcher32, id_deflvl, id_chunksz, &
-   &                                 cd_interp, cd_extrap, cd_filter, &
-   &                                 cd_unt, dd_unf)
 
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),                       INTENT(IN) :: cd_name
       REAL(sp)        , DIMENSION(:,:,:,:),   INTENT(IN) :: rd_value
@@ -2465,6 +2658,10 @@ CONTAINS
       CHARACTER(LEN=*), DIMENSION(5)        , INTENT(IN), OPTIONAL :: cd_filter
       CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_unt
       REAL(dp)        ,                       INTENT(IN), OPTIONAL :: dd_unf
+      CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_namout
+
+      ! function
+      TYPE(TVAR)                                         :: tf_var
 
       ! local variable
       INTEGER(i4)                                       :: il_type
@@ -2474,10 +2671,14 @@ CONTAINS
       REAL(dp)        , DIMENSION(:,:,:,:), ALLOCATABLE :: dl_value
 
       ! loop indices
+      INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
+      INTEGER(i4) :: jk
+      INTEGER(i4) :: jl
       !----------------------------------------------------------------
 
       ! clean variable
-      CALL var_clean(var__init_sp)      
+      CALL var_clean(tf_var)      
 
       il_type=NF90_FLOAT
       IF( PRESENT(id_type) ) il_type=id_type
@@ -2488,39 +2689,62 @@ CONTAINS
       il_shape(:)=SHAPE(rd_value(:,:,:,:))
 
       ALLOCATE( dl_value( il_shape(1), &
-      &                   il_shape(2), &
-      &                   il_shape(3), &
-      &                   il_shape(4)) )
+         &                il_shape(2), &
+         &                il_shape(3), &
+         &                il_shape(4)) )
 
-      dl_value(:,:,:,:)=REAL(rd_value(:,:,:,:),dp)
+      DO jl=1,il_shape(4)
+         DO jk=1,il_shape(3)
+            DO jj=1,il_shape(2)
+               DO ji=1,il_shape(1)
+                  dl_value(ji,jj,jk,jl)=REAL(rd_value(ji,jj,jk,jl),dp)
+               ENDDO
+            ENDDO
+         ENDDO
+      ENDDO
 
-      var__init_sp=var_init( cd_name, dl_value(:,:,:,:),         &
-      &                      id_start=id_start,                  &
-      &                      id_count=id_count,                  &
-      &                      id_type=il_type,                    &
-      &                      td_dim=td_dim, td_att=td_att,       &
-      &                      dd_fill=dl_fill,                    &
-      &                      cd_units=cd_units,                  &
-      &                      cd_axis=cd_axis,                    &
-      &                      cd_stdname=cd_stdname,              &
-      &                      cd_longname=cd_longname,            &
-      &                      cd_point=cd_point, id_id=id_id,     &
-      &                      id_ew=id_ew, dd_scf=dd_scf,         &
-      &                      dd_ofs=dd_ofs,  id_rec=id_rec,      &
-      &                      dd_min=dd_min, dd_max=dd_max,       &
-      &                      ld_contiguous=ld_contiguous,        &
-      &                      ld_shuffle=ld_shuffle,              &
-      &                      ld_fletcher32=ld_fletcher32,        &
-      &                      id_deflvl=id_deflvl,                &
-      &                      id_chunksz=id_chunksz(:),           &
-      &                      cd_interp=cd_interp(:),             &
-      &                      cd_extrap=cd_extrap(:),             &
-      &                      cd_filter=cd_filter(:),             &
-      &                      cd_unt=cd_unt, dd_unf=dd_unf)
+      tf_var=var_init( cd_name, dl_value(:,:,:,:),         &
+         &             id_start=id_start,                  &
+         &             id_count=id_count,                  &
+         &             id_type=il_type,                    &
+         &             td_dim=td_dim, td_att=td_att,       &
+         &             dd_fill=dl_fill,                    &
+         &             cd_units=cd_units,                  &
+         &             cd_axis=cd_axis,                    &
+         &             cd_stdname=cd_stdname,              &
+         &             cd_longname=cd_longname,            &
+         &             cd_point=cd_point, id_id=id_id,     &
+         &             id_ew=id_ew, dd_scf=dd_scf,         &
+         &             dd_ofs=dd_ofs,  id_rec=id_rec,      &
+         &             dd_min=dd_min, dd_max=dd_max,       &
+         &             ld_contiguous=ld_contiguous,        &
+         &             ld_shuffle=ld_shuffle,              &
+         &             ld_fletcher32=ld_fletcher32,        &
+         &             id_deflvl=id_deflvl,                &
+         &             id_chunksz=id_chunksz(:),           &
+         &             cd_interp=cd_interp(:),             &
+         &             cd_extrap=cd_extrap(:),             &
+         &             cd_filter=cd_filter(:),             &
+         &             cd_unt=cd_unt, dd_unf=dd_unf,       &
+         &             cd_namout=cd_namout )
       
       DEALLOCATE( dl_value )
       
    END FUNCTION var__init_sp
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__init_1D_i8(cd_name, kd_value,                    &
+         &                  id_start, id_count, id_type, td_dim,  &
+         &                  td_att, kd_fill, cd_units, cd_axis,   &
+         &                  cd_stdname, cd_longname,              &
+         &                  cd_point, id_id, id_ew,               &
+         &                  dd_scf, dd_ofs,  id_rec,              &
+         &                  dd_min, dd_max,                       &
+         &                  ld_contiguous, ld_shuffle,            &
+         &                  ld_fletcher32, id_deflvl, id_chunksz, &
+         &                  cd_interp, cd_extrap, cd_filter,      &
+         &                  cd_unt, dd_unf,                       &
+         &                  cd_namout) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function initialize a variable structure,
    !> with a integer(8) 1D array of value.
@@ -2536,14 +2760,18 @@ CONTAINS
    !> indices in the variable where value will be written could be specify if
    !> start and count array are given. Dimension structure is needed in that 
    !> case.    
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date June, 2015
    !> - add interp, extrap, and filter argument
    !> @date July, 2015
    !> - add unit factor (to change unit)
-   !
+   !> @date January, 2019
+   !> - decompose array conversion on each dimension
+   !> @date February, 2019
+   !> - add output name (to change name)
+   !>
    !> @param[in] cd_name         : variable name
    !> @param[in] kd_value        : 1D array of integer(8) value
    !> @param[in] id_start        : index in the variable from which the 
@@ -2577,21 +2805,12 @@ CONTAINS
    !> @param[in] cd_filter       filter method
    !> @param[in] cd_unt          new units (linked to units factor)
    !> @param[in] dd_unf          units factor
+   !> @param[in] cd_namout       output name (renamed variable)
    !> @return variable structure
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION var__init_1D_i8( cd_name, kd_value,        &
-   &                                    id_start, id_count, id_type, td_dim, &
-   &                                    td_att, kd_fill, cd_units, cd_axis,&
-   &                                    cd_stdname, cd_longname,  &
-   &                                    cd_point, id_id, id_ew,   &
-   &                                    dd_scf, dd_ofs,  id_rec,  &
-   &                                    dd_min, dd_max,           &
-   &                                    ld_contiguous, ld_shuffle,&
-   &                                    ld_fletcher32, id_deflvl, id_chunksz, &
-   &                                    cd_interp, cd_extrap, cd_filter, &
-   &                                    cd_unt, dd_unf)
 
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),                       INTENT(IN) :: cd_name
       INTEGER(i8)     , DIMENSION(:)        , INTENT(IN) :: kd_value
@@ -2623,6 +2842,10 @@ CONTAINS
       CHARACTER(LEN=*), DIMENSION(5)        , INTENT(IN), OPTIONAL :: cd_filter
       CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_unt
       REAL(dp)        ,                       INTENT(IN), OPTIONAL :: dd_unf
+      CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_namout
+
+      ! function
+      TYPE(TVAR)                                         :: tf_var
 
       ! local variable
       INTEGER(i4)                                       :: il_type
@@ -2632,10 +2855,11 @@ CONTAINS
       REAL(dp)        , DIMENSION(:)      , ALLOCATABLE :: dl_value
 
       ! loop indices
+      INTEGER(i4) :: ji
       !----------------------------------------------------------------
 
       ! clean variable
-      CALL var_clean(var__init_1D_i8)      
+      CALL var_clean(tf_var)      
 
       il_type=NF90_INT
       IF( PRESENT(id_type) ) il_type=id_type
@@ -2646,35 +2870,52 @@ CONTAINS
       il_shape=SIZE(kd_value(:))
       ALLOCATE( dl_value( il_shape) )
 
-      dl_value(:)=REAL(kd_value(:),dp)
+      DO ji=1,il_shape
+         dl_value(ji)=REAL(kd_value(ji),dp)
+      ENDDO
 
-      var__init_1D_i8=var_init( cd_name, dl_value(:),               &
-      &                         id_start=id_start,                  &
-      &                         id_count=id_count,                  &
-      &                         id_type=il_type,                    &
-      &                         td_dim=td_dim, td_att=td_att,       &
-      &                         dd_fill=dl_fill,                    &
-      &                         cd_units=cd_units,                  &
-      &                         cd_axis=cd_axis,                    &
-      &                         cd_stdname=cd_stdname,              &
-      &                         cd_longname=cd_longname,            &
-      &                         cd_point=cd_point, id_id=id_id,     &
-      &                         id_ew=id_ew, dd_scf=dd_scf,         &
-      &                         dd_ofs=dd_ofs,  id_rec=id_rec,      &
-      &                         dd_min=dd_min, dd_max=dd_max,       &
-      &                         ld_contiguous=ld_contiguous,        &
-      &                         ld_shuffle=ld_shuffle,              &
-      &                         ld_fletcher32=ld_fletcher32,        &
-      &                         id_deflvl=id_deflvl,                &
-      &                         id_chunksz=id_chunksz(:),           &
-      &                         cd_interp=cd_interp(:),             &
-      &                         cd_extrap=cd_extrap(:),             &
-      &                         cd_filter=cd_filter(:),             &
-      &                         cd_unt=cd_unt, dd_unf=dd_unf)
+      tf_var=var_init( cd_name, dl_value(:),               &
+         &             id_start=id_start,                  &
+         &             id_count=id_count,                  &
+         &             id_type=il_type,                    &
+         &             td_dim=td_dim, td_att=td_att,       &
+         &             dd_fill=dl_fill,                    &
+         &             cd_units=cd_units,                  &
+         &             cd_axis=cd_axis,                    &
+         &             cd_stdname=cd_stdname,              &
+         &             cd_longname=cd_longname,            &
+         &             cd_point=cd_point, id_id=id_id,     &
+         &             id_ew=id_ew, dd_scf=dd_scf,         &
+         &             dd_ofs=dd_ofs,  id_rec=id_rec,      &
+         &             dd_min=dd_min, dd_max=dd_max,       &
+         &             ld_contiguous=ld_contiguous,        &
+         &             ld_shuffle=ld_shuffle,              &
+         &             ld_fletcher32=ld_fletcher32,        &
+         &             id_deflvl=id_deflvl,                &
+         &             id_chunksz=id_chunksz(:),           &
+         &             cd_interp=cd_interp(:),             &
+         &             cd_extrap=cd_extrap(:),             &
+         &             cd_filter=cd_filter(:),             &
+         &             cd_unt=cd_unt, dd_unf=dd_unf,       &
+         &             cd_namout=cd_namout )
  
       DEALLOCATE( dl_value )
  
    END FUNCTION var__init_1D_i8
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__init_2D_i8(cd_name, kd_value,        &
+         &                             id_start, id_count, id_type, td_dim, &
+         &                             td_att, kd_fill, cd_units, cd_axis,&
+         &                             cd_stdname, cd_longname,  &
+         &                             cd_point, id_id, id_ew,   &
+         &                             dd_scf, dd_ofs,  id_rec,  &
+         &                             dd_min, dd_max,           &
+         &                             ld_contiguous, ld_shuffle,&
+         &                             ld_fletcher32, id_deflvl, id_chunksz, &
+         &                             cd_interp, cd_extrap, cd_filter, &
+         &                             cd_unt, dd_unf, &
+         &                             cd_namout) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function initialize a variable structure,
    !> with a integer(8) 2D array of value.
@@ -2690,14 +2931,18 @@ CONTAINS
    !> indices in the variable where value will be written could be specify if
    !> start and count array are given. Dimension structure is needed in that 
    !> case.    
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date June, 2015
    !> - add interp, extrap, and filter argument
    !> @date July, 2015
    !> - add unit factor (to change unit)
-   !
+   !> @date January, 2019
+   !> - decompose array conversion on each dimension
+   !> @date February, 2019
+   !> - add output name (to change name)
+   !>
    !> @param[in] cd_name         variable name
    !> @param[in] kd_value        2D array of integer(8) value
    !> @param[in] id_start        index in the variable from which the data values 
@@ -2729,21 +2974,12 @@ CONTAINS
    !> @param[in] cd_filter       filter method
    !> @param[in] cd_unt          new units (linked to units factor)
    !> @param[in] dd_unf          units factor
+   !> @param[in] cd_namout       output name (renamed variable)
    !> @return variable structure
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION var__init_2D_i8( cd_name, kd_value,        &
-   &                                    id_start, id_count, id_type, td_dim, &
-   &                                    td_att, kd_fill, cd_units, cd_axis,&
-   &                                    cd_stdname, cd_longname,  &
-   &                                    cd_point, id_id, id_ew,   &
-   &                                    dd_scf, dd_ofs,  id_rec,  &
-   &                                    dd_min, dd_max,           &
-   &                                    ld_contiguous, ld_shuffle,&
-   &                                    ld_fletcher32, id_deflvl, id_chunksz, &
-   &                                    cd_interp, cd_extrap, cd_filter, &
-   &                                    cd_unt, dd_unf)
 
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),                       INTENT(IN) :: cd_name
       INTEGER(i8)     , DIMENSION(:,:)     ,  INTENT(IN) :: kd_value
@@ -2775,6 +3011,10 @@ CONTAINS
       CHARACTER(LEN=*), DIMENSION(5)        , INTENT(IN), OPTIONAL :: cd_filter
       CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_unt
       REAL(dp)        ,                       INTENT(IN), OPTIONAL :: dd_unf
+      CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_namout
+
+      ! function
+      TYPE(TVAR)                                         :: tf_var
 
       ! local variable
       INTEGER(i4)                                  :: il_type
@@ -2784,10 +3024,12 @@ CONTAINS
       REAL(dp)   , DIMENSION(:,:)    , ALLOCATABLE :: dl_value
 
       ! loop indices
+      INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
       !----------------------------------------------------------------
 
       ! clean variable
-      CALL var_clean(var__init_2D_i8)      
+      CALL var_clean(tf_var)      
 
       il_type=NF90_INT
       IF( PRESENT(id_type) ) il_type=id_type
@@ -2798,37 +3040,56 @@ CONTAINS
       il_shape(:)=SHAPE(kd_value(:,:))
 
       ALLOCATE( dl_value( il_shape(1), &
-      &                   il_shape(2)) )
+         &                il_shape(2)) )
 
-      dl_value(:,:)=REAL(kd_value(:,:),dp)
+      DO jj=1,il_shape(2)
+         DO ji=1,il_shape(1)
+            dl_value(ji,jj)=REAL(kd_value(ji,jj),dp)
+         ENDDO
+      ENDDO
 
-      var__init_2D_i8=var_init( cd_name, dl_value(:,:),             &
-      &                         id_start=id_start,                  &
-      &                         id_count=id_count,                  &
-      &                         id_type=il_type,                    &
-      &                         td_dim=td_dim, td_att=td_att,       &
-      &                         dd_fill=dl_fill,                    &
-      &                         cd_units=cd_units,                  &
-      &                         cd_axis=cd_axis,                    &
-      &                         cd_stdname=cd_stdname,              &
-      &                         cd_longname=cd_longname,            &
-      &                         cd_point=cd_point, id_id=id_id,     &
-      &                         id_ew=id_ew, dd_scf=dd_scf,         &
-      &                         dd_ofs=dd_ofs,  id_rec=id_rec,      &
-      &                         dd_min=dd_min, dd_max=dd_max,       &
-      &                         ld_contiguous=ld_contiguous,        &
-      &                         ld_shuffle=ld_shuffle,              &
-      &                         ld_fletcher32=ld_fletcher32,        &
-      &                         id_deflvl=id_deflvl,                &
-      &                         id_chunksz=id_chunksz(:),           &
-      &                         cd_interp=cd_interp(:),             &
-      &                         cd_extrap=cd_extrap(:),             &
-      &                         cd_filter=cd_filter(:),             &
-      &                         cd_unt=cd_unt, dd_unf=dd_unf)
+      tf_var=var_init( cd_name, dl_value(:,:),             &
+         &             id_start=id_start,                  &
+         &             id_count=id_count,                  &
+         &             id_type=il_type,                    &
+         &             td_dim=td_dim, td_att=td_att,       &
+         &             dd_fill=dl_fill,                    &
+         &             cd_units=cd_units,                  &
+         &             cd_axis=cd_axis,                    &
+         &             cd_stdname=cd_stdname,              &
+         &             cd_longname=cd_longname,            &
+         &             cd_point=cd_point, id_id=id_id,     &
+         &             id_ew=id_ew, dd_scf=dd_scf,         &
+         &             dd_ofs=dd_ofs,  id_rec=id_rec,      &
+         &             dd_min=dd_min, dd_max=dd_max,       &
+         &             ld_contiguous=ld_contiguous,        &
+         &             ld_shuffle=ld_shuffle,              &
+         &             ld_fletcher32=ld_fletcher32,        &
+         &             id_deflvl=id_deflvl,                &
+         &             id_chunksz=id_chunksz(:),           &
+         &             cd_interp=cd_interp(:),             &
+         &             cd_extrap=cd_extrap(:),             &
+         &             cd_filter=cd_filter(:),             &
+         &             cd_unt=cd_unt, dd_unf=dd_unf,       &
+         &             cd_namout=cd_namout )
       
       DEALLOCATE( dl_value )
       
    END FUNCTION var__init_2D_i8
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__init_3D_i8(cd_name, kd_value,                    &
+         &                  id_start, id_count, id_type, td_dim,  &
+         &                  td_att, kd_fill, cd_units, cd_axis,   &
+         &                  cd_stdname, cd_longname,              &
+         &                  cd_point, id_id, id_ew,               &
+         &                  dd_scf, dd_ofs,  id_rec,              &
+         &                  dd_min, dd_max,                       &
+         &                  ld_contiguous, ld_shuffle,            &
+         &                  ld_fletcher32, id_deflvl, id_chunksz, &
+         &                  cd_interp, cd_extrap, cd_filter,      &
+         &                  cd_unt, dd_unf,                       &
+         &                  cd_namout) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function initialize a variable structure,
    !> with a integer(8) 3D array of value.
@@ -2844,14 +3105,18 @@ CONTAINS
    !> indices in the variable where value will be written could be specify if
    !> start and count array are given. Dimension structure is needed in that 
    !> case.    
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date June, 2015
    !> - add interp, extrap, and filter argument
    !> @date July, 2015
    !> - add unit factor (to change unit)
-   !
+   !> @date January, 2019
+   !> - decompose array conversion on each dimension
+   !> @date February, 2019
+   !> - add output name (to change name)
+   !>
    !> @param[in] cd_name         variable name
    !> @param[in] kd_value        2D array of integer(8) value
    !> @param[in] id_start        index in the variable from which the 
@@ -2885,21 +3150,12 @@ CONTAINS
    !> @param[in] cd_filter       filter method
    !> @param[in] cd_unt          new units (linked to units factor)
    !> @param[in] dd_unf          units factor
+   !> @param[in] cd_namout       output name (renamed variable)
    !> @return variable structure
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION var__init_3D_i8( cd_name, kd_value,        &
-   &                                    id_start, id_count, id_type, td_dim, &
-   &                                    td_att, kd_fill, cd_units, cd_axis,&
-   &                                    cd_stdname, cd_longname,  &
-   &                                    cd_point, id_id, id_ew,   &
-   &                                    dd_scf, dd_ofs,  id_rec,  &
-   &                                    dd_min, dd_max,           &
-   &                                    ld_contiguous, ld_shuffle,&
-   &                                    ld_fletcher32, id_deflvl, id_chunksz, &
-   &                                    cd_interp, cd_extrap, cd_filter, &
-   &                                    cd_unt, dd_unf)
 
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),                       INTENT(IN) :: cd_name
       INTEGER(i8)     , DIMENSION(:,:,:)   ,  INTENT(IN) :: kd_value
@@ -2931,6 +3187,10 @@ CONTAINS
       CHARACTER(LEN=*), DIMENSION(5)        , INTENT(IN), OPTIONAL :: cd_filter
       CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_unt
       REAL(dp)        ,                       INTENT(IN), OPTIONAL :: dd_unf
+      CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_namout
+
+      ! function
+      TYPE(TVAR)                                         :: tf_var
 
       ! local variable
       INTEGER(i4)                                  :: il_type
@@ -2940,10 +3200,13 @@ CONTAINS
       REAL(dp)   , DIMENSION(:,:,:)  , ALLOCATABLE :: dl_value
 
       ! loop indices
+      INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
+      INTEGER(i4) :: jk
       !----------------------------------------------------------------
 
       ! clean variable
-      CALL var_clean(var__init_3D_i8)      
+      CALL var_clean(tf_var)      
 
       il_type=NF90_INT
       IF( PRESENT(id_type) ) il_type=id_type
@@ -2954,38 +3217,59 @@ CONTAINS
       il_shape(:)=SHAPE(kd_value(:,:,:))
 
       ALLOCATE( dl_value( il_shape(1), &
-      &                   il_shape(2), &
-      &                   il_shape(3)) )
+         &                il_shape(2), &
+         &                il_shape(3)) )
 
-      dl_value(:,:,:)=REAL(kd_value(:,:,:),dp)
+      DO jk=1,il_shape(3)
+         DO jj=1,il_shape(2)
+            DO ji=1,il_shape(1)
+               dl_value(ji,jj,jk)=REAL(kd_value(ji,jj,jk),dp)
+            ENDDO
+         ENDDO
+      ENDDO
 
-      var__init_3D_i8=var_init( cd_name, dl_value(:,:,:),           &
-      &                         id_start=id_start,                  &
-      &                         id_count=id_count,                  &
-      &                         id_type=il_type,                    &
-      &                         td_dim=td_dim, td_att=td_att,       &
-      &                         dd_fill=dl_fill,                    &
-      &                         cd_units=cd_units,                  &
-      &                         cd_axis=cd_axis,                    &
-      &                         cd_stdname=cd_stdname,              &
-      &                         cd_longname=cd_longname,            &
-      &                         cd_point=cd_point, id_id=id_id,     &
-      &                         id_ew=id_ew, dd_scf=dd_scf,         &
-      &                         dd_ofs=dd_ofs,  id_rec=id_rec,      &
-      &                         dd_min=dd_min, dd_max=dd_max,       &
-      &                         ld_contiguous=ld_contiguous,        &
-      &                         ld_shuffle=ld_shuffle,              &
-      &                         ld_fletcher32=ld_fletcher32,        &
-      &                         id_deflvl=id_deflvl,                &
-      &                         id_chunksz=id_chunksz(:),           &
-      &                         cd_interp=cd_interp(:),             &
-      &                         cd_extrap=cd_extrap(:),             &
-      &                         cd_filter=cd_filter(:),             &
-      &                         cd_unt=cd_unt, dd_unf=dd_unf)
+      tf_var=var_init( cd_name, dl_value(:,:,:),           &
+         &             id_start=id_start,                  &
+         &             id_count=id_count,                  &
+         &             id_type=il_type,                    &
+         &             td_dim=td_dim, td_att=td_att,       &
+         &             dd_fill=dl_fill,                    &
+         &             cd_units=cd_units,                  &
+         &             cd_axis=cd_axis,                    &
+         &             cd_stdname=cd_stdname,              &
+         &             cd_longname=cd_longname,            &
+         &             cd_point=cd_point, id_id=id_id,     &
+         &             id_ew=id_ew, dd_scf=dd_scf,         &
+         &             dd_ofs=dd_ofs,  id_rec=id_rec,      &
+         &             dd_min=dd_min, dd_max=dd_max,       &
+         &             ld_contiguous=ld_contiguous,        &
+         &             ld_shuffle=ld_shuffle,              &
+         &             ld_fletcher32=ld_fletcher32,        &
+         &             id_deflvl=id_deflvl,                &
+         &             id_chunksz=id_chunksz(:),           &
+         &             cd_interp=cd_interp(:),             &
+         &             cd_extrap=cd_extrap(:),             &
+         &             cd_filter=cd_filter(:),             &
+         &             cd_unt=cd_unt, dd_unf=dd_unf,       &
+         &             cd_namout=cd_namout )
       
       DEALLOCATE( dl_value )
       
    END FUNCTION var__init_3D_i8
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__init_i8(cd_name, kd_value,                    &
+         &               id_start, id_count, id_type, td_dim,  &
+         &               td_att, kd_fill, cd_units, cd_axis,   &
+         &               cd_stdname, cd_longname,              &
+         &               cd_point, id_id, id_ew,               &
+         &               dd_scf, dd_ofs,  id_rec,              &
+         &               dd_min, dd_max,                       &
+         &               ld_contiguous, ld_shuffle,            &
+         &               ld_fletcher32, id_deflvl, id_chunksz, &
+         &               cd_interp, cd_extrap, cd_filter,      &
+         &               cd_unt, dd_unf,                       &
+         &               cd_namout) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function initialize a variable structure,
    !> with a integer(8) 4D array of value.
@@ -3001,14 +3285,18 @@ CONTAINS
    !> indices in the variable where value will be written could be specify if
    !> start and count array are given. Dimension structure is needed in that 
    !> case.    
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date June, 2015
    !> - add interp, extrap, and filter argument
    !> @date July, 2015
    !> - add unit factor (to change unit)
-   !
+   !> @date January, 2019
+   !> - decompose array conversion on each dimension
+   !> @date February, 2019
+   !> - add output name (to change name)
+   !>
    !> @param[in] cd_name         variable name
    !> @param[in] kd_value        4D array of integer(8) value
    !> @param[in] id_start        index in the variable from which the 
@@ -3042,21 +3330,12 @@ CONTAINS
    !> @param[in] cd_filter       filter method
    !> @param[in] cd_unt          new units (linked to units factor)
    !> @param[in] dd_unf          units factor
+   !> @param[in] cd_namout       output name (renamed variable)
    !> @return variable structure
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION var__init_i8( cd_name, kd_value,        &
-   &                                 id_start, id_count, id_type, td_dim, &
-   &                                 td_att, kd_fill, cd_units, cd_axis,&
-   &                                 cd_stdname, cd_longname,  &
-   &                                 cd_point, id_id, id_ew,   &
-   &                                 dd_scf, dd_ofs,  id_rec,  &
-   &                                 dd_min, dd_max,           &
-   &                                 ld_contiguous, ld_shuffle,&
-   &                                 ld_fletcher32, id_deflvl, id_chunksz, &
-   &                                 cd_interp, cd_extrap, cd_filter, &
-   &                                 cd_unt, dd_unf)
 
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),                       INTENT(IN) :: cd_name
       INTEGER(i8)     , DIMENSION(:,:,:,:),   INTENT(IN) :: kd_value
@@ -3088,7 +3367,10 @@ CONTAINS
       CHARACTER(LEN=*), DIMENSION(5)        , INTENT(IN), OPTIONAL :: cd_filter
       CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_unt
       REAL(dp)        ,                       INTENT(IN), OPTIONAL :: dd_unf
+      CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_namout
 
+      ! function
+      TYPE(TVAR)                                         :: tf_var
 
       ! local variable
       INTEGER(i4)                                       :: il_type
@@ -3098,10 +3380,14 @@ CONTAINS
       REAL(dp)        , DIMENSION(:,:,:,:), ALLOCATABLE :: dl_value
 
       ! loop indices
+      INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
+      INTEGER(i4) :: jk
+      INTEGER(i4) :: jl
       !----------------------------------------------------------------
 
       ! clean variable
-      CALL var_clean(var__init_i8)      
+      CALL var_clean(tf_var)      
 
       il_type=NF90_INT
       IF( PRESENT(id_type) ) il_type=id_type
@@ -3112,39 +3398,62 @@ CONTAINS
       il_shape(:)=SHAPE(kd_value(:,:,:,:))
 
       ALLOCATE( dl_value( il_shape(1), &
-      &                   il_shape(2), &
-      &                   il_shape(3), &
-      &                   il_shape(4)) )
+         &                il_shape(2), &
+         &                il_shape(3), &
+         &                il_shape(4)) )
 
-      dl_value(:,:,:,:)=REAL(kd_value(:,:,:,:),dp)
+      DO jl=1,il_shape(4)
+         DO jk=1,il_shape(3)
+            DO jj=1,il_shape(2)
+               DO ji=1,il_shape(1)
+                  dl_value(ji,jj,jk,jl)=REAL(kd_value(ji,jj,jk,jl),dp)
+               ENDDO
+            ENDDO
+         ENDDO
+      ENDDO                  
 
-      var__init_i8=var_init( cd_name, dl_value(:,:,:,:),         &
-      &                      id_start=id_start,                  &
-      &                      id_count=id_count,                  &
-      &                      id_type=il_type,                    &
-      &                      td_dim=td_dim, td_att=td_att,       &
-      &                      dd_fill=dl_fill,                    &
-      &                      cd_units=cd_units,                  &
-      &                      cd_axis=cd_axis,                    &
-      &                      cd_stdname=cd_stdname,              &
-      &                      cd_longname=cd_longname,            &
-      &                      cd_point=cd_point, id_id=id_id,     &
-      &                      id_ew=id_ew, dd_scf=dd_scf,         &
-      &                      dd_ofs=dd_ofs,  id_rec=id_rec,      &
-      &                      dd_min=dd_min, dd_max=dd_max,       &
-      &                      ld_contiguous=ld_contiguous,        &
-      &                      ld_shuffle=ld_shuffle,              &
-      &                      ld_fletcher32=ld_fletcher32,        &
-      &                      id_deflvl=id_deflvl,                &
-      &                      id_chunksz=id_chunksz(:),           &
-      &                      cd_interp=cd_interp(:),             &
-      &                      cd_extrap=cd_extrap(:),             &
-      &                      cd_filter=cd_filter(:),             &
-      &                      cd_unt=cd_unt, dd_unf=dd_unf)
+      tf_var=var_init( cd_name, dl_value(:,:,:,:),         &
+         &             id_start=id_start,                  &
+         &             id_count=id_count,                  &
+         &             id_type=il_type,                    &
+         &             td_dim=td_dim, td_att=td_att,       &
+         &             dd_fill=dl_fill,                    &
+         &             cd_units=cd_units,                  &
+         &             cd_axis=cd_axis,                    &
+         &             cd_stdname=cd_stdname,              &
+         &             cd_longname=cd_longname,            &
+         &             cd_point=cd_point, id_id=id_id,     &
+         &             id_ew=id_ew, dd_scf=dd_scf,         &
+         &             dd_ofs=dd_ofs,  id_rec=id_rec,      &
+         &             dd_min=dd_min, dd_max=dd_max,       &
+         &             ld_contiguous=ld_contiguous,        &
+         &             ld_shuffle=ld_shuffle,              &
+         &             ld_fletcher32=ld_fletcher32,        &
+         &             id_deflvl=id_deflvl,                &
+         &             id_chunksz=id_chunksz(:),           &
+         &             cd_interp=cd_interp(:),             &
+         &             cd_extrap=cd_extrap(:),             &
+         &             cd_filter=cd_filter(:),             &
+         &             cd_unt=cd_unt, dd_unf=dd_unf,       &
+         &             cd_namout=cd_namout )
       
       DEALLOCATE( dl_value )
       
    END FUNCTION var__init_i8
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__init_1D_i4(cd_name, id_value,                    &
+         &                  id_start, id_count, id_type, td_dim,  &
+         &                  td_att, id_fill, cd_units, cd_axis,   &
+         &                  cd_stdname, cd_longname,              &
+         &                  cd_point, id_id, id_ew,               &
+         &                  dd_scf, dd_ofs,  id_rec,              &
+         &                  dd_min, dd_max,                       &
+         &                  ld_contiguous, ld_shuffle,            &
+         &                  ld_fletcher32, id_deflvl, id_chunksz, &
+         &                  cd_interp, cd_extrap, cd_filter,      &
+         &                  cd_unt, dd_unf,                       &
+         &                  cd_namout) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function initialize a variable structure,
    !> with a integer(4) 1D array of value.
@@ -3160,14 +3469,18 @@ CONTAINS
    !> indices in the variable where value will be written could be specify if
    !> start and count array are given. Dimension structure is needed in that 
    !> case.    
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date June, 2015
    !> - add interp, extrap, and filter argument
    !> @date July, 2015
    !> - add unit factor (to change unit)
-   !
+   !> @date January, 2019
+   !> - decompose array conversion on each dimension
+   !> @date February, 2019
+   !> - add output name (to change name)
+   !>
    !> @param[in] cd_name         variable name
    !> @param[in] id_value        1D array of integer(4) value
    !> @param[in] id_start        index in the variable from which the 
@@ -3201,21 +3514,12 @@ CONTAINS
    !> @param[in] cd_filter       filter method
    !> @param[in] cd_unt          new units (linked to units factor)
    !> @param[in] dd_unf          units factor
+   !> @param[in] cd_namout       output name (renamed variable)
    !> @return variable structure
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION var__init_1D_i4( cd_name, id_value,        &
-   &                                    id_start, id_count, id_type, td_dim, &
-   &                                    td_att, id_fill, cd_units, cd_axis,&
-   &                                    cd_stdname, cd_longname,  &
-   &                                    cd_point, id_id, id_ew,   &
-   &                                    dd_scf, dd_ofs,  id_rec,  &
-   &                                    dd_min, dd_max,           &
-   &                                    ld_contiguous, ld_shuffle,&
-   &                                    ld_fletcher32, id_deflvl, id_chunksz, &
-   &                                    cd_interp, cd_extrap, cd_filter, &
-   &                                    cd_unt, dd_unf)
 
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),                       INTENT(IN) :: cd_name
       INTEGER(i4)     , DIMENSION(:)        , INTENT(IN) :: id_value
@@ -3247,6 +3551,10 @@ CONTAINS
       CHARACTER(LEN=*), DIMENSION(5)        , INTENT(IN), OPTIONAL :: cd_filter
       CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_unt
       REAL(dp)        ,                       INTENT(IN), OPTIONAL :: dd_unf
+      CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_namout
+
+      ! function
+      TYPE(TVAR)                                         :: tf_var
 
       ! local variable
       INTEGER(i4)                                       :: il_type
@@ -3256,10 +3564,11 @@ CONTAINS
       REAL(dp)        , DIMENSION(:)      , ALLOCATABLE :: dl_value
 
       ! loop indices
+      INTEGER(i4) :: ji
       !----------------------------------------------------------------
 
       ! clean variable
-      CALL var_clean(var__init_1D_i4)      
+      CALL var_clean(tf_var)      
 
       il_type=NF90_INT
       IF( PRESENT(id_type) ) il_type=id_type
@@ -3270,35 +3579,52 @@ CONTAINS
       il_shape=SIZE(id_value(:))
       ALLOCATE( dl_value( il_shape) )
 
-      dl_value(:)=REAL(id_value(:),dp)
+      DO ji=1,il_shape
+         dl_value(ji)=REAL(id_value(ji),dp)
+      ENDDO
 
-      var__init_1D_i4=var_init( cd_name, dl_value(:),               &
-      &                         id_start=id_start,                  &
-      &                         id_count=id_count,                  &
-      &                         id_type=il_type,                    &
-      &                         td_dim=td_dim, td_att=td_att,       &
-      &                         dd_fill=dl_fill,                    &
-      &                         cd_units=cd_units,                  &
-      &                         cd_axis=cd_axis,                    &
-      &                         cd_stdname=cd_stdname,              &
-      &                         cd_longname=cd_longname,            &
-      &                         cd_point=cd_point, id_id=id_id,     &
-      &                         id_ew=id_ew, dd_scf=dd_scf,         &
-      &                         dd_ofs=dd_ofs,  id_rec=id_rec,      &
-      &                         dd_min=dd_min, dd_max=dd_max,       &
-      &                         ld_contiguous=ld_contiguous,        &
-      &                         ld_shuffle=ld_shuffle,              &
-      &                         ld_fletcher32=ld_fletcher32,        &
-      &                         id_deflvl=id_deflvl,                &
-      &                         id_chunksz=id_chunksz(:),           &
-      &                         cd_interp=cd_interp(:),             &
-      &                         cd_extrap=cd_extrap(:),             &
-      &                         cd_filter=cd_filter(:),             &
-      &                         cd_unt=cd_unt, dd_unf=dd_unf)
+      tf_var=var_init( cd_name, dl_value(:),               &
+         &             id_start=id_start,                  &
+         &             id_count=id_count,                  &
+         &             id_type=il_type,                    &
+         &             td_dim=td_dim, td_att=td_att,       &
+         &             dd_fill=dl_fill,                    &
+         &             cd_units=cd_units,                  &
+         &             cd_axis=cd_axis,                    &
+         &             cd_stdname=cd_stdname,              &
+         &             cd_longname=cd_longname,            &
+         &             cd_point=cd_point, id_id=id_id,     &
+         &             id_ew=id_ew, dd_scf=dd_scf,         &
+         &             dd_ofs=dd_ofs,  id_rec=id_rec,      &
+         &             dd_min=dd_min, dd_max=dd_max,       &
+         &             ld_contiguous=ld_contiguous,        &
+         &             ld_shuffle=ld_shuffle,              &
+         &             ld_fletcher32=ld_fletcher32,        &
+         &             id_deflvl=id_deflvl,                &
+         &             id_chunksz=id_chunksz(:),           &
+         &             cd_interp=cd_interp(:),             &
+         &             cd_extrap=cd_extrap(:),             &
+         &             cd_filter=cd_filter(:),             &
+         &             cd_unt=cd_unt, dd_unf=dd_unf,       &
+         &             cd_namout=cd_namout )
  
       DEALLOCATE( dl_value )
  
    END FUNCTION var__init_1D_i4
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__init_2D_i4(cd_name, id_value,                    &
+         &                  id_start, id_count, id_type, td_dim,  &
+         &                  td_att, id_fill, cd_units, cd_axis,   &
+         &                  cd_stdname, cd_longname,              &
+         &                  cd_point, id_id, id_ew,               &
+         &                  dd_scf, dd_ofs,  id_rec,              &
+         &                  dd_min, dd_max,                       &
+         &                  ld_contiguous, ld_shuffle,            &
+         &                  ld_fletcher32, id_deflvl, id_chunksz, &
+         &                  cd_interp, cd_extrap, cd_filter,      &
+         &                  cd_unt, dd_unf,                       &
+         &                  cd_namout) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function initialize a variable structure,
    !> with a integer(4) 2D array of value.
@@ -3314,14 +3640,18 @@ CONTAINS
    !> indices in the variable where value will be written could be specify if
    !> start and count array are given. Dimension structure is needed in that 
    !> case.    
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date June, 2015
    !> - add interp, extrap, and filter argument
    !> @date July, 2015
    !> - add unit factor (to change unit)
-   !
+   !> @date January, 2019
+   !> - decompose array conversion on each dimension
+   !> @date February, 2019
+   !> - add output name (to change name)
+   !>
    !> @param[in] cd_name         variable name
    !> @param[in] id_value        2D array of integer(4) value
    !> @param[in] id_start        index in the variable from which the 
@@ -3355,21 +3685,12 @@ CONTAINS
    !> @param[in] cd_filter       filter method
    !> @param[in] cd_unt          new units (linked to units factor)
    !> @param[in] dd_unf          units factor
+   !> @param[in] cd_namout       output name (renamed variable)
    !> @return variable structure
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION var__init_2D_i4( cd_name, id_value,        &
-   &                                    id_start, id_count, id_type, td_dim, &
-   &                                    td_att, id_fill, cd_units, cd_axis,&
-   &                                    cd_stdname, cd_longname,  &
-   &                                    cd_point, id_id, id_ew,   &
-   &                                    dd_scf, dd_ofs,  id_rec,  &
-   &                                    dd_min, dd_max,           &
-   &                                    ld_contiguous, ld_shuffle,&
-   &                                    ld_fletcher32, id_deflvl, id_chunksz, &
-   &                                    cd_interp, cd_extrap, cd_filter, &
-   &                                    cd_unt, dd_unf)
 
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),                       INTENT(IN) :: cd_name
       INTEGER(i4)     , DIMENSION(:,:)     ,  INTENT(IN) :: id_value
@@ -3401,6 +3722,10 @@ CONTAINS
       CHARACTER(LEN=*), DIMENSION(5)        , INTENT(IN), OPTIONAL :: cd_filter
       CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_unt
       REAL(dp)        ,                       INTENT(IN), OPTIONAL :: dd_unf
+      CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_namout
+
+      ! function
+      TYPE(TVAR)                                         :: tf_var
 
       ! local variable
       INTEGER(i4)                                  :: il_type
@@ -3410,10 +3735,12 @@ CONTAINS
       REAL(dp)   , DIMENSION(:,:)    , ALLOCATABLE :: dl_value
 
       ! loop indices
+      INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
       !----------------------------------------------------------------
 
       ! clean variable
-      CALL var_clean(var__init_2D_i4)      
+      CALL var_clean(tf_var)      
 
       il_type=NF90_INT
       IF( PRESENT(id_type) ) il_type=id_type
@@ -3424,37 +3751,56 @@ CONTAINS
       il_shape(:)=SHAPE(id_value(:,:))
 
       ALLOCATE( dl_value( il_shape(1), &
-      &                   il_shape(2)) )
+         &                il_shape(2)) )
 
-      dl_value(:,:)=REAL(id_value(:,:),dp)
+      DO jj=1,il_shape(2)
+         DO ji=1,il_shape(1)
+            dl_value(ji,jj)=REAL(id_value(ji,jj),dp)
+         ENDDO
+      ENDDO
 
-      var__init_2D_i4=var_init( cd_name, dl_value(:,:),             &
-      &                         id_start=id_start,                  &
-      &                         id_count=id_count,                  &
-      &                         id_type=il_type,                    &
-      &                         td_dim=td_dim, td_att=td_att,       &
-      &                         dd_fill=dl_fill,                    &
-      &                         cd_units=cd_units,                  &
-      &                         cd_axis=cd_axis,                    &
-      &                         cd_stdname=cd_stdname,              &
-      &                         cd_longname=cd_longname,            &
-      &                         cd_point=cd_point, id_id=id_id,     &
-      &                         id_ew=id_ew, dd_scf=dd_scf,         &
-      &                         dd_ofs=dd_ofs,  id_rec=id_rec,      &
-      &                         dd_min=dd_min, dd_max=dd_max,       &
-      &                         ld_contiguous=ld_contiguous,        &
-      &                         ld_shuffle=ld_shuffle,              &
-      &                         ld_fletcher32=ld_fletcher32,        &
-      &                         id_deflvl=id_deflvl,                &
-      &                         id_chunksz=id_chunksz(:),           &
-      &                         cd_interp=cd_interp(:),             &
-      &                         cd_extrap=cd_extrap(:),             &
-      &                         cd_filter=cd_filter(:),             &
-      &                         cd_unt=cd_unt, dd_unf=dd_unf)
+      tf_var=var_init( cd_name, dl_value(:,:),             &
+         &             id_start=id_start,                  &
+         &             id_count=id_count,                  &
+         &             id_type=il_type,                    &
+         &             td_dim=td_dim, td_att=td_att,       &
+         &             dd_fill=dl_fill,                    &
+         &             cd_units=cd_units,                  &
+         &             cd_axis=cd_axis,                    &
+         &             cd_stdname=cd_stdname,              &
+         &             cd_longname=cd_longname,            &
+         &             cd_point=cd_point, id_id=id_id,     &
+         &             id_ew=id_ew, dd_scf=dd_scf,         &
+         &             dd_ofs=dd_ofs,  id_rec=id_rec,      &
+         &             dd_min=dd_min, dd_max=dd_max,       &
+         &             ld_contiguous=ld_contiguous,        &
+         &             ld_shuffle=ld_shuffle,              &
+         &             ld_fletcher32=ld_fletcher32,        &
+         &             id_deflvl=id_deflvl,                &
+         &             id_chunksz=id_chunksz(:),           &
+         &             cd_interp=cd_interp(:),             &
+         &             cd_extrap=cd_extrap(:),             &
+         &             cd_filter=cd_filter(:),             &
+         &             cd_unt=cd_unt, dd_unf=dd_unf,       &
+         &             cd_namout=cd_namout )
       
       DEALLOCATE( dl_value )
       
    END FUNCTION var__init_2D_i4
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__init_3D_i4(cd_name, id_value,                    &
+         &                  id_start, id_count, id_type, td_dim,  &
+         &                  td_att, id_fill, cd_units, cd_axis,   &
+         &                  cd_stdname, cd_longname,              &
+         &                  cd_point, id_id, id_ew,               &
+         &                  dd_scf, dd_ofs,  id_rec,              &
+         &                  dd_min, dd_max,                       &
+         &                  ld_contiguous, ld_shuffle,            &
+         &                  ld_fletcher32, id_deflvl, id_chunksz, &
+         &                  cd_interp, cd_extrap, cd_filter,      &
+         &                  cd_unt, dd_unf,                       &
+         &                  cd_namout) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function initialize a variable structure,
    !> with a integer(4) 3D array of value.
@@ -3470,14 +3816,18 @@ CONTAINS
    !> indices in the variable where value will be written could be specify if
    !> start and count array are given. Dimension structure is needed in that 
    !> case.    
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date June, 2015
    !> - add interp, extrap, and filter argument
    !> @date July, 2015
    !> - add unit factor (to change unit)
-   !
+   !> @date January, 2019
+   !> - decompose array conversion on each dimension
+   !> @date February, 2019
+   !> - add output name (to change name)
+   !>
    !> @param[in] cd_name         variable name
    !> @param[in] id_value        3D array of integer(4) value
    !> @param[in] id_start        index in the variable from which the 
@@ -3511,21 +3861,12 @@ CONTAINS
    !> @param[in] cd_filter       filter method
    !> @param[in] cd_unt          new units (linked to units factor)
    !> @param[in] dd_unf          units factor
+   !> @param[in] cd_namout       output name (renamed variable)
    !> @return variable structure
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION var__init_3D_i4( cd_name, id_value,        &
-   &                                    id_start, id_count, id_type, td_dim, &
-   &                                    td_att, id_fill, cd_units, cd_axis,&
-   &                                    cd_stdname, cd_longname,  &
-   &                                    cd_point, id_id, id_ew,   &
-   &                                    dd_scf, dd_ofs,  id_rec,  &
-   &                                    dd_min, dd_max,           &
-   &                                    ld_contiguous, ld_shuffle,&
-   &                                    ld_fletcher32, id_deflvl, id_chunksz, &
-   &                                    cd_interp, cd_extrap, cd_filter, &
-   &                                    cd_unt, dd_unf)
 
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),                       INTENT(IN) :: cd_name
       INTEGER(i4)     , DIMENSION(:,:,:)   ,  INTENT(IN) :: id_value
@@ -3557,6 +3898,10 @@ CONTAINS
       CHARACTER(LEN=*), DIMENSION(5)        , INTENT(IN), OPTIONAL :: cd_filter
       CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_unt
       REAL(dp)        ,                       INTENT(IN), OPTIONAL :: dd_unf
+      CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_namout
+
+      ! function
+      TYPE(TVAR)                                         :: tf_var
 
       ! local variable
       INTEGER(i4)                                  :: il_type
@@ -3566,10 +3911,13 @@ CONTAINS
       REAL(dp)   , DIMENSION(:,:,:)  , ALLOCATABLE :: dl_value
 
       ! loop indices
+      INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
+      INTEGER(i4) :: jk
       !----------------------------------------------------------------
 
       ! clean variable
-      CALL var_clean(var__init_3D_i4)      
+      CALL var_clean(tf_var)      
 
       il_type=NF90_INT
       IF( PRESENT(id_type) ) il_type=id_type
@@ -3580,38 +3928,59 @@ CONTAINS
       il_shape(:)=SHAPE(id_value(:,:,:))
 
       ALLOCATE( dl_value( il_shape(1), &
-      &                   il_shape(2), &
-      &                   il_shape(3)) )
+         &                il_shape(2), &
+         &                il_shape(3)) )
 
-      dl_value(:,:,:)=REAL(id_value(:,:,:),dp)
+      DO jk=1,il_shape(3)
+         DO jj=1,il_shape(2)
+            DO ji=1,il_shape(1)
+               dl_value(ji,jj,jk)=REAL(id_value(ji,jj,jk),dp)
+            ENDDO
+         ENDDO
+      ENDDO
 
-      var__init_3D_i4=var_init( cd_name, dl_value(:,:,:),           &
-      &                         id_start=id_start,                  &
-      &                         id_count=id_count,                  &
-      &                         id_type=il_type,                    &
-      &                         td_dim=td_dim, td_att=td_att,       &
-      &                         dd_fill=dl_fill,                    &
-      &                         cd_units=cd_units,                  &
-      &                         cd_axis=cd_axis,                    &
-      &                         cd_stdname=cd_stdname,              &
-      &                         cd_longname=cd_longname,            &
-      &                         cd_point=cd_point, id_id=id_id,     &
-      &                         id_ew=id_ew, dd_scf=dd_scf,         &
-      &                         dd_ofs=dd_ofs,  id_rec=id_rec,      &
-      &                         dd_min=dd_min, dd_max=dd_max,       &
-      &                         ld_contiguous=ld_contiguous,        &
-      &                         ld_shuffle=ld_shuffle,              &
-      &                         ld_fletcher32=ld_fletcher32,        &
-      &                         id_deflvl=id_deflvl,                &
-      &                         id_chunksz=id_chunksz(:),           &
-      &                         cd_interp=cd_interp(:),             &
-      &                         cd_extrap=cd_extrap(:),             &
-      &                         cd_filter=cd_filter(:),             &
-      &                         cd_unt=cd_unt, dd_unf=dd_unf)
+      tf_var=var_init( cd_name, dl_value(:,:,:),           &
+         &             id_start=id_start,                  &
+         &             id_count=id_count,                  &
+         &             id_type=il_type,                    &
+         &             td_dim=td_dim, td_att=td_att,       &
+         &             dd_fill=dl_fill,                    &
+         &             cd_units=cd_units,                  &
+         &             cd_axis=cd_axis,                    &
+         &             cd_stdname=cd_stdname,              &
+         &             cd_longname=cd_longname,            &
+         &             cd_point=cd_point, id_id=id_id,     &
+         &             id_ew=id_ew, dd_scf=dd_scf,         &
+         &             dd_ofs=dd_ofs,  id_rec=id_rec,      &
+         &             dd_min=dd_min, dd_max=dd_max,       &
+         &             ld_contiguous=ld_contiguous,        &
+         &             ld_shuffle=ld_shuffle,              &
+         &             ld_fletcher32=ld_fletcher32,        &
+         &             id_deflvl=id_deflvl,                &
+         &             id_chunksz=id_chunksz(:),           &
+         &             cd_interp=cd_interp(:),             &
+         &             cd_extrap=cd_extrap(:),             &
+         &             cd_filter=cd_filter(:),             &
+         &             cd_unt=cd_unt, dd_unf=dd_unf,       &
+         &             cd_namout=cd_namout )
       
       DEALLOCATE( dl_value )
       
    END FUNCTION var__init_3D_i4
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__init_i4(cd_name, id_value,                    &
+         &               id_start, id_count, id_type, td_dim,  &
+         &               td_att, id_fill, cd_units, cd_axis,   &
+         &               cd_stdname, cd_longname,              &
+         &               cd_point, id_id, id_ew,               &
+         &               dd_scf, dd_ofs,  id_rec,              &
+         &               dd_min, dd_max,                       &
+         &               ld_contiguous, ld_shuffle,            &
+         &               ld_fletcher32, id_deflvl, id_chunksz, &
+         &               cd_interp, cd_extrap, cd_filter,      &
+         &               cd_unt, dd_unf,                       &
+         &               cd_namout) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function initialize a variable structure,
    !> with a integer(4) 4D array of value.
@@ -3627,14 +3996,18 @@ CONTAINS
    !> indices in the variable where value will be written could be specify if
    !> start and count array are given. Dimension structure is needed in that 
    !> case.    
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date June, 2015
    !> - add interp, extrap, and filter argument
    !> @date July, 2015
    !> - add unit factor (to change unit)
-   !
+   !> @date January, 2019
+   !> - decompose array conversion on each dimension
+   !> @date February, 2019
+   !> - add output name (to change name)
+   !>
    !> @param[in] cd_name         variable name
    !> @param[in] id_value        4D array of integer(4) value
    !> @param[in] id_start        index in the variable from which the 
@@ -3668,22 +4041,12 @@ CONTAINS
    !> @param[in] cd_filter       filter method
    !> @param[in] cd_unt          new units (linked to units factor)
    !> @param[in] dd_unf          units factor
-
+   !> @param[in] cd_namout       output name (renamed variable)
    !> @return variable structure
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION var__init_i4( cd_name, id_value,        &
-   &                                 id_start, id_count, id_type, td_dim, &
-   &                                 td_att, id_fill, cd_units, cd_axis,&
-   &                                 cd_stdname, cd_longname,  &
-   &                                 cd_point, id_id, id_ew,   &
-   &                                 dd_scf, dd_ofs,  id_rec,  &
-   &                                 dd_min, dd_max,           &
-   &                                 ld_contiguous, ld_shuffle,&
-   &                                 ld_fletcher32, id_deflvl, id_chunksz, &
-   &                                 cd_interp, cd_extrap, cd_filter, &
-   &                                 cd_unt, dd_unf)
 
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),                       INTENT(IN) :: cd_name
       INTEGER(i4)     , DIMENSION(:,:,:,:),   INTENT(IN) :: id_value
@@ -3715,6 +4078,10 @@ CONTAINS
       CHARACTER(LEN=*), DIMENSION(5)        , INTENT(IN), OPTIONAL :: cd_filter
       CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_unt
       REAL(dp)        ,                       INTENT(IN), OPTIONAL :: dd_unf
+      CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_namout
+
+      ! function
+      TYPE(TVAR)                                         :: tf_var
 
       ! local variable
       INTEGER(i4)                                       :: il_type
@@ -3724,10 +4091,14 @@ CONTAINS
       REAL(dp)        , DIMENSION(:,:,:,:), ALLOCATABLE :: dl_value
 
       ! loop indices
+      INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
+      INTEGER(i4) :: jk
+      INTEGER(i4) :: jl
       !----------------------------------------------------------------
 
       ! clean variable
-      CALL var_clean(var__init_i4)      
+      CALL var_clean(tf_var)      
 
       il_type=NF90_INT
       IF( PRESENT(id_type) ) il_type=id_type
@@ -3738,39 +4109,62 @@ CONTAINS
       il_shape(:)=SHAPE(id_value(:,:,:,:))
 
       ALLOCATE( dl_value( il_shape(1), &
-      &                   il_shape(2), &
-      &                   il_shape(3), &
-      &                   il_shape(4)) )
+         &                il_shape(2), &
+         &                il_shape(3), &
+         &                il_shape(4)) )
 
-      dl_value(:,:,:,:)=REAL(id_value(:,:,:,:),dp)
+      DO jl=1,il_shape(4)
+         DO jk=1,il_shape(3)
+            DO jj=1,il_shape(2)
+               DO ji=1,il_shape(1)
+                  dl_value(ji,jj,jk,jl)=REAL(id_value(ji,jj,jk,jl),dp)
+               ENDDO
+            ENDDO
+         ENDDO
+      ENDDO
 
-      var__init_i4=var_init( cd_name, dl_value(:,:,:,:),         &
-      &                      id_start=id_start,                  &
-      &                      id_count=id_count,                  &
-      &                      id_type=il_type,                    &
-      &                      td_dim=td_dim, td_att=td_att,       &
-      &                      dd_fill=dl_fill,                    &
-      &                      cd_units=cd_units,                  &
-      &                      cd_axis=cd_axis,                    &
-      &                      cd_stdname=cd_stdname,              &
-      &                      cd_longname=cd_longname,            &
-      &                      cd_point=cd_point, id_id=id_id,     &
-      &                      id_ew=id_ew, dd_scf=dd_scf,         &
-      &                      dd_ofs=dd_ofs,  id_rec=id_rec,      &
-      &                      dd_min=dd_min, dd_max=dd_max,       &
-      &                      ld_contiguous=ld_contiguous,        &
-      &                      ld_shuffle=ld_shuffle,              &
-      &                      ld_fletcher32=ld_fletcher32,        &
-      &                      id_deflvl=id_deflvl,                &
-      &                      id_chunksz=id_chunksz(:),           &
-      &                      cd_interp=cd_interp(:),             &
-      &                      cd_extrap=cd_extrap(:),             &
-      &                      cd_filter=cd_filter(:),             &
-      &                      cd_unt=cd_unt, dd_unf=dd_unf)
+      tf_var=var_init( cd_name, dl_value(:,:,:,:),         &
+         &             id_start=id_start,                  &
+         &             id_count=id_count,                  &
+         &             id_type=il_type,                    &
+         &             td_dim=td_dim, td_att=td_att,       &
+         &             dd_fill=dl_fill,                    &
+         &             cd_units=cd_units,                  &
+         &             cd_axis=cd_axis,                    &
+         &             cd_stdname=cd_stdname,              &
+         &             cd_longname=cd_longname,            &
+         &             cd_point=cd_point, id_id=id_id,     &
+         &             id_ew=id_ew, dd_scf=dd_scf,         &
+         &             dd_ofs=dd_ofs,  id_rec=id_rec,      &
+         &             dd_min=dd_min, dd_max=dd_max,       &
+         &             ld_contiguous=ld_contiguous,        &
+         &             ld_shuffle=ld_shuffle,              &
+         &             ld_fletcher32=ld_fletcher32,        &
+         &             id_deflvl=id_deflvl,                &
+         &             id_chunksz=id_chunksz(:),           &
+         &             cd_interp=cd_interp(:),             &
+         &             cd_extrap=cd_extrap(:),             &
+         &             cd_filter=cd_filter(:),             &
+         &             cd_unt=cd_unt, dd_unf=dd_unf,       &
+         &             cd_namout=cd_namout )
       
       DEALLOCATE( dl_value )
       
    END FUNCTION var__init_i4
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__init_1D_i2(cd_name, sd_value,                    &
+         &                  id_start, id_count, id_type, td_dim,  &
+         &                  td_att, sd_fill, cd_units, cd_axis,   &
+         &                  cd_stdname, cd_longname,              &
+         &                  cd_point, id_id, id_ew,               &
+         &                  dd_scf, dd_ofs,  id_rec,              &
+         &                  dd_min, dd_max,                       &
+         &                  ld_contiguous, ld_shuffle,            &
+         &                  ld_fletcher32, id_deflvl, id_chunksz, &
+         &                  cd_interp, cd_extrap, cd_filter,      &
+         &                  cd_unt, dd_unf,                       &
+         &                  cd_namout) &
+         &  RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function initialize a variable structure,
    !> with a integer(2) 1D array of value.
@@ -3786,14 +4180,18 @@ CONTAINS
    !> indices in the variable where value will be written could be specify if
    !> start and count array are given. Dimension structure is needed in that 
    !> case.    
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date June, 2015
    !> - add interp, extrap, and filter argument
    !> @date July, 2015
    !> - add unit factor (to change unit)
-   !
+   !> @date January, 2019
+   !> - decompose array conversion on each dimension
+   !> @date February, 2019
+   !> - add output name (to change name)
+   !>
    !> @param[in] cd_name         variable name
    !> @param[in] sd_value        1D array of integer(2) value
    !> @param[in] id_start        index in the variable from which the 
@@ -3827,21 +4225,12 @@ CONTAINS
    !> @param[in] cd_filter       filter method
    !> @param[in] cd_unt          new units (linked to units factor)
    !> @param[in] dd_unf          units factor
+   !> @param[in] cd_namout       output name (renamed variable)
    !> @return variable structure
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION var__init_1D_i2( cd_name, sd_value,        &
-   &                                    id_start, id_count, id_type, td_dim, &
-   &                                    td_att, sd_fill, cd_units, cd_axis,&
-   &                                    cd_stdname, cd_longname,  &
-   &                                    cd_point, id_id, id_ew,   &
-   &                                    dd_scf, dd_ofs,  id_rec,  &
-   &                                    dd_min, dd_max,           &
-   &                                    ld_contiguous, ld_shuffle,&
-   &                                    ld_fletcher32, id_deflvl, id_chunksz, &
-   &                                    cd_interp, cd_extrap, cd_filter, &
-   &                                    cd_unt, dd_unf)
 
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),                       INTENT(IN) :: cd_name
       INTEGER(i2)     , DIMENSION(:)        , INTENT(IN) :: sd_value
@@ -3873,7 +4262,10 @@ CONTAINS
       CHARACTER(LEN=*), DIMENSION(5)        , INTENT(IN), OPTIONAL :: cd_filter
       CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_unt
       REAL(dp)        ,                       INTENT(IN), OPTIONAL :: dd_unf
+      CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_namout
 
+      ! function
+      TYPE(TVAR)                                         :: tf_var
 
       ! local variable
       INTEGER(i4)                                       :: il_type
@@ -3883,10 +4275,11 @@ CONTAINS
       REAL(dp)        , DIMENSION(:)      , ALLOCATABLE :: dl_value
 
       ! loop indices
+      INTEGER(i4) :: ji
       !----------------------------------------------------------------
 
       ! clean variable
-      CALL var_clean(var__init_1D_i2)      
+      CALL var_clean(tf_var)      
 
       il_type=NF90_SHORT
       IF( PRESENT(id_type) ) il_type=id_type
@@ -3897,35 +4290,52 @@ CONTAINS
       il_shape=SIZE(sd_value(:))
       ALLOCATE( dl_value( il_shape) )
 
-      dl_value(:)=REAL(sd_value(:),dp)
+      DO ji=1,il_shape
+         dl_value(ji)=REAL(sd_value(ji),dp)
+      ENDDO
 
-      var__init_1D_i2=var_init( cd_name, dl_value(:),               &
-      &                         id_start=id_start,                  &
-      &                         id_count=id_count,                  &
-      &                         id_type=il_type,                    &
-      &                         td_dim=td_dim, td_att=td_att,       &
-      &                         dd_fill=dl_fill,                    &
-      &                         cd_units=cd_units,                  &
-      &                         cd_axis=cd_axis,                    &
-      &                         cd_stdname=cd_stdname,              &
-      &                         cd_longname=cd_longname,            &
-      &                         cd_point=cd_point, id_id=id_id,     &
-      &                         id_ew=id_ew, dd_scf=dd_scf,         &
-      &                         dd_ofs=dd_ofs,  id_rec=id_rec,      &
-      &                         dd_min=dd_min, dd_max=dd_max,       &
-      &                         ld_contiguous=ld_contiguous,        &
-      &                         ld_shuffle=ld_shuffle,              &
-      &                         ld_fletcher32=ld_fletcher32,        &
-      &                         id_deflvl=id_deflvl,                &
-      &                         id_chunksz=id_chunksz(:),           &
-      &                         cd_interp=cd_interp(:),             &
-      &                         cd_extrap=cd_extrap(:),             &
-      &                         cd_filter=cd_filter(:),             &
-      &                         cd_unt=cd_unt, dd_unf=dd_unf)
+      tf_var=var_init( cd_name, dl_value(:),               &
+         &             id_start=id_start,                  &
+         &             id_count=id_count,                  &
+         &             id_type=il_type,                    &
+         &             td_dim=td_dim, td_att=td_att,       &
+         &             dd_fill=dl_fill,                    &
+         &             cd_units=cd_units,                  &
+         &             cd_axis=cd_axis,                    &
+         &             cd_stdname=cd_stdname,              &
+         &             cd_longname=cd_longname,            &
+         &             cd_point=cd_point, id_id=id_id,     &
+         &             id_ew=id_ew, dd_scf=dd_scf,         &
+         &             dd_ofs=dd_ofs,  id_rec=id_rec,      &
+         &             dd_min=dd_min, dd_max=dd_max,       &
+         &             ld_contiguous=ld_contiguous,        &
+         &             ld_shuffle=ld_shuffle,              &
+         &             ld_fletcher32=ld_fletcher32,        &
+         &             id_deflvl=id_deflvl,                &
+         &             id_chunksz=id_chunksz(:),           &
+         &             cd_interp=cd_interp(:),             &
+         &             cd_extrap=cd_extrap(:),             &
+         &             cd_filter=cd_filter(:),             &
+         &             cd_unt=cd_unt, dd_unf=dd_unf,       &
+         &             cd_namout=cd_namout )
  
       DEALLOCATE( dl_value )
  
    END FUNCTION var__init_1D_i2
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__init_2D_i2(cd_name, sd_value,                    &
+         &                  id_start, id_count, id_type, td_dim,  &
+         &                  td_att, sd_fill, cd_units, cd_axis,   &
+         &                  cd_stdname, cd_longname,              &
+         &                  cd_point, id_id, id_ew,               &
+         &                  dd_scf, dd_ofs,  id_rec,              &
+         &                  dd_min, dd_max,                       &
+         &                  ld_contiguous, ld_shuffle,            &
+         &                  ld_fletcher32, id_deflvl, id_chunksz, &
+         &                  cd_interp, cd_extrap, cd_filter,      &
+         &                  cd_unt, dd_unf,                       &
+         &                  cd_namout) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function initialize a variable structure,
    !> with a integer(2) 2D array of value.
@@ -3941,14 +4351,18 @@ CONTAINS
    !> indices in the variable where value will be written could be specify if
    !> start and count array are given. Dimension structure is needed in that 
    !> case.    
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date June, 2015
    !> - add interp, extrap, and filter argument
    !> @date July, 2015
    !> - add unit factor (to change unit)
-   !
+   !> @date January, 2019
+   !> - decompose array conversion on each dimension
+   !> @date February, 2019
+   !> - add output name (to change name)
+   !>
    !> @param[in] cd_name         variable name
    !> @param[in] sd_value        2D array of integer(2) value
    !> @param[in] id_start        index in the variable from which the 
@@ -3982,21 +4396,12 @@ CONTAINS
    !> @param[in] cd_filter       filter method
    !> @param[in] cd_unt          new units (linked to units factor)
    !> @param[in] dd_unf          units factor
+   !> @param[in] cd_namout       output name (renamed variable)
    !> @return variable structure
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION var__init_2D_i2( cd_name, sd_value,        &
-   &                                    id_start, id_count, id_type, td_dim, &
-   &                                    td_att, sd_fill, cd_units, cd_axis,&
-   &                                    cd_stdname, cd_longname,  &
-   &                                    cd_point, id_id, id_ew,   &
-   &                                    dd_scf, dd_ofs,  id_rec,  &
-   &                                    dd_min, dd_max,           &
-   &                                    ld_contiguous, ld_shuffle,&
-   &                                    ld_fletcher32, id_deflvl, id_chunksz, &
-   &                                    cd_interp, cd_extrap, cd_filter, &
-   &                                    cd_unt, dd_unf)
 
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),                       INTENT(IN) :: cd_name
       INTEGER(i2)     , DIMENSION(:,:)     ,  INTENT(IN) :: sd_value
@@ -4028,7 +4433,10 @@ CONTAINS
       CHARACTER(LEN=*), DIMENSION(5)        , INTENT(IN), OPTIONAL :: cd_filter
       CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_unt
       REAL(dp)        ,                       INTENT(IN), OPTIONAL :: dd_unf
+      CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_namout
 
+      ! function
+      TYPE(TVAR)                                         :: tf_var
 
       ! local variable
       INTEGER(i4)                                  :: il_type
@@ -4038,10 +4446,12 @@ CONTAINS
       REAL(dp)   , DIMENSION(:,:)    , ALLOCATABLE :: dl_value
 
       ! loop indices
+      INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
       !----------------------------------------------------------------
 
       ! clean variable
-      CALL var_clean(var__init_2D_i2)      
+      CALL var_clean(tf_var)      
 
       il_type=NF90_SHORT
       IF( PRESENT(id_type) ) il_type=id_type
@@ -4052,37 +4462,56 @@ CONTAINS
       il_shape(:)=SHAPE(sd_value(:,:))
 
       ALLOCATE( dl_value( il_shape(1), &
-      &                   il_shape(2)) )
+         &                il_shape(2)) )
 
-      dl_value(:,:)=REAL(sd_value(:,:),dp)
+      DO jj=1,il_shape(2)
+         DO ji=1,il_shape(1)
+            dl_value(ji,jj)=REAL(sd_value(ji,jj),dp)
+         ENDDO
+      ENDDO
 
-      var__init_2D_i2=var_init( cd_name, dl_value(:,:),             &
-      &                         id_start=id_start,                  &
-      &                         id_count=id_count,                  &
-      &                         id_type=il_type,                    &
-      &                         td_dim=td_dim, td_att=td_att,       &
-      &                         dd_fill=dl_fill,                    &
-      &                         cd_units=cd_units,                  &
-      &                         cd_axis=cd_axis,                    &
-      &                         cd_stdname=cd_stdname,              &
-      &                         cd_longname=cd_longname,            &
-      &                         cd_point=cd_point, id_id=id_id,     &
-      &                         id_ew=id_ew, dd_scf=dd_scf,         &
-      &                         dd_ofs=dd_ofs,  id_rec=id_rec,      &
-      &                         dd_min=dd_min, dd_max=dd_max,       &
-      &                         ld_contiguous=ld_contiguous,        &
-      &                         ld_shuffle=ld_shuffle,              &
-      &                         ld_fletcher32=ld_fletcher32,        &
-      &                         id_deflvl=id_deflvl,                &
-      &                         id_chunksz=id_chunksz(:),           &
-      &                         cd_interp=cd_interp(:),             &
-      &                         cd_extrap=cd_extrap(:),             &
-      &                         cd_filter=cd_filter(:),             &
-      &                         cd_unt=cd_unt, dd_unf=dd_unf)
+      tf_var=var_init( cd_name, dl_value(:,:),             &
+         &             id_start=id_start,                  &
+         &             id_count=id_count,                  &
+         &             id_type=il_type,                    &
+         &             td_dim=td_dim, td_att=td_att,       &
+         &             dd_fill=dl_fill,                    &
+         &             cd_units=cd_units,                  &
+         &             cd_axis=cd_axis,                    &
+         &             cd_stdname=cd_stdname,              &
+         &             cd_longname=cd_longname,            &
+         &             cd_point=cd_point, id_id=id_id,     &
+         &             id_ew=id_ew, dd_scf=dd_scf,         &
+         &             dd_ofs=dd_ofs,  id_rec=id_rec,      &
+         &             dd_min=dd_min, dd_max=dd_max,       &
+         &             ld_contiguous=ld_contiguous,        &
+         &             ld_shuffle=ld_shuffle,              &
+         &             ld_fletcher32=ld_fletcher32,        &
+         &             id_deflvl=id_deflvl,                &
+         &             id_chunksz=id_chunksz(:),           &
+         &             cd_interp=cd_interp(:),             &
+         &             cd_extrap=cd_extrap(:),             &
+         &             cd_filter=cd_filter(:),             &
+         &             cd_unt=cd_unt, dd_unf=dd_unf,       &
+         &             cd_namout=cd_namout )
       
       DEALLOCATE( dl_value )
       
    END FUNCTION var__init_2D_i2
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__init_3D_i2(cd_name, sd_value,                    &
+         &                  id_start, id_count, id_type, td_dim,  &
+         &                  td_att, sd_fill, cd_units, cd_axis,   &
+         &                  cd_stdname, cd_longname,              &
+         &                  cd_point, id_id, id_ew,               &
+         &                  dd_scf, dd_ofs,  id_rec,              &
+         &                  dd_min, dd_max,                       &
+         &                  ld_contiguous, ld_shuffle,            &
+         &                  ld_fletcher32, id_deflvl, id_chunksz, &
+         &                  cd_interp, cd_extrap, cd_filter,      &
+         &                  cd_unt, dd_unf,                       &
+         &                  cd_namout) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function initialize a variable structure,
    !> with a integer(2) 3D array of value.
@@ -4098,14 +4527,18 @@ CONTAINS
    !> indices in the variable where value will be written could be specify if
    !> start and count array are given. Dimension structure is needed in that 
    !> case.    
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date June, 2015
    !> - add interp, extrap, and filter argument
    !> @date July, 2015
    !> - add unit factor (to change unit)
-   !
+   !> @date January, 2019
+   !> - decompose array conversion on each dimension
+   !> @date February, 2019
+   !> - add output name (to change name)
+   !>
    !> @param[in] cd_name         variable name
    !> @param[in] sd_value        3D array of integer(2) value
    !> @param[in] id_start        index in the variable from which the 
@@ -4139,21 +4572,12 @@ CONTAINS
    !> @param[in] cd_filter       filter method
    !> @param[in] cd_unt          new units (linked to units factor)
    !> @param[in] dd_unf          units factor
+   !> @param[in] cd_namout       output name (renamed variable)
    !> @return variable structure
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION var__init_3D_i2( cd_name, sd_value,        &
-   &                                    id_start, id_count, id_type, td_dim, &
-   &                                    td_att, sd_fill, cd_units, cd_axis,&
-   &                                    cd_stdname, cd_longname,  &
-   &                                    cd_point, id_id, id_ew,   &
-   &                                    dd_scf, dd_ofs,  id_rec,  &
-   &                                    dd_min, dd_max,           &
-   &                                    ld_contiguous, ld_shuffle,&
-   &                                    ld_fletcher32, id_deflvl, id_chunksz, &
-   &                                    cd_interp, cd_extrap, cd_filter, &
-   &                                    cd_unt, dd_unf)
 
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),                       INTENT(IN) :: cd_name
       INTEGER(i2)     , DIMENSION(:,:,:)   ,  INTENT(IN) :: sd_value
@@ -4185,6 +4609,10 @@ CONTAINS
       CHARACTER(LEN=*), DIMENSION(5)        , INTENT(IN), OPTIONAL :: cd_filter
       CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_unt
       REAL(dp)        ,                       INTENT(IN), OPTIONAL :: dd_unf
+      CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_namout
+
+      ! function
+      TYPE(TVAR)                                         :: tf_var
 
       ! local variable
       INTEGER(i4)                                  :: il_type
@@ -4194,10 +4622,13 @@ CONTAINS
       REAL(dp)   , DIMENSION(:,:,:)  , ALLOCATABLE :: dl_value
 
       ! loop indices
+      INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
+      INTEGER(i4) :: jk
       !----------------------------------------------------------------
 
       ! clean variable
-      CALL var_clean(var__init_3D_i2)      
+      CALL var_clean(tf_var)      
 
       il_type=NF90_SHORT
       IF( PRESENT(id_type) ) il_type=id_type
@@ -4208,38 +4639,59 @@ CONTAINS
       il_shape(:)=SHAPE(sd_value(:,:,:))
 
       ALLOCATE( dl_value( il_shape(1), &
-      &                   il_shape(2), &
-      &                   il_shape(3)) )
+         &                il_shape(2), &
+         &                il_shape(3)) )
 
-      dl_value(:,:,:)=REAL(sd_value(:,:,:),dp)
+      DO jk=1,il_shape(3)
+         DO jj=1,il_shape(2)
+            DO ji=1,il_shape(1)
+               dl_value(ji,jj,jk)=REAL(sd_value(ji,jj,jk),dp)
+            ENDDO
+         ENDDO
+      ENDDO
 
-      var__init_3D_i2=var_init( cd_name, dl_value(:,:,:),           &
-      &                         id_start=id_start,                  &
-      &                         id_count=id_count,                  &
-      &                         id_type=il_type,                    &
-      &                         td_dim=td_dim, td_att=td_att,       &
-      &                         dd_fill=dl_fill,                    &
-      &                         cd_units=cd_units,                  &
-      &                         cd_axis=cd_axis,                    &
-      &                         cd_stdname=cd_stdname,              &
-      &                         cd_longname=cd_longname,            &
-      &                         cd_point=cd_point, id_id=id_id,     &
-      &                         id_ew=id_ew, dd_scf=dd_scf,         &
-      &                         dd_ofs=dd_ofs,  id_rec=id_rec,      &
-      &                         dd_min=dd_min, dd_max=dd_max,       &
-      &                         ld_contiguous=ld_contiguous,        &
-      &                         ld_shuffle=ld_shuffle,              &
-      &                         ld_fletcher32=ld_fletcher32,        &
-      &                         id_deflvl=id_deflvl,                &
-      &                         id_chunksz=id_chunksz(:),           &
-      &                         cd_interp=cd_interp(:),             &
-      &                         cd_extrap=cd_extrap(:),             &
-      &                         cd_filter=cd_filter(:),             &
-      &                         cd_unt=cd_unt, dd_unf=dd_unf)
+      tf_var=var_init( cd_name, dl_value(:,:,:),           &
+         &             id_start=id_start,                  &
+         &             id_count=id_count,                  &
+         &             id_type=il_type,                    &
+         &             td_dim=td_dim, td_att=td_att,       &
+         &             dd_fill=dl_fill,                    &
+         &             cd_units=cd_units,                  &
+         &             cd_axis=cd_axis,                    &
+         &             cd_stdname=cd_stdname,              &
+         &             cd_longname=cd_longname,            &
+         &             cd_point=cd_point, id_id=id_id,     &
+         &             id_ew=id_ew, dd_scf=dd_scf,         &
+         &             dd_ofs=dd_ofs,  id_rec=id_rec,      &
+         &             dd_min=dd_min, dd_max=dd_max,       &
+         &             ld_contiguous=ld_contiguous,        &
+         &             ld_shuffle=ld_shuffle,              &
+         &             ld_fletcher32=ld_fletcher32,        &
+         &             id_deflvl=id_deflvl,                &
+         &             id_chunksz=id_chunksz(:),           &
+         &             cd_interp=cd_interp(:),             &
+         &             cd_extrap=cd_extrap(:),             &
+         &             cd_filter=cd_filter(:),             &
+         &             cd_unt=cd_unt, dd_unf=dd_unf,       &
+         &             cd_namout=cd_namout )
       
       DEALLOCATE( dl_value )
       
    END FUNCTION var__init_3D_i2
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__init_i2(cd_name, sd_value,        &
+         &                          id_start, id_count, id_type, td_dim, &
+         &                          td_att, sd_fill, cd_units, cd_axis,&
+         &                          cd_stdname, cd_longname,  &
+         &                          cd_point, id_id, id_ew,   &
+         &                          dd_scf, dd_ofs,  id_rec,  &
+         &                          dd_min, dd_max,           &
+         &                          ld_contiguous, ld_shuffle,&
+         &                          ld_fletcher32, id_deflvl, id_chunksz, &
+         &                          cd_interp, cd_extrap, cd_filter, &
+         &                          cd_unt, dd_unf, &
+         &                          cd_namout) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function initialize a variable structure,
    !> with a integer(2) 4D array of value.
@@ -4255,14 +4707,18 @@ CONTAINS
    !> indices in the variable where value will be written could be specify if
    !> start and count array are given. Dimension structure is needed in that 
    !> case.    
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date June, 2015
    !> - add interp, extrap, and filter argument
    !> @date July, 2015
    !> - add unit factor (to change unit)
-   !
+   !> @date January, 2019
+   !> - decompose array conversion on each dimension
+   !> @date February, 2019
+   !> - add output name (to change name)
+   !>
    !> @param[in] cd_name         variable name
    !> @param[in] sd_value        4D array of integer(2) value
    !> @param[in] id_start        index in the variable from which the 
@@ -4296,21 +4752,12 @@ CONTAINS
    !> @param[in] cd_filter       filter method
    !> @param[in] cd_unt          new units (linked to units factor)
    !> @param[in] dd_unf          units factor
+   !> @param[in] cd_namout       output name (renamed variable)
    !> @return variable structure
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION var__init_i2( cd_name, sd_value,        &
-   &                                 id_start, id_count, id_type, td_dim, &
-   &                                 td_att, sd_fill, cd_units, cd_axis,&
-   &                                 cd_stdname, cd_longname,  &
-   &                                 cd_point, id_id, id_ew,   &
-   &                                 dd_scf, dd_ofs,  id_rec,  &
-   &                                 dd_min, dd_max,           &
-   &                                 ld_contiguous, ld_shuffle,&
-   &                                 ld_fletcher32, id_deflvl, id_chunksz, &
-   &                                 cd_interp, cd_extrap, cd_filter, &
-   &                                 cd_unt, dd_unf)
 
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),                       INTENT(IN) :: cd_name
       INTEGER(i2)     , DIMENSION(:,:,:,:),   INTENT(IN) :: sd_value
@@ -4342,6 +4789,10 @@ CONTAINS
       CHARACTER(LEN=*), DIMENSION(5)        , INTENT(IN), OPTIONAL :: cd_filter
       CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_unt
       REAL(dp)        ,                       INTENT(IN), OPTIONAL :: dd_unf
+      CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_namout
+
+      ! function
+      TYPE(TVAR)                                         :: tf_var
 
       ! local variable
       INTEGER(i4)                                       :: il_type
@@ -4351,10 +4802,14 @@ CONTAINS
       REAL(dp)        , DIMENSION(:,:,:,:), ALLOCATABLE :: dl_value
 
       ! loop indices
+      INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
+      INTEGER(i4) :: jk
+      INTEGER(i4) :: jl
       !----------------------------------------------------------------
 
       ! clean variable
-      CALL var_clean(var__init_i2)      
+      CALL var_clean(tf_var)      
 
       il_type=NF90_SHORT
       IF( PRESENT(id_type) ) il_type=id_type
@@ -4365,39 +4820,62 @@ CONTAINS
       il_shape(:)=SHAPE(sd_value(:,:,:,:))
 
       ALLOCATE( dl_value( il_shape(1), &
-      &                   il_shape(2), &
-      &                   il_shape(3), &
-      &                   il_shape(4)) )
+         &                il_shape(2), &
+         &                il_shape(3), &
+         &                il_shape(4)) )
 
-      dl_value(:,:,:,:)=REAL(sd_value(:,:,:,:),dp)
+      DO jl=1,il_shape(4)
+         DO jk=1,il_shape(3)
+            DO jj=1,il_shape(2)
+               DO ji=1,il_shape(1)
+                  dl_value(ji,jj,jk,jl)=REAL(sd_value(ji,jj,jk,jl),dp)
+               ENDDO
+            ENDDO
+         ENDDO
+      ENDDO
 
-      var__init_i2=var_init( cd_name, dl_value(:,:,:,:),         &
-      &                      id_start=id_start,                  &
-      &                      id_count=id_count,                  &
-      &                      id_type=il_type,                    &
-      &                      td_dim=td_dim, td_att=td_att,       &
-      &                      dd_fill=dl_fill,                    &
-      &                      cd_units=cd_units,                  &
-      &                      cd_axis=cd_axis,                    &
-      &                      cd_stdname=cd_stdname,              &
-      &                      cd_longname=cd_longname,            &
-      &                      cd_point=cd_point, id_id=id_id,     &
-      &                      id_ew=id_ew, dd_scf=dd_scf,         &
-      &                      dd_ofs=dd_ofs,  id_rec=id_rec,      &
-      &                      dd_min=dd_min, dd_max=dd_max,       &
-      &                      ld_contiguous=ld_contiguous,        &
-      &                      ld_shuffle=ld_shuffle,              &
-      &                      ld_fletcher32=ld_fletcher32,        &
-      &                      id_deflvl=id_deflvl,                &
-      &                      id_chunksz=id_chunksz(:),           &
-      &                      cd_interp=cd_interp(:),             &
-      &                      cd_extrap=cd_extrap(:),             &
-      &                      cd_filter=cd_filter(:),             &
-      &                      cd_unt=cd_unt, dd_unf=dd_unf)
+      tf_var=var_init( cd_name, dl_value(:,:,:,:),         &
+         &             id_start=id_start,                  &
+         &             id_count=id_count,                  &
+         &             id_type=il_type,                    &
+         &             td_dim=td_dim, td_att=td_att,       &
+         &             dd_fill=dl_fill,                    &
+         &             cd_units=cd_units,                  &
+         &             cd_axis=cd_axis,                    &
+         &             cd_stdname=cd_stdname,              &
+         &             cd_longname=cd_longname,            &
+         &             cd_point=cd_point, id_id=id_id,     &
+         &             id_ew=id_ew, dd_scf=dd_scf,         &
+         &             dd_ofs=dd_ofs,  id_rec=id_rec,      &
+         &             dd_min=dd_min, dd_max=dd_max,       &
+         &             ld_contiguous=ld_contiguous,        &
+         &             ld_shuffle=ld_shuffle,              &
+         &             ld_fletcher32=ld_fletcher32,        &
+         &             id_deflvl=id_deflvl,                &
+         &             id_chunksz=id_chunksz(:),           &
+         &             cd_interp=cd_interp(:),             &
+         &             cd_extrap=cd_extrap(:),             &
+         &             cd_filter=cd_filter(:),             &
+         &             cd_unt=cd_unt, dd_unf=dd_unf,       &
+         &             cd_namout=cd_namout )
       
       DEALLOCATE( dl_value )
       
    END FUNCTION var__init_i2
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__init_1D_i1(cd_name, bd_value,                    &
+         &                  id_start, id_count, id_type, td_dim,  &
+         &                  td_att, bd_fill, cd_units, cd_axis,   &
+         &                  cd_stdname, cd_longname,              &
+         &                  cd_point, id_id, id_ew,               &
+         &                  dd_scf, dd_ofs,  id_rec,              &
+         &                  dd_min, dd_max,                       &
+         &                  ld_contiguous, ld_shuffle,            &
+         &                  ld_fletcher32, id_deflvl, id_chunksz, &
+         &                  cd_interp, cd_extrap, cd_filter,      &
+         &                  cd_unt, dd_unf,                       &
+         &                  cd_namout) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function initialize a variable structure,
    !> with a integer(1) 1D array of value.
@@ -4413,14 +4891,18 @@ CONTAINS
    !> indices in the variable where value will be written could be specify if
    !> start and count array are given. Dimension structure is needed in that 
    !> case.    
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date June, 2015
    !> - add interp, extrap, and filter argument
    !> @date July, 2015
    !> - add unit factor (to change unit)
-   !
+   !> @date January, 2019
+   !> - decompose array conversion on each dimension
+   !> @date February, 2019
+   !> - add output name (to change name)
+   !>
    !> @param[in] cd_name         variable name
    !> @param[in] bd_value        1D array of integer(1) value
    !> @param[in] id_start        index in the variable from which the 
@@ -4454,21 +4936,12 @@ CONTAINS
    !> @param[in] cd_filter       filter method
    !> @param[in] cd_unt          new units (linked to units factor)
    !> @param[in] dd_unf          units factor
+   !> @param[in] cd_namout       output name (renamed variable)
    !> @return variable structure
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION var__init_1D_i1( cd_name, bd_value,        &
-   &                                    id_start, id_count, id_type, td_dim, &
-   &                                    td_att, bd_fill, cd_units, cd_axis,&
-   &                                    cd_stdname, cd_longname,  &
-   &                                    cd_point, id_id, id_ew,   &
-   &                                    dd_scf, dd_ofs,  id_rec,  &
-   &                                    dd_min, dd_max,           &
-   &                                    ld_contiguous, ld_shuffle,&
-   &                                    ld_fletcher32, id_deflvl, id_chunksz, &
-   &                                    cd_interp, cd_extrap, cd_filter, &
-   &                                    cd_unt, dd_unf)
 
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),                       INTENT(IN) :: cd_name
       INTEGER(i1)     , DIMENSION(:)        , INTENT(IN) :: bd_value
@@ -4500,6 +4973,10 @@ CONTAINS
       CHARACTER(LEN=*), DIMENSION(5)        , INTENT(IN), OPTIONAL :: cd_filter
       CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_unt
       REAL(dp)        ,                       INTENT(IN), OPTIONAL :: dd_unf
+      CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_namout
+
+      ! function
+      TYPE(TVAR)                                         :: tf_var
 
       ! local variable
       INTEGER(i4)                                       :: il_type
@@ -4509,10 +4986,11 @@ CONTAINS
       REAL(dp)        , DIMENSION(:)      , ALLOCATABLE :: dl_value
 
       ! loop indices
+      INTEGER(i4) :: ji
       !----------------------------------------------------------------
 
       ! clean variable
-      CALL var_clean(var__init_1D_i1)      
+      CALL var_clean(tf_var)      
 
       il_type=NF90_BYTE
       IF( PRESENT(id_type) ) il_type=id_type
@@ -4523,35 +5001,52 @@ CONTAINS
       il_shape=SIZE(bd_value(:))
       ALLOCATE( dl_value( il_shape) )
 
-      dl_value(:)=REAL(bd_value(:),dp)
+      DO ji=1,il_shape
+         dl_value(ji)=REAL(bd_value(ji),dp)
+      ENDDO
 
-      var__init_1D_i1=var_init( cd_name, dl_value(:),               &
-      &                         id_start=id_start,                  &
-      &                         id_count=id_count,                  &
-      &                         id_type=il_type,                    &
-      &                         td_dim=td_dim, td_att=td_att,       &
-      &                         dd_fill=dl_fill,                    &
-      &                         cd_units=cd_units,                  &
-      &                         cd_axis=cd_axis,                    &
-      &                         cd_stdname=cd_stdname,              &
-      &                         cd_longname=cd_longname,            &
-      &                         cd_point=cd_point, id_id=id_id,     &
-      &                         id_ew=id_ew, dd_scf=dd_scf,         &
-      &                         dd_ofs=dd_ofs,  id_rec=id_rec,      &
-      &                         dd_min=dd_min, dd_max=dd_max,       &
-      &                         ld_contiguous=ld_contiguous,        &
-      &                         ld_shuffle=ld_shuffle,              &
-      &                         ld_fletcher32=ld_fletcher32,        &
-      &                         id_deflvl=id_deflvl,                &
-      &                         id_chunksz=id_chunksz(:),           &
-      &                         cd_interp=cd_interp(:),             &
-      &                         cd_extrap=cd_extrap(:),             &
-      &                         cd_filter=cd_filter(:),             &
-      &                         cd_unt=cd_unt, dd_unf=dd_unf)
+      tf_var=var_init( cd_name, dl_value(:),               &
+         &             id_start=id_start,                  &
+         &             id_count=id_count,                  &
+         &             id_type=il_type,                    &
+         &             td_dim=td_dim, td_att=td_att,       &
+         &             dd_fill=dl_fill,                    &
+         &             cd_units=cd_units,                  &
+         &             cd_axis=cd_axis,                    &
+         &             cd_stdname=cd_stdname,              &
+         &             cd_longname=cd_longname,            &
+         &             cd_point=cd_point, id_id=id_id,     &
+         &             id_ew=id_ew, dd_scf=dd_scf,         &
+         &             dd_ofs=dd_ofs,  id_rec=id_rec,      &
+         &             dd_min=dd_min, dd_max=dd_max,       &
+         &             ld_contiguous=ld_contiguous,        &
+         &             ld_shuffle=ld_shuffle,              &
+         &             ld_fletcher32=ld_fletcher32,        &
+         &             id_deflvl=id_deflvl,                &
+         &             id_chunksz=id_chunksz(:),           &
+         &             cd_interp=cd_interp(:),             &
+         &             cd_extrap=cd_extrap(:),             &
+         &             cd_filter=cd_filter(:),             &
+         &             cd_unt=cd_unt, dd_unf=dd_unf,       &
+         &             cd_namout=cd_namout )
  
       DEALLOCATE( dl_value )
  
    END FUNCTION var__init_1D_i1
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__init_2D_i1(cd_name, bd_value,                    &
+         &                  id_start, id_count, id_type, td_dim,  &
+         &                  td_att, bd_fill, cd_units, cd_axis,   &
+         &                  cd_stdname, cd_longname,              &
+         &                  cd_point, id_id, id_ew,               &
+         &                  dd_scf, dd_ofs,  id_rec,              &
+         &                  dd_min, dd_max,                       &
+         &                  ld_contiguous, ld_shuffle,            &
+         &                  ld_fletcher32, id_deflvl, id_chunksz, &
+         &                  cd_interp, cd_extrap, cd_filter,      &
+         &                  cd_unt, dd_unf,                       &
+         &                  cd_namout) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function initialize a variable structure,
    !> with a integer(1) 2D array of value.
@@ -4567,14 +5062,18 @@ CONTAINS
    !> indices in the variable where value will be written could be specify if
    !> start and count array are given. Dimension structure is needed in that 
    !> case.    
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date June, 2015
    !> - add interp, extrap, and filter argument
    !> @date July, 2015
    !> - add unit factor (to change unit)
-   !
+   !> @date January, 2019
+   !> - decompose array conversion on each dimension
+   !> @date February, 2019
+   !> - add output name (to change name)
+   !>
    !> @param[in] cd_name         variable name
    !> @param[in] bd_value        2D array of integer(1) value
    !> @param[in] id_start        index in the variable from which the 
@@ -4608,21 +5107,12 @@ CONTAINS
    !> @param[in] cd_filter       filter method
    !> @param[in] cd_unt          new units (linked to units factor)
    !> @param[in] dd_unf          units factor
+   !> @param[in] cd_namout       output name (renamed variable)
    !> @return variable structure
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION var__init_2D_i1( cd_name, bd_value,        &
-   &                                    id_start, id_count, id_type, td_dim, &
-   &                                    td_att, bd_fill, cd_units, cd_axis,&
-   &                                    cd_stdname, cd_longname,  &
-   &                                    cd_point, id_id, id_ew,   &
-   &                                    dd_scf, dd_ofs,  id_rec,  &
-   &                                    dd_min, dd_max,           &
-   &                                    ld_contiguous, ld_shuffle,&
-   &                                    ld_fletcher32, id_deflvl, id_chunksz, &
-   &                                    cd_interp, cd_extrap, cd_filter, &
-   &                                    cd_unt, dd_unf)
 
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),                       INTENT(IN) :: cd_name
       INTEGER(i1)     , DIMENSION(:,:)     ,  INTENT(IN) :: bd_value
@@ -4654,6 +5144,10 @@ CONTAINS
       CHARACTER(LEN=*), DIMENSION(5)        , INTENT(IN), OPTIONAL :: cd_filter
       CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_unt
       REAL(dp)        ,                       INTENT(IN), OPTIONAL :: dd_unf
+      CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_namout
+
+      ! function
+      TYPE(TVAR)                                         :: tf_var
 
       ! local variable
       INTEGER(i4)                                  :: il_type
@@ -4663,10 +5157,12 @@ CONTAINS
       REAL(dp)   , DIMENSION(:,:)    , ALLOCATABLE :: dl_value
 
       ! loop indices
+      INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
       !----------------------------------------------------------------
 
       ! clean variable
-      CALL var_clean(var__init_2D_i1)      
+      CALL var_clean(tf_var)      
 
       il_type=NF90_BYTE
       IF( PRESENT(id_type) ) il_type=id_type
@@ -4677,37 +5173,56 @@ CONTAINS
       il_shape(:)=SHAPE(bd_value(:,:))
 
       ALLOCATE( dl_value( il_shape(1), &
-      &                   il_shape(2)) )
+         &                il_shape(2)) )
 
-      dl_value(:,:)=REAL(bd_value(:,:),dp)
+      DO jj=1,il_shape(2)
+         DO ji=1,il_shape(1)
+            dl_value(ji,jj)=REAL(bd_value(ji,jj),dp)
+         ENDDO
+      ENDDO
 
-      var__init_2D_i1=var_init( cd_name, dl_value(:,:),             &
-      &                         id_start=id_start,                  &
-      &                         id_count=id_count,                  &
-      &                         id_type=il_type,                    &
-      &                         td_dim=td_dim, td_att=td_att,       &
-      &                         dd_fill=dl_fill,                    &
-      &                         cd_units=cd_units,                  &
-      &                         cd_axis=cd_axis,                    &
-      &                         cd_stdname=cd_stdname,              &
-      &                         cd_longname=cd_longname,            &
-      &                         cd_point=cd_point, id_id=id_id,     &
-      &                         id_ew=id_ew, dd_scf=dd_scf,         &
-      &                         dd_ofs=dd_ofs,  id_rec=id_rec,      &
-      &                         dd_min=dd_min, dd_max=dd_max,       &
-      &                         ld_contiguous=ld_contiguous,        &
-      &                         ld_shuffle=ld_shuffle,              &
-      &                         ld_fletcher32=ld_fletcher32,        &
-      &                         id_deflvl=id_deflvl,                &
-      &                         id_chunksz=id_chunksz(:),           &
-      &                         cd_interp=cd_interp(:),             &
-      &                         cd_extrap=cd_extrap(:),             &
-      &                         cd_filter=cd_filter(:),             &
-      &                         cd_unt=cd_unt, dd_unf=dd_unf)
+      tf_var=var_init( cd_name, dl_value(:,:),             &
+         &             id_start=id_start,                  &
+         &             id_count=id_count,                  &
+         &             id_type=il_type,                    &
+         &             td_dim=td_dim, td_att=td_att,       &
+         &             dd_fill=dl_fill,                    &
+         &             cd_units=cd_units,                  &
+         &             cd_axis=cd_axis,                    &
+         &             cd_stdname=cd_stdname,              &
+         &             cd_longname=cd_longname,            &
+         &             cd_point=cd_point, id_id=id_id,     &
+         &             id_ew=id_ew, dd_scf=dd_scf,         &
+         &             dd_ofs=dd_ofs,  id_rec=id_rec,      &
+         &             dd_min=dd_min, dd_max=dd_max,       &
+         &             ld_contiguous=ld_contiguous,        &
+         &             ld_shuffle=ld_shuffle,              &
+         &             ld_fletcher32=ld_fletcher32,        &
+         &             id_deflvl=id_deflvl,                &
+         &             id_chunksz=id_chunksz(:),           &
+         &             cd_interp=cd_interp(:),             &
+         &             cd_extrap=cd_extrap(:),             &
+         &             cd_filter=cd_filter(:),             &
+         &             cd_unt=cd_unt, dd_unf=dd_unf,       &
+         &             cd_namout=cd_namout )
       
       DEALLOCATE( dl_value )
       
    END FUNCTION var__init_2D_i1
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__init_3D_i1(cd_name, bd_value,                    &
+         &                  id_start, id_count, id_type, td_dim,  &
+         &                  td_att, bd_fill, cd_units, cd_axis,   &
+         &                  cd_stdname, cd_longname,              &
+         &                  cd_point, id_id, id_ew,               &
+         &                  dd_scf, dd_ofs,  id_rec,              &
+         &                  dd_min, dd_max,                       &
+         &                  ld_contiguous, ld_shuffle,            &
+         &                  ld_fletcher32, id_deflvl, id_chunksz, &
+         &                  cd_interp, cd_extrap, cd_filter,      &
+         &                  cd_unt, dd_unf,                       &
+         &                  cd_namout) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function initialize a variable structure,
    !> with a integer(1) 3D array of value.
@@ -4723,14 +5238,18 @@ CONTAINS
    !> indices in the variable where value will be written could be specify if
    !> start and count array are given. Dimension structure is needed in that 
    !> case.    
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date June, 2015
    !> - add interp, extrap, and filter argument
    !> @date July, 2015
    !> - add unit factor (to change unit)
-   !
+   !> @date January, 2019
+   !> - decompose array conversion on each dimension
+   !> @date February, 2019
+   !> - add output name (to change name)
+   !>
    !> @param[in] cd_name         variable name
    !> @param[in] bd_value        3D array of integer(1) value
    !> @param[in] id_start        index in the variable from which the 
@@ -4764,21 +5283,12 @@ CONTAINS
    !> @param[in] cd_filter       filter method
    !> @param[in] cd_unt          new units (linked to units factor)
    !> @param[in] dd_unf          units factor
+   !> @param[in] cd_namout       output name (renamed variable)
    !> @return variable structure
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION var__init_3D_i1( cd_name, bd_value,        &
-   &                                    id_start, id_count, id_type, td_dim, &
-   &                                    td_att, bd_fill, cd_units, cd_axis,&
-   &                                    cd_stdname, cd_longname,  &
-   &                                    cd_point, id_id, id_ew,   &
-   &                                    dd_scf, dd_ofs,  id_rec,  &
-   &                                    dd_min, dd_max,           &
-   &                                    ld_contiguous, ld_shuffle,&
-   &                                    ld_fletcher32, id_deflvl, id_chunksz, &
-   &                                    cd_interp, cd_extrap, cd_filter, &
-   &                                    cd_unt, dd_unf)
 
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),                       INTENT(IN) :: cd_name
       INTEGER(i1)     , DIMENSION(:,:,:)   ,  INTENT(IN) :: bd_value
@@ -4810,6 +5320,10 @@ CONTAINS
       CHARACTER(LEN=*), DIMENSION(5)        , INTENT(IN), OPTIONAL :: cd_filter
       CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_unt
       REAL(dp)        ,                       INTENT(IN), OPTIONAL :: dd_unf
+      CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_namout
+
+      ! function
+      TYPE(TVAR)                                         :: tf_var
 
       ! local variable
       INTEGER(i4)                                  :: il_type
@@ -4819,10 +5333,13 @@ CONTAINS
       REAL(dp)   , DIMENSION(:,:,:)  , ALLOCATABLE :: dl_value
 
       ! loop indices
+      INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
+      INTEGER(i4) :: jk
       !----------------------------------------------------------------
 
       ! clean variable
-      CALL var_clean(var__init_3D_i1)      
+      CALL var_clean(tf_var)      
 
       il_type=NF90_BYTE
       IF( PRESENT(id_type) ) il_type=id_type
@@ -4833,38 +5350,59 @@ CONTAINS
       il_shape(:)=SHAPE(bd_value(:,:,:))
 
       ALLOCATE( dl_value( il_shape(1), &
-      &                   il_shape(2), &
-      &                   il_shape(3)) )
+         &                il_shape(2), &
+         &                il_shape(3)) )
 
-      dl_value(:,:,:)=REAL(bd_value(:,:,:),dp)
+      DO jk=1,il_shape(3)
+         DO jj=1,il_shape(2)
+            DO ji=1,il_shape(1)
+               dl_value(:,:,:)=REAL(bd_value(:,:,:),dp)
+            ENDDO
+         ENDDO
+      ENDDO
 
-      var__init_3D_i1=var_init( cd_name, dl_value(:,:,:),           &
-      &                         id_start=id_start,                  &
-      &                         id_count=id_count,                  &
-      &                         id_type=il_type,                    &
-      &                         td_dim=td_dim, td_att=td_att,       &
-      &                         dd_fill=dl_fill,                    &
-      &                         cd_units=cd_units,                  &
-      &                         cd_axis=cd_axis,                    &
-      &                         cd_stdname=cd_stdname,              &
-      &                         cd_longname=cd_longname,            &
-      &                         cd_point=cd_point, id_id=id_id,     &
-      &                         id_ew=id_ew, dd_scf=dd_scf,         &
-      &                         dd_ofs=dd_ofs,  id_rec=id_rec,      &
-      &                         dd_min=dd_min, dd_max=dd_max,       &
-      &                         ld_contiguous=ld_contiguous,        &
-      &                         ld_shuffle=ld_shuffle,              &
-      &                         ld_fletcher32=ld_fletcher32,        &
-      &                         id_deflvl=id_deflvl,                &
-      &                         id_chunksz=id_chunksz(:),           &
-      &                         cd_interp=cd_interp(:),             &
-      &                         cd_extrap=cd_extrap(:),             &
-      &                         cd_filter=cd_filter(:),             &
-      &                         cd_unt=cd_unt, dd_unf=dd_unf)
+      tf_var=var_init( cd_name, dl_value(:,:,:),           &
+         &             id_start=id_start,                  &
+         &             id_count=id_count,                  &
+         &             id_type=il_type,                    &
+         &             td_dim=td_dim, td_att=td_att,       &
+         &             dd_fill=dl_fill,                    &
+         &             cd_units=cd_units,                  &
+         &             cd_axis=cd_axis,                    &
+         &             cd_stdname=cd_stdname,              &
+         &             cd_longname=cd_longname,            &
+         &             cd_point=cd_point, id_id=id_id,     &
+         &             id_ew=id_ew, dd_scf=dd_scf,         &
+         &             dd_ofs=dd_ofs,  id_rec=id_rec,      &
+         &             dd_min=dd_min, dd_max=dd_max,       &
+         &             ld_contiguous=ld_contiguous,        &
+         &             ld_shuffle=ld_shuffle,              &
+         &             ld_fletcher32=ld_fletcher32,        &
+         &             id_deflvl=id_deflvl,                &
+         &             id_chunksz=id_chunksz(:),           &
+         &             cd_interp=cd_interp(:),             &
+         &             cd_extrap=cd_extrap(:),             &
+         &             cd_filter=cd_filter(:),             &
+         &             cd_unt=cd_unt, dd_unf=dd_unf,       &
+         &             cd_namout=cd_namout )
       
       DEALLOCATE( dl_value )
       
    END FUNCTION var__init_3D_i1
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__init_i1(cd_name, bd_value,                    &
+         &               id_start, id_count, id_type, td_dim,  &
+         &               td_att, bd_fill, cd_units, cd_axis,   &
+         &               cd_stdname, cd_longname,              &
+         &               cd_point, id_id, id_ew,               &
+         &               dd_scf, dd_ofs,  id_rec,              &
+         &               dd_min, dd_max,                       &
+         &               ld_contiguous, ld_shuffle,            &
+         &               ld_fletcher32, id_deflvl, id_chunksz, &
+         &               cd_interp, cd_extrap, cd_filter,      &
+         &               cd_unt, dd_unf,                       &
+         &               cd_namout) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function initialize a variable structure,
    !> with a integer(1) 4D array of value.
@@ -4880,14 +5418,18 @@ CONTAINS
    !> indices in the variable where value will be written could be specify if
    !> start and count array are given. Dimension structure is needed in that 
    !> case. 
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date June, 2015
    !> - add interp, extrap, and filter argument
    !> @date July, 2015
    !> - add unit factor (to change unit)
-   !
+   !> @date January, 2019
+   !> - decompose array conversion on each dimension
+   !> @date February, 2019
+   !> - add output name (to change name)
+   !>
    !> @param[in] cd_name         variable name
    !> @param[in] bd_value        4D array of integer(1) value
    !> @param[in] id_start        index in the variable from which the 
@@ -4921,21 +5463,12 @@ CONTAINS
    !> @param[in] cd_filter       filter method
    !> @param[in] cd_unt          new units (linked to units factor)
    !> @param[in] dd_unf          units factor
+   !> @param[in] cd_namout       output name (renamed variable)
    !> @return variable structure
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION var__init_i1( cd_name, bd_value,        &
-   &                                 id_start, id_count, id_type, td_dim, &
-   &                                 td_att, bd_fill, cd_units, cd_axis,&
-   &                                 cd_stdname, cd_longname,  &
-   &                                 cd_point, id_id, id_ew,   &
-   &                                 dd_scf, dd_ofs,  id_rec,  &
-   &                                 dd_min, dd_max,           &
-   &                                 ld_contiguous, ld_shuffle,&
-   &                                 ld_fletcher32, id_deflvl, id_chunksz, &
-   &                                 cd_interp, cd_extrap, cd_filter, &
-   &                                 cd_unt, dd_unf)
 
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),                       INTENT(IN) :: cd_name
       INTEGER(i1)     , DIMENSION(:,:,:,:),   INTENT(IN) :: bd_value
@@ -4967,6 +5500,10 @@ CONTAINS
       CHARACTER(LEN=*), DIMENSION(5)        , INTENT(IN), OPTIONAL :: cd_filter
       CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_unt
       REAL(dp)        ,                       INTENT(IN), OPTIONAL :: dd_unf
+      CHARACTER(LEN=*),                       INTENT(IN), OPTIONAL :: cd_namout
+
+      ! function
+      TYPE(TVAR)                                         :: tf_var
 
       ! local variable
       INTEGER(i4)                                       :: il_type
@@ -4976,10 +5513,14 @@ CONTAINS
       REAL(dp)        , DIMENSION(:,:,:,:), ALLOCATABLE :: dl_value
 
       ! loop indices
+      INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
+      INTEGER(i4) :: jk
+      INTEGER(i4) :: jl
       !----------------------------------------------------------------
 
       ! clean variable
-      CALL var_clean(var__init_i1)      
+      CALL var_clean(tf_var)      
 
       il_type=NF90_BYTE
       IF( PRESENT(id_type) ) il_type=id_type
@@ -4990,138 +5531,165 @@ CONTAINS
       il_shape(:)=SHAPE(bd_value(:,:,:,:))
 
       ALLOCATE( dl_value( il_shape(1), &
-      &                   il_shape(2), &
-      &                   il_shape(3), &
-      &                   il_shape(4)) )
+         &                il_shape(2), &
+         &                il_shape(3), &
+         &                il_shape(4)) )
 
-      dl_value(:,:,:,:)=REAL(bd_value(:,:,:,:),dp)
+      DO jl=1,il_shape(4)
+         DO jk=1,il_shape(3)
+            DO jj=1,il_shape(2)
+               DO ji=1,il_shape(1)
+                  dl_value(ji,jj,jk,jl)=REAL(bd_value(ji,jj,jk,jl),dp)
+               ENDDO
+            ENDDO
+         ENDDO
+      ENDDO
 
-      var__init_i1=var_init( cd_name, dl_value(:,:,:,:),         &
-      &                      id_start=id_start,                  &
-      &                      id_count=id_count,                  &
-      &                      id_type=il_type,                    &
-      &                      td_dim=td_dim, td_att=td_att,       &
-      &                      dd_fill=dl_fill,                    &
-      &                      cd_units=cd_units,                  &
-      &                      cd_axis=cd_axis,                    &
-      &                      cd_stdname=cd_stdname,              &
-      &                      cd_longname=cd_longname,            &
-      &                      cd_point=cd_point, id_id=id_id,     &
-      &                      id_ew=id_ew, dd_scf=dd_scf,         &
-      &                      dd_ofs=dd_ofs,  id_rec=id_rec,      &
-      &                      dd_min=dd_min, dd_max=dd_max,       &
-      &                      ld_contiguous=ld_contiguous,        &
-      &                      ld_shuffle=ld_shuffle,              &
-      &                      ld_fletcher32=ld_fletcher32,        &
-      &                      id_deflvl=id_deflvl,                &
-      &                      id_chunksz=id_chunksz(:),           &
-      &                      cd_interp=cd_interp(:),             &
-      &                      cd_extrap=cd_extrap(:),             &
-      &                      cd_filter=cd_filter(:),             &
-      &                      cd_unt=cd_unt, dd_unf=dd_unf)
+      tf_var=var_init( cd_name, dl_value(:,:,:,:),         &
+         &             id_start=id_start,                  &
+         &             id_count=id_count,                  &
+         &             id_type=il_type,                    &
+         &             td_dim=td_dim, td_att=td_att,       &
+         &             dd_fill=dl_fill,                    &
+         &             cd_units=cd_units,                  &
+         &             cd_axis=cd_axis,                    &
+         &             cd_stdname=cd_stdname,              &
+         &             cd_longname=cd_longname,            &
+         &             cd_point=cd_point, id_id=id_id,     &
+         &             id_ew=id_ew, dd_scf=dd_scf,         &
+         &             dd_ofs=dd_ofs,  id_rec=id_rec,      &
+         &             dd_min=dd_min, dd_max=dd_max,       &
+         &             ld_contiguous=ld_contiguous,        &
+         &             ld_shuffle=ld_shuffle,              &
+         &             ld_fletcher32=ld_fletcher32,        &
+         &             id_deflvl=id_deflvl,                &
+         &             id_chunksz=id_chunksz(:),           &
+         &             cd_interp=cd_interp(:),             &
+         &             cd_extrap=cd_extrap(:),             &
+         &             cd_filter=cd_filter(:),             &
+         &             cd_unt=cd_unt, dd_unf=dd_unf,       &
+         &             cd_namout=cd_namout )
       
       DEALLOCATE( dl_value )
       
    END FUNCTION var__init_i1
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var_concat(td_var1, td_var2, id_dim) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
-   !> @brief  This function concatenate variable value following DIM direction.
+   !> @brief  This function concatenate variable value following id_dim direction.
    !> 
    !> @details
    !> By default variable are concatenate following time dimension. To
-   !> concatenate following another dimension, specify DIM=x where x is the
+   !> concatenate following another dimension, specify id_dim=x where x is the
    !> dimension number (jp_I, jp_J,jp_K, jp_L). 
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] td_var1   variable structure
    !> @param[in] td_var2   variable structure
    !> @param[in] DIM       dimension following which concatenate
    !> @return variable structure
    !-------------------------------------------------------------------
-   FUNCTION var_concat(td_var1, td_var2, DIM)
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR) , INTENT(IN) :: td_var1
       TYPE(TVAR) , INTENT(IN) :: td_var2
-      INTEGER(i4), INTENT(IN), OPTIONAL :: DIM
+      INTEGER(i4), INTENT(IN), OPTIONAL :: id_dim
 
       ! function
-      TYPE(TVAR) :: var_concat
+      TYPE(TVAR)              :: tf_var
 
       ! local variable
       INTEGER(i4) :: il_dim
       !----------------------------------------------------------------
       il_dim=4
-      IF( PRESENT(DIM) ) il_dim=DIM
+      IF( PRESENT(id_dim) ) il_dim=id_dim
 
       IF( .NOT. ASSOCIATED(td_var1%d_value) )THEN
          CALL logger_error("VAR CONCAT: no value associated to variable "//&
-         &  TRIM(td_var1%c_name) )
+            &  TRIM(td_var1%c_name) )
       ELSEIF( .NOT. ASSOCIATED(td_var2%d_value) )THEN
          CALL logger_error("VAR CONCAT: no value associated to variable "//&
-         &  TRIM(td_var2%c_name) )
+            &  TRIM(td_var2%c_name) )
       ELSEIF( il_dim < 0 .OR. il_dim > 4 )THEN
          CALL logger_error("VAR CONCAT: invalid concatenate dimension ")
       ELSE
          ! check other dimension
          SELECT CASE(il_dim)
          CASE(jp_I)
-            var_concat=var__concat_i(td_var1, td_var2)
+            tf_var=var__concat_i(td_var1, td_var2)
          CASE(jp_J)
-            var_concat=var__concat_j(td_var1, td_var2)
+            tf_var=var__concat_j(td_var1, td_var2)
          CASE(jp_K)
-            var_concat=var__concat_k(td_var1, td_var2)
+            tf_var=var__concat_k(td_var1, td_var2)
          CASE(jp_L)
-            var_concat=var__concat_l(td_var1, td_var2)
+            tf_var=var__concat_l(td_var1, td_var2)
          END SELECT
       ENDIF
 
    END FUNCTION var_concat
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__concat_i(td_var1, td_var2) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief  This function concatenate variable value following i-direction.
    !> 
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !> @date January, 2019
+   !> - decompose array copy on each dimension
+   !>
    !> @param[in] td_var1   variable structure
    !> @param[in] td_var2   variable structure
    !> @return variable structure
    !-------------------------------------------------------------------
-   FUNCTION var__concat_i(td_var1, td_var2)
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR) , INTENT(IN) :: td_var1
       TYPE(TVAR) , INTENT(IN) :: td_var2
 
       ! function
-      TYPE(TVAR) :: var__concat_i
+      TYPE(TVAR)              :: tf_var
 
       ! local variable
       TYPE(TVAR)        :: tl_var
       CHARACTER(LEN=lc) :: cl_tmp
 
+      ! loop indices
+      INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
+      INTEGER(i4) :: jk
+      INTEGER(i4) :: jl
       !----------------------------------------------------------------
       IF( .NOT. td_var1%t_dim(1)%l_use .OR. &
-      &   .NOT. td_var1%t_dim(1)%l_use )THEN
+         &.NOT. td_var1%t_dim(1)%l_use )THEN
+
          CALL logger_error("VAR CONCAT: can not concatenate variable "//&
-         &  TRIM(td_var1%c_name)//" on an unused dimension I")
+            &              TRIM(td_var1%c_name)//" on an unused dimension I")
+   
       ELSEIF( ANY(td_var1%t_dim(2:4)%i_len /=  td_var2%t_dim(2:4)%i_len) )THEN
 
          cl_tmp='('//":"//","//&
-         &           TRIM(fct_str(td_var1%t_dim(2)%i_len))//','//&
-         &           TRIM(fct_str(td_var1%t_dim(3)%i_len))//','//&
-         &           TRIM(fct_str(td_var1%t_dim(4)%i_len))//')'
+            &   TRIM(fct_str(td_var1%t_dim(2)%i_len))//','//&
+            &   TRIM(fct_str(td_var1%t_dim(3)%i_len))//','//&
+            &   TRIM(fct_str(td_var1%t_dim(4)%i_len))//')'
          CALL logger_debug("VAR CONCAT: first variable dimensions "//&
-         &  TRIM(cl_tmp) )
+            &   TRIM(cl_tmp) )
          cl_tmp='('//":"//","//&
-         &           TRIM(fct_str(td_var2%t_dim(2)%i_len))//','//&
-         &           TRIM(fct_str(td_var2%t_dim(3)%i_len))//','//&
-         &           TRIM(fct_str(td_var2%t_dim(4)%i_len))//')'         
+            &   TRIM(fct_str(td_var2%t_dim(2)%i_len))//','//&
+            &   TRIM(fct_str(td_var2%t_dim(3)%i_len))//','//&
+            &   TRIM(fct_str(td_var2%t_dim(4)%i_len))//')'         
          CALL logger_debug("VAR CONCAT: second variable dimensions "//&
-         &  TRIM(cl_tmp) )
+            &   TRIM(cl_tmp) )
 
          CALL logger_error("VAR CONCAT: dimension not conform")
+
       ELSE
          tl_var=var_copy(td_var1)
 
@@ -5130,73 +5698,105 @@ CONTAINS
          tl_var%t_dim(1)%i_len=td_var1%t_dim(1)%i_len+td_var2%t_dim(1)%i_len
          
          ALLOCATE(tl_var%d_value(tl_var%t_dim(1)%i_len, &
-         &                       tl_var%t_dim(2)%i_len, &
-         &                       tl_var%t_dim(3)%i_len, &
-         &                       tl_var%t_dim(4)%i_len) )
+            &                    tl_var%t_dim(2)%i_len, &
+            &                    tl_var%t_dim(3)%i_len, &
+            &                    tl_var%t_dim(4)%i_len) )
 
          ! copy first variable value
-         tl_var%d_value(1:td_var1%t_dim(1)%i_len,:,:,:) = &
-         &  td_var1%d_value(:,:,:,:)
+         DO jl=1,tl_var%t_dim(4)%i_len
+            DO jk=1,tl_var%t_dim(3)%i_len
+               DO jj=1,tl_var%t_dim(2)%i_len
+                  DO ji=1,td_var1%t_dim(1)%i_len
+                     tl_var%d_value(ji,jj,jk,jl) = td_var1%d_value(ji,jj,jk,jl)
+                  ENDDO
+               ENDDO
+            ENDDO
+         ENDDO
+         !            tl_var%d_value(1:td_var1%t_dim(1)%i_len,:,:,:) = &
+         !&  td_var1%d_value(:,:,:,:)
 
          ! copy second variable value
-         tl_var%d_value(td_var1%t_dim(1)%i_len+1:tl_var%t_dim(1)%i_len,:,:,:)=&
-         &  td_var2%d_value(:,:,:,:)
+         DO jl=1,tl_var%t_dim(4)%i_len
+            DO jk=1,tl_var%t_dim(3)%i_len
+               DO jj=1,tl_var%t_dim(2)%i_len
+                  DO ji=1,td_var2%t_dim(1)%i_len
+                     tl_var%d_value(ji+td_var1%t_dim(1)%i_len,jj,jk,jl) = td_var2%d_value(ji,jj,jk,jl)
+                  ENDDO
+               ENDDO
+            ENDDO
+         ENDDO
+         !tl_var%d_value(td_var1%t_dim(1)%i_len+1:tl_var%t_dim(1)%i_len,:,:,:)=&
+         !&  td_var2%d_value(:,:,:,:)
 
          ! save result
-         var__concat_i=var_copy(tl_var)
+         tf_var=var_copy(tl_var)
 
          ! clean
          CALL var_clean(tl_var)
       ENDIF
 
    END FUNCTION var__concat_i
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__concat_j(td_var1, td_var2) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief  This function concatenate variable value following j-direction.
    !> 
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !> @date January, 2019
+   !> - decompose array copy on each dimension
+   !>
    !> @param[in] td_var1   variable structure
    !> @param[in] td_var2   variable structure
    !> @return variable structure
    !-------------------------------------------------------------------
-   FUNCTION var__concat_j(td_var1, td_var2)
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR) , INTENT(IN) :: td_var1
       TYPE(TVAR) , INTENT(IN) :: td_var2
 
       ! function
-      TYPE(TVAR) :: var__concat_j
+      TYPE(TVAR)              :: tf_var
 
       ! local variable
       TYPE(TVAR)        :: tl_var
       CHARACTER(LEN=lc) :: cl_tmp
 
+      ! loop indices
+      INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
+      INTEGER(i4) :: jk
+      INTEGER(i4) :: jl
       !----------------------------------------------------------------
       IF( .NOT. td_var1%t_dim(2)%l_use .OR. &
       &   .NOT. td_var1%t_dim(2)%l_use )THEN
+
          CALL logger_error("VAR CONCAT: can not concatenate variable "//&
          &  TRIM(td_var1%c_name)//" on an unused dimension J")      
+
       ELSEIF(     td_var1%t_dim(1)%i_len   /=  td_var2%t_dim(1)%i_len  .OR. &
       &   ANY(td_var1%t_dim(3:4)%i_len /=  td_var2%t_dim(3:4)%i_len) )THEN
 
          cl_tmp='('//&
-         &           TRIM(fct_str(td_var1%t_dim(1)%i_len))//','//&
-         &           ":"//','//&
-         &           TRIM(fct_str(td_var1%t_dim(3)%i_len))//','//&
-         &           TRIM(fct_str(td_var1%t_dim(4)%i_len))//')'
+            &    TRIM(fct_str(td_var1%t_dim(1)%i_len))//','//&
+            &    ":"//','//&
+            &    TRIM(fct_str(td_var1%t_dim(3)%i_len))//','//&
+            &    TRIM(fct_str(td_var1%t_dim(4)%i_len))//')'
          CALL logger_debug("VAR CONCAT: first variable dimensions "//&
-         &  TRIM(cl_tmp) )
+            &    TRIM(cl_tmp) )
          cl_tmp='('//&
-         &           TRIM(fct_str(td_var1%t_dim(1)%i_len))//','//&
-         &           ":"//','//&
-         &           TRIM(fct_str(td_var2%t_dim(3)%i_len))//','//&
-         &           TRIM(fct_str(td_var2%t_dim(4)%i_len))//')'         
+            &    TRIM(fct_str(td_var1%t_dim(1)%i_len))//','//&
+            &    ":"//','//&
+            &    TRIM(fct_str(td_var2%t_dim(3)%i_len))//','//&
+            &    TRIM(fct_str(td_var2%t_dim(4)%i_len))//')'         
          CALL logger_debug("VAR CONCAT: second variable dimensions "//&
-         &  TRIM(cl_tmp) )
+            &    TRIM(cl_tmp) )
 
          CALL logger_error("VAR CONCAT: dimension not conform")
+
       ELSE
          tl_var=var_copy(td_var1)
 
@@ -5205,73 +5805,105 @@ CONTAINS
          tl_var%t_dim(2)%i_len=td_var1%t_dim(2)%i_len+td_var2%t_dim(2)%i_len
          
          ALLOCATE(tl_var%d_value(tl_var%t_dim(1)%i_len, &
-         &                       tl_var%t_dim(2)%i_len, &
-         &                       tl_var%t_dim(3)%i_len, &
-         &                       tl_var%t_dim(4)%i_len) )
+            &                    tl_var%t_dim(2)%i_len, &
+            &                    tl_var%t_dim(3)%i_len, &
+            &                    tl_var%t_dim(4)%i_len) )
 
          ! copy first variable value
-         tl_var%d_value(:,1:td_var1%t_dim(2)%i_len,:,:)= &
-         &  td_var1%d_value(:,:,:,:)
+         DO jl=1,tl_var%t_dim(4)%i_len
+            DO jk=1,tl_var%t_dim(3)%i_len
+               DO jj=1,td_var1%t_dim(2)%i_len
+                  DO ji=1,tl_var%t_dim(1)%i_len
+                     tl_var%d_value(ji,jj,jk,jl) = td_var1%d_value(ji,jj,jk,jl)
+                  ENDDO
+               ENDDO
+            ENDDO
+         ENDDO
+         !         tl_var%d_value(:,1:td_var1%t_dim(2)%i_len,:,:)= &
+         !&  td_var1%d_value(:,:,:,:)
 
          ! copy second variable value
-         tl_var%d_value(:,td_var1%t_dim(2)%i_len+1:tl_var%t_dim(2)%i_len,:,:)=&
-         &  td_var2%d_value(:,:,:,:)
+         DO jl=1,tl_var%t_dim(4)%i_len
+            DO jk=1,tl_var%t_dim(3)%i_len
+               DO jj=1,td_var2%t_dim(2)%i_len
+                  DO ji=1,tl_var%t_dim(1)%i_len
+                     tl_var%d_value(ji,jj+td_var2%t_dim(2)%i_len,jk,jl) = td_var2%d_value(ji,jj,jk,jl)
+                  ENDDO
+               ENDDO
+            ENDDO
+         ENDDO    
+         !         tl_var%d_value(:,td_var1%t_dim(2)%i_len+1:tl_var%t_dim(2)%i_len,:,:)=&
+         !&  td_var2%d_value(:,:,:,:)
 
          ! save result
-         var__concat_j=var_copy(tl_var)
+         tf_var=var_copy(tl_var)
 
          ! clean
          CALL var_clean(tl_var)
       ENDIF
 
    END FUNCTION var__concat_j
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__concat_k(td_var1, td_var2) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief  This function concatenate variable value following k-direction.
    !> 
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
+   !> @date January, 2019
+   !> - decompose array copy on each dimension
    !
    !> @param[in] td_var1   variable structure
    !> @param[in] td_var2   variable structure
    !> @return variable structure
    !-------------------------------------------------------------------
-   FUNCTION var__concat_k(td_var1, td_var2)
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR) , INTENT(IN) :: td_var1
       TYPE(TVAR) , INTENT(IN) :: td_var2
 
       ! function
-      TYPE(TVAR) :: var__concat_k
+      TYPE(TVAR)              :: tf_var
 
       ! local variable
       TYPE(TVAR)        :: tl_var
       CHARACTER(LEN=lc) :: cl_tmp
 
+      ! loop indices
+      INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
+      INTEGER(i4) :: jk
+      INTEGER(i4) :: jl
       !----------------------------------------------------------------
       IF( .NOT. td_var1%t_dim(3)%l_use .OR. &
       &   .NOT. td_var1%t_dim(3)%l_use )THEN
+
          CALL logger_error("VAR CONCAT: can not concatenate variable "//&
          &  TRIM(td_var1%c_name)//" on an unused dimension K")      
+
       ELSEIF(     td_var1%t_dim(4)%i_len   /=  td_var2%t_dim(4)%i_len  .OR. &
       &   ANY(td_var1%t_dim(1:2)%i_len /=  td_var2%t_dim(1:2)%i_len) )THEN
 
          cl_tmp='('//&
-         &           TRIM(fct_str(td_var1%t_dim(1)%i_len))//','//&
-         &           TRIM(fct_str(td_var1%t_dim(2)%i_len))//','//&
-         &           ":"//','//&
-         &           TRIM(fct_str(td_var1%t_dim(4)%i_len))//')'
+            &    TRIM(fct_str(td_var1%t_dim(1)%i_len))//','//&
+            &    TRIM(fct_str(td_var1%t_dim(2)%i_len))//','//&
+            &    ":"//','//&
+            &    TRIM(fct_str(td_var1%t_dim(4)%i_len))//')'
          CALL logger_debug("VAR CONCAT: first variable dimensions "//&
-         &  TRIM(cl_tmp) )
+            &    TRIM(cl_tmp) )
          cl_tmp='('//&
-         &           TRIM(fct_str(td_var1%t_dim(1)%i_len))//','//&
-         &           TRIM(fct_str(td_var2%t_dim(2)%i_len))//','//&
-         &           ":"//','//&
-         &           TRIM(fct_str(td_var2%t_dim(4)%i_len))//')'         
+            &    TRIM(fct_str(td_var1%t_dim(1)%i_len))//','//&
+            &    TRIM(fct_str(td_var2%t_dim(2)%i_len))//','//&
+            &    ":"//','//&
+            &    TRIM(fct_str(td_var2%t_dim(4)%i_len))//')'         
          CALL logger_debug("VAR CONCAT: second variable dimensions "//&
-         &  TRIM(cl_tmp) )
+            &    TRIM(cl_tmp) )
 
          CALL logger_error("VAR CONCAT: dimension not conform")
+
       ELSE
          tl_var=var_copy(td_var1)
 
@@ -5280,72 +5912,104 @@ CONTAINS
          tl_var%t_dim(3)%i_len=td_var1%t_dim(3)%i_len+td_var2%t_dim(3)%i_len
          
          ALLOCATE(tl_var%d_value(tl_var%t_dim(1)%i_len, &
-         &                       tl_var%t_dim(2)%i_len, &
-         &                       tl_var%t_dim(3)%i_len, &
-         &                       tl_var%t_dim(4)%i_len) )
+            &                    tl_var%t_dim(2)%i_len, &
+            &                    tl_var%t_dim(3)%i_len, &
+            &                    tl_var%t_dim(4)%i_len) )
 
          ! copy first variable value
-         tl_var%d_value(:,:,1:td_var1%t_dim(3)%i_len,:)= &
-         &  td_var1%d_value(:,:,:,:)
+         DO jl=1,tl_var%t_dim(4)%i_len
+            DO jk=1,td_var1%t_dim(3)%i_len
+               DO jj=1,tl_var%t_dim(2)%i_len
+                  DO ji=1,tl_var%t_dim(1)%i_len
+                     tl_var%d_value(ji,jj,jk,jl) = td_var1%d_value(ji,jj,jk,jl)
+                  ENDDO
+               ENDDO
+            ENDDO
+         ENDDO
+         !tl_var%d_value(:,:,1:td_var1%t_dim(3)%i_len,:)= &
+         ! &  td_var1%d_value(:,:,:,:)
 
          ! copy second variable value
-         tl_var%d_value(:,:,td_var1%t_dim(3)%i_len+1:tl_var%t_dim(3)%i_len,:)=&
-         &  td_var2%d_value(:,:,:,:)
+         DO jl=1,tl_var%t_dim(4)%i_len
+            DO jk=1,td_var2%t_dim(3)%i_len
+               DO jj=1,tl_var%t_dim(2)%i_len
+                  DO ji=1,tl_var%t_dim(1)%i_len
+                     tl_var%d_value(ji,jj,jk+td_var1%t_dim(3)%i_len,jl) = td_var2%d_value(ji,jj,jk,jl)
+                  ENDDO
+               ENDDO
+            ENDDO
+         ENDDO
+         !tl_var%d_value(:,:,td_var1%t_dim(3)%i_len+1:tl_var%t_dim(3)%i_len,:)=&
+         !&  td_var2%d_value(:,:,:,:)
 
          ! save result
-         var__concat_k=var_copy(tl_var)
+         tf_var=var_copy(tl_var)
 
          ! clean
          CALL var_clean(tl_var)
       ENDIF
 
    END FUNCTION var__concat_k
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__concat_l(td_var1, td_var2) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief  This function concatenate variable value following l-direction.
    !> 
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !> @date January, 2019
+   !> - decompose array copy on each dimension
+   !>
    !> @param[in] td_var1   variable structure
    !> @param[in] td_var2   variable structure
    !> @return variable structure
    !-------------------------------------------------------------------
-   FUNCTION var__concat_l(td_var1, td_var2)
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR) , INTENT(IN) :: td_var1
       TYPE(TVAR) , INTENT(IN) :: td_var2
 
       ! function
-      TYPE(TVAR) :: var__concat_l
+      TYPE(TVAR)              :: tf_var
 
       ! local variable
       TYPE(TVAR)        :: tl_var
       CHARACTER(LEN=lc) :: cl_tmp
 
+      ! loop indices
+      INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
+      INTEGER(i4) :: jk
+      INTEGER(i4) :: jl
       !----------------------------------------------------------------
       IF( .NOT. td_var1%t_dim(4)%l_use .OR. &
       &   .NOT. td_var1%t_dim(4)%l_use )THEN
+
          CALL logger_error("VAR CONCAT: can not concatenate variable "//&
          &  TRIM(td_var1%c_name)//" on an unused dimension L")      
+
       ELSEIF( ANY(td_var1%t_dim(1:3)%i_len /=  td_var2%t_dim(1:3)%i_len) )THEN
 
          cl_tmp='('//&
-         &           TRIM(fct_str(td_var1%t_dim(1)%i_len))//','//&
-         &           TRIM(fct_str(td_var1%t_dim(2)%i_len))//','//&
-         &           TRIM(fct_str(td_var1%t_dim(3)%i_len))//','//&
-         &           ":"//','//')'
+            &    TRIM(fct_str(td_var1%t_dim(1)%i_len))//','//&
+            &    TRIM(fct_str(td_var1%t_dim(2)%i_len))//','//&
+            &    TRIM(fct_str(td_var1%t_dim(3)%i_len))//','//&
+            &    ":"//','//')'
          CALL logger_debug("VAR CONCAT: first variable dimensions "//&
-         &  TRIM(cl_tmp) )
+            &   TRIM(cl_tmp) )
          cl_tmp='('//&
-         &           TRIM(fct_str(td_var1%t_dim(1)%i_len))//','//&
-         &           TRIM(fct_str(td_var2%t_dim(2)%i_len))//','//&
-         &           TRIM(fct_str(td_var2%t_dim(3)%i_len))//','//&
-         &           ":"//','//')'         
+            &    TRIM(fct_str(td_var1%t_dim(1)%i_len))//','//&
+            &    TRIM(fct_str(td_var2%t_dim(2)%i_len))//','//&
+            &    TRIM(fct_str(td_var2%t_dim(3)%i_len))//','//&
+            &    ":"//','//')'         
          CALL logger_debug("VAR CONCAT: second variable dimensions "//&
-         &  TRIM(cl_tmp) )
+            &    TRIM(cl_tmp) )
 
          CALL logger_error("VAR CONCAT: dimension not conform")
+
       ELSE
          tl_var=var_copy(td_var1)
 
@@ -5354,26 +6018,46 @@ CONTAINS
          tl_var%t_dim(4)%i_len=td_var1%t_dim(4)%i_len+td_var2%t_dim(4)%i_len
          
          ALLOCATE(tl_var%d_value(tl_var%t_dim(1)%i_len, &
-         &                       tl_var%t_dim(2)%i_len, &
-         &                       tl_var%t_dim(3)%i_len, &
-         &                       tl_var%t_dim(4)%i_len) )
+            &                    tl_var%t_dim(2)%i_len, &
+            &                    tl_var%t_dim(3)%i_len, &
+            &                    tl_var%t_dim(4)%i_len) )
 
          ! copy first variable value
-         tl_var%d_value(:,:,1:td_var1%t_dim(4)%i_len,:)= &
-         &  td_var1%d_value(:,:,:,:)
+         DO jl=1,td_var1%t_dim(4)%i_len
+            DO jk=1,tl_var%t_dim(3)%i_len
+               DO jj=1,tl_var%t_dim(2)%i_len
+                  DO ji=1,tl_var%t_dim(1)%i_len
+                     tl_var%d_value(ji,jj,jk,jl) = td_var1%d_value(ji,jj,jk,jl)
+                  ENDDO
+               ENDDO
+            ENDDO
+         ENDDO
+         !tl_var%d_value(:,:,1:td_var1%t_dim(4)%i_len,:)= &
+         !&  td_var1%d_value(:,:,:,:)
 
          ! copy second variable value
-         tl_var%d_value(:,:,td_var1%t_dim(4)%i_len+1:tl_var%t_dim(4)%i_len,:)=&
-         &  td_var2%d_value(:,:,:,:)
+         DO jl=1,td_var2%t_dim(4)%i_len
+            DO jk=1,tl_var%t_dim(3)%i_len
+               DO jj=1,tl_var%t_dim(2)%i_len
+                  DO ji=1,tl_var%t_dim(1)%i_len
+                     tl_var%d_value(ji,jj,jk,jl+td_var2%t_dim(4)%i_len) = td_var2%d_value(ji,jj,jk,jl)
+                  ENDDO
+               ENDDO
+            ENDDO
+         ENDDO
+         !tl_var%d_value(:,:,td_var1%t_dim(4)%i_len+1:tl_var%t_dim(4)%i_len,:)=&
+         !&  td_var2%d_value(:,:,:,:)
 
          ! save result
-         var__concat_l=var_copy(tl_var)
+         tf_var=var_copy(tl_var)
 
          ! clean
          CALL var_clean(tl_var)
       ENDIF
 
    END FUNCTION var__concat_l
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var__add_att_arr(td_var, td_att)
    !-------------------------------------------------------------------
    !> @brief This subroutine add an array of attribute structure 
    !> in a variable structure.
@@ -5382,12 +6066,15 @@ CONTAINS
    !> @date November, 2013 - Initial Version
    !> @date June, 2015 
    !> - add all element of the array in the same time
+   !> @date January, 2019
+   !> - deallocate attribute strucure whatever happens
    !>
    !> @param[inout] td_var variable structure
    !> @param[in] td_att    array of attribute structure
    !-------------------------------------------------------------------
-   SUBROUTINE var__add_att_arr(td_var, td_att)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TVAR),               INTENT(INOUT) :: td_var
       TYPE(TATT), DIMENSION(:), INTENT(IN)    :: td_att
@@ -5410,8 +6097,8 @@ CONTAINS
          IF(il_status /= 0 )THEN
 
             CALL logger_error( &
-            &  " VAR ADD ATT: not enough space to put attributes from "//&
-            &  TRIM(td_var%c_name)//" in temporary attribute structure")
+               &  " VAR ADD ATT: not enough space to put attributes from "//&
+               &  TRIM(td_var%c_name)//" in temporary attribute structure")
 
          ELSE
 
@@ -5424,8 +6111,8 @@ CONTAINS
             IF(il_status /= 0 )THEN
 
                CALL logger_error( &
-               &  " VAR ADD ATT: not enough space to put attributes "//&
-               &  "in variable structure "//TRIM(td_var%c_name) )
+                  &  " VAR ADD ATT: not enough space to put attributes "//&
+                  &  "in variable structure "//TRIM(td_var%c_name) )
 
             ENDIF
 
@@ -5434,9 +6121,9 @@ CONTAINS
 
             ! clean
             CALL att_clean(tl_att(:))
-            DEALLOCATE(tl_att)
-            
          ENDIF
+         DEALLOCATE(tl_att)
+
       ELSE
       ! no attribute in variable structure
          IF( ASSOCIATED(td_var%t_att) )THEN
@@ -5447,8 +6134,8 @@ CONTAINS
          IF(il_status /= 0 )THEN
 
             CALL logger_error( &
-            &  " VAR ADD ATT: not enough space to put attributes "//&
-            &  "in variable structure "//TRIM(td_var%c_name) )
+               &  " VAR ADD ATT: not enough space to put attributes "//&
+               &  "in variable structure "//TRIM(td_var%c_name) )
 
          ENDIF
       ENDIF
@@ -5462,8 +6149,8 @@ CONTAINS
          il_ind=att_get_index( td_var%t_att(:), tl_att(ji)%c_name )
          IF( il_ind /= 0 )THEN
             CALL logger_error( &
-            &  " VAR ADD ATT: attribute "//TRIM(tl_att(ji)%c_name)//&
-            &  ", already in variable "//TRIM(td_var%c_name) )
+               &  " VAR ADD ATT: attribute "//TRIM(tl_att(ji)%c_name)//&
+               &  ", already in variable "//TRIM(td_var%c_name) )
             CALL att_clean(tl_att(ji))
          ENDIF
       ENDDO
@@ -5505,20 +6192,25 @@ CONTAINS
 
 
    END SUBROUTINE var__add_att_arr
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var__add_att_unit(td_var, td_att)
    !-------------------------------------------------------------------
    !> @brief This subroutine add an attribute structure 
    !> in a variable structure.
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date June, 2015 
    !> - use var__add_att_arr subroutine
-   !
+   !> @date January, 2019
+   !> - clean attribute strucure
+   !>
    !> @param[inout] td_var variable structure
    !> @param[in] td_att    attribute structure
    !-------------------------------------------------------------------
-   SUBROUTINE var__add_att_unit(td_var, td_att)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TVAR), INTENT(INOUT) :: td_var
       TYPE(TATT), INTENT(IN)    :: td_att
@@ -5535,22 +6227,30 @@ CONTAINS
       ! 
       CALL var_add_att( td_var, tl_att(:) )
 
+      ! clean
+      CALL att_clean(tl_att)
+
    END SUBROUTINE var__add_att_unit
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var__del_att_name(td_var, cd_name)
    !-------------------------------------------------------------------
    !> @brief This subroutine delete an attribute 
    !> from variable structure.
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date February, 2015 
    !> - define local attribute structure to avoid mistake 
    !> with pointer
-   !
+   !> @date January, 2019
+   !> - clean attribute strucure
+   !>
    !> @param[inout] td_var variable structure
    !> @param[in] cd_name   attribute name
    !-------------------------------------------------------------------
-   SUBROUTINE var__del_att_name(td_var, cd_name)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TVAR)      , INTENT(INOUT) :: td_var
       CHARACTER(LEN=*), INTENT(IN   ) :: cd_name
@@ -5578,25 +6278,29 @@ CONTAINS
          
          tl_att=att_copy(td_var%t_att(il_ind))
          CALL var_del_att(td_var, tl_att)
-
+         ! clean
+         CALL att_clean(tl_att)
       ENDIF
 
    END SUBROUTINE var__del_att_name
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var__del_att_str(td_var, td_att)
    !-------------------------------------------------------------------
    !> @brief This subroutine delete an attribute 
    !> from variable structure.
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013- Initial Version
    !> @date February, 2015 
    !> - delete highlight attribute too, when attribute 
    !> is deleted
-   !
+   !>
    !> @param[inout] td_var variable structure
    !> @param[in] td_att    attribute structure
    !-------------------------------------------------------------------
-   SUBROUTINE var__del_att_str(td_var, td_att)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TVAR), INTENT(INOUT) :: td_var
       TYPE(TATT), INTENT(IN)    :: td_att
@@ -5671,8 +6375,8 @@ CONTAINS
 
                ! clean
                CALL att_clean(tl_att(:))
-               DEALLOCATE(tl_att)
             ENDIF 
+            DEALLOCATE(tl_att)
          ENDIF
 
          ! highlight attribute
@@ -5700,18 +6404,21 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE var__del_att_str
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var_move_att(td_var, td_att)
    !-------------------------------------------------------------------
    !> @brief This subroutine move an attribute structure 
    !> from variable structure.
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] td_var variable structure
    !> @param[in] td_att    attribute structure
    !-------------------------------------------------------------------
-   SUBROUTINE var_move_att(td_var, td_att)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TVAR), INTENT(INOUT) :: td_var
       TYPE(TATT), INTENT(IN)    :: td_att
@@ -5733,20 +6440,23 @@ CONTAINS
       CALL att_clean(tl_att)
 
    END SUBROUTINE var_move_att
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var__add_dim_arr(td_var, td_dim)
    !-------------------------------------------------------------------
    !> @brief This subroutine add an array of dimension structure in a variable 
    !> structure.
    !> - number of dimension in variable can't be greater than 4
    !> - dimension can't be already uses in variable structure
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] td_var variable structure
    !> @param[in] td_dim    dimension structure
    !-------------------------------------------------------------------
-   SUBROUTINE var__add_dim_arr(td_var, td_dim)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TVAR),               INTENT(INOUT) :: td_var
       TYPE(TDIM), DIMENSION(:), INTENT(IN)    :: td_dim
@@ -5771,28 +6481,30 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE var__add_dim_arr
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var__add_dim_unit(td_var, td_dim) 
    !-------------------------------------------------------------------
    !> @brief This subroutine add one dimension in a variable 
    !> structure.
    !> @details
    !> - number of dimension in variable can't be greater than 4
    !> - dimension can't be already uses in variable structure 
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] td_var variable structure
    !> @param[in] td_dim    dimension structure
    !-------------------------------------------------------------------
-   SUBROUTINE var__add_dim_unit(td_var, td_dim) 
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TVAR)      , INTENT(INOUT) :: td_var
       TYPE(TDIM)      , INTENT(IN   ) :: td_dim
 
       ! local variable
       INTEGER(i4) :: il_ind
-
       !----------------------------------------------------------------
 
       IF( td_var%i_ndim <= ip_maxdim )THEN
@@ -5831,20 +6543,23 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE var__add_dim_unit
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var_del_dim(td_var, td_dim)
    !-------------------------------------------------------------------
    !> @brief This subroutine delete a dimension structure in a variable 
    !> structure.
-   !
+   !>
    !> @warning delete variable value too.
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] td_var variable structure
    !> @param[in] td_dim    dimension structure
    !-------------------------------------------------------------------
-   SUBROUTINE var_del_dim(td_var, td_dim)
+      
       IMPLICIT NONE
+      
       ! Argument      
       TYPE(TVAR)      , INTENT(INOUT) :: td_var
       TYPE(TDIM)      , INTENT(IN   ) :: td_dim
@@ -5854,7 +6569,6 @@ CONTAINS
       INTEGER(i4), DIMENSION(ip_maxdim) :: il_shape
 
       TYPE(TDIM)  :: tl_dim ! empty dimension structure
-
       !----------------------------------------------------------------
 
       IF( td_var%i_ndim <= ip_maxdim )THEN
@@ -5893,6 +6607,8 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE var_del_dim
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var_move_dim(td_var, td_dim)
    !-------------------------------------------------------------------
    !> @brief This subroutine move a dimension structure 
    !> in variable structure.
@@ -5900,15 +6616,16 @@ CONTAINS
    !> @warning 
    !> - dimension order could be changed
    !> - delete variable value 
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] td_var variable structure
    !> @param[in] td_dim    dimension structure
    !-------------------------------------------------------------------
-   SUBROUTINE var_move_dim(td_var, td_dim)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TVAR)      , INTENT(INOUT) :: td_var
       TYPE(TDIM)      , INTENT(IN   ) :: td_dim
@@ -5941,15 +6658,17 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE var_move_dim
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var__print_arr(td_var)
    !-------------------------------------------------------------------
    !> @brief This subroutine print informations of an array of variables. 
    !>
    !> @author J.Paul
    !> @date June, 2014 - Initial Version
-   !
+   !>
    !> @param[in] td_var array of variables structure
    !-------------------------------------------------------------------
-   SUBROUTINE var__print_arr(td_var)
+
       IMPLICIT NONE
 
       ! Argument      
@@ -5964,6 +6683,8 @@ CONTAINS
       ENDDO
 
    END SUBROUTINE var__print_arr
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var__print_unit(td_var, ld_more)
    !-------------------------------------------------------------------
    !> @brief This subroutine print variable information.</br/>
    !> @details
@@ -5972,11 +6693,11 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] td_var    variable structure
    !> @param[in] ld_more   print more infomration about variable
    !-------------------------------------------------------------------
-   SUBROUTINE var__print_unit(td_var, ld_more)
+
       IMPLICIT NONE
 
       ! Argument      
@@ -6018,33 +6739,33 @@ CONTAINS
       END SELECT      
 
       WRITE(*,'((/a,a),4(/3x,a,a),4(/3x,a,i3),&
-      &         (/3x,a,a),3(/3x,a,ES12.4))')&
-      &        " Variable : ",TRIM(td_var%c_name),    &
-      &        " standard name : ",TRIM(td_var%c_stdname), &
-      &        " long name     : ",TRIM(td_var%c_longname), &
-      &        " units         : ",TRIM(td_var%c_units),   &
-      &        " point         : ",TRIM(td_var%c_point),   &
-      &        " id            : ",td_var%i_id,            &
-      &        " rec           : ",td_var%i_rec,           &
-      &        " ndim          : ",td_var%i_ndim,          &
-      &        " natt          : ",td_var%i_natt,          &
-      &        " type          : ",TRIM(cl_type),          &
-      &        " scale factor  : ",td_var%d_scf,           &
-      &        " add offset    : ",td_var%d_ofs,           &
-      &        " _FillValue    : ",td_var%d_fill
+         &     (/3x,a,a),3(/3x,a,ES12.4))')&
+         &    " Variable : ",TRIM(td_var%c_name),    &
+         &    " standard name : ",TRIM(td_var%c_stdname), &
+         &    " long name     : ",TRIM(td_var%c_longname), &
+         &    " units         : ",TRIM(td_var%c_units),   &
+         &    " point         : ",TRIM(td_var%c_point),   &
+         &    " id            : ",td_var%i_id,            &
+         &    " rec           : ",td_var%i_rec,           &
+         &    " ndim          : ",td_var%i_ndim,          &
+         &    " natt          : ",td_var%i_natt,          &
+         &    " type          : ",TRIM(cl_type),          &
+         &    " scale factor  : ",td_var%d_scf,           &
+         &    " add offset    : ",td_var%d_ofs,           &
+         &    " _FillValue    : ",td_var%d_fill
 
       IF( ASSOCIATED(td_var%d_value) )THEN
          dl_min=MINVAL(td_var%d_value(:,:,:,:), &
-         &             mask=(td_var%d_value(:,:,:,:)/=td_var%d_fill) )&
-         &      *td_var%d_scf+td_var%d_ofs
+            &          mask=(td_var%d_value(:,:,:,:)/=td_var%d_fill) )&
+            &   *td_var%d_scf+td_var%d_ofs
          dl_max=MAXVAL(td_var%d_value(:,:,:,:), &
-         &             mask=(td_var%d_value(:,:,:,:)/=td_var%d_fill) )&
-         &      *td_var%d_scf+td_var%d_ofs
+            &          mask=(td_var%d_value(:,:,:,:)/=td_var%d_fill) )&
+            &   *td_var%d_scf+td_var%d_ofs
 
          WRITE(*,'((3x,a),2(/3x,a,ES12.4))')&
-         &        "VALUE ASSOCIATED" ,       &
-         &        " min value     : ",dl_min,&        
-         &        " max value     : ",dl_max
+            &     "VALUE ASSOCIATED" ,       &
+            &     " min value     : ",dl_min,&        
+            &     " max value     : ",dl_max
       ENDIF      
 
       IF( ll_more )THEN
@@ -6068,10 +6789,12 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE var__print_unit
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var__add_value(td_var, dd_value, id_start, id_count)
    !-------------------------------------------------------------------
    !> @brief This subroutine add a 4D array of real(8) value in a variable 
    !> structure.
-   !
+   !>
    !> @details 
    !> indices in the variable where value will be written could be specify if
    !> start and count array are given. 
@@ -6079,6 +6802,8 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
+   !> @date January, 2019
+   !> - decompose array copy on each dimension
    !>
    !> @param[inout] td_var variable structure
    !> @param[in] dd_value  array of variable value
@@ -6086,8 +6811,9 @@ CONTAINS
    !> will be read
    !> @param[in] id_count  number of indices selected along each dimension
    !-------------------------------------------------------------------
-   SUBROUTINE var__add_value(td_var, dd_value, id_start, id_count)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TVAR),                        INTENT(INOUT) :: td_var
       REAL(dp),    DIMENSION(:,:,:,:),   INTENT(IN)    :: dd_value
@@ -6102,6 +6828,9 @@ CONTAINS
 
       ! loop indices
       INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
+      INTEGER(i4) :: jk
+      INTEGER(i4) :: jl
       !----------------------------------------------------------------
 
       ! check id_count and id_start optionals parameters...
@@ -6172,10 +6901,10 @@ CONTAINS
 
                ! Allocate space to hold variable value in structure
                ALLOCATE(td_var%d_value( td_var%t_dim(1)%i_len, &
-               &                        td_var%t_dim(2)%i_len, &
-               &                        td_var%t_dim(3)%i_len, &
-               &                        td_var%t_dim(4)%i_len),&
-               &        stat=il_status)
+                  &                     td_var%t_dim(2)%i_len, &
+                  &                     td_var%t_dim(3)%i_len, &
+                  &                     td_var%t_dim(4)%i_len),&
+                  &     stat=il_status)
                IF(il_status /= 0 )THEN
 
                  CALL logger_error( &
@@ -6187,8 +6916,8 @@ CONTAINS
                
                ! initialise array
                CALL logger_trace( &
-               &  " VAR ADD VALUE: value in variable "//TRIM(td_var%c_name)//&
-               &  ", initialise to FillValue "//TRIM(fct_str(td_var%d_fill)) )
+                  & " VAR ADD VALUE: value in variable "//TRIM(td_var%c_name)//&
+                  & ", initialise to FillValue "//TRIM(fct_str(td_var%d_fill)) )
                td_var%d_value(:,:,:,:)=td_var%d_fill
 
             ENDIF
@@ -6198,15 +6927,30 @@ CONTAINS
             &  " (standard name "//TRIM(td_var%c_stdname)//")" )
 
             ! put value in variable structure
-            td_var%d_value( il_start(1):il_start(1)+il_count(1)-1, &
-            &               il_start(2):il_start(2)+il_count(2)-1, &
-            &               il_start(3):il_start(3)+il_count(3)-1, &
-            &               il_start(4):il_start(4)+il_count(4)-1 ) = dd_value(:,:,:,:)
+            DO jl=1,il_count(4)
+               DO jk=1,il_count(3)
+                  DO jj=1,il_count(2)
+                     DO ji=1,il_count(1)
+                        td_var%d_value(ji+il_start(1)-1, &
+                           &           jj+il_start(2)-1, &
+                           &           jk+il_start(3)-1, &
+                           &           jl+il_start(4)-1 ) = dd_value(ji,jj,jk,jl)
+                     ENDDO
+                  ENDDO
+               ENDDO
+            ENDDO
+
+!            td_var%d_value( il_start(1):il_start(1)+il_count(1)-1, &
+!            &               il_start(2):il_start(2)+il_count(2)-1, &
+!            &               il_start(3):il_start(3)+il_count(3)-1, &
+!            &               il_start(4):il_start(4)+il_count(4)-1 ) = dd_value(:,:,:,:)
 
          ENDIF
       ENDIF
 
    END SUBROUTINE var__add_value
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var__add_value_dp(td_var, dd_value, id_type, id_start, id_count)
    !-------------------------------------------------------------------
    !> @brief This subroutine add a 4D array of real(8) value in a variable 
    !> structure. Dimension of the array must be ordered as ('x','y','z','t')
@@ -6225,8 +6969,9 @@ CONTAINS
    !> will be written
    !> @param[in] id_count  number of indices selected along each dimension
    !-------------------------------------------------------------------
-   SUBROUTINE var__add_value_dp(td_var, dd_value, id_type, id_start, id_count)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TVAR),                        INTENT(INOUT) :: td_var
       REAL(dp),    DIMENSION(:,:,:,:),   INTENT(IN)    :: dd_value
@@ -6261,17 +7006,21 @@ CONTAINS
       CALL var__add_value(td_var, dd_value, id_start, id_count)
 
    END SUBROUTINE var__add_value_dp
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var__add_value_rp(td_var, rd_value, id_type, id_start, id_count)
    !-------------------------------------------------------------------
    !> @brief This subroutine add a 4D array of real(4) value in a variable 
    !> structure. Dimension of the array must be ordered as ('x','y','z','t')
-   !
+   !>
    !> @details 
    !> Optionally, you could specify the type of the variable to be used (default real(4)),
    !> and indices of the variable where value will be written with start and count array.
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !> @date January, 2019
+   !> - decompose array conversion on each dimension
+   !>
    !> @param[inout] td_var variable structure
    !> @param[in] rd_value  array of variable value
    !> @param[in] id_type   type of the variable to be used (default real(4)) 
@@ -6279,8 +7028,9 @@ CONTAINS
    !> will be written
    !> @param[in] id_count  number of indices selected along each dimension
    !-------------------------------------------------------------------
-   SUBROUTINE var__add_value_rp(td_var, rd_value, id_type, id_start, id_count)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TVAR),                        INTENT(INOUT) :: td_var
       REAL(sp),    DIMENSION(:,:,:,:),   INTENT(IN)    :: rd_value
@@ -6295,6 +7045,12 @@ CONTAINS
       INTEGER(i4)      , DIMENSION(ip_maxdim)              :: il_shape
 
       REAL(dp)         , DIMENSION(:,:,:,:)  , ALLOCATABLE :: dl_value
+
+      ! loop indices
+      INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
+      INTEGER(i4) :: jk
+      INTEGER(i4) :: jl
       !----------------------------------------------------------------
 
       IF( PRESENT(id_type) )THEN
@@ -6328,26 +7084,39 @@ CONTAINS
          &  " in variable structure")
 
       ENDIF
-      dl_value(:,:,:,:)=REAL(rd_value(:,:,:,:), dp)
-      
+
+      DO jl=1,il_shape(4)
+         DO jk=1,il_shape(3)
+            DO jj=1,il_shape(2)
+               DO ji=1,il_shape(1)
+                  dl_value(ji,jj,jk,jl)=REAL(rd_value(ji,jj,jk,jl), dp)
+               ENDDO
+            ENDDO
+         ENDDO
+      ENDDO
+
       CALL var__add_value(td_var, dl_value(:,:,:,:), id_start(:), id_count(:))
 
       DEALLOCATE(dl_value)
 
    END SUBROUTINE var__add_value_rp
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var__add_value_i1(td_var, bd_value, id_type, id_start, id_count)
    !-------------------------------------------------------------------
    !> @brief This subroutine add a 4D array of integer(1) value in a variable 
    !> structure. Dimension of the array must be ordered as ('x','y','z','t')
-   !
+   !>
    !> @details 
    !> Optionally, you could specify the type of the variable to be used (default integer(1)),
    !> and indices of the variable where value will be written with start and count array.
    !>
    !> @note variable type is forced to BYTE
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !> @date January, 2019
+   !> - decompose array conversion on each dimension
+   !>
    !> @param[inout] td_var variabele structure
    !> @param[in] bd_value  array of variable value
    !> @param[in] id_type   type of the variable to be used (default integer(1)) 
@@ -6355,8 +7124,9 @@ CONTAINS
    !> will be read
    !> @param[in] id_count  number of indices selected along each dimension
    !-------------------------------------------------------------------
-   SUBROUTINE var__add_value_i1(td_var, bd_value, id_type, id_start, id_count)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TVAR),                        INTENT(INOUT) :: td_var
       INTEGER(i1), DIMENSION(:,:,:,:),   INTENT(IN)    :: bd_value
@@ -6371,6 +7141,12 @@ CONTAINS
       INTEGER(i4)      , DIMENSION(ip_maxdim)              :: il_shape
 
       REAL(dp)         , DIMENSION(:,:,:,:)  , ALLOCATABLE :: dl_value
+
+      ! loop indices
+      INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
+      INTEGER(i4) :: jk
+      INTEGER(i4) :: jl
       !----------------------------------------------------------------
 
       IF( PRESENT(id_type) )THEN
@@ -6404,26 +7180,39 @@ CONTAINS
          &  " in variable structure")
 
       ENDIF
-      dl_value(:,:,:,:)=REAL(bd_value(:,:,:,:),dp)      
+
+      DO jl=1,il_shape(4)
+         DO jk=1,il_shape(3)
+            DO jj=1,il_shape(2)
+               DO ji=1,il_shape(1)
+                  dl_value(ji,jj,jk,jl)=REAL(bd_value(ji,jj,jk,jl),dp)      
+               ENDDO
+            ENDDO
+         ENDDO
+      ENDDO
 
       CALL var__add_value(td_var, dl_value(:,:,:,:), id_start(:), id_count(:))
 
       DEALLOCATE(dl_value)
 
    END SUBROUTINE var__add_value_i1
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var__add_value_i2(td_var, sd_value, id_type, id_start, id_count)
    !-------------------------------------------------------------------
    !> @brief This subroutine add a 4D array of integer(2) value in a variable 
    !> structure. Dimension of the array must be ordered as ('x','y','z','t')
-   !
+   !>
    !> @details 
    !> Optionally, you could specify the type of the variable to be used (default integer(2)),
    !> and indices of the variable where value will be written with start and count array.
    !>
    !> @note variable type is forced to SHORT
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !> @date January, 2019
+   !> - decompose array conversion on each dimension
+   !>
    !> @param[inout] td_var variabele structure
    !> @param[in] sd_value  array of variable value
    !> @param[in] id_type   type of the variable to be used (default integer(2)) 
@@ -6431,8 +7220,9 @@ CONTAINS
    !> will be read
    !> @param[in] id_count  number of indices selected along each dimension
    !-------------------------------------------------------------------
-   SUBROUTINE var__add_value_i2(td_var, sd_value, id_type, id_start, id_count)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TVAR),                        INTENT(INOUT) :: td_var
       INTEGER(i2), DIMENSION(:,:,:,:),   INTENT(IN)    :: sd_value
@@ -6447,6 +7237,12 @@ CONTAINS
       INTEGER(i4)      , DIMENSION(ip_maxdim)              :: il_shape
 
       REAL(dp)         , DIMENSION(:,:,:,:)  , ALLOCATABLE :: dl_value
+
+      ! loop indices
+      INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
+      INTEGER(i4) :: jk
+      INTEGER(i4) :: jl
       !----------------------------------------------------------------
 
       IF( PRESENT(id_type) )THEN
@@ -6480,26 +7276,39 @@ CONTAINS
          &  " in variable structure")
 
       ENDIF
-      dl_value(:,:,:,:)=REAL(sd_value(:,:,:,:),dp)      
+
+      DO jl=1,il_shape(4)
+         DO jk=1,il_shape(3)
+            DO jj=1,il_shape(2)
+               DO ji=1,il_shape(1)
+                  dl_value(ji,jj,jk,jl)=REAL(sd_value(ji,jj,jk,jl),dp)      
+               ENDDO
+            ENDDO
+         ENDDO
+      ENDDO
 
       CALL var__add_value(td_var, dl_value(:,:,:,:), id_start(:), id_count(:))
 
       DEALLOCATE(dl_value)
 
    END SUBROUTINE var__add_value_i2
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var__add_value_i4(td_var, id_value, id_type, id_start, id_count)
    !-------------------------------------------------------------------
    !> @brief This subroutine add a 4D array of integer(4) value in a variable 
    !> structure. Dimension of the array must be ordered as ('x','y','z','t')
-   !
+   !>
    !> @details 
    !> Optionally, you could specify the type of the variable to be used (default integer(4)),
    !> and indices of the variable where value will be written with start and count array.
    !>
    !> @note variable type is forced to INT
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !> @date January, 2019
+   !> - decompose array conversion on each dimension
+   !>
    !> @param[inout] td_var variabele structure
    !> @param[in] id_value  array of variable value
    !> @param[in] id_type   type of the variable to be used (default integer(4)) 
@@ -6507,8 +7316,9 @@ CONTAINS
    !> will be read
    !> @param[in] id_count  number of indices selected along each dimension
    !-------------------------------------------------------------------
-   SUBROUTINE var__add_value_i4(td_var, id_value, id_type, id_start, id_count)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TVAR),                        INTENT(INOUT) :: td_var
       INTEGER(i4), DIMENSION(:,:,:,:),   INTENT(IN)    :: id_value
@@ -6523,6 +7333,12 @@ CONTAINS
       INTEGER(i4)      , DIMENSION(ip_maxdim)              :: il_shape
 
       REAL(dp)         , DIMENSION(:,:,:,:)  , ALLOCATABLE :: dl_value
+
+      ! loop indices
+      INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
+      INTEGER(i4) :: jk
+      INTEGER(i4) :: jl
       !----------------------------------------------------------------
 
       IF( PRESENT(id_type) )THEN
@@ -6556,24 +7372,37 @@ CONTAINS
          &  " in variable structure")
 
       ENDIF
-      dl_value(:,:,:,:)=REAL(id_value(:,:,:,:),dp)      
+
+      DO jl=1,il_shape(4)
+         DO jk=1,il_shape(3)
+            DO jj=1,il_shape(2)
+               DO ji=1,il_shape(1)
+                  dl_value(ji,jj,jk,jl)=REAL(id_value(ji,jj,jk,jl),dp)      
+               ENDDO
+            ENDDO
+         ENDDO
+      ENDDO
 
       CALL var__add_value(td_var, dl_value(:,:,:,:), id_start(:), id_count(:))
 
       DEALLOCATE(dl_value)
 
    END SUBROUTINE var__add_value_i4
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var__add_value_i8(td_var, kd_value, id_type, id_start, id_count)
    !-------------------------------------------------------------------
    !> @brief This subroutine add a 4D array of integer(8) value in a variable 
    !> structure. Dimension of the array must be ordered as ('x','y','z','t')
-   !
+   !>
    !> @details 
    !> Optionally, you could specify the type of the variable to be used (default integer(4)),
    !> and indices of the variable where value will be written with start and count array.
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !> @date January, 2019
+   !> - decompose array conversion on each dimension
+   !>
    !> @param[inout] td_var variable structure
    !> @param[in] kd_value  array of variable value
    !> @param[in] id_type   type of the variable to be used (default integer(8)) 
@@ -6581,8 +7410,9 @@ CONTAINS
    !> will be read
    !> @param[in] id_count  number of indices selected along each dimension
    !-------------------------------------------------------------------
-   SUBROUTINE var__add_value_i8(td_var, kd_value, id_type, id_start, id_count)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TVAR),                        INTENT(INOUT) :: td_var
       INTEGER(i8), DIMENSION(:,:,:,:),   INTENT(IN)    :: kd_value
@@ -6597,6 +7427,12 @@ CONTAINS
       INTEGER(i4)      , DIMENSION(ip_maxdim)              :: il_shape
 
       REAL(dp)         , DIMENSION(:,:,:,:)  , ALLOCATABLE :: dl_value
+
+      ! loop indices
+      INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
+      INTEGER(i4) :: jk
+      INTEGER(i4) :: jl
       !----------------------------------------------------------------
 
       IF( PRESENT(id_type) )THEN
@@ -6630,24 +7466,38 @@ CONTAINS
          &  " in variable structure")
 
       ENDIF
-      dl_value(:,:,:,:)=REAL(kd_value(:,:,:,:),dp)
+
+      DO jl=1,il_shape(4)
+         DO jk=1,il_shape(3)
+            DO jj=1,il_shape(2)
+               DO ji=1,il_shape(1)
+                  dl_value(ji,jj,jk,jl)=REAL(kd_value(ji,jj,jk,jl),dp)
+               ENDDO
+            ENDDO
+         ENDDO
+      ENDDO
 
       CALL var__add_value(td_var, dl_value, id_start, id_count)
 
       DEALLOCATE(dl_value)
 
    END SUBROUTINE var__add_value_i8
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var_del_value(td_var)
    !-------------------------------------------------------------------
    !> @brief This subroutine remove variable value in a variable 
    !> structure.
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
+   !> @date January, 2019
+   !> - nullify array inside variable structure
    !>
    !> @param[inout] td_var variable structure
    !-------------------------------------------------------------------
-   SUBROUTINE var_del_value(td_var)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TVAR), INTENT(INOUT) :: td_var
 
@@ -6658,8 +7508,12 @@ CONTAINS
       &  " will be remove ")
 
       DEALLOCATE(td_var%d_value)
+      NULLIFY(td_var%d_value)
 
    END SUBROUTINE var_del_value
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var_get_index(td_var, cd_name, cd_stdname) &
+         & RESULT (if_idx)
    !-------------------------------------------------------------------
    !> @brief This function return the variable index, in a array of variable
    !> structure,  given variable name or standard name. 
@@ -6672,12 +7526,16 @@ CONTAINS
    !> @param[in] cd_stdname   variable standard name
    !> @return variable index in array of variable structure (0 if not found)
    !-------------------------------------------------------------------
-   INTEGER(i4) FUNCTION var_get_index(td_var, cd_name, cd_stdname)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TVAR)      , DIMENSION(:), INTENT(IN) :: td_var
       CHARACTER(LEN=*),               INTENT(IN) :: cd_name
       CHARACTER(LEN=*),               INTENT(IN), OPTIONAL :: cd_stdname
+
+      ! function
+      INTEGER(i4)                                :: if_idx
 
       ! local variable
       INTEGER(i4) :: il_size
@@ -6685,7 +7543,8 @@ CONTAINS
       ! loop indices
       INTEGER(i4) :: ji
       !----------------------------------------------------------------
-      var_get_index=0
+
+      if_idx=0
       il_size=SIZE(td_var(:))
 
       ! check if variable is in array of variable structure
@@ -6694,22 +7553,22 @@ CONTAINS
          ! look for variable name
          IF( fct_lower(td_var(ji)%c_name) == fct_lower(cd_name) )THEN
          
-            var_get_index=ji
+            if_idx=ji
             EXIT
 
          ! look for variable standard name
          ELSE IF( fct_lower(td_var(ji)%c_stdname) == fct_lower(cd_name) .AND.&
-         &    TRIM(fct_lower(td_var(ji)%c_stdname)) /= '' )THEN
+            &     TRIM(fct_lower(td_var(ji)%c_stdname)) /= '' )THEN
             
-            var_get_index=ji
+            if_idx=ji
             EXIT
 
          ELSE IF( PRESENT(cd_stdname) )THEN 
 
             IF( fct_lower(td_var(ji)%c_stdname) == fct_lower(cd_stdname) .AND.&
-            &    TRIM(fct_lower(td_var(ji)%c_stdname)) /= '' )THEN
+               &TRIM(fct_lower(td_var(ji)%c_stdname)) /= '' )THEN
             
-               var_get_index=ji
+               if_idx=ji
                EXIT
             ENDIF
 
@@ -6717,17 +7576,17 @@ CONTAINS
 
          ! look for variable longname
          IF( fct_lower(td_var(ji)%c_longname) == fct_lower(cd_name) .AND.&
-         &   TRIM(fct_lower(td_var(ji)%c_longname)) /= '' )THEN
+            &TRIM(fct_lower(td_var(ji)%c_longname)) /= '' )THEN
             
-            var_get_index=ji
+            if_idx=ji
             EXIT
 
          ELSE IF( PRESENT(cd_stdname) )THEN
 
             IF( fct_lower(td_var(ji)%c_longname) == fct_lower(cd_stdname) .AND.&
-            &    TRIM(fct_lower(td_var(ji)%c_longname)) /= '' )THEN
+               &TRIM(fct_lower(td_var(ji)%c_longname)) /= '' )THEN
             
-               var_get_index=ji
+               if_idx=ji
                EXIT
             ENDIF
 
@@ -6736,6 +7595,9 @@ CONTAINS
       ENDDO
 
    END FUNCTION var_get_index
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var_get_id(td_var, cd_name, cd_stdname) &
+         & RESULT (if_id)
    !-------------------------------------------------------------------
    !> @brief This function return the variable id, 
    !> given variable name or standard name. 
@@ -6744,18 +7606,22 @@ CONTAINS
    !> @date November, 2013 - Initial Version
    !> @date July, 2015
    !> - check long name
-   !
+   !>
    !> @param[in] td_var       array of variable structure
    !> @param[in] cd_name      variable name
    !> @param[in] cd_stdname   variable standard name
    !> @return variable id in array of variable structure (0 if not found)
    !-------------------------------------------------------------------
-   INTEGER(i4) FUNCTION var_get_id(td_var, cd_name, cd_stdname)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TVAR)      , DIMENSION(:), INTENT(IN) :: td_var
       CHARACTER(LEN=*),               INTENT(IN) :: cd_name
       CHARACTER(LEN=*),               INTENT(IN), OPTIONAL :: cd_stdname
+
+      ! function
+      INTEGER(i4)                                :: if_id
 
       ! local variable
       INTEGER(i4) :: il_size
@@ -6763,7 +7629,7 @@ CONTAINS
       ! loop indices
       INTEGER(i4) :: ji
       !----------------------------------------------------------------
-      var_get_id=0
+      if_id=0
       il_size=SIZE(td_var(:))
 
       ! check if variable is in array of variable structure
@@ -6772,22 +7638,22 @@ CONTAINS
          ! look for variable name
          IF( fct_lower(td_var(ji)%c_name) == fct_lower(cd_name) )THEN
          
-            var_get_id=td_var(ji)%i_id
+            if_id=td_var(ji)%i_id
             EXIT
 
          ! look for variable standard name
          ELSE IF( fct_lower(td_var(ji)%c_stdname) == fct_lower(cd_name) .AND.&
-         &    TRIM(fct_lower(td_var(ji)%c_stdname)) /= '' )THEN
+            &     TRIM(fct_lower(td_var(ji)%c_stdname)) /= '' )THEN
             
-            var_get_id=td_var(ji)%i_id
+            if_id=td_var(ji)%i_id
             EXIT
 
          ELSE IF( PRESENT(cd_stdname) )THEN
 
             IF( fct_lower(td_var(ji)%c_stdname) == fct_lower(cd_stdname) .AND.&
-            &    TRIM(fct_lower(td_var(ji)%c_stdname)) /= '' )THEN
+               &TRIM(fct_lower(td_var(ji)%c_stdname)) /= '' )THEN
             
-               var_get_id=td_var(ji)%i_id
+               if_id=td_var(ji)%i_id
                EXIT
             ENDIF
 
@@ -6795,17 +7661,17 @@ CONTAINS
 
          ! look for variable long name
          IF( fct_lower(td_var(ji)%c_longname) == fct_lower(cd_name) .AND.&
-         &    TRIM(fct_lower(td_var(ji)%c_longname)) /= '' )THEN
+            &TRIM(fct_lower(td_var(ji)%c_longname)) /= '' )THEN
             
-            var_get_id=td_var(ji)%i_id
+            if_id=td_var(ji)%i_id
             EXIT
 
          ELSE IF( PRESENT(cd_stdname) )THEN 
 
             IF( fct_lower(td_var(ji)%c_longname) == fct_lower(cd_stdname) .AND.&
-            &    TRIM(fct_lower(td_var(ji)%c_longname)) /= '' )THEN
+               &TRIM(fct_lower(td_var(ji)%c_longname)) /= '' )THEN
             
-               var_get_id=td_var(ji)%i_id
+               if_id=td_var(ji)%i_id
                EXIT
             ENDIF
 
@@ -6814,42 +7680,50 @@ CONTAINS
       ENDDO
 
    END FUNCTION var_get_id
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var_get_mask(td_var) &
+         & RESULT (if_mask)
    !-------------------------------------------------------------------
    !> @brief
    !> This function return the mask 3D of variable, given variable structure.
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] td_var array of variable structure
    !> @return variable mask(3D)
    !-------------------------------------------------------------------
-   FUNCTION var_get_mask(td_var)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TVAR), INTENT(IN) :: td_var
 
       ! function
       INTEGER(i4), DIMENSION(td_var%t_dim(1)%i_len, &
-      &                      td_var%t_dim(2)%i_len, &
-      &                      td_var%t_dim(3)%i_len ) :: var_get_mask
+         &                   td_var%t_dim(2)%i_len, &
+         &                   td_var%t_dim(3)%i_len ) :: if_mask
 
       ! local variable
       !----------------------------------------------------------------
+
       IF( ASSOCIATED(td_var%d_value) )THEN
 
          CALL logger_debug( "VAR GET MASK: create mask from variable "//&
-         &               TRIM(td_var%c_name)//", FillValue ="//&
-         &               TRIM(fct_str(td_var%d_fill)))
-         var_get_mask(:,:,:)=1
+            &               TRIM(td_var%c_name)//", FillValue ="//&
+            &               TRIM(fct_str(td_var%d_fill)))
+         if_mask(:,:,:)=1
          WHERE( td_var%d_value(:,:,:,1) == td_var%d_fill )
-            var_get_mask(:,:,:)=0
+            if_mask(:,:,:)=0
          ENDWHERE
 
       ELSE
          CALL logger_error("VAR GET MASK: variable value not define.")
       ENDIF
+
    END FUNCTION var_get_mask
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var_chg_FillValue(td_var, dd_fill)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine change FillValue of the variable to 
@@ -6860,12 +7734,15 @@ CONTAINS
    !> 
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !> @date January, 2019
+   !> - write fill value on array level by level
+   !>
    !> @param[inout] td_var array of variable structure
    !> @param[in] dd_fill _FillValue to be used
    !-------------------------------------------------------------------
-   SUBROUTINE var_chg_FillValue(td_var, dd_fill)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TVAR), INTENT(INOUT) :: td_var
       REAL(dp)  , INTENT(IN)   , OPTIONAL :: dd_fill
@@ -6877,6 +7754,9 @@ CONTAINS
       INTEGER(i2) :: sl_fill
       INTEGER(i4) :: il_fill
       REAL(sp)    :: rl_fill
+
+      ! loop indices
+      INTEGER(i4) :: jl
       !----------------------------------------------------------------
 
       CALL logger_trace( "VAR CHG FILL VALUE: change _FillValue in variable "//&
@@ -6924,9 +7804,11 @@ CONTAINS
 
       IF( ASSOCIATED(td_var%d_value) )THEN
          ! change FillValue in variable value
-         WHERE( td_var%d_value(:,:,:,:) == td_var%d_fill )
-            td_var%d_value(:,:,:,:)=tl_att%d_value(1)
-         END WHERE
+         DO jl=1,td_var%t_dim(jp_L)%i_len
+            WHERE( td_var%d_value(:,:,:,jl) == td_var%d_fill )
+               td_var%d_value(:,:,:,jl)=tl_att%d_value(1)
+            END WHERE
+         ENDDO
       ENDIF
 
       ! change attribute _FillValue
@@ -6936,6 +7818,8 @@ CONTAINS
       CALL att_clean(tl_att)
 
    END SUBROUTINE var_chg_FillValue
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var_def_extra( cd_file )
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine read variable configuration file. And save 
@@ -6945,11 +7829,12 @@ CONTAINS
    !> @date November, 2013 - Initial Version
    !> @date June, 2015 
    !> - new namelist format to get extra information (interpolation,...)
-   !
+   !>
    !> @param[in] cd_file   configuration file of variable
    !-------------------------------------------------------------------
-   SUBROUTINE var_def_extra( cd_file )
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*), INTENT(IN) :: cd_file
 
@@ -6980,11 +7865,11 @@ CONTAINS
 
          il_fileid=fct_getunit()
          OPEN( il_fileid, FILE=TRIM(cd_file), &
-         &                FORM='FORMATTED',   &
-         &                ACCESS='SEQUENTIAL',&
-         &                STATUS='OLD',       &
-         &                ACTION='READ',      &
-         &                IOSTAT=il_status)
+            &             FORM='FORMATTED',   &
+            &             ACCESS='SEQUENTIAL',&
+            &             STATUS='OLD',       &
+            &             ACTION='READ',      &
+            &             IOSTAT=il_status)
          CALL fct_err(il_status)
          IF( il_status /= 0 )THEN
             CALL logger_fatal("VAR DEF EXTRA: can not open file "//&
@@ -7017,8 +7902,8 @@ CONTAINS
 
          ELSE
             CALL logger_info("VAR DEF EXTRA: "//TRIM(fct_str(il_nvar))//&
-            &            " variable to be read on varaible config file"//&
-            &            TRIM(cd_file))
+               &             " variable to be read on varaible config file"//&
+               &             TRIM(cd_file))
 
             CALL logger_trace("VAR DEF EXTRA: rewind "//TRIM(cd_file))
             REWIND( il_fileid, IOSTAT=il_status)
@@ -7044,10 +7929,10 @@ CONTAINS
 
                   cl_interp='int='//TRIM(fct_split(cl_line,5))
                   tg_varextra(ji)%c_interp(:) = &
-                  &  var__get_interp(TRIM(tg_varextra(ji)%c_name), cl_interp)
+                     &  var__get_interp(TRIM(tg_varextra(ji)%c_name), cl_interp)
                   CALL logger_debug("VAR DEF EXTRA: "//&
-                  &  TRIM(tg_varextra(ji)%c_name)//&
-                  &  " "//TRIM(tg_varextra(ji)%c_interp(1)))
+                     &  TRIM(tg_varextra(ji)%c_name)//&
+                     &  " "//TRIM(tg_varextra(ji)%c_interp(1)))
 
                   tg_varextra(ji)%c_longname=TRIM(fct_split(cl_line,6))
                   tg_varextra(ji)%c_stdname =TRIM(fct_split(cl_line,7))
@@ -7074,6 +7959,8 @@ CONTAINS
       ENDIF      
 
    END SUBROUTINE var_def_extra
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var_chg_extra( cd_varinfo )
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine add variable information get from namelist in 
@@ -7101,11 +7988,14 @@ CONTAINS
    !> @date November, 2013 - Initial Version
    !> @date July, 2015 
    !> - get unit and unit factor (to change unit) 
-   !
+   !> @date February, 2019
+   !> - get variable output name
+   !>
    !> @param[in] cd_varinfo   variable information from namelist
    !-------------------------------------------------------------------
-   SUBROUTINE var_chg_extra( cd_varinfo )
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*), DIMENSION(:), INTENT(IN) :: cd_varinfo
 
@@ -7116,6 +8006,7 @@ CONTAINS
       CHARACTER(LEN=lc), DIMENSION(1)              :: cl_extrap
       CHARACTER(LEN=lc), DIMENSION(5)              :: cl_filter
       CHARACTER(LEN=lc)                            :: cl_unt
+      CHARACTER(LEN=lc)                            :: cl_namout
 
       INTEGER(i4)                                  :: il_ind
       INTEGER(i4)                                  :: il_nvar
@@ -7144,6 +8035,7 @@ CONTAINS
             cl_extrap(:)=var__get_extrap(cl_name, cl_method)
             cl_filter(:)=var__get_filter(cl_name, cl_method)
             cl_unt=var__get_unt(cl_name, cl_method)
+            cl_namout=var__get_namout(cl_name, cl_method)
 
 
             il_ind=var_get_index(tg_varextra(:), TRIM(cl_name))
@@ -7152,6 +8044,7 @@ CONTAINS
                IF( dl_max /= dp_fill ) tg_varextra(il_ind)%d_max=dl_max
                IF( dl_unf /= dp_fill ) tg_varextra(il_ind)%d_unf=dl_unf
                IF(cl_unt      /='') tg_varextra(il_ind)%c_unt      =cl_unt
+               IF(cl_namout   /='') tg_varextra(il_ind)%c_namout   =cl_namout
                IF(cl_interp(1)/='') tg_varextra(il_ind)%c_interp(:)=cl_interp(:)
                IF(cl_extrap(1)/='') tg_varextra(il_ind)%c_extrap(:)=cl_extrap(:)
                IF(cl_filter(1)/='') tg_varextra(il_ind)%c_filter(:)=cl_filter(:)
@@ -7183,45 +8076,52 @@ CONTAINS
                ! add new variable
                il_ind=il_nvar+1
                tg_varextra(il_ind)=var_init( TRIM(cl_name), &
-               &                               cd_interp=cl_interp(:), &
-               &                               cd_extrap=cl_extrap(:), &
-               &                               cd_filter=cl_filter(:), &
-               &                               dd_min = dl_min, &
-               &                               dd_max = dl_max, &
-               &                               cd_unt = cl_unt, &
-               &                               dd_unf = dl_unf )
+                  &                          cd_interp=cl_interp(:), &
+                  &                          cd_extrap=cl_extrap(:), &
+                  &                          cd_filter=cl_filter(:), &
+                  &                          dd_min = dl_min, &
+                  &                          dd_max = dl_max, &
+                  &                          cd_unt = cl_unt, &
+                  &                          dd_unf = dl_unf, &
+                  &                          cd_namout = cl_namout )
 
             ENDIF
 
             ji=ji+1
             CALL logger_debug( "VAR CHG EXTRA: name       "//&
-            &                  TRIM(tg_varextra(il_ind)%c_name) )
+               &               TRIM(tg_varextra(il_ind)%c_name) )
             CALL logger_debug( "VAR CHG EXTRA: interp     "//&
-            &                  TRIM(tg_varextra(il_ind)%c_interp(1)) )         
+               &               TRIM(tg_varextra(il_ind)%c_interp(1)) )         
             CALL logger_debug( "VAR CHG EXTRA: filter     "//&
-            &                  TRIM(tg_varextra(il_ind)%c_filter(1)) )         
+               &               TRIM(tg_varextra(il_ind)%c_filter(1)) )         
             CALL logger_debug( "VAR CHG EXTRA: extrap     "//&
-            &                  TRIM(tg_varextra(il_ind)%c_extrap(1)) )
+               &               TRIM(tg_varextra(il_ind)%c_extrap(1)) )
             IF( tg_varextra(il_ind)%d_min /= dp_fill )THEN
                CALL logger_debug( "VAR CHG EXTRA: min value  "//&
-               &                  TRIM(fct_str(tg_varextra(il_ind)%d_min)) )
+                  &               TRIM(fct_str(tg_varextra(il_ind)%d_min)) )
             ENDIF
             IF( tg_varextra(il_ind)%d_max /= dp_fill )THEN
                CALL logger_debug( "VAR CHG EXTRA: max value  "//&
-               &                  TRIM(fct_str(tg_varextra(il_ind)%d_max)) )
+                  &               TRIM(fct_str(tg_varextra(il_ind)%d_max)) )
             ENDIF
             IF( TRIM(tg_varextra(il_ind)%c_unt) /= '' )THEN
                CALL logger_debug( "VAR CHG EXTRA: new unit  "//&
-               &                  TRIM(tg_varextra(il_ind)%c_unt) )
+                  &               TRIM(tg_varextra(il_ind)%c_unt) )
             ENDIF
             IF( tg_varextra(il_ind)%d_unf /= 1. )THEN
                CALL logger_debug( "VAR CHG EXTRA: new unit factor  "//&
-               &                  TRIM(fct_str(tg_varextra(il_ind)%d_unf)) )
+                  &               TRIM(fct_str(tg_varextra(il_ind)%d_unf)) )
+            ENDIF
+            IF( TRIM(tg_varextra(il_ind)%c_namout) /= '' )THEN
+               CALL logger_debug( "VAR CHG EXTRA: new name output  "//&
+                  &               TRIM(tg_varextra(il_ind)%c_namout) )
             ENDIF
          ENDDO
       ENDIF
 
    END SUBROUTINE var_chg_extra
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var_clean_extra( )
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine clean global array of variable structure 
@@ -7229,16 +8129,24 @@ CONTAINS
    !> 
    !> @author J.Paul
    !> @date October, 2016 - Initial Version
+   !> @date January, 2019
+   !> - check if tg_varextra is allocated before clean it
+   !>
    !-------------------------------------------------------------------
-   SUBROUTINE var_clean_extra( )
+
       IMPLICIT NONE
+
       ! Argument
       !----------------------------------------------------------------
 
-      CALL var_clean(tg_varextra(:))
-      DEALLOCATE(tg_varextra)
+      IF( ALLOCATED(tg_varextra) )THEN
+         CALL var_clean(tg_varextra(:))
+         DEALLOCATE(tg_varextra)
+      ENDIF
 
    END SUBROUTINE var_clean_extra
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var_read_matrix(td_var, cd_matrix)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine read matrix value from character string in namelist
@@ -7257,12 +8165,13 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] td_var variable structure
    !> @param[in] cd_matrix matrix value
    !-------------------------------------------------------------------
-   SUBROUTINE var_read_matrix(td_var, cd_matrix)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TVAR)      , INTENT(INOUT) :: td_var
       CHARACTER(LEN=*), INTENT(IN   ) :: cd_matrix
@@ -7341,6 +8250,8 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE var_read_matrix
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var__get_extra(td_var)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine add extra information in variable structure.
@@ -7354,8 +8265,9 @@ CONTAINS
    !>
    !> @param[inout] td_var variable structure
    !-------------------------------------------------------------------
-   SUBROUTINE var__get_extra( td_var )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR), INTENT(INOUT) :: td_var
 
@@ -7495,6 +8407,12 @@ CONTAINS
                td_var%d_unf=tg_varextra(il_ind)%d_unf
             ENDIF
 
+            ! namout
+            IF( TRIM(td_var%c_namout) == '' .AND. &
+            &   TRIM(tg_varextra(il_ind)%c_namout) /= '' )THEN
+               td_var%c_namout=TRIM(tg_varextra(il_ind)%c_namout)
+            ENDIF
+
          ELSE
             CALL logger_warn("VAR GET EXTRA: no extra information on "//&
                &  "variable "//TRIM(td_var%c_name)//". you should define it"//&
@@ -7509,6 +8427,9 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE var__get_extra
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__get_min(cd_name, cd_varinfo) &
+         & RESULT (df_min)
    !-------------------------------------------------------------------
    !> @brief
    !> This function check if variable information read in namelist contains 
@@ -7524,19 +8445,20 @@ CONTAINS
    !> value follows string "min ="
    !> @date Feb, 2016
    !> - check character just after keyword
-   !
+   !>
    !> @param[in] cd_name      variable name
    !> @param[in] cd_varinfo   variable information read in namelist 
    !> @return minimum value to be used (FillValue if none)
    !-------------------------------------------------------------------
-   FUNCTION var__get_min( cd_name, cd_varinfo )
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*), INTENT(IN   ) :: cd_name
       CHARACTER(LEN=*), INTENT(IN   ) :: cd_varinfo
 
       ! function
-      REAL(dp) :: var__get_min
+      REAL(dp)                        :: df_min
 
       ! local variable
       CHARACTER(LEN=lc) :: cl_tmp
@@ -7550,7 +8472,7 @@ CONTAINS
       !----------------------------------------------------------------
       ! init
       cl_min=''
-      var__get_min=dp_fill
+      df_min=dp_fill
 
       ji=1
       cl_tmp=fct_split(cd_varinfo,ji,';')
@@ -7571,9 +8493,9 @@ CONTAINS
 
       IF( TRIM(cl_min) /= '' )THEN
          IF( fct_is_real(cl_min) )THEN
-            READ(cl_min,*) var__get_min
+            READ(cl_min,*) df_min
             CALL logger_debug("VAR GET MIN: will use minimum value of "//&
-            &  TRIM(fct_str(var__get_min))//" for variable "//TRIM(cd_name) )
+               &  TRIM(fct_str(df_min))//" for variable "//TRIM(cd_name) )
          ELSE
             CALL logger_error("VAR GET MIN: invalid minimum value ("//&
                & TRIM(cl_min)//") for variable "//TRIM(cd_name)//&
@@ -7582,6 +8504,9 @@ CONTAINS
       ENDIF
 
    END FUNCTION var__get_min
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__get_max(cd_name, cd_varinfo) &
+         & RESULT (df_max)
    !-------------------------------------------------------------------
    !> @brief
    !> This function check if variable information read in namelist contains 
@@ -7597,19 +8522,20 @@ CONTAINS
    !> value follows string "max ="
    !> @date Feb, 2016
    !> - check character just after keyword
-   !
+   !>
    !> @param[in] cd_name      variable name
    !> @param[in] cd_varinfo   variable information read in namelist 
    !> @return maximum value to be used (FillValue if none)
    !-------------------------------------------------------------------
-   FUNCTION var__get_max( cd_name, cd_varinfo )
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*), INTENT(IN   ) :: cd_name
       CHARACTER(LEN=*), INTENT(IN   ) :: cd_varinfo
 
       ! function
-      REAL(dp) :: var__get_max
+      REAL(dp)                        :: df_max
 
       ! local variable
       CHARACTER(LEN=lc) :: cl_tmp
@@ -7623,7 +8549,7 @@ CONTAINS
       !----------------------------------------------------------------
       ! init
       cl_max=''
-      var__get_max=dp_fill
+      df_max=dp_fill
 
       ji=1
       cl_tmp=fct_split(cd_varinfo,ji,';')
@@ -7644,16 +8570,19 @@ CONTAINS
 
       IF( TRIM(cl_max) /= '' )THEN
          IF( fct_is_real(cl_max) )THEN
-            READ(cl_max,*) var__get_max
+            READ(cl_max,*) df_max
             CALL logger_debug("VAR GET MAX: will use maximum value of "//&
-            &  TRIM(fct_str(var__get_max))//" for variable "//TRIM(cd_name) )
+               &  TRIM(fct_str(df_max))//" for variable "//TRIM(cd_name) )
          ELSE
             CALL logger_error("VAR GET MAX: invalid maximum value for "//&
-            &  "variable "//TRIM(cd_name)//". check namelist." )
+               &  "variable "//TRIM(cd_name)//". check namelist." )
          ENDIF
       ENDIF
 
    END FUNCTION var__get_max
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__get_unf(cd_name, cd_varinfo) &
+         & RESULT (df_unf)
    !-------------------------------------------------------------------
    !> @brief
    !> This function check if variable information read in namelist contains 
@@ -7666,19 +8595,20 @@ CONTAINS
    !> @date June, 2015 - Initial Version
    !> @date Feb, 2016
    !> - check character just after keyword
-   !
+   !>
    !> @param[in] cd_name      variable name
    !> @param[in] cd_varinfo   variable information read in namelist 
    !> @return untis factor value to be used (FillValue if none)
    !-------------------------------------------------------------------
-   FUNCTION var__get_unf( cd_name, cd_varinfo )
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*), INTENT(IN   ) :: cd_name
       CHARACTER(LEN=*), INTENT(IN   ) :: cd_varinfo
 
       ! function
-      REAL(dp) :: var__get_unf
+      REAL(dp)                        :: df_unf
 
       ! local variable
       CHARACTER(LEN=lc) :: cl_tmp
@@ -7686,7 +8616,7 @@ CONTAINS
       
       INTEGER(i4)       :: il_ind
 
-      REAL(dp)          :: rl_unf
+      REAL(dp)          :: dl_unf
 
       ! loop indices
       INTEGER(i4) :: ji
@@ -7694,7 +8624,7 @@ CONTAINS
       !----------------------------------------------------------------
       ! init
       cl_unf=''
-      var__get_unf=dp_fill
+      df_unf=dp_fill
 
       ji=1
       cl_tmp=fct_split(cd_varinfo,ji,';')
@@ -7704,7 +8634,7 @@ CONTAINS
             ! check character just after
             jj=il_ind+LEN('unf')
             IF(  TRIM(cl_tmp(jj:jj)) == ' ' .OR. &
-            &    TRIM(cl_tmp(jj:jj)) == '=' )THEN
+               & TRIM(cl_tmp(jj:jj)) == '=' )THEN
                cl_unf=fct_split(cl_tmp,2,'=')
                EXIT
             ENDIF
@@ -7714,11 +8644,11 @@ CONTAINS
       ENDDO
 
       IF( TRIM(cl_unf) /= '' )THEN
-         rl_unf=math_compute(cl_unf)
-         IF( rl_unf /= dp_fill )THEN
-            var__get_unf = rl_unf
+         dl_unf=math_compute(cl_unf)
+         IF( dl_unf /= dp_fill )THEN
+            df_unf = dl_unf
             CALL logger_debug("VAR GET UNITS FACTOR: will use units factor "//&
-               &  "value of "//TRIM(fct_str(var__get_unf))//" for variable "//&
+               &  "value of "//TRIM(fct_str(df_unf))//" for variable "//&
                &   TRIM(cd_name) )
          ELSE
             CALL logger_error("VAR GET UNITS FACTOR: invalid units factor "//&
@@ -7727,6 +8657,9 @@ CONTAINS
       ENDIF
 
    END FUNCTION var__get_unf
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__get_interp(cd_name, cd_varinfo) &
+         & RESULT (cf_interp)
    !-------------------------------------------------------------------
    !> @brief
    !> This function check if variable information read in namelist contains 
@@ -7750,19 +8683,20 @@ CONTAINS
    !> value follows string "int ="
    !> @date Feb, 2016
    !> - check character just after keyword
-   !
+   !>
    !> @param[in] cd_name      variable name
    !> @param[in] cd_varinfo   variable information read in namelist
    !> @return array of character information about interpolation 
    !-------------------------------------------------------------------
-   FUNCTION var__get_interp( cd_name, cd_varinfo )
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*), INTENT(IN   ) :: cd_name
       CHARACTER(LEN=*), INTENT(IN   ) :: cd_varinfo
 
       ! function
-      CHARACTER(LEN=lc), DIMENSION(2) :: var__get_interp
+      CHARACTER(LEN=lc), DIMENSION(2) :: cf_interp
 
       ! local variable
       CHARACTER(LEN=lc) :: cl_tmp
@@ -7780,7 +8714,7 @@ CONTAINS
       INTEGER(i4) :: jj
       !----------------------------------------------------------------
 
-      var__get_interp(:)=''
+      cf_interp(:)=''
 
       ji=1
       cl_tmp=fct_split(cd_varinfo,ji,';')
@@ -7804,7 +8738,7 @@ CONTAINS
             il_ind= INDEX(fct_lower(cl_int),TRIM(cp_interp_list(jj)))
             IF( il_ind /= 0 )THEN
 
-               var__get_interp(1)=TRIM(cp_interp_list(jj))
+               cf_interp(1)=TRIM(cp_interp_list(jj))
                il_len=LEN(TRIM(cp_interp_list(jj)))
                
                ! look for factor
@@ -7837,16 +8771,16 @@ CONTAINS
 
                SELECT CASE(TRIM(cl_factor))
                   CASE('rhoi','rhoj','rhok')
-                     IF( il_mul /= 0 ) var__get_interp(2)='*'//TRIM(cl_factor)
-                     IF( il_div /= 0 ) var__get_interp(2)='/'//TRIM(cl_factor)
+                     IF( il_mul /= 0 ) cf_interp(2)='*'//TRIM(cl_factor)
+                     IF( il_div /= 0 ) cf_interp(2)='/'//TRIM(cl_factor)
                   CASE('')
-                     var__get_interp(2)=''
+                     cf_interp(2)=''
                   CASE DEFAULT
-                     var__get_interp(2)=''
+                     cf_interp(2)=''
                      CALL logger_error("VAR GET INTERP: variable "//&
-                     &     TRIM(cd_name)//&
-                     &     " invalid factor coefficient. check namelist. "//&
-                     &     " factor should be choose between rhox rhoy rhoz.")
+                        &     TRIM(cd_name)//&
+                        &     " invalid factor coefficient. check namelist. "//&
+                        &     " factor should be choose between rhox rhoy rhoz.")
                END SELECT
 
                EXIT
@@ -7855,6 +8789,9 @@ CONTAINS
       ENDIF
 
    END FUNCTION var__get_interp
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__get_extrap(cd_name, cd_varinfo) &
+         & RESULT (cf_extrap)
    !-------------------------------------------------------------------
    !> @brief
    !> This function check if variable information read in namelist contains 
@@ -7877,19 +8814,20 @@ CONTAINS
    !> value follows string "ext ="
    !> @date Feb, 2016
    !> - check character just after keyword
-   !
+   !>
    !> @param[in] cd_name      variable name
    !> @param[in] cd_varinfo   variable information read in namelist
    !> @return array of character information about extrapolation
    !-------------------------------------------------------------------
-   FUNCTION var__get_extrap( cd_name, cd_varinfo )
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*), INTENT(IN   ) :: cd_name
       CHARACTER(LEN=*), INTENT(IN   ) :: cd_varinfo
 
       ! function
-      CHARACTER(LEN=lc), DIMENSION(1) :: var__get_extrap
+      CHARACTER(LEN=lc), DIMENSION(1) :: cf_extrap
 
       ! local variable
       CHARACTER(LEN=lc) :: cl_tmp
@@ -7902,7 +8840,7 @@ CONTAINS
       INTEGER(i4) :: jj
       !----------------------------------------------------------------
 
-      var__get_extrap(:)=''
+      cf_extrap(:)=''
 
       ji=1
       cl_tmp=fct_split(cd_varinfo,ji,';')
@@ -7924,10 +8862,10 @@ CONTAINS
       IF( TRIM(cl_ext) /= '' )THEN
          DO jj=1,ip_nextrap
             IF( TRIM(fct_lower(cl_ext)) == TRIM(cp_extrap_list(jj)) )THEN
-               var__get_extrap(1)=TRIM(cp_extrap_list(jj))
+               cf_extrap(1)=TRIM(cp_extrap_list(jj))
 
                CALL logger_trace("VAR GET EXTRAP: variable "//TRIM(cd_name)//&
-               &  " will use extrapolation method "//TRIM(var__get_extrap(1)) )
+                  &  " will use extrapolation method "//TRIM(cf_extrap(1)) )
 
                EXIT
             ENDIF
@@ -7936,6 +8874,9 @@ CONTAINS
 
 
    END FUNCTION var__get_extrap
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__get_filter(cd_name, cd_varinfo) &
+         & RESULt (cf_filter)
    !-------------------------------------------------------------------
    !> @brief
    !> This function check if variable information read in namelist contains 
@@ -7964,14 +8905,15 @@ CONTAINS
    !> @param[in] cd_name      variable name
    !> @param[in] cd_varinfo   variable information read in namelist 
    !-------------------------------------------------------------------
-   FUNCTION var__get_filter( cd_name, cd_varinfo )
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*), INTENT(IN   ) :: cd_name
       CHARACTER(LEN=*), INTENT(IN   ) :: cd_varinfo
 
       ! function
-      CHARACTER(LEN=lc), DIMENSION(5) :: var__get_filter
+      CHARACTER(LEN=lc), DIMENSION(5) :: cf_filter
 
       ! local variable
       CHARACTER(LEN=lc) :: cl_tmp
@@ -7983,7 +8925,7 @@ CONTAINS
       INTEGER(i4) :: jj
       !----------------------------------------------------------------
 
-      var__get_filter(:)=''
+      cf_filter(:)=''
 
       ji=1
       cl_tmp=fct_split(cd_varinfo,ji,';')
@@ -8006,20 +8948,20 @@ CONTAINS
          DO jj=1,ip_nfilter
             il_ind=INDEX(fct_lower(cl_flt),TRIM(cp_filter_list(jj)))
             IF( il_ind /= 0 )THEN
-               var__get_filter(1)=TRIM(cp_filter_list(jj))
+               cf_filter(1)=TRIM(cp_filter_list(jj))
 
                ! look for number of run
                il_ind=SCAN(fct_lower(cl_flt),'*')
                IF( il_ind /=0 )THEN
                   IF( fct_is_num(cl_flt(1:il_ind-1)) )THEN
-                     var__get_filter(2)=TRIM(cl_flt(1:il_ind-1))
+                     cf_filter(2)=TRIM(cl_flt(1:il_ind-1))
                   ELSE IF( fct_is_num(cl_flt(il_ind+1:)) )THEN
-                     var__get_filter(2)=TRIM(cl_flt(il_ind+1:))
+                     cf_filter(2)=TRIM(cl_flt(il_ind+1:))
                   ELSE
-                     var__get_filter(2)='1'
+                     cf_filter(2)='1'
                   ENDIF
                ELSE
-                  var__get_filter(2)='1'
+                  cf_filter(2)='1'
                ENDIF
 
                ! look for filter parameter
@@ -8030,27 +8972,27 @@ CONTAINS
                   IF( il_ind /=0 )THEN
                      cl_flt=TRIM(cl_flt(1:il_ind-1))
                      ! look for cut-off frequency
-                     var__get_filter(3)=fct_split(cl_flt,1,',')
+                     cf_filter(3)=fct_split(cl_flt,1,',')
                      ! look for halo size
-                     var__get_filter(4)=fct_split(cl_flt,2,',')
+                     cf_filter(4)=fct_split(cl_flt,2,',')
                      ! look for alpha parameter
-                     var__get_filter(5)=fct_split(cl_flt,3,',')
+                     cf_filter(5)=fct_split(cl_flt,3,',')
                   ELSE
                      CALL logger_error("VAR GET FILTER: variable "//&
                      &  TRIM(cd_name)//&
                      &  " unclosed parentheses. check namelist. ")
                   ENDIF
                ELSE
-                  var__get_filter(3)=''
-                  var__get_filter(4)=''
-                  var__get_filter(5)=''
+                  cf_filter(3)=''
+                  cf_filter(4)=''
+                  cf_filter(5)=''
                ENDIF
    
-               CALL logger_trace("VAR GET FILTER: name "//TRIM(var__get_filter(1)))
-               CALL logger_trace("VAR GET FILTER: nturn "//TRIM(var__get_filter(2)))
-               CALL logger_trace("VAR GET FILTER: cutoff "//TRIM(var__get_filter(3)))
-               CALL logger_trace("VAR GET FILTER: halo "//TRIM(var__get_filter(4)))
-               CALL logger_trace("VAR GET FILTER: alpha "//TRIM(var__get_filter(5)))
+               CALL logger_trace("VAR GET FILTER: name   "//TRIM(cf_filter(1)))
+               CALL logger_trace("VAR GET FILTER: nturn  "//TRIM(cf_filter(2)))
+               CALL logger_trace("VAR GET FILTER: cutoff "//TRIM(cf_filter(3)))
+               CALL logger_trace("VAR GET FILTER: halo   "//TRIM(cf_filter(4)))
+               CALL logger_trace("VAR GET FILTER: alpha  "//TRIM(cf_filter(5)))
 
                EXIT
             ENDIF
@@ -8058,31 +9000,35 @@ CONTAINS
       ENDIF
 
    END FUNCTION var__get_filter
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__get_unt(cd_name, cd_varinfo) &
+         & RESULT (cf_unt)
    !-------------------------------------------------------------------
    !> @brief
    !> This function check if variable information read in namelist contains 
-   !> unit and return it if true. 
+   !> output unit and return it if true. 
    !> 
    !> @details 
-   !> unit is assume to follow string "unt ="
+   !> output unit is assume to follow string "unt ="
    !>
    !> @author J.Paul
    !> @date June, 2015 - Initial Version
-   !> @date Feb, 2016
+   !> @date February, 2016
    !> - check character just after keyword
-   !
+   !>
    !> @param[in] cd_name      variable name
    !> @param[in] cd_varinfo   variable information read in namelist
    !> @return unit string character 
    !-------------------------------------------------------------------
-   FUNCTION var__get_unt( cd_name, cd_varinfo )
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*), INTENT(IN   ) :: cd_name
       CHARACTER(LEN=*), INTENT(IN   ) :: cd_varinfo
 
       ! function
-      CHARACTER(LEN=lc)               :: var__get_unt
+      CHARACTER(LEN=lc)               :: cf_unt
 
       ! local variable
       CHARACTER(LEN=lc) :: cl_tmp
@@ -8094,7 +9040,7 @@ CONTAINS
       INTEGER(i4) :: jj
       !----------------------------------------------------------------
 
-      var__get_unt=''
+      cf_unt=''
 
       ji=1
       cl_tmp=fct_split(cd_varinfo,ji,';')
@@ -8104,8 +9050,8 @@ CONTAINS
             ! check character just after
             jj=il_ind+LEN('unt')
             IF(  TRIM(cl_tmp(jj:jj)) == ' ' .OR. &
-            &    TRIM(cl_tmp(jj:jj)) == '=' )THEN
-               var__get_unt=fct_split(cl_tmp,2,'=')
+               & TRIM(cl_tmp(jj:jj)) == '=' )THEN
+               cf_unt=fct_split(cl_tmp,2,'=')
                EXIT
             ENDIF
          ENDIF
@@ -8113,13 +9059,80 @@ CONTAINS
          cl_tmp=fct_split(cd_varinfo,ji,';')         
       ENDDO
 
-      IF( TRIM(var__get_unt) /= '' )THEN
-         CALL logger_debug("VAR GET UNIT: will use units "//&
-            &  TRIM(var__get_unt)//" for variable "//&
+      IF( TRIM(cf_unt) /= '' )THEN
+         CALL logger_debug("VAR GET UNIT: will use output unit "//&
+            &  TRIM(cf_unt)//" for variable "//&
             &  TRIM(cd_name) )
       ENDIF
 
    END FUNCTION var__get_unt
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var__get_namout(cd_name, cd_varinfo) &
+         & RESULT (cf_namout)
+   !-------------------------------------------------------------------
+   !> @brief
+   !> This function check if variable information read in namelist contains 
+   !> variable ouptut name and return it if true. 
+   !> 
+   !> @details 
+   !> output name is assume to follow string "out ="
+   !>
+   !> @author J.Paul
+   !> @date February, 2019 - Initial Version
+   !>
+   !> @param[in] cd_name      variable name
+   !> @param[in] cd_varinfo   variable information read in namelist
+   !> @return ouptut name string character 
+   !-------------------------------------------------------------------
+
+      IMPLICIT NONE
+
+      ! Argument
+      CHARACTER(LEN=*), INTENT(IN   ) :: cd_name
+      CHARACTER(LEN=*), INTENT(IN   ) :: cd_varinfo
+
+      ! function
+      CHARACTER(LEN=lc)               :: cf_namout
+
+      ! local variable
+      CHARACTER(LEN=lc) :: cl_tmp
+      
+      INTEGER(i4)       :: il_ind
+
+      ! loop indices
+      INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
+      !----------------------------------------------------------------
+
+      cf_namout=''
+
+      ji=1
+      cl_tmp=fct_split(cd_varinfo,ji,';')
+      DO WHILE( TRIM(cl_tmp) /= '' )
+         il_ind=INDEX(TRIM(cl_tmp),'out')
+         IF( il_ind /= 0 )THEN
+            ! check character just after
+            jj=il_ind+LEN('out')
+            IF(  TRIM(cl_tmp(jj:jj)) == ' ' .OR. &
+               & TRIM(cl_tmp(jj:jj)) == '=' )THEN
+               cf_namout=fct_split(cl_tmp,2,'=')
+               EXIT
+            ENDIF
+         ENDIF
+         ji=ji+1
+         cl_tmp=fct_split(cd_varinfo,ji,';')         
+      ENDDO
+
+      IF( TRIM(cf_namout) /= '' )THEN
+         CALL logger_debug("VAR GET NAMOUT: will use output name "//&
+            &  TRIM(cf_namout)//" for variable "//&
+            &  TRIM(cd_name) )
+      ENDIF
+
+   END FUNCTION var__get_namout
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var_max_dim(td_var) &
+         & RESULT (tf_dim)
    !-------------------------------------------------------------------
    !> @brief 
    !> This function search and save the biggest dimensions use 
@@ -8127,18 +9140,18 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] td_var array of variable structure
    !> @return array of dimension 
    !-------------------------------------------------------------------
-   FUNCTION var_max_dim(td_var)
+
       IMPLICIT NONE
 
       ! Argument      
       TYPE(TVAR), DIMENSION(:), INTENT(IN) :: td_var
       
       ! function
-      TYPE(TDIM), DIMENSION(ip_maxdim) :: var_max_dim
+      TYPE(TDIM), DIMENSION(ip_maxdim)     :: tf_dim
 
       ! local variable
       INTEGER(i4) :: il_nvar
@@ -8149,35 +9162,37 @@ CONTAINS
                           
       il_nvar=SIZE(td_var(:))
                           
-      var_max_dim(:)=dim_copy(td_var(1)%t_dim(:))
+      tf_dim(:)=dim_copy(td_var(1)%t_dim(:))
 
       IF( il_nvar > 1 )THEN
          DO ji=2,il_nvar     
                              
             IF( td_var(ji)%t_dim(1)%l_use .AND. &
-            &   td_var(ji)%t_dim(1)%i_len >= var_max_dim(1)%i_len )THEN
-               var_max_dim(1)=dim_copy(td_var(ji)%t_dim(1))
+            &   td_var(ji)%t_dim(1)%i_len >= tf_dim(1)%i_len )THEN
+               tf_dim(1)=dim_copy(td_var(ji)%t_dim(1))
             ENDIF            
                              
             IF( td_var(ji)%t_dim(2)%l_use .AND. &
-            &   td_var(ji)%t_dim(2)%i_len >= var_max_dim(2)%i_len )THEN 
-               var_max_dim(2)=dim_copy(td_var(ji)%t_dim(2))
+            &   td_var(ji)%t_dim(2)%i_len >= tf_dim(2)%i_len )THEN 
+               tf_dim(2)=dim_copy(td_var(ji)%t_dim(2))
             ENDIF            
                              
             IF( td_var(ji)%t_dim(3)%l_use .AND. &
-            &   td_var(ji)%t_dim(3)%i_len >= var_max_dim(3)%i_len )THEN 
-               var_max_dim(3)=dim_copy(td_var(ji)%t_dim(3))
+            &   td_var(ji)%t_dim(3)%i_len >= tf_dim(3)%i_len )THEN 
+               tf_dim(3)=dim_copy(td_var(ji)%t_dim(3))
             ENDIF            
                              
             IF( td_var(ji)%t_dim(4)%l_use .AND. &
-            &   td_var(ji)%t_dim(4)%i_len >= var_max_dim(4)%i_len )THEN
-               var_max_dim(4)=dim_copy(td_var(ji)%t_dim(4))
+            &   td_var(ji)%t_dim(4)%i_len >= tf_dim(4)%i_len )THEN
+               tf_dim(4)=dim_copy(td_var(ji)%t_dim(4))
             ENDIF
 
          ENDDO
       ENDIF
 
    END FUNCTION var_max_dim
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var_limit_value(td_var)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine forced minimum and maximum value of variable,
@@ -8185,11 +9200,12 @@ CONTAINS
    !> 
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] td_var variable structure
    !-------------------------------------------------------------------
-   SUBROUTINE var_limit_value( td_var )
+      
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR), INTENT(INOUT) :: td_var
 
@@ -8218,6 +9234,44 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE var_limit_value
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var_chg_name(td_var)
+   !-------------------------------------------------------------------
+   !> @brief
+   !> This subroutine replace name of the variable,
+   !> 
+   !> @details
+   !> output name (namout) is read from the namelist.
+   !>
+   !> @note the variable value should be already read.
+   !>
+   !> @author J.Paul
+   !> @date February, 2019 - Initial Version
+   !>
+   !> @param[inout] td_var variable structure
+   !-------------------------------------------------------------------
+
+      IMPLICIT NONE
+
+      ! Argument
+      TYPE(TVAR), INTENT(INOUT) :: td_var
+
+      ! local variable
+      ! loop indices
+      !----------------------------------------------------------------
+
+      IF( ASSOCIATED(td_var%d_value) )THEN
+         !- change variable name 
+         IF( TRIM(td_var%c_namout) /= TRIM(td_var%c_name) .AND. &
+         &   TRIM(td_var%c_namout) /= '' )THEN
+            td_var%c_name = TRIM(td_var%c_namout)
+         ENDIF
+
+      ENDIF
+
+   END SUBROUTINE var_chg_name
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var_chg_unit(td_var)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine replace unit name of the variable,
@@ -8230,11 +9284,12 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date June, 2015 - Initial Version
-   !
+   !>
    !> @param[inout] td_var variable structure
    !-------------------------------------------------------------------
-   SUBROUTINE var_chg_unit( td_var )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR), INTENT(INOUT) :: td_var
 
@@ -8265,10 +9320,14 @@ CONTAINS
             tl_att=att_init('units',TRIM(td_var%c_unt))
             CALL var_move_att(td_var,tl_att)
          ENDIF
+         ! clean
+         CALL att_clean(tl_att)
 
       ENDIF
 
    END SUBROUTINE var_chg_unit
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var_check_dim(td_var)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine check variable dimension expected, as defined in
@@ -8280,11 +9339,12 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] td_var    variable structure
    !-------------------------------------------------------------------
-   SUBROUTINE var_check_dim( td_var )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR), INTENT(INOUT) :: td_var
 
@@ -8315,7 +9375,7 @@ CONTAINS
             DO ji=1,il_naxis
                IF( INDEX(TRIM(cl_dim),td_var%c_axis(ji:ji)) == 0 )THEN
                   CALL logger_debug("VAR CHECK DIM: "//TRIM(cl_dim)//&
-                  &                 " "//TRIM(td_var%c_axis(ji:ji)) )
+                     &              " "//TRIM(td_var%c_axis(ji:ji)) )
                   ll_warn=.TRUE.
                   EXIT
                ENDIF
@@ -8323,25 +9383,25 @@ CONTAINS
 
             IF( ll_warn )THEN
                CALL logger_warn("VAR CHECK DIM: variable dimension ("//&
-               &                TRIM(cl_dim)//") not conform with dimension"//&
-               &                 " expected ("//TRIM(td_var%c_axis)//"). ") 
+                  &             TRIM(cl_dim)//") not conform with dimension"//&
+                  &             " expected ("//TRIM(td_var%c_axis)//"). ") 
             ENDIF
          ELSE
             ! too much dimension
             CALL logger_warn("VAR CHECK DIM: too much dimension for "//&
-            &                "variable "//TRIM(td_var%c_name)//".")
+               &             "variable "//TRIM(td_var%c_name)//".")
             cl_dim=TRIM(fct_upper(cp_dimorder))
             il_ndim =LEN( TRIM(ADJUSTL(cl_dim)) )
             DO ji=1,il_ndim 
                IF( INDEX(TRIM(td_var%c_axis),cl_dim(ji:ji)) == 0 )THEN
                   IF( td_var%t_dim(ji)%l_use )THEN
                      IF( td_var%t_dim(ji)%i_len == 1 )THEN
-                        ! remove unuseful dimension
+                        ! remove useless dimension
                         CALL var_del_dim(td_var,td_var%t_dim(ji))
                      ELSE
                         CALL logger_warn("VAR CHECK DIM: variable "//&
-                        &           TRIM(td_var%c_name)//" should not use"//&
-                        &           " dimension "//TRIM(td_var%t_dim(ji)%c_name))
+                           &     TRIM(td_var%c_name)//" should not use"//&
+                           &     " dimension "//TRIM(td_var%t_dim(ji)%c_name))
                      ENDIF
                   ENDIF
                ENDIF
@@ -8353,6 +9413,8 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE var_check_dim
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var_reorder(td_var, cd_dimorder)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine reshape variable value and dimension 
@@ -8367,12 +9429,13 @@ CONTAINS
    !> @date August, 2014 - Initial Version
    !> @date July 2015 
    !> - do not use dim_disorder anymore
-   !
+   !>
    !> @param[inout] td_var       variable structure
    !> @param[in]    cd_dimorder  string character of dimension order to be used
    !-------------------------------------------------------------------
-   SUBROUTINE var_reorder( td_var, cd_dimorder )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR)              , INTENT(INOUT) :: td_var
       CHARACTER(LEN=ip_maxdim), INTENT(IN   ), OPTIONAL :: cd_dimorder
@@ -8398,12 +9461,12 @@ CONTAINS
       CALL dim_reorder(tl_dim(:),TRIM(cl_dimorder))
 
       ALLOCATE(dl_value(tl_dim(1)%i_len, &
-      &                 tl_dim(2)%i_len, &
-      &                 tl_dim(3)%i_len, &
-      &                 tl_dim(4)%i_len ))
+         &              tl_dim(2)%i_len, &
+         &              tl_dim(3)%i_len, &
+         &              tl_dim(4)%i_len ))
 
       dl_value(:,:,:,:)=dim_reshape_2xyzt(tl_dim, &
-      &                                   td_var%d_value(:,:,:,:))
+         &                                td_var%d_value(:,:,:,:))
 
       ! change dimension
       td_var%t_dim(:)=dim_copy(tl_dim(:))
@@ -8416,48 +9479,58 @@ CONTAINS
       CALL dim_clean(tl_dim(:))
 
    END SUBROUTINE var_reorder
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var_get_unit(td_var) &
+         & RESULT (if_unit)
    !-------------------------------------------------------------------
    !> @brief
    !> This function get the next unused unit in array of variable structure. 
    !> 
    !> @author J.Paul
    !> @date September, 2014 - Initial Version
-   !
+   !>
    !> @param[in] td_var array of variable structure 
    !> @return free variable id
    !-------------------------------------------------------------------
-   FUNCTION var_get_unit(td_var)
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR), DIMENSION(:), INTENT(IN) :: td_var
 
       ! function
-      INTEGER(i4) :: var_get_unit
+      INTEGER(i4)                          :: if_unit
 
       ! local variable
       ! loop indices
       !----------------------------------------------------------------
 
-      var_get_unit=MAXVAL(td_var(:)%i_id)+1
+      if_unit=MAXVAL(td_var(:)%i_id)+1
 
    END FUNCTION var_get_unit
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var_to_date(td_var) &
+         & RESULT (tf_date)
    !-------------------------------------------------------------------
    !> @brief
    !> This function convert a time variable structure in date structure. 
    !> 
    !> @author J.Paul
    !> @date November, 2014 - Initial Version
-   !
+   !> @date January, 2019
+   !> -  add case for units in hours  
+   !>
    !> @param[in] td_var time variable structure 
    !> @return date structure
    !-------------------------------------------------------------------
-   FUNCTION var_to_date(td_var)
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR), INTENT(IN) :: td_var
 
       ! function
-      TYPE(TDATE) :: var_to_date
+      TYPE(TDATE)            :: tf_date
 
       ! local variable
       CHARACTER(LEN=lc) :: cl_step
@@ -8482,6 +9555,8 @@ CONTAINS
                SELECT CASE(TRIM(cl_step))
                   CASE('seconds')
                      kl_nsec=INT(td_var%d_value(1,1,1,1),i8)
+                  CASE('hours')
+                     kl_nsec=INT(td_var%d_value(1,1,1,1)*3600,i8)
                   CASE('days')
                      kl_nsec=INT(td_var%d_value(1,1,1,1)*86400,i8)
                   CASE DEFAULT
@@ -8489,34 +9564,42 @@ CONTAINS
                      &  "in variable "//TRIM(td_var%c_name))
                END SELECT
 
+               CALL logger_trace("VAR TO DATE: "//fct_str(kl_nsec)//&
+                  &              "seconds since "//TRIM(cl_date))
+
                tl_dateo=date_init(cl_date)
 
-               var_to_date=date_init(kl_nsec,tl_dateo)
+               tf_date=date_init(kl_nsec,tl_dateo)
 
             ELSE
                CALL logger_error("VAR TO DATE: no attribute units in "//&
-               &  "variable "//TRIM(td_var%c_name))
+                  &              "variable "//TRIM(td_var%c_name))
             ENDIF
          ELSE
             CALL logger_error("VAR TO DATE: no value associated to "//&
-            &  "variable "//TRIM(td_var%c_name))
+               &              "variable "//TRIM(td_var%c_name))
          ENDIF
       ELSE
          CALL logger_error("VAR TO DATE: variable "//TRIM(td_var%c_name)//&
-         &  "can not be convert in date.")
+            &              "can not be convert in date.")
       ENDIF
 
    END FUNCTION var_to_date
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE var_get_dummy(cd_dummy)
    !-------------------------------------------------------------------
    !> @brief This subroutine fill dummy variable array
-   !
+   !>
    !> @author J.Paul
    !> @date September, 2015 - Initial Version
-   !
+   !> @date May, 2019
+   !> - read number of dummy element
+   !>
    !> @param[in] cd_dummy dummy configuration file
    !-------------------------------------------------------------------
-   SUBROUTINE var_get_dummy( cd_dummy )
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*), INTENT(IN) :: cd_dummy
 
@@ -8528,12 +9611,18 @@ CONTAINS
 
       ! loop indices
       ! namelist
+      INTEGER(i4)                                :: in_ndumvar
+      INTEGER(i4)                                :: in_ndumdim
+      INTEGER(i4)                                :: in_ndumatt
       CHARACTER(LEN=lc), DIMENSION(ip_maxdumcfg) :: cn_dumvar
       CHARACTER(LEN=lc), DIMENSION(ip_maxdumcfg) :: cn_dumdim
       CHARACTER(LEN=lc), DIMENSION(ip_maxdumcfg) :: cn_dumatt
 
       !----------------------------------------------------------------
       NAMELIST /namdum/ &   !< dummy namelist
+      &  in_ndumvar,&       !< number of variable  name
+      &  in_ndumdim,&       !< number of dimension name
+      &  in_ndumatt,&       !< number of attribute name
       &  cn_dumvar, &       !< variable  name
       &  cn_dumdim, &       !< dimension name
       &  cn_dumatt          !< attribute name
@@ -8549,55 +9638,68 @@ CONTAINS
          il_fileid=fct_getunit()
    
          OPEN( il_fileid, FILE=TRIM(cd_dummy), &
-         &                FORM='FORMATTED',       &
-         &                ACCESS='SEQUENTIAL',    &
-         &                STATUS='OLD',           &
-         &                ACTION='READ',          &
-         &                IOSTAT=il_status)
+            &             FORM='FORMATTED',    &
+            &             ACCESS='SEQUENTIAL', &
+            &             STATUS='OLD',        &
+            &             ACTION='READ',       &
+            &             IOSTAT=il_status)
          CALL fct_err(il_status)
          IF( il_status /= 0 )THEN
             CALL logger_fatal("DIM GET DUMMY: opening "//TRIM(cd_dummy))
          ENDIF
    
          READ( il_fileid, NML = namdum )
-         cm_dumvar(:)=cn_dumvar(:)
+         im_ndumvar  = in_ndumvar
+         cm_dumvar(:)= cn_dumvar(:)
 
          CLOSE( il_fileid )
+
+         IF( im_ndumvar > ip_maxdumcfg )THEN
+            CALL logger_fatal("VAR GET dUMMY : too much dummy variables &
+               &              ( >"//fct_str(ip_maxdumcfg)//" ). &
+               &              set ip_maxdumcfg to higher value.")
+         ENDIF
 
       ENDIF
    
    END SUBROUTINE var_get_dummy
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION var_is_dummy(td_var) &
+         & RESULT (lf_dummy)
    !-------------------------------------------------------------------
    !> @brief This function check if variable is defined as dummy variable
    !> in configuraton file
    !>
    !> @author J.Paul
    !> @date September, 2015 - Initial Version
-   !
+   !> @date, May, 2019
+   !> - use number of dummy elt in do-loop
+   !>
    !> @param[in] td_var variable structure
    !> @return true if variable is dummy variable 
    !-------------------------------------------------------------------
-   FUNCTION var_is_dummy(td_var)
+
       IMPLICIT NONE
 
       ! Argument      
       TYPE(TVAR), INTENT(IN) :: td_var
       
       ! function
-      LOGICAL :: var_is_dummy
+      LOGICAL                :: lf_dummy
       
       ! loop indices
       INTEGER(i4) :: ji
       !----------------------------------------------------------------
 
-      var_is_dummy=.FALSE.
-      DO ji=1,ip_maxdumcfg
+      lf_dummy=.FALSE.
+      DO ji=1,im_ndumvar !ip_maxdumcfg
          IF( fct_lower(td_var%c_name) == fct_lower(cm_dumvar(ji)) )THEN
-            var_is_dummy=.TRUE.
+            lf_dummy=.TRUE.
             EXIT
          ENDIF
       ENDDO
 
    END FUNCTION var_is_dummy
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 END MODULE var
 

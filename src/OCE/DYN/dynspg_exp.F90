@@ -29,15 +29,15 @@ MODULE dynspg_exp
    PUBLIC   dyn_spg_exp   ! called in dynspg.F90 
 
    !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: dynspg_exp.F90 10068 2018-08-28 14:09:04Z nicolasmartin $
+   !! $Id: dynspg_exp.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE dyn_spg_exp( kt )
+   SUBROUTINE dyn_spg_exp( kt, Kmm, puu, pvv, Krhs )
       !!----------------------------------------------------------------------
       !!                  ***  routine dyn_spg_exp  ***
       !!
@@ -47,14 +47,16 @@ CONTAINS
       !!
       !! ** Method  :   Explicit free surface formulation. Add to the general
       !!              momentum trend the surface pressure gradient :
-      !!                      (ua,va) = (ua,va) + (spgu,spgv)
-      !!              where spgu = -1/rau0 d/dx(ps) = -g/e1u di( sshn )
-      !!                    spgv = -1/rau0 d/dy(ps) = -g/e2v dj( sshn )
+      !!                      (uu(rhs),vv(rhs)) = (uu(rhs),vv(rhs)) + (spgu,spgv)
+      !!              where spgu = -1/rho0 d/dx(ps) = -g/e1u di( ssh(now) )
+      !!                    spgv = -1/rho0 d/dy(ps) = -g/e2v dj( ssh(now) )
       !!
-      !! ** Action :   (ua,va)   trend of horizontal velocity increased by 
+      !! ** Action :   (puu(:,:,:,Krhs),pvv(:,:,:,Krhs))   trend of horizontal velocity increased by 
       !!                         the surf. pressure gradient trend
       !!---------------------------------------------------------------------
-      INTEGER, INTENT(in)  ::   kt   ! ocean time-step index
+      INTEGER                             , INTENT( in )  ::  kt        ! ocean time-step index
+      INTEGER                             , INTENT( in )  ::  Kmm, Krhs ! ocean time level indices
+      REAL(wp), DIMENSION(jpi,jpj,jpk,jpt), INTENT(inout) ::  puu, pvv  ! ocean velocities and RHS of momentum equation
       !!
       INTEGER ::   ji, jj, jk   ! dummy loop indices
       !!----------------------------------------------------------------------
@@ -71,21 +73,15 @@ CONTAINS
 
       IF( ln_linssh ) THEN          !* linear free surface : add the surface pressure gradient trend
          !
-         DO jj = 2, jpjm1                    ! now surface pressure gradient
-            DO ji = fs_2, fs_jpim1   ! vector opt.
-               spgu(ji,jj) = - grav * ( sshn(ji+1,jj) - sshn(ji,jj) ) * r1_e1u(ji,jj)
-               spgv(ji,jj) = - grav * ( sshn(ji,jj+1) - sshn(ji,jj) ) * r1_e2v(ji,jj)
-            END DO 
-         END DO
+         DO_2D_00_00
+            spgu(ji,jj) = - grav * ( ssh(ji+1,jj,Kmm) - ssh(ji,jj,Kmm) ) * r1_e1u(ji,jj)
+            spgv(ji,jj) = - grav * ( ssh(ji,jj+1,Kmm) - ssh(ji,jj,Kmm) ) * r1_e2v(ji,jj)
+         END_2D
          !
-         DO jk = 1, jpkm1                    ! Add it to the general trend
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1   ! vector opt.
-                  ua(ji,jj,jk) = ua(ji,jj,jk) + spgu(ji,jj)
-                  va(ji,jj,jk) = va(ji,jj,jk) + spgv(ji,jj)
-               END DO
-            END DO
-         END DO
+         DO_3D_00_00( 1, jpkm1 )
+            puu(ji,jj,jk,Krhs) = puu(ji,jj,jk,Krhs) + spgu(ji,jj)
+            pvv(ji,jj,jk,Krhs) = pvv(ji,jj,jk,Krhs) + spgv(ji,jj)
+         END_3D
          !
       ENDIF
       !

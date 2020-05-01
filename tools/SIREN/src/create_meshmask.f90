@@ -2,187 +2,337 @@
 ! NEMO system team, System and Interface for oceanic RElocable Nesting
 !----------------------------------------------------------------------
 !
-! PROGRAM: create_meshmask
-!
 ! DESCRIPTION:
 !> @file
-!> @brief 
+!> @brief
 !>  This program creates the NetCDF file(s) which contain(s) all the
 !>  ocean domain informations.
-!>  It allows to create the domain_cfg.nc file needed to run NEMO, or 
-!>  the mesh_mask file(s).
+!>  it also permits to create the domain_cfg.nc file (needed to run NEMO v4.0
+!>  and upper), or the mesh_mask file(s).
 !>
 !> @details
 !> @section sec1 method
-!>  Bathymetry (and optionally ice shelf draft) is read on input file.<br/>
-!>  Horizontal grid-point position and scale factors, and the coriolis factor 
+!>  bathymetry (and optionally ice shelf draft) is read on input file.<br/>
+!>  horizontal grid-point position, scale factors, and the coriolis factor 
 !>  are read in coordinates file or computed.<br/> 
-!>  Vertical coordinate is defined, and the bathymetry recomputed to fit the
+!>  vertical coordinate is defined, and the bathymetry recomputed to fit the
 !>  vertical grid.<br/>
-!>  Finally the masks from the bathymetry are computed.
+!>  finally the masks from the bathymetry are computed.
 !>
-!>  All the arrays generated, are writen in one to three file(s) depending on
+!>  all the variables read and or computed, are writen in one to three file(s) depending on
 !>  output option.
-!>  @note the file contain depends on
-!>  the vertical coordinate used (z-coord, partial steps, s-coord)
+!>  @note 
+!>    the file contain depends on
+!>    the vertical coordinate used (z-coord, partial steps, s-coord)
 !>
 !> @section sec2 how to
-!>    to create domain_cfg or meshmask file:<br/>
-!> @code{.sh}
-!>    ./SIREN/bin/create_meshmask create_meshmask.nam
-!> @endcode
+!> USAGE: create_meshmask create_meshmask.nam [-v] [-h]<br/>
+!>    - positional arguments:<br/>
+!>       - create_meshmask.nam<br/>
+!>          namelist of create_meshmask
+!>          @note
+!>             a template of the namelist could be created running (in templates directory):
+!>             @code{.sh}
+!>                python create_templates.py create_meshmask
+!>             @endcode
 !>
-!> @note 
-!>    you could find a template of the namelist in templates directory.
+!>    - optional arguments:<br/>
+!>       - -h, --help<br/>
+!>          show this help message (and exit)<br/>
+!>       - -v, --version<br/>
+!>          show Siren's version   (and exit)
 !>
-!>    create_meshmask.nam contains 13 namelists:<br/>
-!>       - logger namelist (namlog)
-!>       - config namelist (namcfg)
-!>       - input files namelist (namin)
-!>       - horizontal grid namelist (namhgr)
-!>       - vertical grid namelist (namzgr)
-!>       - minimum depth namelist (namdmin)
-!>       - vertical coordinate namelist (namzco)
-!>       - partial step namelist (namzps)
-!>       - sigma or hybrid namelist (namsco)
-!>       - lateral boundary condition namelist (namlbc)
-!>       - wetting and dryong namelist (namwd)
-!>       - grid namelist (namgrd)
-!>       - output namelist (namout)
+!> @section sec_meshmask create_meshmask.nam
+!>    create_meshmask.nam contains 13 sub-namelists:<br/>
+!>       - **namlog** to set logger parameters
+!>       - **namcfg** to set configuration file parameters
+!>       - **namsrc** to set source files parameters
+!>       - **namhgr** to set horizontal grid parameters
+!>       - **namzgr** to set vertical grid parameters
+!>       - **namdmin** to set minimum depth parameters
+!>       - **namzco** to set vertical coordinate parameters
+!>       - **namzps** to set partial step parameters
+!>       - **namsco** to set sigma or hybrid parameters
+!>       - **namlbc** to set lateral boundary condition parameters
+!>       - **namwd** to set wetting and drying parameters
+!>       - **namgrd** to set grid parameters
+!>       - **namout** to set output parameters
 !>
-!>    * _logger namelist (namlog)_:<br/>
-!>       - cn_logfile   : log filename
-!>       - cn_verbosity : verbosity ('trace','debug','info',
-!> 'warning','error','fatal','none')
-!>       - in_maxerror  : maximum number of error allowed
+!>    here after, each sub-namelist parameters is detailed.
+!>    @note 
+!>       default values are specified between brackets
 !>
-!>    * _config namelist (namcfg)_:<br/>
-!>       - cn_varcfg : variable configuration file
-!> (see ./SIREN/cfg/variable.cfg).
-!>       - cn_dimcfg : dimension configuration file. define dimensions allowed
-!> (see ./SIREN/cfg/dimension.cfg).
-!>       - cn_dumcfg : useless (dummy) configuration file, for useless 
-!> dimension or variable (see ./SIREN/cfg/dummy.cfg).
+!> @subsection sublog namlog
+!>    the logger sub-namelist parameters are :
 !>
-!>    * _input files namelist (namin)_:<br/>
-!>       - cn_bathy     : Bathymetry file
-!>       - cn_varbathy  : Bathymetry variable name
-!>       - cn_coord     : coordinate file (in_mshhgr=0)
-!>       - cn_isfdep    : Iceshelf draft  (ln_isfcav=true)
-!>       - cn_varisfdep : Iceshelf draft variable name (ln_isfcav=true)
-!>       - in_perio     : NEMO periodicity
-!>       - ln_closea    :
+!>    - **cn_logfile** [@a create_meshmask.log]<br/>
+!>       logger filename
 !>
-!>    * _horizontal grid namelist (namhgr)_:<br/>
-!>       - in_mshhgr   : type of horizontal mesh
-!>         - 0: curvilinear coordinate on the sphere read in coordinate.nc
-!>         - 1: geographical mesh on the sphere with regular grid-spacing
-!>         - 2: f-plane with regular grid-spacing
-!>         - 3: beta-plane with regular grid-spacing
-!>         - 4: Mercator grid with T/U point at the equator
-!>         - 5: beta-plane with regular grid-spacing and rotated domain (GYRE configuration)
-!>       - dn_ppglam0  : longitude of first raw and column T-point (in_mshhgr = 1 or 4)
-!>       - dn_ppgphi0  : latitude  of first raw and column T-point (in_mshhgr = 1 or 4)
-!>       - dn_ppe1_deg : zonal      grid-spacing (degrees)         (in_mshhgr = 1,2,3 or 4)
-!>       - dn_ppe2_deg : meridional grid-spacing (degrees)         (in_mshhgr = 1,2,3 or 4)
+!>    - **cn_verbosity** [@a warning]<br/>
+!>       verbosity level, choose between :
+!>          - trace
+!>          - debug
+!>          - info
+!>          - warning
+!>          - error
+!>          - fatal
+!>          - none
 !>
-!>    * _vertical grid namelist (namzgr)_:<br/>
-!>       - ln_zco    : z-coordinate - full steps
-!>       - ln_zps    : z-coordinate - partial steps
-!>       - ln_sco    : s- or hybrid z-s-coordinate
-!>       - ln_isfcav : ice shelf cavities
-!>       - ln_iscpl  : coupling with ice sheet
-!>       - ln_wd     : Wetting/drying activation
-!>       - in_nlevel : number of vertical level
+!>    - **in_maxerror** [@a 5]<br/> 
+!>       maximum number of error allowed
 !>
-!>    * _depth namelist (namdmin)_:<br/>
-!>       - dn_hmin      : minimum ocean depth (>0) or minimum number of ocean levels (<0)
-!>       - dn_isfhmin   : threshold to discriminate grounded ice to floating ice
+!> @subsection subcfg namcfg
+!>    the configuration sub-namelist parameters are :
 !>
-!>    * _vertical coordinate namelist (namzco)_:<br/>
-!>       - dn_ppsur              : coefficient to compute vertical grid
-!>       - dn_ppa0               : coefficient to compute vertical grid
-!>       - dn_ppa1               : coefficient to compute vertical grid
-!>       - dn_ppkth              : coefficient to compute vertical grid
-!>       - dn_ppacr              : coefficient to compute vertical grid
-!>       - ln_dbletanh           : use double tanh function for vertical coordinates
-!>       - dn_ppa2               : double tanh function parameter
-!>       - dn_ppkth2             : double tanh function parameter
-!>       - dn_ppacr2             : double tanh function parameter
-!>       - dn_ppdzmin            : minimum vertical spacing
-!>       - dn_pphmax             : maximum depth
+!>    - **cn_varcfg** [@a ./cfg/variable.cfg]<br/>
+!>       path to the variable configuration file.<br/>
+!>       the variable configuration file defines standard name, 
+!>       default interpolation method, axis,... 
+!>       to be used for some known variables.<br/> 
 !>
-!>     @note If *ppa1* and *ppa0* and *ppsur* are undefined
-!>           NEMO will compute them from *ppdzmin* , *pphmax*, *ppkth*, *ppacr*
+!>    - **cn_dimcfg** [@a ./cfg/dimension.cfg]<br/> 
+!>       path to the dimension configuration file.<br/> 
+!>       the dimension configuration file defines dimensions allowed.<br/> 
 !>
+!>    - **cn_dumcfg** [@a ./cfg/dummy.cfg]<br/> 
+!>       path to the useless (dummy) configuration file.<br/>
+!>       the dummy configuration file defines useless 
+!>       dimension or variable. these dimension(s) or variable(s) will not be
+!>       processed.<br/>
+!>
+!> @subsection subsrc namsrc 
+!>    the source grid sub-namelist parameters are :
+!>
+!>    - **cn_bathy** [@a ]<br/>
+!>       path to the bathymetry file
+!>    - **cn_varbathy** [@a ]<br/>
+!>       bathymetry variable name
+!>    - **cn_coord** [@a ]<br/>
+!>       path to the coordinate file (in_mshhgr=0)
+!>    - **cn_isfdep** [@a ]<br/>
+!>       iceshelf draft  (ln_isfcav=true, see namzgr)
+!>    - **cn_varisfdep** [@a isfdraft]<br/>
+!>       iceshelf draft variable name (ln_isfcav=true, see namzgr)
+!>    - **in_perio** [@a ]<br/>
+!>       NEMO periodicity
+!>    - **ln_closea**  [@a .TRUE.]<br/>
+!>       logical to fill closed sea or not
+!>
+!> @subsection subhgr namhgr
+!>    the grid sub-namelist parameters are :
+!>
+!>    - **in_mshhgr** [@a 0]<br/>
+!>       type of horizontal mesh
+!>       - 0: curvilinear coordinate on the sphere read in coordinate.nc
+!>       - 1: geographical mesh on the sphere with regular grid-spacing
+!>       - 2: f-plane with regular grid-spacing
+!>       - 3: beta-plane with regular grid-spacing
+!>       - 4: Mercator grid with T/U point at the equator
+!>       - 5: beta-plane with regular grid-spacing and rotated domain (GYRE configuration)
+!>    - **dn_ppglam0** [@a ]<br/>
+!>       longitude of first raw and column T-point (in_mshhgr = 1 or 4)
+!>    - **dn_ppgphi0** [@a ]<br/>
+!>       latitude  of first raw and column T-point (in_mshhgr = 1 or 4)
+!>    - **dn_ppe1_deg** [@a ]<br/>
+!>       zonal      grid-spacing (degrees)         (in_mshhgr = 1,2,3 or 4)
+!>    - **dn_ppe2_deg** [@a ]<br/>
+!>       meridional grid-spacing (degrees)         (in_mshhgr = 1,2,3 or 4)
+!>
+!>
+!> @subsection subzgr namzgr
+!>    the vertical grid sub-namelist parameters are :
+!>
+!>    - **ln_zco** [@a .FALSE.]<br/>
+!>       z-coordinate - full steps
+!>    - **ln_zps** [@a .FALSE.]<br/>
+!>       z-coordinate - partial steps
+!>    - **ln_sco** [@a .FALSE.]<br/>
+!>       s- or hybrid z-s-coordinate
+!>    - **ln_isfcav** [@a .FALSE.]<br/>
+!>       ice shelf cavities
+!>    - **ln_iscpl** [@a .FALSE.]<br/>
+!>       coupling with ice sheet
+!>    - **ln_wd** [@a .FALSE.]<br/>
+!>       Wetting/drying activation
+!>    - **in_nlevel** [@a 75]<br/>
+!>       number of vertical level
+!>
+!> @subsection subdmin namdmin
+!>    the minimum depth sub-namelist parameters are :
+!>
+!>    - **dn_hmin** [@a ]<br/>
+!>       minimum ocean depth (>0) or minimum number of ocean levels (<0)
+!>    - **dn_isfhmin** [@a ]<br/>
+!>       threshold to discriminate grounded ice to floating ice
+!>
+!> @subsection subzco namzco
+!>    the vertical coordinate sub-namelist parameters are :
+!>
+!>    - **dn_pp_to_be_computed** [@a 0]<br/>
+!>
+!>    - **dn_ppsur** [@a -3958.951371276829]<br/>
+!>       coefficient to compute vertical grid
+!>
+!>    - **dn_ppa0** [@a 103.953009600000]<br/>
+!>       coefficient to compute vertical grid
+!>
+!>    - **dn_ppa1** [@a 2.415951269000]<br/>
+!>       coefficient to compute vertical grid
+!>
+!>    - **dn_ppkth** [@a 15.351013700000]<br/>
+!>       coefficient to compute vertical grid
+!>
+!>    - **dn_ppacr** [@a 7.000000000000]<br/>
+!>       coefficient to compute vertical grid
+!>
+!>    - **dn_ppdzmin** [@a 6.]<br/>
+!>       minimum vertical spacing
+!>
+!>    - **dn_pphmax** [@a 5750.]<br/>
+!>       maximum depth
+!>
+!>    - @b ln_dbletanh [@a .TRUE.]<br/>
+!>       use double tanh to compute vartical grid
+!>
+!>    - **dn_ppa2** [@a 100.760928500000]<br/>
+!>       double tanh function parameter
+!>
+!>    - **dn_ppkth2** [@a 48.029893720000]<br/>
+!>       double tanh function parameter
+!>
+!>    - **dn_ppacr2** [@a 13.000000000000]<br/>
+!>       double tanh function parameter
+!>
+!>     @note 
+!>       If *dn_ppa1*, *dn_ppa0* and *dn_ppsur* are undefined,
+!>       NEMO will compute them from *dn_ppdzmin, dn_pphmax, dn_ppkth, dn_ppacr*
+!>
+!>    @warning
 !>       this namelist is also needed to define partial steps, sigma or hybrid coordinate.
 !>
-!>    * _partial step namelist (namzps)_:<br/>
-!>       - dn_e3zps_min          : minimum thickness of partial step level (meters)
-!>       - dn_e3zps_rat          : minimum thickness ratio of partial step level
+!> @subsection subzps namzps
+!>    the partial step sub-namelist parameters are :
 !>
-!>    * _sigma or hybrid namelist (namsco)_:<br/>
-!>       - ln_s_sh94    : use hybrid s-sig Song and Haidvogel 1994 stretching function fssig1
-!>       - ln_s_sf12    : use hybrid s-z-sig Siddorn and Furner 2012 stretching function fgamma
-!>       - dn_sbot_min  : minimum depth of s-bottom surface (>0) (m)
-!>       - dn_sbot_max  : maximum depth of s-bottom surface (= ocean depth) (>0) (m)
-!>       - dn_hc        : Critical depth for transition from sigma to stretched coordinates
-!>       Song and Haidvogel 1994 stretching additional parameters
-!>          - dn_rmax      : maximum cut-off r-value allowed (0<dn_rmax<1)
-!>          - dn_theta     : surface control parameter (0<=dn_theta<=20)
-!>          - dn_thetb     : bottom control parameter  (0<=dn_thetb<= 1)
-!>          - dn_bb        : stretching parameter ( dn_bb=0; top only, dn_bb =1; top and bottom)
-!>       Siddorn and Furner stretching additional parameters
-!>          - ln_sigcrit   : switching to sigma (T) or Z (F) at H<Hc
-!>          - dn_alpha     : stretchin parameter ( >1 surface; <1 bottom)
-!>          - dn_efold     : e-fold length scale for transition region
-!>          - dn_zs        : Surface cell depth (Zs) (m)
-!>          Bottom cell (Zb) (m) = H*rn_zb_a + rn_zb_b'
-!>          - dn_zb_a      : Bathymetry multiplier for Zb
-!>          - dn_zb_b      : Offset for Zb
+!>    - **dn_e3zps_min** [@a 25.]<br/>
+!>       minimum thickness of partial step level (meters)
+!>    - **dn_e3zps_rat** [@a 0.2]<br/>
+!>       minimum thickness ratio of partial step level
 !>
-!>    * _lateral boundary condition namelist (namlbc)_:<br/>
-!>       - rn_shlat : lateral boundary conditions at the coast (modify fmask)
-!>          -     shlat = 0 : free slip
-!>          - 0 < shlat < 2 : partial slip 
-!>          -     shlat = 2 : no slip
-!>          -     shlat > 2 : strong slip
+!>
+!> @subsection subsco namsco
+!>    the sigma or hybrid sub-namelist parameters are :
+!>
+!>    - **ln_s_sh94** [@a .FALSE.]<br/>
+!>       use hybrid s-sig Song and Haidvogel 1994 stretching function fssig1
+!>    - **ln_s_sf12** [@a .FALSE.]<br/>
+!>       use hybrid s-z-sig Siddorn and Furner 2012 stretching function fgamma
+!>    - **dn_sbot_min** [@a ]<br/>
+!>       minimum depth of s-bottom surface (>0) (m)
+!>    - **dn_sbot_max** [@a ]<br/>
+!>       maximum depth of s-bottom surface (= ocean depth) (>0) (m)
+!>    - **dn_hc** [@a ]<br/>
+!>       Critical depth for transition from sigma to stretched coordinates
+!>    <br/> <br/>
+!>    Song and Haidvogel 1994 stretching additional parameters
+!>    - **dn_rmax** [@a ]<br/>
+!>       maximum cut-off r-value allowed (0<dn_rmax<1)
+!>    - **dn_theta** [@a ]<br/>
+!>       surface control parameter (0<=dn_theta<=20)
+!>    - **dn_thetb** [@a ]<br/>
+!>       bottom control parameter  (0<=dn_thetb<= 1)
+!>    - **dn_bb** [@a ]<br/>
+!>       stretching parameter ( dn_bb=0; top only, dn_bb =1; top and bottom)
+!>    <br/> <br/>
+!>    Siddorn and Furner stretching additional parameters
+!>    - **ln_sigcrit** [@a .FALSE.]<br/>
+!>       switching to sigma (T) or Z (F) at H<Hc
+!>    - **dn_alpha** [@a ]<br/>
+!>       stretchin parameter ( >1 surface; <1 bottom)
+!>    - **dn_efold** [@a ]<br/>
+!>       e-fold length scale for transition region
+!>    - **dn_zs** [@a ]<br/>
+!>       Surface cell depth (Zs) (m)
+!>       <br/>
+!>       Bottom cell (Zb) (m) = H*rn_zb_a + rn_zb_b'
+!>       - **dn_zb_a** [@a ]<br/>
+!>          Bathymetry multiplier for Zb
+!>       - **dn_zb_b** [@a ]<br/>
+!>          Offset for Zb
+!>
+!> @subsection sublbc namlbc
+!>    the lateral boundary condition sub-namelist parameters are :
+!>
+!>    - **rn_shlat** [@a 2.]<br/>
+!>       lateral boundary conditions at the coast (modify fmask)
+!>       -     shlat = 0 : free slip
+!>       - 0 < shlat < 2 : partial slip 
+!>       -     shlat = 2 : no slip
+!>       -     shlat > 2 : strong slip
+!>
 !>    for more information see Boundary Condition at the Coast 
-!>    in [NEMO documentation](http://www.nemo-ocean.eu/About-NEMO/Reference-manuals)) 
+!>    in [NEMO documentation](https://forge.ipsl.jussieu.fr/nemo/chrome/site/doc/NEMO/manual/pdf/NEMO_manual.pdf)
 !>
-!>    * _wetting and drying namelist (namwd)_:<br/>
-!>       - dn_wdmin1    : minimum water depth on dried cells
-!>       - dn_wdmin2    : tolerrance of minimum water depth on dried cells
-!>       - dn_wdld      : land elevation below which wetting/drying
-!>    
-!>    * _grid namelist (namgrd)_:<br/>
-!>       - in_cfg    : inverse resolution of the configuration (1/4° => 4)
-!>       - ln_bench  : GYRE (in_mshhgr = 5 ) used as Benchmark.<br/>
-!>                     => forced the resolution to be about 100 km
-!>       - ln_c1d    : use configuration 1D
-!>       - ln_e3_dep : vertical scale factors =T: e3.=dk[depth] =F: old definition
-!>    * _output namelist (namout)_:<br/>
-!>       - cn_domcfg    : output file name
-!>       - in_msh       : number of output file and contain (0-9)
-!>       - in_nproc     : number of processor to be used
-!>       - in_niproc    : i-direction number of processor
-!>       - in_njproc    : j-direction numebr of processor
+!> @subsection subwd namwd
+!>    the wetting and drying sub-namelist parameters are :
+!>
+!>    - **dn_wdmin1** [@a ]<br/>
+!>       minimum water depth on dried cells
+!>    - **dn_wdmin2** [@a ]<br/>
+!>       tolerrance of minimum water depth on dried cells
+!>    - **dn_wdld** [@a ]<br/>
+!>       land elevation below which wetting/drying
+!>
+!> @subsection subgrd namgrd
+!>    the grid sub-namelist parameters are :
+!>
+!>    - **in_cfg** [@a 0]<br/>
+!>       inverse resolution of the configuration (1/4° => 4)
+!>    - **ln_bench** [@a .FALSE.]<br/>
+!>       GYRE (in_mshhgr = 5 ) used as Benchmark.<br/>
+!>       => forced the resolution to be about 100 km
+!>    - **ln_c1d** [@a .FALSE.]<br/>
+!>       use configuration 1D
+!>    - **ln_e3_dep** [@a .FALSE.]<br/>
+!>       vertical scale factors =T: e3.=dk[depth] =F: old definition
+!>
+!> @subsection subout namout
+!>    the output sub-namelist parameters are :
+!>
+!>    - **cn_domcfg** [@a domain_cfg.nc]<br/>
+!>       output file name
+!>    - **in_msh** [@a 0]<br/>
+!>       number of output file and contain (0-9)
+!>    - **in_nproc** [@a 1]<br/>
+!>       number of processor to be used
+!>    - **in_niproc** [@a 1]<br/>
+!>       i-direction number of processor
+!>    - **in_njproc** [@a 1]<br/>
+!>       j-direction numebr of processor
+!>
+!>       - if niproc, and njproc are provided : the program only look for land
+!>         processor to be removed
+!>       - if nproc is provided : the program compute each possible domain layout, 
+!>         and save the one with the most land processor to be removed 
+!>       - with no information about number of processors, the program
+!>         assume to use only one processor
 !>
 !>    @note
 !>        - if         in_msh = 0  : write '**domain_cfg.nc**' file.
 !>        - if MOD(in_msh, 3) = 1  : write '<b>mesh_mask.nc</b>' file.
 !>        - if MOD(in_msh, 3) = 2  : write '<b>mesh.nc</b>' and '<b>mask.nc</b>' files.
 !>        - if MOD(in_msh, 3) = 0  : write '<b>mesh_hgr.nc</b>', '<b>mesh_zgr.nc</b>' and '<b>mask.nc</b>' files.<br/>
-!>        For huge size domain, use option 2 or 3 depending on your vertical coordinate.
-!>        - if     in_msh <= 3: write full 3D arrays for e3[tuvw] and gdep[tuvw]
+!>       For huge size domain, use option 2 or 3 depending on your vertical coordinate.<br/>
+!>
+!>    @note
+!>        - if 0 < in_msh <= 3: write full 3D arrays for e3[tuvw] and gdep[tuvw]
 !>        - if 3 < in_msh <= 6: write full 3D arrays for e3[tuvw] and 2D arrays 
 !>                            corresponding to the depth of the bottom t- and w-points
 !>        - if 6 < in_msh <= 9: write 2D arrays corresponding to the depth and the
 !>                            thickness (e3[tw]_ps) of the bottom points
 !>
-!> @author
-!> J.Paul
-! REVISION HISTORY:
+!> <hr>
+!> @author J.Paul
+!>
 !> @date September, 2015 - Initial Version (based on domhgr.F90, domzgr.F90, domwri.F90)
 !> @date October, 2016
 !> - update from trunk (revision 6961): add wetting and drying, ice sheet coupling..
@@ -192,8 +342,14 @@
 !> - allow to write domain_cfg file
 !> @date November, 2016
 !> - choose vertical scale factors (e3.=dk[depth] or old definition)
+!> @date January, 2019
+!> - add url path to global attributes of output file(s)
+!> @date February, 2019
+!> - rename sub namelist namin to namsrc
+!> @date Ocober, 2019
+!> - add help and version optional arguments
 !>
-!> @note Software governed by the CeCILL licence     (./LICENSE)
+!> @note Software governed by the CeCILL licence     (NEMOGCM/NEMO_CeCILL.txt)
 !----------------------------------------------------------------------
 PROGRAM create_meshmask
 
@@ -215,9 +371,15 @@ PROGRAM create_meshmask
 
    IMPLICIT NONE
 
+   ! parameters
+   CHARACTER(LEN=lc), PARAMETER  :: cp_myname = "create_meshmask"
+
    ! local variable
+   CHARACTER(LEN=lc)                              :: cl_arg
    CHARACTER(LEN=lc)                              :: cl_namelist
    CHARACTER(LEN=lc)                              :: cl_date
+   CHARACTER(LEN=lc)                              :: cl_url
+   CHARACTER(LEN=lc)                              :: cl_errormsg
 
    INTEGER(i1), DIMENSION(:)        , ALLOCATABLE :: bl_tmp
 
@@ -284,7 +446,7 @@ PROGRAM create_meshmask
    CHARACTER(LEN=lc) :: cn_dimcfg   = './cfg/dimension.cfg'
    CHARACTER(LEN=lc) :: cn_dumcfg   = './cfg/dummy.cfg'
 
-   ! namin
+   ! namsrc
    CHARACTER(LEN=lc) :: cn_bathy    = ''
    CHARACTER(LEN=lc) :: cn_varbathy = ''
    CHARACTER(LEN=lc) :: cn_coord    = ''
@@ -316,14 +478,14 @@ PROGRAM create_meshmask
    NAMELIST /namlog/ &  !< logger namelist
    &  cn_logfile,    &  !< log file
    &  cn_verbosity,  &  !< log verbosity
-   &  in_maxerror
+   &  in_maxerror       !< logger maximum error
 
    NAMELIST /namcfg/ &  !< configuration namelist
-   &  cn_varcfg, &       !< variable configuration file
-   &  cn_dimcfg, &       !< dimension configuration file
-   &  cn_dumcfg          !< dummy configuration file
+   &  cn_varcfg,     &  !< variable configuration file
+   &  cn_dimcfg,     &  !< dimension configuration file
+   &  cn_dumcfg         !< dummy configuration file
 
-   NAMELIST /namin/  &  !< input namelist
+   NAMELIST /namsrc/ &  !< source namelist
    &  cn_bathy,      &  !< Bathymetry file
    &  cn_varbathy,   &  !< Bathymetry variable name
    &  cn_coord,      &  !< Coordinate file (in_mshhgr=0)
@@ -352,72 +514,98 @@ PROGRAM create_meshmask
    &  in_njproc         !< j-direction numebr of processor
    !-------------------------------------------------------------------   
 
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   !1- namelist
-   !1-1 get namelist
+   !
+   ! Initialisation
+   ! --------------
+   !
    il_narg=COMMAND_ARGUMENT_COUNT() !f03 intrinsec
-   IF( il_narg/=1 )THEN
-      PRINT *,"ERROR in create_mask: need a namelist"
-      STOP
-   ELSE
-      CALL GET_COMMAND_ARGUMENT(1,cl_namelist) !f03 intrinsec
-   ENDIF
-   !1-2 read namelist
-   INQUIRE(FILE=TRIM(cl_namelist), EXIST=ll_exist)
-   IF( ll_exist )THEN
-      
-      il_fileid=fct_getunit()
 
-      OPEN( il_fileid, FILE=TRIM(cl_namelist), &
-      &                FORM='FORMATTED',       &
-      &                ACCESS='SEQUENTIAL',    &
-      &                STATUS='OLD',           &
-      &                ACTION='READ',          &
-      &                IOSTAT=il_status)
-      CALL fct_err(il_status)
-      IF( il_status /= 0 )THEN
-         PRINT *,"ERROR in create_mask: error opening "//TRIM(cl_namelist)
-         STOP
-      ENDIF
-
-      READ( il_fileid, NML = namlog )
-      !1-2-1 define log file
-      CALL logger_open(TRIM(cn_logfile),TRIM(cn_verbosity),in_maxerror)
-      CALL logger_header()
-
-      READ( il_fileid, NML = namcfg )
-      !1-2-2 get variable extra information
-      CALL var_def_extra(TRIM(cn_varcfg))
-
-      ! get dimension allowed
-      CALL dim_def_extra(TRIM(cn_dimcfg))
-
-      ! get dummy variable
-      CALL var_get_dummy(TRIM(cn_dumcfg))
-      ! get dummy dimension
-      CALL dim_get_dummy(TRIM(cn_dumcfg))
-      ! get dummy attribute
-      CALL att_get_dummy(TRIM(cn_dumcfg))
-
-      READ( il_fileid, NML = namin   )
-      READ( il_fileid, NML = namzgr  )
-      READ( il_fileid, NML = namlbc  )
-
-      READ( il_fileid, NML = namout  )
-
-      CLOSE( il_fileid, IOSTAT=il_status )
-      CALL fct_err(il_status)
-      IF( il_status /= 0 )THEN
-         CALL logger_error("CREATE MASK: closing "//TRIM(cl_namelist))
-      ENDIF
-
+   ! Traitement des arguments fournis
+   ! --------------------------------
+   IF( il_narg /= 1 )THEN
+      WRITE(cl_errormsg,*) ' ERROR : one argument is needed '
+      CALL fct_help(cp_myname,cl_errormsg) 
+      CALL EXIT(1)
    ELSE
 
-      PRINT *,"ERROR in create_mask: can't find "//TRIM(cl_namelist)
+      CALL GET_COMMAND_ARGUMENT(1,cl_arg) !f03 intrinsec
+      SELECT CASE (cl_arg)
+         CASE ('-v', '--version')
 
+            CALL fct_version(cp_myname)
+            CALL EXIT(0)
+
+         CASE ('-h', '--help')
+
+            CALL fct_help(cp_myname)
+            CALL EXIT(0)
+
+         CASE DEFAULT
+
+            cl_namelist=cl_arg
+
+            ! read namelist
+            INQUIRE(FILE=TRIM(cl_namelist), EXIST=ll_exist)
+            IF( ll_exist )THEN
+
+               il_fileid=fct_getunit()
+
+               OPEN( il_fileid, FILE=TRIM(cl_namelist), &
+               &                FORM='FORMATTED',       &
+               &                ACCESS='SEQUENTIAL',    &
+               &                STATUS='OLD',           &
+               &                ACTION='READ',          &
+               &                IOSTAT=il_status)
+               CALL fct_err(il_status)
+               IF( il_status /= 0 )THEN
+                  WRITE(cl_errormsg,*) " ERROR : error opening "//TRIM(cl_namelist)
+                  CALL fct_help(cp_myname,cl_errormsg) 
+                  CALL EXIT(1)
+               ENDIF
+
+               READ( il_fileid, NML = namlog )
+ 
+               ! define logger file
+               CALL logger_open(TRIM(cn_logfile),TRIM(cn_verbosity),in_maxerror)
+               CALL logger_header()
+
+               READ( il_fileid, NML = namcfg )
+               ! get variable extra information
+               CALL var_def_extra(TRIM(cn_varcfg))
+
+               ! get dimension allowed
+               CALL dim_def_extra(TRIM(cn_dimcfg))
+
+               ! get dummy variable
+               CALL var_get_dummy(TRIM(cn_dumcfg))
+               ! get dummy dimension
+               CALL dim_get_dummy(TRIM(cn_dumcfg))
+               ! get dummy attribute
+               CALL att_get_dummy(TRIM(cn_dumcfg))
+
+               READ( il_fileid, NML = namsrc )
+               READ( il_fileid, NML = namzgr )
+               READ( il_fileid, NML = namlbc )
+
+               READ( il_fileid, NML = namout  )
+
+               CLOSE( il_fileid, IOSTAT=il_status )
+               CALL fct_err(il_status)
+               IF( il_status /= 0 )THEN
+                  CALL logger_error("CREATE MASK: closing "//TRIM(cl_namelist))
+               ENDIF
+
+            ELSE
+
+               WRITE(cl_errormsg,*) " ERROR : can't find "//TRIM(cl_namelist)
+               CALL fct_help(cp_myname,cl_errormsg) 
+               CALL EXIT(1)
+
+            ENDIF
+
+      END SELECT
    ENDIF
 
-   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ll_domcfg=.FALSE.
    IF( in_msh == 0 )THEN
       ll_domcfg=.TRUE.
@@ -536,7 +724,7 @@ PROGRAM create_meshmask
 
    ! compute masks
    WRITE(*,*) "COMPUTE MASK"
-   CALL create__mask(tl_namh,jpi,jpj,jpk,ll_domcfg)
+   CALL create_meshmask__mask(tl_namh,jpi,jpj,jpk,ll_domcfg)
 
    ! Maximum stiffness ratio/hydrostatic consistency
    IF( ln_sco    ) CALL grid_zgr_sco_stiff(tl_namz,jpi,jpj,jpk)
@@ -572,7 +760,7 @@ PROGRAM create_meshmask
          !                                  ! ============================
       CASE ( 1 )                            !  create 'mesh_mask.nc' file
          !                                  ! ============================
-         tl_mppout0=mpp_init( 'mesh_mask', tg_tmask, &
+         tl_mppout0=mpp_init( 'mesh_mask.nc', tg_tmask, &
          &                    in_niproc, in_njproc, in_nproc, &
          &                    cd_type=cn_type )
 
@@ -584,10 +772,10 @@ PROGRAM create_meshmask
       CASE ( 2 )                            !  create 'mesh.nc' and 
          !                                  !         'mask.nc' files
          !                                  ! ============================
-         tl_mppout0=mpp_init( 'mask', tg_tmask, &
+         tl_mppout0=mpp_init( 'mask.nc', tg_tmask, &
          &                    in_niproc, in_njproc, in_nproc, &
          &                    cd_type=cn_type )
-         tl_mppout1=mpp_init( 'mesh', tg_tmask, &
+         tl_mppout1=mpp_init( 'mesh.nc', tg_tmask, &
          &                    in_niproc, in_njproc, in_nproc, &
          &                    cd_type=cn_type )
 
@@ -600,13 +788,13 @@ PROGRAM create_meshmask
          !                                  !         'mesh_zgr.nc' and
          !                                  !         'mask.nc'     files
          !                                  ! ============================
-         tl_mppout0=mpp_init( 'mask', tg_tmask, &
+         tl_mppout0=mpp_init( 'mask.nc', tg_tmask, &
          &                    in_niproc, in_njproc, in_nproc, &
          &                    cd_type=cn_type )
-         tl_mppout1=mpp_init( 'mesh_hgr', tg_tmask, &
+         tl_mppout1=mpp_init( 'mesh_hgr.nc', tg_tmask, &
          &                    in_niproc, in_njproc, in_nproc, &
          &                    cd_type=cn_type )
-         tl_mppout2=mpp_init( 'mesh_zgr', tg_tmask, &
+         tl_mppout2=mpp_init( 'mesh_zgr.nc', tg_tmask, &
          &                    in_niproc, in_njproc, in_nproc, &
          &                    cd_type=cn_type )
          !
@@ -1035,7 +1223,7 @@ PROGRAM create_meshmask
    ! define global attributes
    ALLOCATE(tl_gatt(ip_maxatt))
 
-   tl_gatt(:) = create__gloatt(cn_bathy,cn_coord,cn_isfdep,tl_namh,tl_namz)
+   tl_gatt(:) = create_meshmask__gloatt(cn_bathy,cn_coord,cn_isfdep,tl_namh,tl_namz)
 
 
    IF( in_msh == 0 ) in_msh=1
@@ -1045,6 +1233,12 @@ PROGRAM create_meshmask
          tl_att=att_init("Created_by","SIREN create_meshmask")
          CALL mpp_add_att(tl_mppmsk, tl_att)
          
+         !add source url
+         cl_url=fct_split(fct_split(cp_url,2,'$'),2,'URL:')
+         tl_att=att_init("SIREN_url",cl_url)
+         CALL mpp_add_att(tl_mppmsk, tl_att)
+
+         ! add date of creation
          cl_date=date_print(date_now())
          tl_att=att_init("Creation_date",TRIM(cl_date))
          CALL mpp_add_att(tl_mppmsk, tl_att)
@@ -1091,6 +1285,13 @@ PROGRAM create_meshmask
          CALL mpp_add_att(tl_mppmsk, tl_att)
          CALL mpp_add_att(tl_mpphgr, tl_att)
          
+         !add source url
+         cl_url=fct_split(fct_split(cp_url,2,'$'),2,'URL:')
+         tl_att=att_init("SIREN_url",cl_url)
+         CALL mpp_add_att(tl_mppmsk, tl_att)
+         CALL mpp_add_att(tl_mpphgr, tl_att)
+
+         ! add date of creation
          cl_date=date_print(date_now())
          tl_att=att_init("Creation_date",TRIM(cl_date))
          CALL mpp_add_att(tl_mppmsk, tl_att)
@@ -1156,6 +1357,14 @@ PROGRAM create_meshmask
          CALL mpp_add_att(tl_mpphgr, tl_att)
          CALL mpp_add_att(tl_mppzgr, tl_att)
          
+         !add source url
+         cl_url=fct_split(fct_split(cp_url,2,'$'),2,'URL:')
+         tl_att=att_init("SIREN_url",cl_url)
+         CALL mpp_add_att(tl_mppmsk, tl_att)
+         CALL mpp_add_att(tl_mpphgr, tl_att)
+         CALL mpp_add_att(tl_mppzgr, tl_att)
+
+         ! add date of creation
          cl_date=date_print(date_now())
          tl_att=att_init("Creation_date",TRIM(cl_date))
          CALL mpp_add_att(tl_mppmsk, tl_att)
@@ -1258,6 +1467,8 @@ PROGRAM create_meshmask
    CALL logger_footer()
    CALL logger_close()
 CONTAINS
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE create_meshmask__mask(td_nam,jpi,jpj,jpk,ld_domcfg) 
    !-------------------------------------------------------------------
    !> @brief This subroutine compute land/ocean mask arrays at tracer points, 
    !>      horizontal velocity points (u & v), vorticity points (f) and 
@@ -1265,7 +1476,8 @@ CONTAINS
    !>
    !> @details
    !>
-   !> ** Method  :   The ocean/land mask is computed from the basin bathymetry in level (mbathy) which is defined or read in dommba.
+   !> ** Method  :   The ocean/land mask is computed from the basin bathymetry in level (mbathy) 
+   !>      which is defined or read in dommba.
    !>      mbathy equals 0 over continental T-point and the number of ocean level over the ocean.
    !>
    !>      At a given position (ji,jj,jk) the ocean/land mask is given by:
@@ -1323,8 +1535,9 @@ CONTAINS
    !> @param[in] jpj
    !> @param[in] jpk
    !-------------------------------------------------------------------
-   SUBROUTINE create__mask(td_nam,jpi,jpj,jpk,ld_domcfg) 
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TNAMH), INTENT(IN) :: td_nam
       INTEGER(i4), INTENT(IN) :: jpi
@@ -1607,7 +1820,10 @@ CONTAINS
 !      DEALLOCATE( dl_tpol )
 !      DEALLOCATE( dl_fpol )
       
-   END SUBROUTINE create__mask
+   END SUBROUTINE create_meshmask__mask
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION create_meshmask__gloatt(cd_bathy,cd_coord,cd_isfdep,td_namh,td_namz) &
+         & RESULT(tf_att)
    !-------------------------------------------------------------------
    !> @brief 
    !> this function create array of global attributes.
@@ -1621,127 +1837,128 @@ CONTAINS
    !> @param[in] td_namh
    !> @param[in] td_namz
    !-------------------------------------------------------------------
-   FUNCTION create__gloatt(cd_bathy,cd_coord,cd_isfdep,td_namh,td_namz) RESULT(td_att)
+
       IMPLICIT NONE
+
       ! Argument      
-      CHARACTER(LEN=*), INTENT(IN   ) :: cd_bathy 
-      CHARACTER(LEN=*), INTENT(IN   ) :: cd_coord 
-      CHARACTER(LEN=*), INTENT(IN   ) :: cd_isfdep 
-      TYPE(TNAMH)     , INTENT(IN   ) :: td_namh 
-      TYPE(TNAMZ)     , INTENT(IN   ) :: td_namz 
+      CHARACTER(LEN=*), INTENT(IN   )  :: cd_bathy 
+      CHARACTER(LEN=*), INTENT(IN   )  :: cd_coord 
+      CHARACTER(LEN=*), INTENT(IN   )  :: cd_isfdep 
+      TYPE(TNAMH)     , INTENT(IN   )  :: td_namh 
+      TYPE(TNAMZ)     , INTENT(IN   )  :: td_namz 
 
       ! function
-      TYPE(TATT), DIMENSION(ip_maxatt) :: td_att
+      TYPE(TATT), DIMENSION(ip_maxatt) :: tf_att
 
       ! loop indices
       INTEGER(i4) :: ji
       !----------------------------------------------------------------
 
-      ji=1    ; td_att(ji)=att_init("src_bathy",TRIM(cd_bathy))
+      ji=1    ; tf_att(ji)=att_init("src_bathy",TRIM(cd_bathy))
       ! horizontal grid
-      ji=ji+1 ; td_att(ji)=att_init("in_mshhgr",td_namh%i_mshhgr)
+      ji=ji+1 ; tf_att(ji)=att_init("in_mshhgr",td_namh%i_mshhgr)
       SELECT CASE(td_namh%i_mshhgr)
          CASE(0)
-            ji=ji+1 ; td_att(ji)=att_init("src_coord",TRIM(cd_coord))
+            ji=ji+1 ; tf_att(ji)=att_init("src_coord",TRIM(cd_coord))
          CASE(1,4)
-            ji=ji+1 ; td_att(ji)=att_init("ppglam0",td_namh%d_ppglam0)
-            ji=ji+1 ; td_att(ji)=att_init("ppgphi0",td_namh%d_ppgphi0)
+            ji=ji+1 ; tf_att(ji)=att_init("ppglam0",td_namh%d_ppglam0)
+            ji=ji+1 ; tf_att(ji)=att_init("ppgphi0",td_namh%d_ppgphi0)
          CASE(2,3)
-            ji=ji+1 ; td_att(ji)=att_init("ppglam0",td_namh%d_ppglam0)
-            ji=ji+1 ; td_att(ji)=att_init("ppgphi0",td_namh%d_ppgphi0)
-            ji=ji+1 ; td_att(ji)=att_init("ppe1_deg",td_namh%d_ppe1_deg)
-            ji=ji+1 ; td_att(ji)=att_init("ppe2_deg",td_namh%d_ppe2_deg)
+            ji=ji+1 ; tf_att(ji)=att_init("ppglam0",td_namh%d_ppglam0)
+            ji=ji+1 ; tf_att(ji)=att_init("ppgphi0",td_namh%d_ppgphi0)
+            ji=ji+1 ; tf_att(ji)=att_init("ppe1_deg",td_namh%d_ppe1_deg)
+            ji=ji+1 ; tf_att(ji)=att_init("ppe2_deg",td_namh%d_ppe2_deg)
       END SELECT
 
       IF( td_namz%l_isfcav )THEN
-         ji=ji+1 ; td_att(ji)=att_init("ice_shelf_cavities","activated")
-         ji=ji+1 ; td_att(ji)=att_init("src_isfdep",TRIM(cd_isfdep))
+         ji=ji+1 ; tf_att(ji)=att_init("ice_shelf_cavities","activated")
+         ji=ji+1 ; tf_att(ji)=att_init("src_isfdep",TRIM(cd_isfdep))
       ENDIF
       IF( td_namz%l_iscpl )THEN
-         ji=ji+1 ; td_att(ji)=att_init("ice_sheet_coupling","activated")
+         ji=ji+1 ; tf_att(ji)=att_init("ice_sheet_coupling","activated")
       ENDIF
 
       ! vertical grid
       IF( td_namz%l_zco )THEN
-         ji=ji+1 ; td_att(ji)=att_init("z_coord","full steps")
+         ji=ji+1 ; tf_att(ji)=att_init("z_coord","full steps")
       ENDIF
       IF( td_namz%l_zps )THEN
-         ji=ji+1 ; td_att(ji)=att_init("z_coord","partial steps")
+         ji=ji+1 ; tf_att(ji)=att_init("z_coord","partial steps")
       ENDIF
       IF( td_namz%l_sco )THEN
          IF( td_namz%l_s_sh94 )THEN
-            ji=ji+1 ; td_att(ji)=att_init("z_coord","hybrid Song and Haidvogel 1994")
+            ji=ji+1 ; tf_att(ji)=att_init("z_coord","hybrid Song and Haidvogel 1994")
          ELSEIF( td_namz%l_s_sf12 )THEN
-            ji=ji+1 ; td_att(ji)=att_init("z_coord","hybrid Siddorn and Furner 2012")
+            ji=ji+1 ; tf_att(ji)=att_init("z_coord","hybrid Siddorn and Furner 2012")
          ELSE
-            ji=ji+1 ; td_att(ji)=att_init("z_coord","sigma")
+            ji=ji+1 ; tf_att(ji)=att_init("z_coord","sigma")
          ENDIF
       ENDIF
-      ji=ji+1 ; td_att(ji)=att_init("hmin",td_namz%d_hmin)
-      IF( td_namz%l_isfcav ) ji=ji+1 ; td_att(ji)=att_init("isfhmin",td_namz%d_isfhmin)
+      ji=ji+1 ; tf_att(ji)=att_init("hmin",td_namz%d_hmin)
+      IF( td_namz%l_isfcav ) ji=ji+1 ; tf_att(ji)=att_init("isfhmin",td_namz%d_isfhmin)
 
       ! zco
       IF( td_namz%d_ppsur /= NF90_FILL_DOUBLE )THEN
-         ji=ji+1 ; td_att(ji)=att_init("ppsur",td_namz%d_ppsur)
+         ji=ji+1 ; tf_att(ji)=att_init("ppsur",td_namz%d_ppsur)
       ELSE
-         ji=ji+1 ; td_att(ji)=att_init("ppsur","to_be_computed")
+         ji=ji+1 ; tf_att(ji)=att_init("ppsur","to_be_computed")
       ENDIF
       IF( td_namz%d_ppa0 /= NF90_FILL_DOUBLE )THEN
-         ji=ji+1 ; td_att(ji)=att_init("ppa0",td_namz%d_ppa0)
+         ji=ji+1 ; tf_att(ji)=att_init("ppa0",td_namz%d_ppa0)
       ELSE
-         ji=ji+1 ; td_att(ji)=att_init("ppa0","to_be_computed")
+         ji=ji+1 ; tf_att(ji)=att_init("ppa0","to_be_computed")
       ENDIF
       IF( td_namz%d_ppa1 /= NF90_FILL_DOUBLE )THEN
-         ji=ji+1 ; td_att(ji)=att_init("ppa1",td_namz%d_ppa1)
+         ji=ji+1 ; tf_att(ji)=att_init("ppa1",td_namz%d_ppa1)
       ELSE
-         ji=ji+1 ; td_att(ji)=att_init("ppa1","to_be_computed")
+         ji=ji+1 ; tf_att(ji)=att_init("ppa1","to_be_computed")
       ENDIF
 
-      ji=ji+1 ; td_att(ji)=att_init("ppkth",td_namz%d_ppkth)
-      ji=ji+1 ; td_att(ji)=att_init("ppacr",td_namz%d_ppacr)
-      ji=ji+1 ; td_att(ji)=att_init("ppdzmin",td_namz%d_ppdzmin)
-      ji=ji+1 ; td_att(ji)=att_init("pphmax",td_namz%d_pphmax)
+      ji=ji+1 ; tf_att(ji)=att_init("ppkth",td_namz%d_ppkth)
+      ji=ji+1 ; tf_att(ji)=att_init("ppacr",td_namz%d_ppacr)
+      ji=ji+1 ; tf_att(ji)=att_init("ppdzmin",td_namz%d_ppdzmin)
+      ji=ji+1 ; tf_att(ji)=att_init("pphmax",td_namz%d_pphmax)
 
       IF( td_namz%l_dbletanh )THEN
-         ji=ji+1 ; td_att(ji)=att_init("ppa2",td_namz%d_ppa2)
-         ji=ji+1 ; td_att(ji)=att_init("ppkth2",td_namz%d_ppkth2)
-         ji=ji+1 ; td_att(ji)=att_init("ppacr2",td_namz%d_ppacr2)
+         ji=ji+1 ; tf_att(ji)=att_init("ppa2",td_namz%d_ppa2)
+         ji=ji+1 ; tf_att(ji)=att_init("ppkth2",td_namz%d_ppkth2)
+         ji=ji+1 ; tf_att(ji)=att_init("ppacr2",td_namz%d_ppacr2)
       ENDIF
 
       IF( td_namz%l_zps )THEN
-         ji=ji+1 ; td_att(ji)=att_init("e3zps_min",td_namz%d_e3zps_min)
-         ji=ji+1 ; td_att(ji)=att_init("e3zps_rat",td_namz%d_e3zps_rat)
+         ji=ji+1 ; tf_att(ji)=att_init("e3zps_min",td_namz%d_e3zps_min)
+         ji=ji+1 ; tf_att(ji)=att_init("e3zps_rat",td_namz%d_e3zps_rat)
       ENDIF
 
       IF( td_namz%l_sco )THEN
-         ji=ji+1 ; td_att(ji)=att_init("sbot_min",td_namz%d_sbot_min)
-         ji=ji+1 ; td_att(ji)=att_init("sbot_max",td_namz%d_sbot_max)
-         ji=ji+1 ; td_att(ji)=att_init("hc",td_namz%d_hc)
+         ji=ji+1 ; tf_att(ji)=att_init("sbot_min",td_namz%d_sbot_min)
+         ji=ji+1 ; tf_att(ji)=att_init("sbot_max",td_namz%d_sbot_max)
+         ji=ji+1 ; tf_att(ji)=att_init("hc",td_namz%d_hc)
          IF( td_namz%l_s_sh94 )THEN
-            ji=ji+1 ; td_att(ji)=att_init("rmax",td_namz%d_rmax)
-            ji=ji+1 ; td_att(ji)=att_init("theta",td_namz%d_theta)
-            ji=ji+1 ; td_att(ji)=att_init("thetb",td_namz%d_thetb)
-            ji=ji+1 ; td_att(ji)=att_init("bb",td_namz%d_bb)
+            ji=ji+1 ; tf_att(ji)=att_init("rmax",td_namz%d_rmax)
+            ji=ji+1 ; tf_att(ji)=att_init("theta",td_namz%d_theta)
+            ji=ji+1 ; tf_att(ji)=att_init("thetb",td_namz%d_thetb)
+            ji=ji+1 ; tf_att(ji)=att_init("bb",td_namz%d_bb)
          ELSEIF( td_namz%l_s_sf12 )THEN
-            IF( td_namz%l_sigcrit ) ji=ji+1 ; td_att(ji)=att_init("sigma_below_critical_depth","activated")
-            ji=ji+1 ; td_att(ji)=att_init("alpha",td_namz%d_alpha)
-            ji=ji+1 ; td_att(ji)=att_init("efold",td_namz%d_efold)
-            ji=ji+1 ; td_att(ji)=att_init("zs",td_namz%d_zs)
-            ji=ji+1 ; td_att(ji)=att_init("zb_a",td_namz%d_zb_a)
-            ji=ji+1 ; td_att(ji)=att_init("zb_b",td_namz%d_zb_b)
+            IF( td_namz%l_sigcrit ) ji=ji+1 ; tf_att(ji)=att_init("sigma_below_critical_depth","activated")
+            ji=ji+1 ; tf_att(ji)=att_init("alpha",td_namz%d_alpha)
+            ji=ji+1 ; tf_att(ji)=att_init("efold",td_namz%d_efold)
+            ji=ji+1 ; tf_att(ji)=att_init("zs",td_namz%d_zs)
+            ji=ji+1 ; tf_att(ji)=att_init("zb_a",td_namz%d_zb_a)
+            ji=ji+1 ; tf_att(ji)=att_init("zb_b",td_namz%d_zb_b)
          ENDIF
       ENDIF
 
       IF( td_namz%l_wd )THEN
-         ji=ji+1 ; td_att(ji)=att_init("wetting_drying","activated")
+         ji=ji+1 ; tf_att(ji)=att_init("wetting_drying","activated")
       ENDIF
 
       IF( td_namz%l_wd )THEN
-         ji=ji+1 ; td_att(ji)=att_init("wdmin1",td_namz%d_wdmin1)
-         ji=ji+1 ; td_att(ji)=att_init("wdmin2",td_namz%d_wdmin2)
-         ji=ji+1 ; td_att(ji)=att_init("wdld",td_namz%d_wdld)
+         ji=ji+1 ; tf_att(ji)=att_init("wdmin1",td_namz%d_wdmin1)
+         ji=ji+1 ; tf_att(ji)=att_init("wdmin2",td_namz%d_wdmin2)
+         ji=ji+1 ; tf_att(ji)=att_init("wdld",td_namz%d_wdld)
       ENDIF
-      
-   END FUNCTION create__gloatt
-
+ 
+   END FUNCTION create_meshmask__gloatt
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 END PROGRAM

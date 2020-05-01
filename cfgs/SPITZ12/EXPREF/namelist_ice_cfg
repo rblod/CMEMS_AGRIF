@@ -34,6 +34,7 @@
 !------------------------------------------------------------------------------
 &namdyn         !   Ice dynamics
 !------------------------------------------------------------------------------
+   ln_landfast_L16  = .true.          !  landfast: parameterization from Lemieux 2016
 /
 !------------------------------------------------------------------------------
 &namdyn_rdgrft  !   Ice ridging/rafting
@@ -46,6 +47,9 @@
 !------------------------------------------------------------------------------
 &namdyn_adv     !   Ice advection
 !------------------------------------------------------------------------------
+   ln_adv_Pra       = .false.         !  Advection scheme (Prather)
+   ln_adv_UMx       = .true.          !  Advection scheme (Ultimate-Macho)
+      nn_UMx        =   5             !     order of the scheme for UMx (1-5 ; 20=centered 2nd order)
 /
 !------------------------------------------------------------------------------
 &namsbc         !   Ice surface boundary conditions
@@ -66,7 +70,7 @@
 !------------------------------------------------------------------------------
 &namthd_do      !   Ice growth in open water
 !------------------------------------------------------------------------------
-   rn_hinew         =   0.02          !  thickness for new ice formation in open water (m), must be larger than rn_hnewice
+   rn_hinew         =   0.02          !  thickness for new ice formation in open water (m), must be larger than rn_himin
    ln_frazil        = .true.          !  Frazil ice parameterization (ice collection as a function of wind)
 /
 !------------------------------------------------------------------------------
@@ -76,9 +80,9 @@
 !------------------------------------------------------------------------------
 &namthd_pnd     !   Melt ponds
 !------------------------------------------------------------------------------
-   ln_pnd_H12       = .false.         !  activate evolutive melt ponds (from Holland et al 2012)
-   ln_pnd_CST       = .false.         !  activate constant melt ponds
-   ln_pnd_alb       = .false.         !  melt ponds affect albedo or not
+   ln_pnd           = .true.          !  activate melt ponds or not
+     ln_pnd_H12     = .true.          !  activate evolutive melt ponds (from Holland et al 2012)
+     ln_pnd_alb     = .true.          !  melt ponds affect albedo or not
 /
 
 !------------------------------------------------------------------------------

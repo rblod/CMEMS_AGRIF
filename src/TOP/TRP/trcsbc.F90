@@ -28,15 +28,15 @@ MODULE trcsbc
    PUBLIC   trc_sbc   ! routine called by step.F90
 
    !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/TOP 4.0 , NEMO Consortium (2018)
-   !! $Id: trcsbc.F90 10425 2018-12-19 21:54:16Z smasson $ 
+   !! $Id: trcsbc.F90 12489 2020-02-28 15:55:11Z davestorkey $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE trc_sbc ( kt )
+   SUBROUTINE trc_sbc ( kt, Kmm, ptr, Krhs )
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE trc_sbc  ***
       !!                   
@@ -48,20 +48,22 @@ CONTAINS
       !!      * concentration/dilution effect:
       !!            The surface freshwater flux modify the ocean volume
       !!         and thus the concentration of a tracer as :
-      !!            tra = tra + emp * trn / e3t   for k=1
+      !!            tr(Krhs) = tr(Krhs) + emp * tr(Kmm) / e3t   for k=1
       !!         where emp, the surface freshwater budget (evaporation minus
       !!         precipitation ) given in kg/m2/s is divided
       !!         by 1035 kg/m3 (density of ocean water) to obtain m/s.
       !!
-      !! ** Action  : - Update the 1st level of tra with the trend associated
+      !! ** Action  : - Update the 1st level of tr(:,:,:,:,Krhs) with the trend associated
       !!                with the tracer surface boundary condition 
       !!
       !!----------------------------------------------------------------------
-      INTEGER, INTENT(in) ::   kt   ! ocean time-step index
+      INTEGER,                                    INTENT(in   ) :: kt        ! ocean time-step index
+      INTEGER,                                    INTENT(in   ) :: Kmm, Krhs ! time level indices
+      REAL(wp), DIMENSION(jpi,jpj,jpk,jptra,jpt), INTENT(inout) :: ptr       ! passive tracers and RHS of tracer equation
       !
       INTEGER  ::   ji, jj, jn                      ! dummy loop indices
-      REAL(wp) ::   zse3t, zrtrn, zratio, zfact     ! local scalars
-      REAL(wp) ::   zftra, zcd, zdtra, ztfx, ztra   !   -      -
+      REAL(wp) ::   zse3t, zrtrn, zfact     ! local scalars
+      REAL(wp) ::   zftra, zdtra, ztfx, ztra   !   -      -
       CHARACTER (len=22) :: charout
       REAL(wp), DIMENSION(jpi,jpj)   ::   zsfx
       REAL(wp), ALLOCATABLE, DIMENSION(:,:,:) ::   ztrtrd
@@ -81,7 +83,7 @@ CONTAINS
          !
          IF( ln_rsttr .AND. .NOT.ln_top_euler .AND.   &                     ! Restart: read in restart  file
             iom_varid( numrtr, 'sbc_'//TRIM(ctrcnm(1))//'_b', ldstop = .FALSE. ) > 0 ) THEN
-            IF(lwp) WRITE(numout,*) '          nittrc000-nn_dttrc surface tracer content forcing fields red in the restart file'
+            IF(lwp) WRITE(numout,*) '          nittrc000-1 surface tracer content forcing fields read in the restart file'
             zfact = 0.5_wp
             DO jn = 1, jptra
                CALL iom_get( numrtr, jpdom_autoglo, 'sbc_'//TRIM(ctrcnm(jn))//'_b', sbc_trc_b(:,:,jn) )   ! before tracer content sbc
@@ -101,7 +103,7 @@ CONTAINS
          !
       ENDIF
 
-      ! Coupling online : river runoff is added to the horizontal divergence (hdivn) in the subroutine sbc_rnf_div 
+      ! Coupling online : river runoff is added to the horizontal divergence (hdiv) in the subroutine sbc_rnf_div 
       ! one only consider the concentration/dilution effect due to evaporation minus precipitation + freezing/melting of sea-ice
       ! Coupling offline : runoff are in emp which contains E-P-R
       !
@@ -112,57 +114,59 @@ CONTAINS
       ENDIF
 
       ! 0. initialization
-      IF( nn_ice_tr == -1 ) THEN    ! No tracers in sea ice (null concentration in sea ice)
+      SELECT CASE ( nn_ice_tr )
+
+      CASE ( -1 ) ! No tracers in sea ice (null concentration in sea ice)
          !
          DO jn = 1, jptra
-            DO jj = 2, jpj
-               DO ji = fs_2, fs_jpim1   ! vector opt.
-                  sbc_trc(ji,jj,jn) = zsfx(ji,jj) * r1_rau0 * trn(ji,jj,1,jn)
-               END DO
-            END DO
+            DO_2D_01_00
+               sbc_trc(ji,jj,jn) = zsfx(ji,jj) * r1_rho0 * ptr(ji,jj,1,jn,Kmm)
+            END_2D
          END DO
          !
-       ELSE
+      CASE ( 0 )  ! Same concentration in sea ice and in the ocean
          !
          DO jn = 1, jptra
-            DO jj = 2, jpj
-               DO ji = fs_2, fs_jpim1   ! vector opt.
-                  zse3t = 1. / e3t_n(ji,jj,1)
-                  ! tracer flux at the ice/ocean interface (tracer/m2/s)
-                  zftra = - trc_i(ji,jj,jn) * fmmflx(ji,jj) ! uptake of tracer in the sea ice
-                  zcd   =   trc_o(ji,jj,jn) * fmmflx(ji,jj) ! concentration dilution due to freezing-melting,
-                  !                                         ! only used in the levitating sea ice case
-                  ! tracer flux only       : add concentration dilution term in net tracer flux, no F-M in volume flux
-                  ! tracer and mass fluxes : no concentration dilution term in net tracer flux, F-M term in volume flux
-                  ztfx  = zftra                             ! net tracer flux
-                  !
-                  zdtra = r1_rau0 * ( ztfx + zsfx(ji,jj) * trn(ji,jj,1,jn) ) 
-                  IF ( zdtra < 0. ) THEN
-                     zratio = -zdtra * zse3t * r2dttrc / ( trn(ji,jj,1,jn) + zrtrn )
-                     zdtra = MIN(1.0, zratio) * zdtra ! avoid negative concentrations to arise
-                  ENDIF
-                  sbc_trc(ji,jj,jn) =  zdtra 
-               END DO
-            END DO
+            DO_2D_01_00
+               sbc_trc(ji,jj,jn) = ( zsfx(ji,jj) + fmmflx(ji,jj) ) * r1_rho0 * ptr(ji,jj,1,jn,Kmm)
+            END_2D
          END DO
-      ENDIF
+         !
+      CASE ( 1 )  ! Specific treatment of sea ice fluxes with an imposed concentration in sea ice 
+         !
+         DO jn = 1, jptra
+            DO_2D_01_00
+               zse3t = 1. / e3t(ji,jj,1,Kmm)
+               ! tracer flux at the ice/ocean interface (tracer/m2/s)
+               zftra = - trc_i(ji,jj,jn) * fmmflx(ji,jj) ! uptake of tracer in the sea ice
+               !                                         ! only used in the levitating sea ice case
+               ! tracer flux only       : add concentration dilution term in net tracer flux, no F-M in volume flux
+               ! tracer and mass fluxes : no concentration dilution term in net tracer flux, F-M term in volume flux
+               ztfx  = zftra                        ! net tracer flux
+               !
+               zdtra = r1_rho0 * ( ztfx + ( zsfx(ji,jj) + fmmflx(ji,jj) ) * ptr(ji,jj,1,jn,Kmm) ) 
+               IF ( zdtra < 0. ) THEN
+                  zdtra  = MAX(zdtra, -ptr(ji,jj,1,jn,Kmm) * e3t(ji,jj,1,Kmm) / rDt_trc )   ! avoid negative concentrations to arise
+               ENDIF
+               sbc_trc(ji,jj,jn) =  zdtra 
+            END_2D
+         END DO
+      END SELECT
       !
       CALL lbc_lnk( 'trcsbc', sbc_trc(:,:,:), 'T', 1. )
       !                                       Concentration dilution effect on tracers due to evaporation & precipitation 
       DO jn = 1, jptra
          !
-         IF( l_trdtrc )   ztrtrd(:,:,:) = tra(:,:,:,jn)  ! save trends
+         IF( l_trdtrc )   ztrtrd(:,:,:) = ptr(:,:,:,jn,Krhs)  ! save trends
          !
-         DO jj = 2, jpj
-            DO ji = fs_2, fs_jpim1   ! vector opt.
-               zse3t = zfact / e3t_n(ji,jj,1)
-               tra(ji,jj,1,jn) = tra(ji,jj,1,jn) + ( sbc_trc_b(ji,jj,jn) + sbc_trc(ji,jj,jn) ) * zse3t
-            END DO
-         END DO
+         DO_2D_01_00
+            zse3t = zfact / e3t(ji,jj,1,Kmm)
+            ptr(ji,jj,1,jn,Krhs) = ptr(ji,jj,1,jn,Krhs) + ( sbc_trc_b(ji,jj,jn) + sbc_trc(ji,jj,jn) ) * zse3t
+         END_2D
          !
          IF( l_trdtrc ) THEN
-            ztrtrd(:,:,:) = tra(:,:,:,jn) - ztrtrd(:,:,:)
-            CALL trd_tra( kt, 'TRC', jn, jptra_nsr, ztrtrd )
+            ztrtrd(:,:,:) = ptr(:,:,:,jn,Krhs) - ztrtrd(:,:,:)
+            CALL trd_tra( kt, Kmm, Krhs, 'TRC', jn, jptra_nsr, ztrtrd )
          END IF
          !                                                       ! ===========
       END DO                                                     ! tracer loop
@@ -180,9 +184,9 @@ CONTAINS
          END DO
       ENDIF
       !
-      IF( ln_ctl )   THEN
+      IF( sn_cfctl%l_prttrc )   THEN
          WRITE(charout, FMT="('sbc ')") ;  CALL prt_ctl_trc_info(charout)
-                                           CALL prt_ctl_trc( tab4d=tra, mask=tmask, clinfo=ctrcnm, clinfo2='trd' )
+                                           CALL prt_ctl_trc( tab4d=ptr(:,:,:,:,Krhs), mask=tmask, clinfo=ctrcnm, clinfo2='trd' )
       ENDIF
       IF( l_trdtrc )  DEALLOCATE( ztrtrd )
       !
@@ -194,9 +198,13 @@ CONTAINS
    !!----------------------------------------------------------------------
    !!   Dummy module :                      NO passive tracer
    !!----------------------------------------------------------------------
+   USE par_oce
+   USE par_trc
 CONTAINS
-   SUBROUTINE trc_sbc (kt)              ! Empty routine
-      INTEGER, INTENT(in) :: kt
+   SUBROUTINE trc_sbc ( kt, Kmm, ptr, Krhs )      ! Empty routine
+      INTEGER,                                    INTENT(in   ) :: kt        ! ocean time-step index
+      INTEGER,                                    INTENT(in   ) :: Kmm, Krhs ! time level indices
+      REAL(wp), DIMENSION(jpi,jpj,jpk,jptra,jpt), INTENT(inout) :: ptr       ! passive tracers and RHS of tracer equation
       WRITE(*,*) 'trc_sbc: You should not have seen this print! error?', kt
    END SUBROUTINE trc_sbc
 #endif

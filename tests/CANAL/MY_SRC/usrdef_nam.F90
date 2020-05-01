@@ -52,12 +52,12 @@ MODULE usrdef_nam
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: usrdef_nam.F90 10074 2018-08-28 16:15:49Z nicolasmartin $ 
+   !! $Id: usrdef_nam.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE usr_def_nam( ldtxt, ldnam, cd_cfg, kk_cfg, kpi, kpj, kpk, kperio )
+   SUBROUTINE usr_def_nam( cd_cfg, kk_cfg, kpi, kpj, kpk, kperio )
       !!----------------------------------------------------------------------
       !!                     ***  ROUTINE dom_nam  ***
       !!                    
@@ -69,14 +69,13 @@ CONTAINS
       !!
       !! ** input   : - namusr_def namelist found in namelist_cfg
       !!----------------------------------------------------------------------
-      CHARACTER(len=*), DIMENSION(:), INTENT(out) ::   ldtxt, ldnam    ! stored print information
       CHARACTER(len=*)              , INTENT(out) ::   cd_cfg          ! configuration name
       INTEGER                       , INTENT(out) ::   kk_cfg          ! configuration resolution
       INTEGER                       , INTENT(out) ::   kpi, kpj, kpk   ! global domain sizes 
       INTEGER                       , INTENT(out) ::   kperio          ! lateral global domain b.c. 
       !
-      INTEGER ::   ios, ii      ! Local integer
-      REAL(wp)::   zh ! Local scalars
+      INTEGER ::   ios      ! Local integer
+      REAL(wp)::   zh       ! Local scalars
       !!
       NAMELIST/namusr_def/  rn_domszx, rn_domszy, rn_domszz, rn_dx, rn_dy, rn_dz, rn_0xratio, rn_0yratio   &
          &                 , nn_fcase, rn_ppgphi0, rn_vtxmax, rn_uzonal, rn_ujetszx, rn_ujetszy   &
@@ -84,11 +83,10 @@ CONTAINS
          &                 , nn_botcase, nn_initcase, ln_sshnoise, rn_lambda
       !!----------------------------------------------------------------------
       !
-      ii = 1
-      !
-      REWIND( numnam_cfg )          ! Namelist namusr_def (exist in namelist_cfg only)
       READ  ( numnam_cfg, namusr_def, IOSTAT = ios, ERR = 902 )
-902   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namusr_def in configuration namelist', .TRUE. )
+902   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namusr_def in configuration namelist' )
+      !
+      IF(lwm)   WRITE( numond, namusr_def )
       !
 #if defined key_agrif 
       ! Domain parameters are taken from parent:
@@ -102,7 +100,7 @@ CONTAINS
       rn_0yratio = 0.5
 #endif
       !
-      WRITE( ldnam(:), namusr_def )
+      IF(lwm)   WRITE( numond, namusr_def )
       !
       cd_cfg = 'EW_CANAL'             ! name & resolution (not used)
       kk_cfg = INT( rn_dx )
@@ -119,42 +117,42 @@ CONTAINS
 #endif
       !
       zh  = (kpk-1)*rn_dz
-      !                             ! control print
-      WRITE(ldtxt(ii),*) '   '                                                                          ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) 'usr_def_nam  : read the user defined namelist (namusr_def) in namelist_cfg'   ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '~~~~~~~~~~~ '                                                                 ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '   Namelist namusr_def : EW_CANAL test case'                                  ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '      horizontal domain size-x          rn_domszx  = ', rn_domszx, ' km'      ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '      horizontal domain size-y          rn_domszy  = ', rn_domszy, ' km'      ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '      vertical   domain size-z          rn_domszz  = ', rn_domszz, '  m'      ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '      horizontal x-resolution           rn_dx      = ',     rn_dx, ' km'      ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '      horizontal y-resolution           rn_dy      = ',     rn_dy, ' km'      ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '      vertical resolution               rn_dz      = ',     rn_dz, '  m'      ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '      x-domain ratio of the 0           rn_0xratio = ', rn_0xratio            ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '      y-domain ratio of the 0           rn_0yratio = ', rn_0yratio            ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '          H [m] : ', zh                                                       ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '      F computation                     nn_fcase   = ',   nn_fcase            ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '      Reference latitude                rn_ppgphi0 = ', rn_ppgphi0            ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '      10m wind speed                    rn_u10     = ',     rn_u10, ' m/s'    ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '         wind latitudinal extension     rn_windszy = ', rn_windszy, ' km'     ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '         wind longitudinal extension    rn_windszx = ', rn_windszx, ' km'     ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '         Uoce multiplicative factor     rn_uofac   = ',   rn_uofac            ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '      initial Canal max current        rn_vtxmax  = ',  rn_vtxmax, ' m/s'    ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '      initial zonal current             rn_uzonal  = ',  rn_uzonal, ' m/s'    ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '         Jet latitudinal extension      rn_ujetszy = ', rn_ujetszy, ' km'     ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '         Jet longitudinal extension     rn_ujetszx = ', rn_ujetszx, ' km'     ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '      bottom definition (0:flat)        nn_botcase = ', nn_botcase            ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '      initial condition case            nn_initcase= ', nn_initcase           ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '                   (0:rest, 1:zonal current, 10:shear)'                       ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '      add random noise on initial ssh   ln_sshnoise= ', ln_sshnoise           ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '      Gaussian lambda parameter          rn_lambda = ', rn_lambda             ;   ii = ii + 1
-      !
       !                             ! Set the lateral boundary condition of the global domain
       kperio = 1                    ! EW_CANAL configuration : closed basin
-      !
-      WRITE(ldtxt(ii),*) '   '                                                                          ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '   Lateral boundary condition of the global domain'                           ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '      EW_CANAL : closed basin            jperio = ', kperio                   ;   ii = ii + 1
+      !                             ! control print
+      IF(lwp) THEN
+         WRITE(numout,*) '   '
+         WRITE(numout,*) 'usr_def_nam  : read the user defined namelist (namusr_def) in namelist_cfg'
+         WRITE(numout,*) '~~~~~~~~~~~ '
+         WRITE(numout,*) '   Namelist namusr_def : EW_CANAL test case'
+         WRITE(numout,*) '      horizontal domain size-x          rn_domszx  = ', rn_domszx, ' km'
+         WRITE(numout,*) '      horizontal domain size-y          rn_domszy  = ', rn_domszy, ' km'
+         WRITE(numout,*) '      vertical   domain size-z          rn_domszz  = ', rn_domszz, '  m'
+         WRITE(numout,*) '      horizontal x-resolution           rn_dx      = ',     rn_dx, ' km'
+         WRITE(numout,*) '      horizontal y-resolution           rn_dy      = ',     rn_dy, ' km'
+         WRITE(numout,*) '      vertical resolution               rn_dz      = ',     rn_dz, '  m'
+         WRITE(numout,*) '      x-domain ratio of the 0           rn_0xratio = ', rn_0xratio
+         WRITE(numout,*) '      y-domain ratio of the 0           rn_0yratio = ', rn_0yratio
+         WRITE(numout,*) '          H [m] : ', zh
+         WRITE(numout,*) '      F computation                     nn_fcase   = ',   nn_fcase
+         WRITE(numout,*) '      Reference latitude                rn_ppgphi0 = ', rn_ppgphi0
+         WRITE(numout,*) '      10m wind speed                    rn_u10     = ',     rn_u10, ' m/s'
+         WRITE(numout,*) '         wind latitudinal extension     rn_windszy = ', rn_windszy, ' km'
+         WRITE(numout,*) '         wind longitudinal extension    rn_windszx = ', rn_windszx, ' km'
+         WRITE(numout,*) '         Uoce multiplicative factor     rn_uofac   = ',   rn_uofac
+         WRITE(numout,*) '      initial Canal max current         rn_vtxmax  = ',  rn_vtxmax, ' m/s'
+         WRITE(numout,*) '      initial zonal current             rn_uzonal  = ',  rn_uzonal, ' m/s'
+         WRITE(numout,*) '         Jet latitudinal extension      rn_ujetszy = ', rn_ujetszy, ' km'
+         WRITE(numout,*) '         Jet longitudinal extension     rn_ujetszx = ', rn_ujetszx, ' km'
+         WRITE(numout,*) '      bottom definition (0:flat)        nn_botcase = ', nn_botcase
+         WRITE(numout,*) '      initial condition case            nn_initcase= ', nn_initcase
+         WRITE(numout,*) '                   (0:rest, 1:zonal current, 10:shear)'
+         WRITE(numout,*) '      add random noise on initial ssh   ln_sshnoise= ', ln_sshnoise
+         WRITE(numout,*) '      Gaussian lambda parameter          rn_lambda = ', rn_lambda
+         WRITE(numout,*) '   '
+         WRITE(numout,*) '   Lateral boundary condition of the global domain'
+         WRITE(numout,*) '      EW_CANAL : closed basin               jperio = ', kperio
+      ENDIF
       !
    END SUBROUTINE usr_def_nam
 

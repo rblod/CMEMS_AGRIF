@@ -2,8 +2,6 @@
 ! NEMO system team, System and Interface for oceanic RElocable Nesting
 !----------------------------------------------------------------------
 !
-! MODULE: grid_zgr
-!
 ! DESCRIPTION:
 !> @brief This module manage Vertical grid.
 !>
@@ -23,7 +21,7 @@
 !>
 !> @author
 !> G, Madec
-! REVISION HISTORY:
+!>
 !> @date December, 1995 - Original code : s vertical coordinate
 !> @date July, 1997
 !> - lbc_lnk call
@@ -57,9 +55,10 @@
 !> @date November, 2016
 !> - J, Paul : vertical scale factors e3. = dk[gdep] or old definition
 !>
-!> @note Software governed by the CeCILL licence     (./LICENSE)
+!> @note Software governed by the CeCILL licence     (NEMOGCM/NEMO_CeCILL.txt)
 !----------------------------------------------------------------------
 MODULE grid_zgr
+
    USE netcdf                          ! nf90 library
    USE kind                            ! F90 kind parameter
    USE fct                             ! basic usefull function
@@ -76,6 +75,7 @@ MODULE grid_zgr
    USE iom_mpp                         ! I/O MPP manager
    USE lbc                             ! lateral boundary conditions
    USE grid_hgr                        ! Horizontal mesh
+
    IMPLICIT NONE
    ! NOTE_avoid_public_variables_if_possible
    ! type and variable
@@ -271,8 +271,10 @@ MODULE grid_zgr
    TYPE(TVAR), SAVE :: tg_esigw     !            sco(tanh)
 
 CONTAINS
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_zgr_init(jpi, jpj, jpk, ld_sco) 
    !-------------------------------------------------------------------
-   !> @brief This function initialise global variable needed to compute vertical
+   !> @brief This subroutine initialise global variable needed to compute vertical
    !>        mesh
    !>
    !> @author J.Paul
@@ -283,8 +285,9 @@ CONTAINS
    !> @param[in] jpk
    !> @param[in] ld_sco
    !-------------------------------------------------------------------
-   SUBROUTINE grid_zgr_init( jpi,jpj,jpk, ld_sco ) 
+
       IMPLICIT NONE
+
       ! Argument      
       INTEGER(i4), INTENT(IN) :: jpi
       INTEGER(i4), INTENT(IN) :: jpj
@@ -357,16 +360,19 @@ CONTAINS
       tg_e3vw_0  =var_init('e3vw_0  ',dl_tmp3D(:,:,:), dd_fill=dp_fill, id_type=NF90_DOUBLE)
 
    END SUBROUTINE grid_zgr_init
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_zgr_clean(ld_sco) 
    !-------------------------------------------------------------------
-   !> @brief This function clean hgr structure
+   !> @brief This subroutine clean hgr structure
    !>
    !> @author J.Paul
    !> @date September, 2015 - Initial version
    !>
    !> @param[in] ld_sco
    !-------------------------------------------------------------------
-   SUBROUTINE grid_zgr_clean(ld_sco) 
+
       IMPLICIT NONE
+
       ! Argument      
       LOGICAL    , INTENT(IN) :: ld_sco
 
@@ -417,6 +423,9 @@ CONTAINS
       CALL var_clean(tg_e3vw_0  )
       
    END SUBROUTINE grid_zgr_clean
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION grid_zgr_nam(cd_coord, id_perio, cd_namelist) &
+         & RESULT (tf_namz)
    !-------------------------------------------------------------------
    !> @brief This function initialise zgr namelist structure
    !>
@@ -428,8 +437,9 @@ CONTAINS
    !> @param[in] cd_namelist
    !> @return hgr namelist structure
    !-------------------------------------------------------------------
-   FUNCTION grid_zgr_nam( cd_coord,id_perio,cd_namelist )
+
       IMPLICIT NONE
+
       ! Argument      
       CHARACTER(LEN=*), INTENT(IN) :: cd_coord
       INTEGER(i4)     , INTENT(IN) :: id_perio   
@@ -437,7 +447,7 @@ CONTAINS
       CHARACTER(LEN=*), INTENT(IN) :: cd_namelist
       
       ! function
-      TYPE(TNAMZ) :: grid_zgr_nam
+      TYPE(TNAMZ)                  :: tf_namz
 
       ! local variable
       INTEGER(i4)        :: il_status
@@ -460,17 +470,17 @@ CONTAINS
       REAL(dp)          :: dn_isfhmin  = NF90_FILL_DOUBLE
 
       ! namzco
-      REAL(dp)          :: dn_ppsur    = NF90_FILL_DOUBLE
-      REAL(dp)          :: dn_ppa0     = NF90_FILL_DOUBLE
-      REAL(dp)          :: dn_ppa1     = NF90_FILL_DOUBLE
-      REAL(dp)          :: dn_ppkth    = NF90_FILL_DOUBLE
-      REAL(dp)          :: dn_ppacr    = NF90_FILL_DOUBLE
-      REAL(dp)          :: dn_ppdzmin  = NF90_FILL_DOUBLE
-      REAL(dp)          :: dn_pphmax   = NF90_FILL_DOUBLE
-      LOGICAL           :: ln_dbletanh = .FALSE.
-      REAL(dp)          :: dn_ppa2     = NF90_FILL_DOUBLE
-      REAL(dp)          :: dn_ppkth2   = NF90_FILL_DOUBLE
-      REAL(dp)          :: dn_ppacr2   = NF90_FILL_DOUBLE
+      REAL(dp)          :: dn_ppsur    = -3958.951371276829 !NF90_FILL_DOUBLE
+      REAL(dp)          :: dn_ppa0     = 103.953009600000   !NF90_FILL_DOUBLE
+      REAL(dp)          :: dn_ppa1     = 2.415951269000     !NF90_FILL_DOUBLE
+      REAL(dp)          :: dn_ppkth    = 15.351013700000    !NF90_FILL_DOUBLE
+      REAL(dp)          :: dn_ppacr    = 7.000000000000     !NF90_FILL_DOUBLE
+      REAL(dp)          :: dn_ppdzmin  = 6.                 !NF90_FILL_DOUBLE
+      REAL(dp)          :: dn_pphmax   = 5750.              !NF90_FILL_DOUBLE
+      LOGICAL           :: ln_dbletanh = .TRUE.
+      REAL(dp)          :: dn_ppa2     = 100.760928500000   !NF90_FILL_DOUBLE
+      REAL(dp)          :: dn_ppkth2   = 48.029893720000    !NF90_FILL_DOUBLE
+      REAL(dp)          :: dn_ppacr2   = 13.000000000000    !NF90_FILL_DOUBLE
 
       ! namzps
       REAL(dp)          :: dn_e3zps_min= NF90_FILL_DOUBLE
@@ -632,75 +642,75 @@ CONTAINS
          CALL logger_error("GRID ZGR NAM: closing "//TRIM(cd_namelist))
       ENDIF
      
-      grid_zgr_nam%c_coord    = TRIM(cd_coord)
-      grid_zgr_nam%i_perio    = id_perio
+      tf_namz%c_coord    = TRIM(cd_coord)
+      tf_namz%i_perio    = id_perio
 
-      grid_zgr_nam%l_zco      = ln_zco    
-      grid_zgr_nam%l_zps      = ln_zps    
-      grid_zgr_nam%l_sco      = ln_sco    
-      grid_zgr_nam%l_isfcav   = ln_isfcav 
-      grid_zgr_nam%l_iscpl    = ln_iscpl 
-      grid_zgr_nam%l_wd       = ln_wd 
-      grid_zgr_nam%i_nlevel   = in_nlevel
+      tf_namz%l_zco      = ln_zco    
+      tf_namz%l_zps      = ln_zps    
+      tf_namz%l_sco      = ln_sco    
+      tf_namz%l_isfcav   = ln_isfcav 
+      tf_namz%l_iscpl    = ln_iscpl 
+      tf_namz%l_wd       = ln_wd 
+      tf_namz%i_nlevel   = in_nlevel
 
-      grid_zgr_nam%d_hmin     = dn_hmin  
-      grid_zgr_nam%d_isfhmin  = dn_isfhmin  
+      tf_namz%d_hmin     = dn_hmin  
+      tf_namz%d_isfhmin  = dn_isfhmin  
 
-      grid_zgr_nam%d_ppsur    = dn_ppsur  
-      grid_zgr_nam%d_ppa0     = dn_ppa0   
-      grid_zgr_nam%d_ppa1     = dn_ppa1   
-      grid_zgr_nam%d_ppkth    = dn_ppkth  
-      grid_zgr_nam%d_ppacr    = dn_ppacr  
-      grid_zgr_nam%d_ppdzmin  = dn_ppdzmin
-      grid_zgr_nam%d_pphmax   = dn_pphmax 
+      tf_namz%d_ppsur    = dn_ppsur  
+      tf_namz%d_ppa0     = dn_ppa0   
+      tf_namz%d_ppa1     = dn_ppa1   
+      tf_namz%d_ppkth    = dn_ppkth  
+      tf_namz%d_ppacr    = dn_ppacr  
+      tf_namz%d_ppdzmin  = dn_ppdzmin
+      tf_namz%d_pphmax   = dn_pphmax 
                              
-      grid_zgr_nam%l_dbletanh = ln_dbletanh
-      grid_zgr_nam%d_ppa2     = dn_ppa2    
-      grid_zgr_nam%d_ppkth2   = dn_ppkth2  
-      grid_zgr_nam%d_ppacr2   = dn_ppacr2  
+      tf_namz%l_dbletanh = ln_dbletanh
+      tf_namz%d_ppa2     = dn_ppa2    
+      tf_namz%d_ppkth2   = dn_ppkth2  
+      tf_namz%d_ppacr2   = dn_ppacr2  
 
-      grid_zgr_nam%d_e3zps_min= dn_e3zps_min
-      grid_zgr_nam%d_e3zps_rat= dn_e3zps_rat
-!      grid_zgr_nam%i_msh      = in_msh      
+      tf_namz%d_e3zps_min= dn_e3zps_min
+      tf_namz%d_e3zps_rat= dn_e3zps_rat
+!      tf_namz%i_msh      = in_msh      
 
-      grid_zgr_nam%l_s_sh94   = ln_s_sh94  
-      grid_zgr_nam%l_s_sf12   = ln_s_sf12  
-      grid_zgr_nam%d_sbot_min = dn_sbot_min
-      grid_zgr_nam%d_sbot_max = dn_sbot_max
-      grid_zgr_nam%d_rmax     = dn_rmax    
-      grid_zgr_nam%d_hc       = dn_hc      
+      tf_namz%l_s_sh94   = ln_s_sh94  
+      tf_namz%l_s_sf12   = ln_s_sf12  
+      tf_namz%d_sbot_min = dn_sbot_min
+      tf_namz%d_sbot_max = dn_sbot_max
+      tf_namz%d_rmax     = dn_rmax    
+      tf_namz%d_hc       = dn_hc      
       !
-      grid_zgr_nam%d_theta    = dn_theta   
-      grid_zgr_nam%d_thetb    = dn_thetb   
-      grid_zgr_nam%d_bb       = dn_bb      
+      tf_namz%d_theta    = dn_theta   
+      tf_namz%d_thetb    = dn_thetb   
+      tf_namz%d_bb       = dn_bb      
       !
-      grid_zgr_nam%l_sigcrit  = ln_sigcrit
-      grid_zgr_nam%d_alpha    = dn_alpha  
-      grid_zgr_nam%d_efold    = dn_efold  
-      grid_zgr_nam%d_zs       = dn_zs     
-      grid_zgr_nam%d_zb_a     = dn_zb_a
-      grid_zgr_nam%d_zb_b     = dn_zb_b
+      tf_namz%l_sigcrit  = ln_sigcrit
+      tf_namz%d_alpha    = dn_alpha  
+      tf_namz%d_efold    = dn_efold  
+      tf_namz%d_zs       = dn_zs     
+      tf_namz%d_zb_a     = dn_zb_a
+      tf_namz%d_zb_b     = dn_zb_b
 
-!      grid_zgr_nam%i_cla      = in_cla
+!      tf_namz%i_cla      = in_cla
 
-      grid_zgr_nam%d_wdmin1   = dn_wdmin1  
-      grid_zgr_nam%d_wdmin2   = dn_wdmin2  
-      grid_zgr_nam%d_wdld     = dn_wdld  
+      tf_namz%d_wdmin1   = dn_wdmin1  
+      tf_namz%d_wdmin2   = dn_wdmin2  
+      tf_namz%d_wdld     = dn_wdld  
 
-!      grid_zgr_nam%c_cfg      = TRIM(cn_cfg)
-!      grid_zgr_nam%i_cfg      = in_cfg
-!      grid_zgr_nam%i_bench    = in_bench
-!      grid_zgr_nam%l_zoom     = ln_zoom
-      grid_zgr_nam%l_c1d      = ln_c1d
-      grid_zgr_nam%l_e3_dep   = ln_e3_dep
+!      tf_namz%c_cfg      = TRIM(cn_cfg)
+!      tf_namz%i_cfg      = in_cfg
+!      tf_namz%i_bench    = in_bench
+!      tf_namz%l_zoom     = ln_zoom
+      tf_namz%l_c1d      = ln_c1d
+      tf_namz%l_e3_dep   = ln_e3_dep
 
-!      grid_zgr_nam%c_cfz      = cn_cfz   
-!      grid_zgr_nam%i_izoom    = in_izoom 
-!      grid_zgr_nam%i_jzoom    = in_jzoom 
-!      grid_zgr_nam%l_zoom_s   = ln_zoom_s
-!      grid_zgr_nam%l_zoom_e   = ln_zoom_e
-!      grid_zgr_nam%l_zoom_w   = ln_zoom_w
-!      grid_zgr_nam%l_zoom_n   = ln_zoom_n
+!      tf_namz%c_cfz      = cn_cfz   
+!      tf_namz%i_izoom    = in_izoom 
+!      tf_namz%i_jzoom    = in_jzoom 
+!      tf_namz%l_zoom_s   = ln_zoom_s
+!      tf_namz%l_zoom_e   = ln_zoom_e
+!      tf_namz%l_zoom_w   = ln_zoom_w
+!      tf_namz%l_zoom_n   = ln_zoom_n
 
    ELSE
 
@@ -709,6 +719,8 @@ CONTAINS
    ENDIF
 
    END FUNCTION grid_zgr_nam
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_zgr_fill(td_nam, jpi, jpj, jpk, td_bathy, td_risfdep) 
    !-------------------------------------------------------------------
    !> @brief This subroutine fill vertical mesh
    !>
@@ -724,8 +736,9 @@ CONTAINS
    !> @param[in] td_bathy
    !> @param[in] td_risfdep
    !-------------------------------------------------------------------
-   SUBROUTINE grid_zgr_fill( td_nam,jpi,jpj,jpk,td_bathy,td_risfdep ) 
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TNAMZ), INTENT(IN   ) :: td_nam
       INTEGER(i4), INTENT(IN   ) :: jpi
@@ -835,6 +848,8 @@ CONTAINS
          &   ' w '//TRIM(fct_str(MAXVAL( tg_e3w_0%d_value(:,:,:,1) ))) )
 
    END SUBROUTINE grid_zgr_fill
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_zgr__z(td_nam, jpk) 
    !-------------------------------------------------------------------
    !> @brief This subroutine set the depth of model levels and the resulting 
    !>        vertical scale factors.
@@ -864,8 +879,9 @@ CONTAINS
    !> @param[in] td_nam
    !> @param[in] jpk
    !-------------------------------------------------------------------
-   SUBROUTINE grid_zgr__z(td_nam,jpk) 
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TNAMZ), INTENT(IN   ) :: td_nam
       INTEGER(i4), INTENT(IN   ) :: jpk
@@ -1030,6 +1046,8 @@ CONTAINS
       END DO
 
    END SUBROUTINE grid_zgr__z
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_zgr__bat(td_nam, td_bathy, td_risfdep) !jpi,jpj,td_bathy,td_risfdep ) 
    !-------------------------------------------------------------------
    !> @brief This subroutine set bathymetry both in levels and meters
    !>
@@ -1072,8 +1090,9 @@ CONTAINS
    !> @param[in] td_bathy
    !> @param[in] td_risfdep
    !-------------------------------------------------------------------
-   SUBROUTINE grid_zgr__bat( td_nam,td_bathy,td_risfdep ) !jpi,jpj,td_bathy,td_risfdep ) 
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TNAMZ), INTENT(IN   ) :: td_nam
 !      INTEGER(i4), INTENT(IN   ) :: jpi
@@ -1193,6 +1212,8 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE grid_zgr__bat
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_zgr__zco(jpk) 
    !-------------------------------------------------------------------
    !> @brief This subroutine define the z-coordinate system
    !>
@@ -1204,8 +1225,9 @@ CONTAINS
    !>
    !> @param[in] jpk
    !-------------------------------------------------------------------
-   SUBROUTINE grid_zgr__zco(jpk) 
+
       IMPLICIT NONE
+
       ! Argument      
       INTEGER(i4), INTENT(IN   ) :: jpk
 
@@ -1228,6 +1250,8 @@ CONTAINS
       END DO
 
    END SUBROUTINE grid_zgr__zco
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+!   SUBROUTINE grid_zgr__bat_zoom(td_nam,jpi,jpj) 
 !   !-------------------------------------------------------------------
 !   !> @brief This subroutine : 
 !   !> - close zoom domain boundary if necessary
@@ -1240,8 +1264,9 @@ CONTAINS
 !   !> @param[in] jpi
 !   !> @param[in] jpj
 !   !-------------------------------------------------------------------
-!   SUBROUTINE grid_zgr__bat_zoom(td_nam,jpi,jpj) 
+!
 !      IMPLICIT NONE
+!
 !      ! Argument      
 !      TYPE(TNAMZ), INTENT(IN   ) :: td_nam
 !      INTEGER(i4), INTENT(IN   ) :: jpi
@@ -1292,6 +1317,8 @@ CONTAINS
 !      ENDIF
 !
 !   END SUBROUTINE grid_zgr__bat_zoom
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_zgr__bat_ctl(td_nam, jpi, jpj, jpk) 
    !-------------------------------------------------------------------
    !> @brief This subroutine check the bathymetry in levels
    !>
@@ -1322,8 +1349,9 @@ CONTAINS
    !> @param[in] jpj
    !> @param[in] jpk
    !-------------------------------------------------------------------
-   SUBROUTINE grid_zgr__bat_ctl(td_nam,jpi,jpj,jpk) 
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TNAMZ), INTENT(IN   ) :: td_nam
       INTEGER(i4), INTENT(IN   ) :: jpi
@@ -1432,6 +1460,8 @@ CONTAINS
       ENDIF      
 
    END SUBROUTINE grid_zgr__bat_ctl
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_zgr__bot_level()!td_nam,jpi,jpj) 
    !-------------------------------------------------------------------
    !> @brief This subroutine defines the vertical index of ocean bottom (mbk. arrays)
    !>
@@ -1451,8 +1481,9 @@ CONTAINS
    ! @param[in] jpi
    ! @param[in] jpj
    !-------------------------------------------------------------------
-   SUBROUTINE grid_zgr__bot_level( )!td_nam,jpi,jpj) 
+
       IMPLICIT NONE
+
       ! Argument      
 !      TYPE(TNAMZ), INTENT(IN   ) :: td_nam
 !      INTEGER(i4), INTENT(IN   ) :: jpi
@@ -1487,6 +1518,8 @@ CONTAINS
 !      CALL lbc_lnk(tg_mbkv%d_value(:,:,1,1),'U', td_nam%i_perio, 1._dp)
 
    END SUBROUTINE grid_zgr__bot_level
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_zgr__top_level()!td_nam,jpi,jpj) 
    !-------------------------------------------------------------------
    !> @brief This subroutine defines the vertical index of ocean top (mik. arrays)
    !>
@@ -1505,8 +1538,9 @@ CONTAINS
    ! @param[in] jpi
    ! @param[in] jpj
    !-------------------------------------------------------------------
-   SUBROUTINE grid_zgr__top_level( )!td_nam,jpi,jpj) 
+
       IMPLICIT NONE
+
       ! Argument      
 !      TYPE(TNAMZ), INTENT(IN   ) :: td_nam
 !      INTEGER(i4), INTENT(IN   ) :: jpi
@@ -1546,8 +1580,10 @@ CONTAINS
 !      CALL lbc_lnk(tg_mikf%d_value(:,:,1,1),'F',td_nam%i_perio,1._dp)
 
    END SUBROUTINE grid_zgr__top_level
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_zgr_zps_init(jpi, jpj) 
    !-------------------------------------------------------------------
-   !> @brief This function initialise global variable needed to compute vertical
+   !> @brief This subroutine initialise global variable needed to compute vertical
    !>        mesh
    !>
    !> @author J.Paul
@@ -1556,8 +1592,9 @@ CONTAINS
    !> @param[in] jpi
    !> @param[in] jpj
    !-------------------------------------------------------------------
-   SUBROUTINE grid_zgr_zps_init(jpi,jpj) 
+
       IMPLICIT NONE
+
       ! Argument      
       INTEGER(i4), INTENT(IN) :: jpi
       INTEGER(i4), INTENT(IN) :: jpj
@@ -1574,17 +1611,19 @@ CONTAINS
       tg_e3wp    =var_init('e3w_ps   ',dl_tmp(:,:), dd_fill=dp_fill, id_type=NF90_DOUBLE)
 
    END SUBROUTINE grid_zgr_zps_init
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_zgr_zps_clean() 
    !-------------------------------------------------------------------
-   !> @brief This function clean hgr structure
+   !> @brief This subroutine clean hgr structure
    !>
    !> @author J.Paul
    !> @date September, 2015 - Initial version
    !>
    !-------------------------------------------------------------------
-   SUBROUTINE grid_zgr_zps_clean() 
-      IMPLICIT NONE
-      ! Argument      
 
+      IMPLICIT NONE
+
+      ! Argument      
       ! local variable
       ! loop indices
       !----------------------------------------------------------------
@@ -1593,6 +1632,8 @@ CONTAINS
       CALL var_clean(tg_e3wp     )
       
    END SUBROUTINE grid_zgr_zps_clean
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_zgr__zps_fill(td_nam, jpi, jpj, jpk, td_bathy, td_risfdep) 
    !-------------------------------------------------------------------
    !> @brief This subroutine define the depth and vertical scale factor in partial step
    !>      z-coordinate case
@@ -1647,8 +1688,9 @@ CONTAINS
    !> @param[inout] td_bathy
    !> @param[inout] td_risfdep
    !-------------------------------------------------------------------
-   SUBROUTINE grid_zgr__zps_fill( td_nam, jpi,jpj,jpk,td_bathy, td_risfdep ) 
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TNAMZ), INTENT(IN   ) :: td_nam
       INTEGER(i4), INTENT(IN   ) :: jpi
@@ -1896,6 +1938,8 @@ CONTAINS
       !END IF
 
    END SUBROUTINE grid_zgr__zps_fill
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_zgr__isf_fill(td_nam, jpi,jpj,jpk, td_bathy, td_risfdep) 
    !-------------------------------------------------------------------
    !> @brief This subroutine check the bathymetry in levels
    !>
@@ -1920,8 +1964,9 @@ CONTAINS
    !> @param[in] td_bathy
    !> @param[in] td_risfdep
    !-------------------------------------------------------------------
-   SUBROUTINE grid_zgr__isf_fill( td_nam, jpi,jpj,jpk, td_bathy, td_risfdep) 
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TNAMZ), INTENT(IN   ) :: td_nam
       INTEGER(i4), INTENT(IN   ) :: jpi
@@ -1950,7 +1995,6 @@ CONTAINS
       INTEGER(i4) :: jj
       INTEGER(i4) :: jk
       INTEGER(i4) :: jl
-      
       !----------------------------------------------------------------
 
       ! (ISF) compute misfdep
@@ -2778,6 +2822,9 @@ CONTAINS
       END DO
 
    END SUBROUTINE grid_zgr__isf_fill
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+!   SUBROUTINE grid_zgr__isf_fill_e3x( jpi,jpj, &
+!         &                            td_risfdep) 
 !   !-------------------------------------------------------------------
 !   !> @brief This subroutine define e3t, u, v, w for ISF case 
 !   !>
@@ -2790,9 +2837,9 @@ CONTAINS
 !   !> @param[in] jpj
 !   !> @param[in] td_risfdep
 !   !-------------------------------------------------------------------
-!   SUBROUTINE grid_zgr__isf_fill_e3x( jpi,jpj, &
-!         &                            td_risfdep) 
+!
 !      IMPLICIT NONE
+!
 !      ! Argument      
 !      INTEGER(i4), INTENT(IN   ) :: jpi
 !      INTEGER(i4), INTENT(IN   ) :: jpj
@@ -2882,6 +2929,8 @@ CONTAINS
 !      ! END (ISF)
 !
 !   END SUBROUTINE grid_zgr__isf_fill_e3x
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_zgr__isf_fill_e3uw(jpi, jpj) 
    !-------------------------------------------------------------------
    !> @brief This subroutine define e3uw 
    !>    (adapted for 2 cells in the water column) for ISF case 
@@ -2894,8 +2943,9 @@ CONTAINS
    !> @param[in] jpi
    !> @param[in] jpj
    !-------------------------------------------------------------------
-   SUBROUTINE grid_zgr__isf_fill_e3uw(jpi,jpj) 
+
       IMPLICIT NONE
+
       ! Argument      
       INTEGER(i4)   , INTENT(IN   ) :: jpi
       INTEGER(i4)   , INTENT(IN   ) :: jpj
@@ -2928,6 +2978,8 @@ CONTAINS
       END DO
 
    END SUBROUTINE grid_zgr__isf_fill_e3uw
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+!   SUBROUTINE grid_zgr__isf_fill_gdep3w_0( jpi,jpj,jpk,td_risfdep )
 !   !-------------------------------------------------------------------
 !   !> @brief This subroutine compute gdep3w_0 (vertical sum of e3w) 
 !   !>
@@ -2941,8 +2993,9 @@ CONTAINS
 !   !> @param[in] jpk
 !   !> @param[in] td_risfdep
 !   !-------------------------------------------------------------------
-!   SUBROUTINE grid_zgr__isf_fill_gdep3w_0( jpi,jpj,jpk,td_risfdep )
+!
 !      IMPLICIT NONE
+!
 !      ! Argument      
 !      INTEGER(i4), INTENT(IN   ) :: jpi
 !      INTEGER(i4), INTENT(IN   ) :: jpj
@@ -2984,8 +3037,10 @@ CONTAINS
 !      END DO
 !
 !   END SUBROUTINE grid_zgr__isf_fill_gdep3w_0
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_zgr_sco_init(jpi, jpj) 
    !-------------------------------------------------------------------
-   !> @brief This function initialise global variable needed to compute vertical
+   !> @brief This subroutine initialise global variable needed to compute vertical
    !>        mesh
    !>
    !> @author J.Paul
@@ -2994,8 +3049,9 @@ CONTAINS
    !> @param[in] jpi
    !> @param[in] jpj
    !-------------------------------------------------------------------
-   SUBROUTINE grid_zgr_sco_init(jpi,jpj) 
+
       IMPLICIT NONE
+
       ! Argument      
       INTEGER(i4), INTENT(IN) :: jpi
       INTEGER(i4), INTENT(IN) :: jpj
@@ -3011,17 +3067,19 @@ CONTAINS
       tg_rx1     =var_init('rx1      ',dl_tmp(:,:), dd_fill=dp_fill, id_type=NF90_DOUBLE)
 
    END SUBROUTINE grid_zgr_sco_init
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_zgr_sco_clean() 
    !-------------------------------------------------------------------
-   !> @brief This function clean structure
+   !> @brief This subroutine clean structure
    !>
    !> @author J.Paul
    !> @date September, 2015 - Initial version
    !>
    !-------------------------------------------------------------------
-   SUBROUTINE grid_zgr_sco_clean() 
-      IMPLICIT NONE
-      ! Argument      
 
+      IMPLICIT NONE
+
+      ! Argument      
       ! local variable
       ! loop indices
       !----------------------------------------------------------------
@@ -3029,6 +3087,8 @@ CONTAINS
       CALL var_clean(tg_rx1      )
       
    END SUBROUTINE grid_zgr_sco_clean
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_zgr__sco_fill(td_nam, jpi, jpj, jpk, td_bathy) 
    !-------------------------------------------------------------------
    !> @brief This subroutine define the s-coordinate system
    !>
@@ -3077,8 +3137,9 @@ CONTAINS
    !> - add wetting and drying boolean
    !>
    !-------------------------------------------------------------------
-   SUBROUTINE grid_zgr__sco_fill( td_nam,jpi,jpj,jpk,td_bathy ) 
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TNAMZ), INTENT(IN   ) :: td_nam
       INTEGER(i4), INTENT(IN   ) :: jpi
@@ -3590,6 +3651,8 @@ CONTAINS
       ENDDO
 
    END SUBROUTINE grid_zgr__sco_fill
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_zgr__sco_s_sh94(td_nam, jpi, jpj, jpk, dd_scosrf) 
    !-------------------------------------------------------------------
    !> @brief This subroutine stretch the s-coordinate system
    !>
@@ -3610,9 +3673,9 @@ CONTAINS
    !> @param[in] jpk
    !> @param[in] dd_scosrf
    !-------------------------------------------------------------------
-   SUBROUTINE grid_zgr__sco_s_sh94( td_nam,jpi,jpj,jpk, &
-         &                          dd_scosrf ) 
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TNAMZ),                 INTENT(IN   ) :: td_nam
       INTEGER(i4),                 INTENT(IN   ) :: jpi
@@ -3799,6 +3862,8 @@ CONTAINS
       DEALLOCATE( z_esigwv3 )
 
    END SUBROUTINE grid_zgr__sco_s_sh94
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_zgr__sco_s_sf12(td_nam, jpi, jpj, jpk, dd_scosrf) 
    !-------------------------------------------------------------------
    !> @brief This subroutine stretch the s-coordinate system
    !>
@@ -3823,9 +3888,9 @@ CONTAINS
    !> @param[in] jpk
    !> @param[in] dd_scosrf
    !-------------------------------------------------------------------
-   SUBROUTINE grid_zgr__sco_s_sf12( td_nam,jpi,jpj,jpk, &
-         &                          dd_scosrf ) 
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TNAMZ),                 INTENT(IN   ) :: td_nam
       INTEGER(i4),                 INTENT(IN   ) :: jpi
@@ -4032,6 +4097,10 @@ CONTAINS
       DEALLOCATE( z_esigwv3 )
 
    END SUBROUTINE grid_zgr__sco_s_sf12
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_zgr__sco_s_tanh(td_nam, jpi, jpj, jpk, &
+         &                         dd_scosrf,             &
+         &                         dd_hift, dd_hifu, dd_hifv, dd_hiff) 
    !-------------------------------------------------------------------
    !> @brief This subroutine stretch the s-coordinate system
    !>
@@ -4053,10 +4122,9 @@ CONTAINS
    !> @param[in] dd_hifv 
    ! @param[in] dd_hiff 
    !-------------------------------------------------------------------
-   SUBROUTINE grid_zgr__sco_s_tanh( td_nam,jpi,jpj,jpk, &
-         &                          dd_scosrf, &
-         &                          dd_hift, dd_hifu, dd_hifv, dd_hiff ) 
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TNAMZ),                 INTENT(IN   ) :: td_nam
       INTEGER(i4),                 INTENT(IN   ) :: jpi
@@ -4141,6 +4209,9 @@ CONTAINS
       END DO
 
    END SUBROUTINE grid_zgr__sco_s_tanh
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION grid_zgr__sco_fssig(td_nam, jpk, pk) &
+         &  RESULT( pf )
    !!----------------------------------------------------------------------
    !> @brief This function provide the analytical function in s-coordinate
    !>        
@@ -4157,8 +4228,9 @@ CONTAINS
    !> @param[in] jpk
    !> @param[in] pk
    !!----------------------------------------------------------------------
-   FUNCTION grid_zgr__sco_fssig( td_nam, jpk, pk ) RESULT( pf )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TNAMZ), INTENT(IN   ) :: td_nam
       INTEGER(i4), INTENT(IN   ) :: jpk
@@ -4173,6 +4245,9 @@ CONTAINS
          & / ( 2._dp * SINH( td_nam%d_theta ) )
       !
    END FUNCTION grid_zgr__sco_fssig
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION grid_zgr__sco_fssig1(td_nam, jpk, pk1, pbb) &
+         & RESULT( pf1 )
    !!----------------------------------------------------------------------
    !> @brief This function provide the Song and Haidvogel version of the analytical function in s-coordinate
    !>
@@ -4191,8 +4266,9 @@ CONTAINS
    !> @param[in] pk1 
    !> @param[in] pbb
    !!----------------------------------------------------------------------
-   FUNCTION grid_zgr__sco_fssig1( td_nam, jpk, pk1, pbb ) RESULT( pf1 )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TNAMZ), INTENT(IN   ) :: td_nam
       INTEGER(i4), INTENT(IN   ) :: jpk
@@ -4210,6 +4286,9 @@ CONTAINS
       ENDIF
       !
    END FUNCTION grid_zgr__sco_fssig1
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION grid_zgr__sco_fgamma(td_nam, jpk, pk1, pzb, pzs, psmth) &
+         & RESULT( p_gamma )
    !!----------------------------------------------------------------------
    !> @brief This function provide analytical function for the s-coordinate
    !>
@@ -4235,14 +4314,17 @@ CONTAINS
    !> @param[in] pzs
    !> @param[in] pzsmth
    !!----------------------------------------------------------------------
-   FUNCTION grid_zgr__sco_fgamma( td_nam, jpk, pk1, pzb, pzs, psmth) RESULT( p_gamma )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TNAMZ), INTENT(IN   ) :: td_nam
       INTEGER(i4), INTENT(IN   ) :: jpk
       REAL(dp)   , DIMENSION(:) , INTENT(IN   ) :: pk1       ! continuous "k" coordinate
+
       ! function
       REAL(dp)   , DIMENSION(jpk) :: p_gamma   ! stretched coordinate
+
       ! local variable
       REAL(dp)   , INTENT(IN   ) :: pzb           ! Bottom box depth
       REAL(dp)   , INTENT(IN   ) :: pzs           ! surface box depth
@@ -4276,6 +4358,8 @@ CONTAINS
 
       !
    END FUNCTION grid_zgr__sco_fgamma
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_zgr_sco_stiff(td_nam, jpi, jpj, jpk)
    !-------------------------------------------------------------------
    !> @brief This subroutine stretch the s-coordinate system
    !>
@@ -4292,8 +4376,9 @@ CONTAINS
    !> @param[in] jpj
    !> @param[in] jpk
    !-------------------------------------------------------------------
-   SUBROUTINE grid_zgr_sco_stiff(td_nam, jpi,jpj,jpk)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TNAMZ), INTENT(IN   ) :: td_nam
       INTEGER(i4), INTENT(IN   ) :: jpi
@@ -4370,4 +4455,5 @@ CONTAINS
          &  TRIM(fct_str(zrxmax)) )
 
    END SUBROUTINE grid_zgr_sco_stiff
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 END MODULE grid_zgr

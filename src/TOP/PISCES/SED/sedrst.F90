@@ -9,7 +9,7 @@ MODULE sedrst
    !! ==============
    USE sed
    USE sedarr
-   USE trc_oce, ONLY : l_offline, nn_dttrc
+   USE trc_oce, ONLY : l_offline
    USE phycst , ONLY : rday
    USE iom
    USE daymod
@@ -26,7 +26,7 @@ MODULE sedrst
    PUBLIC sed_rst_wri
    PUBLIC sed_rst_cal
 
-   !! $Id: sedrst.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: sedrst.F90 12649 2020-04-03 07:11:57Z smasson $
 CONTAINS
 
 
@@ -48,24 +48,26 @@ CONTAINS
             lrst_sed = .FALSE.
             IF( ln_rst_list ) THEN
                nrst_lst = 1
-               nitrst = nstocklist( nrst_lst )
+               nitrst = nn_stocklist( nrst_lst )
             ELSE
                nitrst = nitend
             ENDIF
          ENDIF
-         IF( .NOT. ln_rst_list .AND. MOD( kt - 1, nstock ) == 0 ) THEN
+         IF( .NOT. ln_rst_list .AND. MOD( kt - 1, nn_stock ) == 0 ) THEN
             ! we use kt - 1 and not kt - nittrc000 to keep the same periodicity from the beginning of the experiment
-            nitrst = kt + nstock - 1                  ! define the next value of nitrst for restart writing
+            nitrst = kt + nn_stock - 1                  ! define the next value of nitrst for restart writing
             IF( nitrst > nitend )   nitrst = nitend   ! make sure we write a restart at the end of the run
          ENDIF
       ELSE
          IF( kt == nittrc000 ) lrst_sed = .FALSE.
       ENDIF
 
+      IF( .NOT. ln_rst_list .AND. nn_stock == -1 )   RETURN   ! we will never do any restart
+
       ! to get better performances with NetCDF format:
-      ! we open and define the tracer restart file one tracer time step before writing the data (-> at nitrst - 2*nn_dttrc + 1)
-      ! except if we write tracer restart files every tracer time step or if a tracer restart file was writen at nitend - 2*nn_dttrc + 1
-      IF( kt == nitrst - 2*nn_dtsed .OR. nstock == nn_dtsed .OR. ( kt == nitend - nn_dtsed .AND. .NOT. lrst_sed ) ) THEN
+      ! we open and define the tracer restart file one tracer time step before writing the data (-> at nitrst - 1)
+      ! except if we write tracer restart files every tracer time step or if a tracer restart file was writen at nitend - 1
+      IF( kt == nitrst - 2*nn_dtsed .OR. nn_stock == nn_dtsed .OR. ( kt == nitend - nn_dtsed .AND. .NOT. lrst_sed ) ) THEN
          ! beware of the format used to write kt (default is i8.8, that should be large enough)
          IF( nitrst > 1.0e9 ) THEN   ;   WRITE(clkt,*       ) nitrst
          ELSE                        ;   WRITE(clkt,'(i8.8)') nitrst
@@ -77,7 +79,7 @@ CONTAINS
          IF( clpath(LEN_TRIM(clpath):) /= '/' ) clpath = TRIM(clpath) // '/'
          IF(lwp) WRITE(numsed,*) &
              '             open sed restart.output NetCDF file: ',TRIM(clpath)//clname
-         CALL iom_open( TRIM(clpath)//TRIM(clname), numrsw, ldwrt = .TRUE., kdlev = jpksed )
+         CALL iom_open( TRIM(clpath)//TRIM(clname), numrsw, ldwrt = .TRUE., kdlev = jpksed, cdcomp = 'SED' )
          lrst_sed = .TRUE.
       ENDIF
       !
@@ -299,7 +301,7 @@ CONTAINS
           CALL iom_close( numrsw )     ! close the restart file (only at last time step)
           IF( l_offline .AND. ln_rst_list ) THEN
              nrst_lst = nrst_lst + 1
-             nitrst = nstocklist( nrst_lst )
+             nitrst = nn_stocklist( nrst_lst )
           ENDIF
       ENDIF
 
@@ -327,7 +329,7 @@ CONTAINS
       !!                   time step of previous run + 1.
       !!       In both those options, the  exact duration of the experiment
       !!       since the beginning (cumulated duration of all previous restart runs)
-      !!       is not stored in the restart and is assumed to be (nittrc000-1)*rdt.
+      !!       is not stored in the restart and is assumed to be (nittrc000-1)*rn_Dt.
       !!       This is valid is the time step has remained constant.
       !!
       !!       nn_rsttr = 2  the duration of the experiment in days (adatrj)
@@ -378,7 +380,7 @@ CONTAINS
                CALL iom_get( numrsr, 'adatrj', adatrj  )
              ELSE
                ndastp = ndate0 - 1     ! ndate0 read in the namelist in dom_nam
-               adatrj = ( REAL( nittrc000-1, wp ) * rdt ) / rday
+               adatrj = ( REAL( nittrc000-1, wp ) * rn_Dt ) / rday
                ! note this is wrong if time step has changed during run
             ENDIF
             !

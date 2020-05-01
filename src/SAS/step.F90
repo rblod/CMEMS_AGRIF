@@ -48,8 +48,12 @@ MODULE step
    PUBLIC   stp   ! called by nemogcm.F90
 
    !!----------------------------------------------------------------------
+   !! time level indices
+   !!----------------------------------------------------------------------
+   INTEGER, PUBLIC :: Nbb, Nnn, Naa, Nrhs          !! used by nemo_init
+   !!----------------------------------------------------------------------
    !! NEMO/SAS 4.0 , NEMO Consortium (2018)
-   !! $Id: step.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: step.F90 12650 2020-04-03 07:27:30Z smasson $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -73,7 +77,9 @@ CONTAINS
       !! ---------------------------------------------------------------------
 
 #if defined key_agrif
+      IF( nstop > 0 ) return   ! avoid to go further if an error was detected during previous time step 
       kstp = nit000 + Agrif_Nb_Step()
+      Kbb_a = Nbb; Kmm_a = Nnn; Krhs_a = Nrhs   ! agrif_oce module copies of time level indices
       IF ( lk_agrif_debug ) THEN
          IF ( Agrif_Root() .and. lwp) Write(*,*) '---'
          IF (lwp) Write(*,*) 'Grid Number',Agrif_Fixed(),' time step ',kstp, 'int tstep',Agrif_NbStepint()
@@ -95,23 +101,17 @@ CONTAINS
       !           the environment of ocean BDY. Therefore bdy is called in both OPA and SAS modules.
       !           From SAS: ocean bdy data are wrong  (but we do not care) and ice bdy data are OK.  
       !           This is not clean and should be changed in the future. 
-      IF( ln_bdy     )       CALL bdy_dta ( kstp, time_offset=+1 )   ! update dynamic & tracer data at open boundaries
       ! ==>
-                             CALL sbc    ( kstp )         ! Sea Boundary Condition (including sea-ice)
+      IF( ln_bdy     )       CALL bdy_dta( kstp,      Nnn )                   ! update dynamic & tracer data at open boundaries
+                             CALL sbc    ( kstp, Nbb, Nnn )                   ! Sea Boundary Condition (including sea-ice)
 
-                             CALL dia_wri( kstp )         ! ocean model: outputs
+                             CALL dia_wri( kstp,      Nnn )                   ! ocean model: outputs
 
 #if defined key_agrif
       !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-      ! AGRIF
+      ! AGRIF recursive integration
       !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<      
                              CALL Agrif_Integrate_ChildGrids( stp )  
-
-      IF( Agrif_NbStepint() == 0 ) THEN               ! AGRIF Update from zoom N to zoom 1 then to Parent 
-#if defined key_si3
-                             CALL Agrif_Update_ice( )   ! update sea-ice
-#endif
-      ENDIF
 #endif
                              
       !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -120,14 +120,27 @@ CONTAINS
                              CALL stp_ctl( kstp, indic )
       IF( indic < 0  )  THEN
                              CALL ctl_stop( 'step: indic < 0' )
-                             CALL dia_wri_state( 'output.abort' )
+                             CALL dia_wri_state( Nnn, 'output.abort' )
       ENDIF
-      IF( kstp == nit000   ) CALL iom_close( numror )     ! close input  ocean restart file
+#if defined key_agrif
+      !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+      ! AGRIF update
+      !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<      
+      IF( Agrif_NbStepint() == 0 .AND. nstop == 0 ) THEN                       ! AGRIF Update from zoom N to zoom 1 then to Parent 
+#if defined key_si3
+                             CALL Agrif_Update_ice( )   ! update sea-ice
+#endif
+      ENDIF
+#endif
+      !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+      ! File manipulation at the end of the first time step
+      !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<                         
+      IF( kstp == nit000   ) CALL iom_close( numror )                          ! close input  ocean restart file
       
       !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
       ! Coupled mode
       !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-      IF( lk_oasis    )  CALL sbc_cpl_snd( kstp )     ! coupled mode : field exchanges if OASIS-coupled ice
+      IF( lk_oasis    )  CALL sbc_cpl_snd( kstp, Nbb, Nnn )     ! coupled mode : field exchanges if OASIS-coupled ice
 
 #if defined key_iomput
       IF( kstp == nitrst ) THEN

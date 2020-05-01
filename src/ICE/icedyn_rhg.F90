@@ -37,16 +37,14 @@ MODULE icedyn_rhg
    ! ** namelist (namrhg) **
    LOGICAL ::   ln_rhg_EVP       ! EVP rheology
    !
-   !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/ICE 4.0 , NEMO Consortium (2018)
-   !! $Id: icedyn_rhg.F90 10413 2018-12-18 17:59:59Z clem $
+   !! $Id: icedyn_rhg.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL licence     (./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE ice_dyn_rhg( kt )
+   SUBROUTINE ice_dyn_rhg( kt, Kmm )
       !!-------------------------------------------------------------------
       !!               ***  ROUTINE ice_dyn_rhg  ***
       !!               
@@ -57,25 +55,27 @@ CONTAINS
       !!                      - shear, divergence and delta (shear_i, divu_i, delta_i)
       !!--------------------------------------------------------------------
       INTEGER, INTENT(in) ::   kt     ! ice time step
+      INTEGER, INTENT(in) ::   Kmm    ! ocean time level index
       !!--------------------------------------------------------------------
       ! controls
       IF( ln_timing    )   CALL timing_start('icedyn_rhg')                                                             ! timing
       IF( ln_icediachk )   CALL ice_cons_hsm(0, 'icedyn_rhg', rdiag_v, rdiag_s, rdiag_t, rdiag_fv, rdiag_fs, rdiag_ft) ! conservation
+      IF( ln_icediachk )   CALL ice_cons2D  (0, 'icedyn_rhg',  diag_v,  diag_s,  diag_t,  diag_fv,  diag_fs,  diag_ft) ! conservation
       !
       IF( kt == nit000 .AND. lwp ) THEN
          WRITE(numout,*)
          WRITE(numout,*)'ice_dyn_rhg: sea-ice rheology'
          WRITE(numout,*)'~~~~~~~~~~~'
       ENDIF
-
-      ! --------
-      ! Rheology
-      ! --------   
+      !
+      !--------------!
+      !== Rheology ==!
+      !--------------!   
       SELECT CASE( nice_rhg )
       !                                !------------------------!
       CASE( np_rhgEVP )                ! Elasto-Viscous-Plastic !
          !                             !------------------------!
-         CALL ice_dyn_rhg_evp( kt, stress1_i, stress2_i, stress12_i, shear_i, divu_i, delta_i )
+         CALL ice_dyn_rhg_evp( kt, Kmm, stress1_i, stress2_i, stress12_i, shear_i, divu_i, delta_i )
          !         
       END SELECT
       !
@@ -84,8 +84,10 @@ CONTAINS
       ENDIF
       !
       ! controls
+      IF( sn_cfctl%l_prtctl ) &
+         &                 CALL ice_prt3D   ('icedyn_rhg')                                                             ! prints
       IF( ln_icediachk )   CALL ice_cons_hsm(1, 'icedyn_rhg', rdiag_v, rdiag_s, rdiag_t, rdiag_fv, rdiag_fs, rdiag_ft) ! conservation
-      IF( ln_ctl       )   CALL ice_prt3D   ('icedyn_rhg')                                                             ! prints
+      IF( ln_icediachk )   CALL ice_cons2D  (1, 'icedyn_rhg',  diag_v,  diag_s,  diag_t,  diag_fv,  diag_fs,  diag_ft) ! conservation
       IF( ln_timing    )   CALL timing_stop ('icedyn_rhg')                                                             ! timing
       !
    END SUBROUTINE ice_dyn_rhg
@@ -108,12 +110,10 @@ CONTAINS
       NAMELIST/namdyn_rhg/  ln_rhg_EVP, ln_aEVP, rn_creepl, rn_ecc , nn_nevp, rn_relast
       !!-------------------------------------------------------------------
       !
-      REWIND( numnam_ice_ref )         ! Namelist namdyn_rhg in reference namelist : Ice dynamics
       READ  ( numnam_ice_ref, namdyn_rhg, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 ) CALL ctl_nam ( ios , 'namdyn_rhg in reference namelist', lwp )
-      REWIND( numnam_ice_cfg )         ! Namelist namdyn_rhg in configuration namelist : Ice dynamics
+901   IF( ios /= 0 ) CALL ctl_nam ( ios , 'namdyn_rhg in reference namelist' )
       READ  ( numnam_ice_cfg, namdyn_rhg, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 ) CALL ctl_nam ( ios , 'namdyn_rhg in configuration namelist', lwp )
+902   IF( ios >  0 ) CALL ctl_nam ( ios , 'namdyn_rhg in configuration namelist' )
       IF(lwm) WRITE ( numoni, namdyn_rhg )
       !
       IF(lwp) THEN                     ! control print

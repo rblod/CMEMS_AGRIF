@@ -7,10 +7,6 @@ MODULE trcbc
    !!            3.6 !  2015 (T . Lovato) Revision and BDY support
    !!            4.0 !  2016 (T . Lovato) Include application of sbc and cbc
    !!----------------------------------------------------------------------
-#if defined key_top
-   !!----------------------------------------------------------------------
-   !!   'key_top'                                                TOP model 
-   !!----------------------------------------------------------------------
    !!   trc_bc       :  Apply tracer Boundary Conditions
    !!----------------------------------------------------------------------
    USE par_trc       !  passive tracers parameters
@@ -43,18 +39,22 @@ MODULE trcbc
 #else
    TYPE(FLD), SAVE, PUBLIC, ALLOCATABLE, DIMENSION(:), TARGET  :: sf_trcobc
 #endif
-   TYPE(MAP_POINTER), ALLOCATABLE, DIMENSION(:) :: nbmap_ptr   ! array of pointers to nbmap
+
+#if defined key_top
+   !!----------------------------------------------------------------------
+   !!   'key_top'                                                TOP model 
+   !!----------------------------------------------------------------------
 
    !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/TOP 4.0 , NEMO Consortium (2018)
-   !! $Id: trcbc.F90 10068 2018-08-28 14:09:04Z nicolasmartin $
+   !! $Id: trcbc.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE trc_bc_ini( ntrc )
+   SUBROUTINE trc_bc_ini( ntrc, Kmm )
       !!----------------------------------------------------------------------
       !!                   ***  ROUTINE trc_bc_ini  ***
       !!                    
@@ -63,7 +63,8 @@ CONTAINS
       !! ** Method  : - Read namtsd namelist
       !!              - allocates passive tracer BC data structure 
       !!----------------------------------------------------------------------
-      INTEGER,INTENT(in) :: ntrc                           ! number of tracers
+      INTEGER, INTENT(in) :: ntrc                          ! number of tracers
+      INTEGER, INTENT(in) ::   Kmm                         ! time level index
       !
       INTEGER            :: jl, jn , ib, ibd, ii, ij, ik   ! dummy loop indices
       INTEGER            :: ierr0, ierr1, ierr2, ierr3     ! temporary integers
@@ -81,7 +82,7 @@ CONTAINS
       REAL(wp)   , DIMENSION(jpmaxtrc) :: rn_trcfac    ! multiplicative factor for tracer values
       !!
       NAMELIST/namtrc_bc/ cn_dir_obc, sn_trcobc, rn_trofac, cn_dir_sbc, sn_trcsbc, rn_trsfac, & 
-                        & cn_dir_cbc, sn_trccbc, rn_trcfac, ln_rnf_ctl, rn_bc_time
+                        & cn_dir_cbc, sn_trccbc, rn_trcfac, ln_rnf_ctl, rn_sbc_time, rn_cbc_time
       NAMELIST/namtrc_bdy/ cn_trc_dflt, cn_trc, nn_trcdmp_bdy
       !!----------------------------------------------------------------------
       !
@@ -120,22 +121,20 @@ CONTAINS
       n_trc_indcbc(:) = 0
       !
       ! Read Boundary Conditions Namelists
-      REWIND( numnat_ref )              ! Namelist namtrc_bc in reference namelist : Passive tracer data structure
       READ  ( numnat_ref, namtrc_bc, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namtrc_bc in reference namelist', lwp )
-      REWIND( numnat_cfg )              ! Namelist namtrc_bc in configuration namelist : Passive tracer data structure
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namtrc_bc in reference namelist' )
       READ  ( numnat_cfg, namtrc_bc, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namtrc_bc in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namtrc_bc in configuration namelist' )
       IF(lwm) WRITE ( numont, namtrc_bc )
 
       IF ( ln_bdy ) THEN
-         REWIND( numnat_ref )              ! Namelist namtrc_bdy in reference namelist : Passive tracer data structure
          READ  ( numnat_ref, namtrc_bdy, IOSTAT = ios, ERR = 903)
-903      IF( ios /= 0 )   CALL ctl_nam ( ios , 'namtrc_bdy in reference namelist', lwp )
-
-         REWIND( numnat_cfg )              ! Namelist namtrc_bdy in configuration namelist : Passive tracer data structure
+903      IF( ios /= 0 )   CALL ctl_nam ( ios , 'namtrc_bdy in reference namelist' )
+         ! make sur that all elements of the namelist variables have a default definition from namelist_ref
+         cn_trc     (2:jp_bdy) = cn_trc     (1)
+         cn_trc_dflt(2:jp_bdy) = cn_trc_dflt(1)
          READ  ( numnat_cfg, namtrc_bdy, IOSTAT = ios, ERR = 904 )
-904      IF( ios >  0 )   CALL ctl_nam ( ios , 'namtrc_bdy in configuration namelist', lwp )
+904      IF( ios >  0 )   CALL ctl_nam ( ios , 'namtrc_bdy in configuration namelist' )
          IF(lwm) WRITE ( numont, namtrc_bdy )
       
          ! setup up preliminary informations for BDY structure
@@ -233,7 +232,7 @@ CONTAINS
       !
       ! OPEN Lateral boundary conditions
       IF( ln_bdy .AND. nb_trcobc > 0 ) THEN 
-         ALLOCATE ( sf_trcobc(nb_trcobc), rf_trofac(nb_trcobc), nbmap_ptr(nb_trcobc), STAT=ierr1 )
+         ALLOCATE ( sf_trcobc(nb_trcobc), rf_trofac(nb_trcobc), STAT=ierr1 )
          IF( ierr1 > 0 ) THEN
             CALL ctl_stop( 'trc_bc_ini: unable to allocate sf_trcobc structure' )   ;   RETURN
          ENDIF
@@ -256,17 +255,13 @@ CONTAINS
                   ENDIF
                   trcdta_bdy(jn,ib)%trc => sf_trcobc(jl)%fnow(:,1,:)
                   trcdta_bdy(jn,ib)%rn_fac = rf_trofac(jl)
-                  ! create OBC mapping array
-                  nbmap_ptr(jl)%ptr => idx_bdy(ib)%nbmap(:,igrd)
-                  nbmap_ptr(jl)%ll_unstruc = ln_coords_file(igrd)
-                  !
                ELSE                          !* Initialise obc arrays from initial conditions *!
                   ALLOCATE ( trcdta_bdy(jn,ib)%trc(nblen,jpk) )
                   DO ibd = 1, nblen
                      DO ik = 1, jpkm1
                         ii = idx_bdy(ib)%nbi(ibd,igrd)
                         ij = idx_bdy(ib)%nbj(ibd,igrd)
-                        trcdta_bdy(jn,ib)%trc(ibd,ik) = trn(ii,ij,ik,jn) * tmask(ii,ij,ik)
+                        trcdta_bdy(jn,ib)%trc(ibd,ik) = tr(ii,ij,ik,jn,Kmm) * tmask(ii,ij,ik)
                      END DO
                   END DO
                   trcdta_bdy(jn,ib)%rn_fac = 1._wp
@@ -275,6 +270,15 @@ CONTAINS
          END DO
          !
          CALL fld_fill( sf_trcobc, slf_i, cn_dir_obc, 'trc_bc_ini', 'Passive tracer OBC data', 'namtrc_bc' )
+         DO jn = 1, ntrc   ! define imap pointer, must be done after the call to fld_fill
+            DO ib = 1, nb_bdy
+               IF( ln_trc_obc(jn) ) THEN     !* Initialise from external data *!
+                  jl = n_trc_indobc(jn)
+                  sf_trcobc(jl)%imap => idx_bdy(ib)%nbmap(1:idx_bdy(ib)%nblen(igrd),igrd)
+               ENDIF
+            END DO
+         END DO
+         !
       ENDIF
 
       ! SURFACE Boundary conditions
@@ -332,7 +336,7 @@ CONTAINS
    END SUBROUTINE trc_bc_ini
 
 
-   SUBROUTINE trc_bc(kt, jit)
+   SUBROUTINE trc_bc(kt, Kmm, ptr, Krhs, jit)
       !!----------------------------------------------------------------------
       !!                   ***  ROUTINE trc_bc  ***
       !!
@@ -343,8 +347,10 @@ CONTAINS
       !!----------------------------------------------------------------------
       USE fldread
       !!      
-      INTEGER, INTENT(in)           ::   kt    ! ocean time-step index
-      INTEGER, INTENT(in), OPTIONAL ::   jit   ! subcycle time-step index (for timesplitting option)
+      INTEGER                                   , INTENT(in)           ::   kt        ! ocean time-step index
+      INTEGER                                   , INTENT(in)           ::   Kmm, Krhs ! time level indices
+      INTEGER                                   , INTENT(in), OPTIONAL ::   jit       ! subcycle time-step index (for timesplitting option)
+      REAL(wp), DIMENSION(jpi,jpj,jpk,jptra,jpt), INTENT(inout) :: ptr            ! passive tracers and RHS of tracer equation
       !!
       INTEGER  :: ji, jj, jk, jn, jl             ! Loop index
       REAL(wp) :: zfact, zrnf
@@ -361,10 +367,10 @@ CONTAINS
       ! 1. Update Boundary conditions data
       IF( PRESENT(jit) ) THEN 
          !
-         ! OPEN boundary conditions (use time_offset=+1 as they are applied at the end of the step)
+         ! BDY: use pt_offset=0.5 as applied at the end of the step and fldread is referenced at the middle of the step
          IF( nb_trcobc > 0 ) THEN
            if (lwp) write(numout,'(a,i5,a,i10)') '   reading OBC data for ', nb_trcobc ,' variable(s) at step ', kt
-           CALL fld_read( kt=kt, kn_fsbc=1, sd=sf_trcobc, map=nbmap_ptr, kit=jit, kt_offset=+1)
+           CALL fld_read( kt=kt, kn_fsbc=1, sd=sf_trcobc, kit=jit, pt_offset = 0.5_wp )
          ENDIF
          !
          ! SURFACE boundary conditions
@@ -381,10 +387,10 @@ CONTAINS
          !
       ELSE
          !
-         ! OPEN boundary conditions (use time_offset=+1 as they are applied at the end of the step)
+         ! BDY: use pt_offset=0.5 as applied at the end of the step and fldread is referenced at the middle of the step
          IF( nb_trcobc > 0 ) THEN
            if (lwp) write(numout,'(a,i5,a,i10)') '   reading OBC data for ', nb_trcobc ,' variable(s) at step ', kt
-           CALL fld_read( kt=kt, kn_fsbc=1, sd=sf_trcobc, map=nbmap_ptr, kt_offset=+1)
+           CALL fld_read( kt=kt, kn_fsbc=1, sd=sf_trcobc, pt_offset = 0.5_wp )
          ENDIF
          !
          ! SURFACE boundary conditions
@@ -407,14 +413,12 @@ CONTAINS
          !
          ! Remove river dilution for tracers with absent river load
          IF( ln_rnf_ctl .AND. .NOT.ln_trc_cbc(jn) ) THEN
-            DO jj = 2, jpj
-               DO ji = fs_2, fs_jpim1
-                  DO jk = 1, nk_rnf(ji,jj)
-                     zrnf = (rnf(ji,jj) + rnf_b(ji,jj)) * 0.5_wp * r1_rau0 / h_rnf(ji,jj)
-                     tra(ji,jj,jk,jn) = tra(ji,jj,jk,jn)  + (trn(ji,jj,jk,jn) * zrnf)
-                  END DO
+            DO_2D_01_00
+               DO jk = 1, nk_rnf(ji,jj)
+                  zrnf = (rnf(ji,jj) + rnf_b(ji,jj)) * 0.5_wp * r1_rho0 / h_rnf(ji,jj)
+                  ptr(ji,jj,jk,jn,Krhs) = ptr(ji,jj,jk,jn,Krhs)  + (ptr(ji,jj,jk,jn,Kmm) * zrnf)
                END DO
-            END DO
+            END_2D
          ENDIF
          !
          ! OPEN boundary conditions: trcbdy is called in trcnxt !
@@ -422,25 +426,23 @@ CONTAINS
          ! SURFACE boundary conditions
          IF( ln_trc_sbc(jn) ) THEN
             jl = n_trc_indsbc(jn)
-            DO jj = 2, jpj
-               DO ji = fs_2, fs_jpim1   ! vector opt.
-                  zfact = 1. / ( e3t_n(ji,jj,1) * rn_bc_time )
-                  tra(ji,jj,1,jn) = tra(ji,jj,1,jn) + rf_trsfac(jl) * sf_trcsbc(jl)%fnow(ji,jj,1) * zfact
-               END DO
-            END DO
+            sf_trcsbc(jl)%fnow(:,:,1) = MAX( rtrn, sf_trcsbc(jl)%fnow(:,:,1) ) ! avoid nedgative value due to interpolation
+            DO_2D_01_00
+               zfact = 1. / ( e3t(ji,jj,1,Kmm) * rn_sbc_time )
+               ptr(ji,jj,1,jn,Krhs) = ptr(ji,jj,1,jn,Krhs) + rf_trsfac(jl) * sf_trcsbc(jl)%fnow(ji,jj,1) * zfact
+            END_2D
          ENDIF
          !
          ! COASTAL boundary conditions
-         IF( ln_rnf .AND. ln_trc_cbc(jn) ) THEN
+         IF( ( ln_rnf .OR. l_offline ) .AND. ln_trc_cbc(jn) ) THEN
+            IF( l_offline )   rn_rfact = 1._wp
             jl = n_trc_indcbc(jn)
-            DO jj = 2, jpj
-               DO ji = fs_2, fs_jpim1   ! vector opt.
-                  DO jk = 1, nk_rnf(ji,jj)
-                     zfact = rn_rfact / ( e1e2t(ji,jj) * h_rnf(ji,jj) * rn_bc_time ) 
-                     tra(ji,jj,jk,jn) = tra(ji,jj,jk,jn) + rf_trcfac(jl) * sf_trccbc(jl)%fnow(ji,jj,1) * zfact
-                  END DO
+            DO_2D_01_00
+               DO jk = 1, nk_rnf(ji,jj)
+                  zfact = rn_rfact / ( e1e2t(ji,jj) * h_rnf(ji,jj) * rn_cbc_time ) * tmask(ji,jj,1)
+                  ptr(ji,jj,jk,jn,Krhs) = ptr(ji,jj,jk,jn,Krhs) + rf_trcfac(jl) * sf_trccbc(jl)%fnow(ji,jj,1) * zfact
                END DO
-            END DO
+            END_2D
          ENDIF
          !                                                       ! ===========
       END DO                                                     ! tracer loop
@@ -454,12 +456,14 @@ CONTAINS
    !!   Dummy module                              NO 3D passive tracer data
    !!----------------------------------------------------------------------
 CONTAINS
-   SUBROUTINE trc_bc_ini( ntrc )        ! Empty routine
-      INTEGER,INTENT(IN) :: ntrc                           ! number of tracers
-      WRITE(*,*) 'trc_bc_ini: You should not have seen this print! error?', kt
+   SUBROUTINE trc_bc_ini( ntrc, Kmm )        ! Empty routine
+      INTEGER, INTENT(IN) :: ntrc                           ! number of tracers
+      INTEGER, INTENT(in) :: Kmm                            ! time level index
+      WRITE(*,*) 'trc_bc_ini: You should not have seen this print! error?', ntrc, Kmm
    END SUBROUTINE trc_bc_ini
-   SUBROUTINE trc_bc( kt )        ! Empty routine
-      WRITE(*,*) 'trc_bc: You should not have seen this print! error?', kt
+   SUBROUTINE trc_bc( kt, Kmm, Krhs )        ! Empty routine
+      INTEGER, INTENT(in) :: kt, Kmm, Krhs ! time level indices
+      WRITE(*,*) 'trc_bc: You should not have seen this print! error?', kt, Kmm, Krhs 
    END SUBROUTINE trc_bc
 #endif
 

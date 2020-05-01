@@ -37,9 +37,11 @@ MODULE icealb
    REAL(wp) ::   rn_alb_imlt      ! bare puddled ice albedo
    REAL(wp) ::   rn_alb_dpnd      ! ponded ice albedo
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/ICE 4.0 , NEMO Consortium (2018)
-   !! $Id: icealb.F90 10535 2019-01-16 17:36:47Z clem $
+   !! $Id: icealb.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -116,58 +118,56 @@ CONTAINS
       z1_c4 = 1. / 0.03
       !
       DO jl = 1, jpl
-         DO jj = 1, jpj
-            DO ji = 1, jpi
-               !                       !--- Specific snow, ice and pond fractions (for now, we prevent melt ponds and snow at the same time)
-               IF( ph_snw(ji,jj,jl) == 0._wp ) THEN
-                  zafrac_snw = 0._wp
-                  IF( ld_pnd_alb ) THEN
-                     zafrac_pnd = pafrac_pnd(ji,jj,jl)
-                  ELSE
-                     zafrac_pnd = 0._wp
-                  ENDIF
-                  zafrac_ice = 1._wp - zafrac_pnd
+         DO_2D_11_11
+            !                       !--- Specific snow, ice and pond fractions (for now, we prevent melt ponds and snow at the same time)
+            IF( ph_snw(ji,jj,jl) == 0._wp ) THEN
+               zafrac_snw = 0._wp
+               IF( ld_pnd_alb ) THEN
+                  zafrac_pnd = pafrac_pnd(ji,jj,jl)
                ELSE
-                  zafrac_snw = 1._wp      ! Snow fully "shades" melt ponds and ice
                   zafrac_pnd = 0._wp
-                  zafrac_ice = 0._wp
                ENDIF
-               !
-               !                       !--- Bare ice albedo (for hi > 150cm)
-               IF( ld_pnd_alb ) THEN
-                  zalb_ice = rn_alb_idry
-               ELSE
-                  IF( ph_snw(ji,jj,jl) == 0._wp .AND. pt_su(ji,jj,jl) >= rt0 ) THEN  ;   zalb_ice = rn_alb_imlt
-                  ELSE                                                               ;   zalb_ice = rn_alb_idry   ;   ENDIF
-               ENDIF
-               !                       !--- Bare ice albedo (for hi < 150cm)
-               IF( 0.05 < ph_ice(ji,jj,jl) .AND. ph_ice(ji,jj,jl) <= 1.5 ) THEN      ! 5cm < hi < 150cm
-                  zalb_ice = zalb_ice    + ( 0.18 - zalb_ice   ) * z1_c1 * ( LOG(1.5) - LOG(ph_ice(ji,jj,jl)) )
-               ELSEIF( ph_ice(ji,jj,jl) <= 0.05 ) THEN                               ! 0cm < hi < 5cm
-                  zalb_ice = rn_alb_oce  + ( 0.18 - rn_alb_oce ) * z1_c2 * ph_ice(ji,jj,jl)
-               ENDIF
-               !
-               !                       !--- Snow-covered ice albedo (freezing, melting cases)
-               IF( pt_su(ji,jj,jl) < rt0 ) THEN
-                  zalb_snw = rn_alb_sdry - ( rn_alb_sdry - zalb_ice ) * EXP( - ph_snw(ji,jj,jl) * z1_c3 )
-               ELSE
-                  zalb_snw = rn_alb_smlt - ( rn_alb_smlt - zalb_ice ) * EXP( - ph_snw(ji,jj,jl) * z1_c4 )
-               ENDIF
-               !                       !--- Ponded ice albedo
-               IF( ld_pnd_alb ) THEN
-                  zalb_pnd = rn_alb_dpnd - ( rn_alb_dpnd - zalb_ice ) * EXP( - ph_pnd(ji,jj,jl) * z1_href_pnd ) 
-               ELSE
-                  zalb_pnd = rn_alb_dpnd
-               ENDIF
-               !                       !--- Surface albedo is weighted mean of snow, ponds and bare ice contributions
-               palb_os(ji,jj,jl) = ( zafrac_snw * zalb_snw + zafrac_pnd * zalb_pnd + zafrac_ice * zalb_ice ) * tmask(ji,jj,1)
-               !
-               palb_cs(ji,jj,jl) = palb_os(ji,jj,jl)  &
-                  &                - ( - 0.1010 * palb_os(ji,jj,jl) * palb_os(ji,jj,jl)  &
-                  &                    + 0.1933 * palb_os(ji,jj,jl) - 0.0148 ) * tmask(ji,jj,1)
-               !
-            END DO
-         END DO
+               zafrac_ice = 1._wp - zafrac_pnd
+            ELSE
+               zafrac_snw = 1._wp      ! Snow fully "shades" melt ponds and ice
+               zafrac_pnd = 0._wp
+               zafrac_ice = 0._wp
+            ENDIF
+            !
+            !                       !--- Bare ice albedo (for hi > 150cm)
+            IF( ld_pnd_alb ) THEN
+               zalb_ice = rn_alb_idry
+            ELSE
+               IF( ph_snw(ji,jj,jl) == 0._wp .AND. pt_su(ji,jj,jl) >= rt0 ) THEN  ;   zalb_ice = rn_alb_imlt
+               ELSE                                                               ;   zalb_ice = rn_alb_idry   ;   ENDIF
+            ENDIF
+            !                       !--- Bare ice albedo (for hi < 150cm)
+            IF( 0.05 < ph_ice(ji,jj,jl) .AND. ph_ice(ji,jj,jl) <= 1.5 ) THEN      ! 5cm < hi < 150cm
+               zalb_ice = zalb_ice    + ( 0.18 - zalb_ice   ) * z1_c1 * ( LOG(1.5) - LOG(ph_ice(ji,jj,jl)) )
+            ELSEIF( ph_ice(ji,jj,jl) <= 0.05 ) THEN                               ! 0cm < hi < 5cm
+               zalb_ice = rn_alb_oce  + ( 0.18 - rn_alb_oce ) * z1_c2 * ph_ice(ji,jj,jl)
+            ENDIF
+            !
+            !                       !--- Snow-covered ice albedo (freezing, melting cases)
+            IF( pt_su(ji,jj,jl) < rt0 ) THEN
+               zalb_snw = rn_alb_sdry - ( rn_alb_sdry - zalb_ice ) * EXP( - ph_snw(ji,jj,jl) * z1_c3 )
+            ELSE
+               zalb_snw = rn_alb_smlt - ( rn_alb_smlt - zalb_ice ) * EXP( - ph_snw(ji,jj,jl) * z1_c4 )
+            ENDIF
+            !                       !--- Ponded ice albedo
+            IF( ld_pnd_alb ) THEN
+               zalb_pnd = rn_alb_dpnd - ( rn_alb_dpnd - zalb_ice ) * EXP( - ph_pnd(ji,jj,jl) * z1_href_pnd ) 
+            ELSE
+               zalb_pnd = rn_alb_dpnd
+            ENDIF
+            !                       !--- Surface albedo is weighted mean of snow, ponds and bare ice contributions
+            palb_os(ji,jj,jl) = ( zafrac_snw * zalb_snw + zafrac_pnd * zalb_pnd + zafrac_ice * zalb_ice ) * tmask(ji,jj,1)
+            !
+            palb_cs(ji,jj,jl) = palb_os(ji,jj,jl)  &
+               &                - ( - 0.1010 * palb_os(ji,jj,jl) * palb_os(ji,jj,jl)  &
+               &                    + 0.1933 * palb_os(ji,jj,jl) - 0.0148 ) * tmask(ji,jj,1)
+            !
+         END_2D
       END DO
       !
       !
@@ -189,12 +189,10 @@ CONTAINS
       NAMELIST/namalb/ rn_alb_sdry, rn_alb_smlt, rn_alb_idry, rn_alb_imlt, rn_alb_dpnd
       !!----------------------------------------------------------------------
       !
-      REWIND( numnam_ice_ref )              ! Namelist namalb in reference namelist : Albedo parameters
       READ  ( numnam_ice_ref, namalb, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namalb in reference namelist', lwp )
-      REWIND( numnam_ice_cfg )              ! Namelist namalb in configuration namelist : Albedo parameters
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namalb in reference namelist' )
       READ  ( numnam_ice_cfg, namalb, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namalb in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namalb in configuration namelist' )
       IF(lwm) WRITE( numoni, namalb )
       !
       IF(lwp) THEN                      ! Control print

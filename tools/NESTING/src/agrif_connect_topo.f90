@@ -250,20 +250,20 @@ CONTAINS
     !
     !
     !
-    DO j = 1,jpj
-       DO i = 1,jpi
+    DO jj = 1,jpj
+       DO ji = 1,jpi
           !
-          IF (Grid%bathy_meter(i,j) .EQ. 0.0 ) THEN
-             Grid%bathy_level(i,j)=0.
+          IF (Grid%bathy_meter(ji,jj) .EQ. 0.0 ) THEN
+             Grid%bathy_level(ji,jj)=0
           ELSE
              !	
-             k1=4
+             k1=2  ! clem: minimum levels = 2 ???
              DO WHILE (k1 .LT. (N-1))
-                IF ((Grid%bathy_meter(i,j).GE.gdepw(k1)) &
-                     .AND.(Grid%bathy_meter(i,j).LE.gdepw(k1+1))) EXIT
+                IF ((Grid%bathy_meter(ji,jj).GE.gdepw(k1)) &
+                     .AND.(Grid%bathy_meter(ji,jj).LE.gdepw(k1+1))) EXIT
                 k1=k1+1
              END DO
-             Grid%bathy_level(i,j)=k1
+             Grid%bathy_level(ji,jj)=k1
              !
           ENDIF
           !

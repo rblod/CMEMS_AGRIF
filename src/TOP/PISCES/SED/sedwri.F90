@@ -14,7 +14,7 @@ MODULE sedwri
    !! * Accessibility
    PUBLIC sed_wri 
 
-   !! $Id: sedwri.F90 10222 2018-10-25 09:42:23Z aumont $
+   !! $Id: sedwri.F90 12489 2020-02-28 15:55:11Z davestorkey $
 CONTAINS
 
    !!----------------------------------------------------------------------
@@ -93,13 +93,13 @@ CONTAINS
       DO jw = 1, jpwat
          DO ji = 1, jpoce
             zflx(ji,jw) = ( pwcp(ji,1,jw) - pwcp_dta(ji,jw) ) &
-               &         * 1.e3 / 1.e2 * dzkbot(ji) / r2dttrc
+               &         * 1.e3 / 1.e2 * dzkbot(ji) / rDt_trc
          ENDDO
       ENDDO
 
       ! Calculation of accumulation rate per dt
       DO js = 1, jpsol
-         zrate =  1.0 / ( denssol * por1(jpksed) ) / r2dttrc
+         zrate =  1.0 / ( denssol * por1(jpksed) ) / rDt_trc
          DO ji = 1, jpoce
             zflx(ji,jpwatp1) = zflx(ji,jpwatp1) + ( tosed(ji,js) - fromsed(ji,js) ) * zrate
          ENDDO

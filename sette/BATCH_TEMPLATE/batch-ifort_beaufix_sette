@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+
+#SBATCH -J sette
+#SBATCH -o sette.%j.out
+#SBATCH -e sette.%j.err
+#SBATCH --export=ALL
+#SBATCH --parsable
+#SBATCH --exclusive
+#SBATCH --nodes=NODES
+#SBATCH --time=00:15:00
+
+##SBATCH -p debug64
+##SBATCH -A smer
+##SBATCH --qos=debug
+
+#SBATCH -p normal64
+##SBATCH -A cmems
+##SBATCH --qos=coper
+
+
+# Test specific settings. Do not hand edit these lines; the fcm_job.sh script will set these
+# (via sed operating on this template job file). 
+#
+  export XIO_HOME="/home/ext/mr/smer/samsong/SRC/XIOS/xios-2.5/MET_INTEL16_r1859"
+  export SETTE_DIR="DEF_SETTE_DIR"
+
+  # DEFAULT NEMO/XIOS PROC NUMBER PER NODE
+  O_PER_NODE=38
+  X_PER_NODE=2
+
+  # REQUESTED TOTAL NEMO/XIOS PROC NUMBER
+  OCORES=NPROCS
+  XCORES=NXIOPROCS
+
+  # AVAILABLE PER NODE & TOTAL PROC NUMBER
+  A_PER_NODE=$((SLURM_CPUS_ON_NODE/2))
+  ACORES=$((SLURM_CPUS_ON_NODE/2*SLURM_JOB_NUM_NODES))
+
+  # ADJUST PROC PER NODE
+  if [ $OCORES -le $O_PER_NODE ]; then O_PER_NODE=$OCORES; fi
+  if [ $XCORES -gt $X_PER_NODE ]; then X_PER_NODE=$((A_PER_NODE-O_PER_NODE)); fi
+
+  # TOTAL NEMO/XIOS PROC NUMBER
+  OCORES=$(( O_PER_NODE * SLURM_JOB_NUM_NODES ))
+  XCORES=$(( X_PER_NODE * SLURM_JOB_NUM_NODES ))
+  TCORES=$(( OCORES + XCORES ))
+
+  # CHECK PROC PER NODE + CHECK TOTAL PROC
+  if [[ $((O_PER_NODE+X_PER_NODE)) -gt $((SLURM_CPUS_ON_NODE/2)) ]] || [[ ${TCORES} -gt ${ACORES} ]]; then
+    exit 1
+  else
+    echo "OCORES: $OCORES"
+    echo "XCORES: $XCORES"
+  fi
+
+
+###############################################################
+#
+#
+# load sette functions (only post_test_tidyup needed)
+#
+  . ${SETTE_DIR}/all_functions.sh
+###############################################################
+#
+# modules to load
+#module purge
+#module load intel/16.1.150
+#module load intelmpi/5.1.2.150
+#module load netcdf/4.4.0
+#module load hdf5/1.8.16
+#module load zlib/1.2.8 szip/2.1
+
+# Don't remove neither change the following line
+# BODY
+#
+# Test specific settings. Do not hand edit these lines; the fcm_job.sh script will set these
+# (via sed operating on this template job file). Note that the number of compute nodes required
+# is also set by the fcm_job.sh on the PBS select header line above.
+#
+# These variables are needed by post_test_tidyup function in all_functions.sh
+#
+  export INPUT_DIR=DEF_INPUT_DIR
+  export CONFIG_DIR=DEF_CONFIG_DIR
+  export TOOLS_DIR=DEF_TOOLS_DIR
+  export NEMO_VALIDATION_DIR=DEF_NEMO_VALIDATION
+  export NEW_CONF=DEF_NEW_CONF
+  export CMP_NAM=DEF_CMP_NAM
+  export TEST_NAME=DEF_TEST_NAME
+  export EXE_DIR=DEF_EXE_DIR
+  ulimit -a
+  ulimit -s unlimited
+#
+# end of set up
+###############################################################
+#
+# change to the working directory 
+#
+  cd $EXE_DIR
+
+  echo Running on host `hostname`
+  echo Time is `date`
+  echo Directory is `pwd`
+# 
+#  Run the parallel MPI executable 
+#
+  if [ $XCORES -gt 0 ]; then
+#
+#  Run MPMD case
+#
+     #XIOS will run on a separate node so will run in parallel queue
+     if [ ! -f ./xios_server.exe ] && [ -f ${XIO_HOME}/bin/xios_server.exe ]; then
+        cp ${XIO_HOME}/bin/xios_server.exe .
+     fi
+     if [ ! -f ./xios_server.exe ]; then
+        echo "./xios_server.exe not found"
+        echo "run aborted"
+        exit
+     fi
+
+    cat > mpmd.conf <<EOF
+0-$((OCORES-1)) ./nemo
+${OCORES}-$((TCORES-1)) ./xios_server.exe
+EOF
+     echo time srun --cpu_bind=cores --mpi=pmi2 -m cyclic -n ${TCORES} --multi-prog ./mpmd.conf
+          time srun --cpu_bind=cores --mpi=pmi2 -m cyclic -n ${TCORES} --multi-prog ./mpmd.conf
+#
+  else
+#
+# Run SPMD case
+#
+    echo time srun --cpu_bind=cores --mpi=pmi2 -m cyclic -n ${OCORES} ./nemo
+         time srun --cpu_bind=cores --mpi=pmi2 -m cyclic -n ${OCORES} ./nemo
+  fi
+#
+
+#
+  post_test_tidyup
+# END_BODY
+# Don't remove neither change the previous line
+  exit
+

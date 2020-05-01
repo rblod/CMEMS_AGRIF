@@ -43,14 +43,16 @@ MODULE trabbc
 
    TYPE(FLD), ALLOCATABLE, DIMENSION(:) ::   sf_qgh   ! structure of input qgh (file informations, fields read)
  
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: trabbc.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: trabbc.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE tra_bbc( kt )
+   SUBROUTINE tra_bbc( kt, Kmm, pts, Krhs )
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE tra_bbc  ***
       !!
@@ -63,7 +65,7 @@ CONTAINS
       !!       The temperature trend associated to this heat flux through the
       !!       ocean bottom can be computed once and is added to the temperature
       !!       trend juste above the bottom at each time step:
-      !!            ta = ta + Qsf / (rau0 rcp e3T) for k= mbkt
+      !!            ta = ta + Qsf / (rho0 rcp e3T) for k= mbkt
       !!       Where Qsf is the geothermal heat flux.
       !!
       !! ** Action  : - update the temperature trends with geothermal heating trend
@@ -72,7 +74,9 @@ CONTAINS
       !! References : Stein, C. A., and S. Stein, 1992, Nature, 359, 123-129.
       !!              Emile-Geay and Madec, 2009, Ocean Science.
       !!----------------------------------------------------------------------
-      INTEGER, INTENT(in) ::   kt   ! ocean time-step index
+      INTEGER,                                   INTENT(in   ) :: kt         ! ocean time-step index
+      INTEGER,                                   INTENT(in   ) :: Kmm, Krhs  ! time level indices
+      REAL(wp), DIMENSION(jpi,jpj,jpk,jpts,jpt), INTENT(inout) :: pts        ! active tracers and RHS of tracer equation
       !
       INTEGER  ::   ji, jj    ! dummy loop indices
       REAL(wp), ALLOCATABLE, DIMENSION(:,:,:) ::   ztrdt   ! 3D workspace
@@ -82,24 +86,23 @@ CONTAINS
       !
       IF( l_trdtra )   THEN         ! Save the input temperature trend
          ALLOCATE( ztrdt(jpi,jpj,jpk) )
-         ztrdt(:,:,:) = tsa(:,:,:,jp_tem)
+         ztrdt(:,:,:) = pts(:,:,:,jp_tem,Krhs)
       ENDIF
       !                             !  Add the geothermal trend on temperature
-      DO jj = 2, jpjm1
-         DO ji = 2, jpim1
-            tsa(ji,jj,mbkt(ji,jj),jp_tem) = tsa(ji,jj,mbkt(ji,jj),jp_tem) + qgh_trd0(ji,jj) / e3t_n(ji,jj,mbkt(ji,jj))
-         END DO
-      END DO
+      DO_2D_00_00
+         pts(ji,jj,mbkt(ji,jj),jp_tem,Krhs) = pts(ji,jj,mbkt(ji,jj),jp_tem,Krhs) + qgh_trd0(ji,jj) / e3t(ji,jj,mbkt(ji,jj),Kmm)
+      END_2D
       !
-      CALL lbc_lnk( 'trabbc', tsa(:,:,:,jp_tem) , 'T', 1. )
+      CALL lbc_lnk( 'trabbc', pts(:,:,:,jp_tem,Krhs) , 'T', 1. )
       !
       IF( l_trdtra ) THEN        ! Send the trend for diagnostics
-         ztrdt(:,:,:) = tsa(:,:,:,jp_tem) - ztrdt(:,:,:)
-         CALL trd_tra( kt, 'TRA', jp_tem, jptra_bbc, ztrdt )
+         ztrdt(:,:,:) = pts(:,:,:,jp_tem,Krhs) - ztrdt(:,:,:)
+         CALL trd_tra( kt, Kmm, Krhs, 'TRA', jp_tem, jptra_bbc, ztrdt )
          DEALLOCATE( ztrdt )
       ENDIF
       !
-      IF(ln_ctl)   CALL prt_ctl( tab3d_1=tsa(:,:,:,jp_tem), clinfo1=' bbc  - Ta: ', mask1=tmask, clinfo3='tra-ta' )
+      CALL iom_put ( "hfgeou" , rho0_rcp * qgh_trd0(:,:) )
+      IF(sn_cfctl%l_prtctl)   CALL prt_ctl( tab3d_1=pts(:,:,:,jp_tem,Krhs), clinfo1=' bbc  - Ta: ', mask1=tmask, clinfo3='tra-ta' )
       !
       IF( ln_timing )   CALL timing_stop('tra_bbc')
       !
@@ -132,13 +135,11 @@ CONTAINS
       NAMELIST/nambbc/ln_trabbc, nn_geoflx, rn_geoflx_cst, sn_qgh, cn_dir 
       !!----------------------------------------------------------------------
       !
-      REWIND( numnam_ref )              ! Namelist nambbc in reference namelist : Bottom momentum boundary condition
       READ  ( numnam_ref, nambbc, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'nambbc in reference namelist', lwp )
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'nambbc in reference namelist' )
       !
-      REWIND( numnam_cfg )              ! Namelist nambbc in configuration namelist : Bottom momentum boundary condition
       READ  ( numnam_cfg, nambbc, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'nambbc in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'nambbc in configuration namelist' )
       IF(lwm) WRITE ( numond, nambbc )
       !
       IF(lwp) THEN                     ! Control print
@@ -160,7 +161,7 @@ CONTAINS
          !
          CASE ( 1 )                          !* constant flux
             IF(lwp) WRITE(numout,*) '   ==>>>   constant heat flux  =   ', rn_geoflx_cst
-            qgh_trd0(:,:) = r1_rau0_rcp * rn_geoflx_cst
+            qgh_trd0(:,:) = r1_rho0_rcp * rn_geoflx_cst
             !
          CASE ( 2 )                          !* variable geothermal heat flux : read the geothermal fluxes in mW/m2
             IF(lwp) WRITE(numout,*) '   ==>>>   variable geothermal heat flux'
@@ -177,7 +178,7 @@ CONTAINS
                &          'bottom temperature boundary condition', 'nambbc', no_print )
 
             CALL fld_read( nit000, 1, sf_qgh )                         ! Read qgh data
-            qgh_trd0(:,:) = r1_rau0_rcp * sf_qgh(1)%fnow(:,:,1) * 1.e-3 ! conversion in W/m2
+            qgh_trd0(:,:) = r1_rho0_rcp * sf_qgh(1)%fnow(:,:,1) * 1.e-3 ! conversion in W/m2
             !
          CASE DEFAULT
             WRITE(ctmp1,*) '     bad flag value for nn_geoflx = ', nn_geoflx

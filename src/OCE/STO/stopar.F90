@@ -111,9 +111,11 @@ MODULE stopar
    INTEGER         :: nn_trc_flt = 0          ! number of passes of Laplacian filter
    INTEGER         :: nn_trc_ord = 1          ! order of autoregressive processes
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: stopar.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: stopar.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -260,16 +262,14 @@ CONTAINS
       INTEGER  ::   ios                 ! Local integer output status for namelist read
 
       ! Read namsto namelist : stochastic parameterization
-      REWIND( numnam_ref )              ! Namelist namdyn_adv in reference namelist : Momentum advection scheme
       READ  ( numnam_ref, namsto, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 ) CALL ctl_nam ( ios , 'namsto in reference namelist', lwp )
+901   IF( ios /= 0 ) CALL ctl_nam ( ios , 'namsto in reference namelist' )
 
-      REWIND( numnam_cfg )              ! Namelist namdyn_adv in configuration namelist : Momentum advection scheme
       READ  ( numnam_cfg, namsto, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 ) CALL ctl_nam ( ios , 'namsto in configuration namelist', lwp )
+902   IF( ios >  0 ) CALL ctl_nam ( ios , 'namsto in configuration namelist' )
       IF(lwm) WRITE ( numond, namsto )
 
-      IF( .NOT.ln_rststo ) THEN   ! no use of stochastic parameterization
+      IF( .NOT.ln_sto_eos ) THEN   ! no use of stochastic parameterization
          IF(lwp) THEN
             WRITE(numout,*)
             WRITE(numout,*) 'sto_par_init : NO use of stochastic parameterization'
@@ -749,7 +749,10 @@ CONTAINS
       CHARACTER(LEN=9)    ::   clsto2d='sto2d_000' ! stochastic parameter variable name
       CHARACTER(LEN=9)    ::   clsto3d='sto3d_000' ! stochastic parameter variable name
       CHARACTER(LEN=10)   ::   clseed='seed0_0000' ! seed variable name
+      !!----------------------------------------------------------------------
 
+      IF( .NOT. ln_rst_list .AND. nn_stock == -1 ) RETURN   ! we will never do any restart
+      
       IF ( jpsto2d > 0 .OR. jpsto3d > 0 ) THEN
 
          IF( kt == nitrst .OR. kt == nitend ) THEN
@@ -789,7 +792,7 @@ CONTAINS
 
          ! Open the restart file one timestep before writing restart
          IF( kt < nitend) THEN
-         IF( kt == nitrst - 1 .OR. nstock == 1 .OR. kt == nitend-1 ) THEN
+         IF( kt == nitrst - 1 .OR. nn_stock == 1 .OR. kt == nitend-1 ) THEN
             ! create the filename
             IF( nitrst > 999999999 ) THEN   ;   WRITE(clkt, *       ) nitrst
             ELSE                            ;   WRITE(clkt, '(i8.8)') nitrst
@@ -825,12 +828,10 @@ CONTAINS
       INTEGER  :: ji, jj
       REAL(KIND=8) :: gran   ! Gaussian random number (forced KIND=8 as in kiss_gaussian)
 
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-            CALL kiss_gaussian( gran )
-            psto(ji,jj) = gran
-         END DO
-      END DO
+      DO_2D_11_11
+         CALL kiss_gaussian( gran )
+         psto(ji,jj) = gran
+      END_2D
 
    END SUBROUTINE sto_par_white
 
@@ -845,13 +846,11 @@ CONTAINS
       !!
       INTEGER  :: ji, jj
 
-      DO jj = 2, jpj-1
-         DO ji = 2, jpi-1
-            psto(ji,jj) = 0.5_wp * psto(ji,jj) + 0.125_wp * &
-                              &  ( psto(ji-1,jj) + psto(ji+1,jj) +  &
-                              &    psto(ji,jj-1) + psto(ji,jj+1) )
-         END DO
-      END DO
+      DO_2D_00_00
+         psto(ji,jj) = 0.5_wp * psto(ji,jj) + 0.125_wp * &
+                           &  ( psto(ji-1,jj) + psto(ji+1,jj) +  &
+                           &    psto(ji,jj-1) + psto(ji,jj+1) )
+      END_2D
 
    END SUBROUTINE sto_par_flt
 

@@ -34,13 +34,13 @@ CONTAINS
 
    SUBROUTINE prt_ctl_trc( tab4d, mask, clinfo, ovlap, kdim, clinfo2 )
       !!----------------------------------------------------------------------
-      !!                     ***  ROUTINE prt_ctl  ***
+      !!                     ***  ROUTINE prt_ctl_trc  ***
       !!
       !! ** Purpose : - print sum control 3D arrays over the same area 
       !!                in mono and mpp case. This way can be usefull when
       !!                debugging a new parametrization in mono or mpp. 
       !!
-      !! ** Method  : 2 possibilities exist when setting the ln_ctl parameter to
+      !! ** Method  : 2 possibilities exist when setting the sn_cfctl%prttrc parameter to
       !!                .true. in the ocean namelist:
       !!              - to debug a MPI run .vs. a mono-processor one; 
       !!                the control print will be done over each sub-domain.
@@ -53,8 +53,8 @@ CONTAINS
       !!                isplt and jsplt must be set to 1.
       !!              - All arguments of the above calling sequence are optional so their
       !!                name must be explicitly typed if used. For instance if the mask
-      !!                array tmask(:,:,:) must be passed through the prt_ctl subroutine, 
-      !!                it must looks like: CALL prt_ctl( mask=tmask ).
+      !!                array tmask(:,:,:) must be passed through the prt_ctl_trc subroutine, 
+      !!                it must look like: CALL prt_ctl_trc( mask=tmask ).
       !!----------------------------------------------------------------------
       REAL(wp)         , DIMENSION(:,:,:,:), INTENT(in), OPTIONAL ::   tab4d     ! 4D array
       REAL(wp)         , DIMENSION(:,:,:)  , INTENT(in), OPTIONAL ::   mask      ! 3D mask to apply to the tab4d array
@@ -209,7 +209,7 @@ CONTAINS
       IF( lk_mpp ) THEN
          sind = narea
          eind = narea
-         clb_name = "('mpp.top.output_',I3.3)"
+         clb_name = "('mpp.top.output_',I4.4)"
          cl_run = 'MULTI processor run'
          ! use indices for each area computed by mpp_init subroutine
          nlditl(1:jpnij) = nldit(:) 
@@ -228,7 +228,7 @@ CONTAINS
       ELSE
          sind = 1
          eind = ijsplt
-         clb_name = "('mono.top.output_',I3.3)"
+         clb_name = "('mono.top.output_',I4.4)"
          cl_run   = 'MONO processor run '
          ! compute indices for each area as done in mpp_init subroutine
          CALL sub_dom

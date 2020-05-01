@@ -79,9 +79,6 @@ MODULE in_out_manager
    INTEGER       ::   ndate0                      !: initial calendar date aammjj
    INTEGER       ::   nleapy                      !: Leap year calendar flag (0/1 or 30)
    INTEGER       ::   ninist                      !: initial state output flag (0/1)
-   INTEGER       ::   nwrite                      !: model standard output frequency
-   INTEGER       ::   nstock                      !: restart file frequency
-   INTEGER, DIMENSION(10) :: nstocklist           !: restart dump times
 
    !!----------------------------------------------------------------------
    !! was in restart but moved here because of the OFF line... better solution should be found...
@@ -89,16 +86,45 @@ MODULE in_out_manager
    INTEGER ::   nitrst                !: time step at which restart file should be written
    LOGICAL ::   lrst_oce              !: logical to control the oce restart write 
    LOGICAL ::   lrst_ice              !: logical to control the ice restart write 
+   LOGICAL ::   lrst_abl              !: logical to control the abl restart write 
    INTEGER ::   numror = 0            !: logical unit for ocean restart (read). Init to 0 is needed for SAS (in daymod.F90)
    INTEGER ::   numrir                !: logical unit for ice   restart (read)
+   INTEGER ::   numrar                !: logical unit for abl   restart (read)
    INTEGER ::   numrow                !: logical unit for ocean restart (write)
    INTEGER ::   numriw                !: logical unit for ice   restart (write)
+   INTEGER ::   numraw                !: logical unit for abl   restart (write)
    INTEGER ::   nrst_lst              !: number of restart to output next
 
    !!----------------------------------------------------------------------
    !!                    output monitoring
    !!----------------------------------------------------------------------
-   LOGICAL ::   ln_ctl           !: run control for debugging
+   TYPE :: sn_ctl                !: structure for control over output selection
+      LOGICAL :: l_glochk  = .FALSE.  !: range sanity checks are local (F) or global (T)
+                                      !  Use global setting for debugging only;
+                                      !  local breaches will still be reported
+                                      !  and stop the code in most cases.
+      LOGICAL :: l_allon   = .FALSE.  !: overall control; activate all following output options
+      LOGICAL :: l_config  = .FALSE.  !: activate/deactivate finer control
+                                      !  Note if l_config is True then sn_cfctl%l_allon is ignored.
+                                      !  Otherwise setting sn_cfctl%l_allon T/F is equivalent to 
+                                      !  setting all the following logicals in this structure T/F
+                                      !  and disabling subsetting of processors
+      LOGICAL :: l_runstat = .FALSE.  !: Produce/do not produce run.stat file (T/F)
+      LOGICAL :: l_trcstat = .FALSE.  !: Produce/do not produce tracer.stat file (T/F)
+      LOGICAL :: l_oceout  = .FALSE.  !: Produce all ocean.outputs    (T) or just one (F)
+      LOGICAL :: l_layout  = .FALSE.  !: Produce all layout.dat files (T) or just one (F)
+      LOGICAL :: l_prtctl  = .FALSE.  !: Produce/do not produce mpp.output_XXXX files (T/F)
+      LOGICAL :: l_prttrc  = .FALSE.  !: Produce/do not produce mpp.top.output_XXXX files (T/F)
+      LOGICAL :: l_oasout  = .FALSE.  !: Produce/do not write oasis setup info to ocean.output (T/F)
+                                      !  Optional subsetting of processor report files
+                                      !  Default settings of 0/1000000/1 should ensure all areas report.
+                                      !  Set to a more restrictive range to select specific areas
+      INTEGER :: procmin   = 0        !: Minimum narea to output
+      INTEGER :: procmax   = 1000000  !: Maximum narea to output
+      INTEGER :: procincr  = 1        !: narea increment to output
+      INTEGER :: ptimincr  = 1        !: timestep increment to output (time.step and run.stat)
+   END TYPE
+   TYPE(sn_ctl), SAVE :: sn_cfctl     !: run control structure for selective output, must have SAVE for default init. of sn_ctl
    LOGICAL ::   ln_timing        !: run control for timing
    LOGICAL ::   ln_diacfl        !: flag whether to create CFL diagnostics
    INTEGER ::   nn_print         !: level of print (0 no print)
@@ -108,8 +134,6 @@ MODULE in_out_manager
    INTEGER ::   nn_jctle         !: End   j indice for the SUM control
    INTEGER ::   nn_isplt         !: number of processors following i
    INTEGER ::   nn_jsplt         !: number of processors following j
-   INTEGER ::   nn_bench         !: benchmark parameter (0/1)
-   INTEGER ::   nn_bit_cmp = 0   !: bit reproducibility  (0/1)
    !                                          
    INTEGER ::   nprint, nictls, nictle, njctls, njctle, isplt, jsplt    !: OLD namelist names
 
@@ -123,20 +147,21 @@ MODULE in_out_manager
    INTEGER ::   numout          =    6      !: logical unit for output print; Set to stdout to ensure any
    INTEGER ::   numnul          =   -1      !: logical unit for /dev/null
       !                                     !  early output can be collected; do not change
-   INTEGER ::   numnam_ref      =   -1      !: logical unit for reference namelist
-   INTEGER ::   numnam_cfg      =   -1      !: logical unit for configuration specific namelist
    INTEGER ::   numond          =   -1      !: logical unit for Output Namelist Dynamics
-   INTEGER ::   numnam_ice_ref  =   -1      !: logical unit for ice reference namelist
-   INTEGER ::   numnam_ice_cfg  =   -1      !: logical unit for ice reference namelist
    INTEGER ::   numoni          =   -1      !: logical unit for Output Namelist Ice
    INTEGER ::   numevo_ice      =   -1      !: logical unit for ice variables (temp. evolution)
    INTEGER ::   numrun          =   -1      !: logical unit for run statistics
    INTEGER ::   numdct_in       =   -1      !: logical unit for transports computing
-   INTEGER ::   numdct_vol      =   -1      !: logical unit for voulume transports output
-   INTEGER ::   numdct_heat     =   -1      !: logical unit for heat    transports output
-   INTEGER ::   numdct_salt     =   -1      !: logical unit for salt    transports output
+   INTEGER ::   numdct_vol      =   -1      !: logical unit for volume transports output
+   INTEGER ::   numdct_heat     =   -1      !: logical unit for heat   transports output
+   INTEGER ::   numdct_salt     =   -1      !: logical unit for salt   transports output
    INTEGER ::   numfl           =   -1      !: logical unit for floats ascii output
    INTEGER ::   numflo          =   -1      !: logical unit for floats ascii output
+      !
+   CHARACTER(LEN=:), ALLOCATABLE :: numnam_ref      !: character buffer for reference namelist
+   CHARACTER(LEN=:), ALLOCATABLE :: numnam_cfg      !: character buffer for configuration specific namelist
+   CHARACTER(LEN=:), ALLOCATABLE :: numnam_ice_ref  !: character buffer for ice reference namelist
+   CHARACTER(LEN=:), ALLOCATABLE :: numnam_ice_cfg  !: character buffer for ice configuration specific namelist
 
    !!----------------------------------------------------------------------
    !!                          Run control  
@@ -148,18 +173,18 @@ MODULE in_out_manager
    CHARACTER(lc) ::   ctmp4, ctmp5, ctmp6   !: temporary characters 4 to 6
    CHARACTER(lc) ::   ctmp7, ctmp8, ctmp9   !: temporary characters 7 to 9
    CHARACTER(lc) ::   ctmp10                !: temporary character 10
-   CHARACTER(lc) ::   cform_err = "(/,' ===>>> : E R R O R',     /,'         ===========',/)"       !:
-   CHARACTER(lc) ::   cform_war = "(/,' ===>>> : W A R N I N G', /,'         ===============',/)"   !:
    LOGICAL       ::   lwm      = .FALSE.    !: boolean : true on the 1st processor only (always)
-   LOGICAL       ::   lwp      = .FALSE.    !: boolean : true on the 1st processor only .OR. ln_ctl
+   LOGICAL       ::   lwp      = .FALSE.    !: boolean : true on the 1st processor only .OR. sn_cfctl%l_oceout=T
    LOGICAL       ::   lsp_area = .TRUE.     !: to make a control print over a specific area
    CHARACTER(lc) ::   cxios_context         !: context name used in xios
    CHARACTER(lc) ::   crxios_context         !: context name used in xios to read restart
    CHARACTER(lc) ::   cwxios_context        !: context name used in xios to write restart file
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: in_out_manager.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: in_out_manager.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!=====================================================================
 END MODULE in_out_manager

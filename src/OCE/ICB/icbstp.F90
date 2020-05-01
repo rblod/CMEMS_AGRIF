@@ -46,7 +46,7 @@ MODULE icbstp
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: icbstp.F90 10068 2018-08-28 14:09:04Z nicolasmartin $
+   !! $Id: icbstp.F90 11536 2019-09-11 13:54:18Z smasson $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -85,7 +85,7 @@ CONTAINS
       !
       !                                   !* write out time
       ll_verbose = .FALSE.
-      IF( nn_verbose_write > 0 .AND. MOD( kt-1 , nn_verbose_write ) == 0 )   ll_verbose = ( nn_verbose_level >= 0 )
+      IF( nn_verbose_write > 0 .AND. MOD( kt-1 , nn_verbose_write ) == 0 )   ll_verbose = ( nn_verbose_level > 0 )
       !
       IF( ll_verbose )   WRITE(numicb,9100) nktberg, ndastp, nsec_day
  9100 FORMAT('kt= ',i8, ' day= ',i8,' secs=',i8)
@@ -162,8 +162,10 @@ CONTAINS
 
       IF(lwp) WRITE(numout,'(a,i6)') 'icebergs: icb_end complete', narea
       !
-      CALL flush( numicb )
-      CLOSE( numicb )
+      IF( nn_verbose_level > 0 ) THEN
+         CALL flush( numicb )
+         CLOSE( numicb )
+      ENDIF
       !
    END SUBROUTINE icb_end
 

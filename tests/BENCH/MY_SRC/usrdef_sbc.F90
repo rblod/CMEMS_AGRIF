@@ -33,6 +33,8 @@ MODULE usrdef_sbc
    PUBLIC   usrdef_sbc_ice_tau  ! routine called by sbcice_lim.F90 for ice dynamics
    PUBLIC   usrdef_sbc_ice_flx  ! routine called by sbcice_lim.F90 for ice thermo
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OPA 4.0 , NEMO Consortium (2016)
    !! $Id$
@@ -40,7 +42,7 @@ MODULE usrdef_sbc
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE usrdef_sbc_oce( kt )
+   SUBROUTINE usrdef_sbc_oce( kt, Kbb )
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE usr_def_sbc  ***
       !!              
@@ -55,6 +57,7 @@ CONTAINS
       !!
       !!----------------------------------------------------------------------
       INTEGER, INTENT(in) ::   kt   ! ocean time step
+      INTEGER, INTENT(in) ::   Kbb  ! ocean time index
       !!---------------------------------------------------------------------
       !     
       IF( kt == nit000 ) THEN
@@ -100,11 +103,9 @@ CONTAINS
       IF( kt==nit000 .AND. lwp)   WRITE(numout,*)' usrdef_sbc_ice : BENCH case: constant stress forcing'
       !
       ! define unique value on each point. z2d ranging from 0.05 to -0.05
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-            z2d(ji,jj) = 0.1 * ( 0.5 - REAL( nimpp + ji - 1 + ( njmpp + jj - 2 ) * jpiglo, wp ) / REAL( jpiglo * jpjglo, wp ) )
-         ENDDO
-      ENDDO
+      DO_2D_11_11
+         z2d(ji,jj) = 0.1 * ( 0.5 - REAL( nimpp + ji - 1 + ( njmpp + jj - 2 ) * jpiglo, wp ) / REAL( jpiglo * jpjglo, wp ) )
+      END_2D
       utau_ice(:,:) = 0.1_wp +  z2d(:,:)
       vtau_ice(:,:) = 0.1_wp +  z2d(:,:)
 

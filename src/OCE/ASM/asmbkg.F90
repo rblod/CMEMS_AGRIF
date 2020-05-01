@@ -46,12 +46,12 @@ MODULE asmbkg
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: asmbkg.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: asmbkg.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE asm_bkg_wri( kt )
+   SUBROUTINE asm_bkg_wri( kt, Kmm )
       !!-----------------------------------------------------------------------
       !!                  ***  ROUTINE asm_bkg_wri ***
       !!
@@ -64,6 +64,7 @@ CONTAINS
       !!              at analysis time.
       !!-----------------------------------------------------------------------
       INTEGER, INTENT( IN ) :: kt               ! Current time-step
+      INTEGER, INTENT( IN ) :: Kmm              ! time level index
       !
       CHARACTER (LEN=50) :: cl_asmbkg
       CHARACTER (LEN=50) :: cl_asmdin
@@ -97,13 +98,13 @@ CONTAINS
             ENDIF
             !
             !                                      ! Write the information
-            CALL iom_rstput( kt, nitbkg_r, inum, 'rdastp' , zdate             )
-            CALL iom_rstput( kt, nitbkg_r, inum, 'un'     , un                )
-            CALL iom_rstput( kt, nitbkg_r, inum, 'vn'     , vn                )
-            CALL iom_rstput( kt, nitbkg_r, inum, 'tn'     , tsn(:,:,:,jp_tem) )
-            CALL iom_rstput( kt, nitbkg_r, inum, 'sn'     , tsn(:,:,:,jp_sal) )
-            CALL iom_rstput( kt, nitbkg_r, inum, 'sshn'   , sshn              )
-            IF( ln_zdftke )   CALL iom_rstput( kt, nitbkg_r, inum, 'en'     , en                )
+            CALL iom_rstput( kt, nitbkg_r, inum, 'rdastp' , zdate                )
+            CALL iom_rstput( kt, nitbkg_r, inum, 'un'     , uu(:,:,:,Kmm)        )
+            CALL iom_rstput( kt, nitbkg_r, inum, 'vn'     , vv(:,:,:,Kmm)        )
+            CALL iom_rstput( kt, nitbkg_r, inum, 'tn'     , ts(:,:,:,jp_tem,Kmm) )
+            CALL iom_rstput( kt, nitbkg_r, inum, 'sn'     , ts(:,:,:,jp_sal,Kmm) )
+            CALL iom_rstput( kt, nitbkg_r, inum, 'sshn'   , ssh(:,:,Kmm)         )
+            IF( ln_zdftke )   CALL iom_rstput( kt, nitbkg_r, inum, 'en'     , en )
             !
             CALL iom_close( inum )
          ENDIF
@@ -132,12 +133,12 @@ CONTAINS
             ENDIF
             !
             !                                      ! Write the information
-            CALL iom_rstput( kt, nitdin_r, inum, 'rdastp' , zdate             )
-            CALL iom_rstput( kt, nitdin_r, inum, 'un'     , un                )
-            CALL iom_rstput( kt, nitdin_r, inum, 'vn'     , vn                )
-            CALL iom_rstput( kt, nitdin_r, inum, 'tn'     , tsn(:,:,:,jp_tem) )
-            CALL iom_rstput( kt, nitdin_r, inum, 'sn'     , tsn(:,:,:,jp_sal) )
-            CALL iom_rstput( kt, nitdin_r, inum, 'sshn'   , sshn              )
+            CALL iom_rstput( kt, nitdin_r, inum, 'rdastp' , zdate                )
+            CALL iom_rstput( kt, nitdin_r, inum, 'un'     , uu(:,:,:,Kmm)        )
+            CALL iom_rstput( kt, nitdin_r, inum, 'vn'     , vv(:,:,:,Kmm)        )
+            CALL iom_rstput( kt, nitdin_r, inum, 'tn'     , ts(:,:,:,jp_tem,Kmm) )
+            CALL iom_rstput( kt, nitdin_r, inum, 'sn'     , ts(:,:,:,jp_sal,Kmm) )
+            CALL iom_rstput( kt, nitdin_r, inum, 'sshn'   , ssh(:,:,Kmm)         )
 #if defined key_si3
             IF( nn_ice == 2 ) THEN
 	            IF( ALLOCATED(at_i) ) THEN

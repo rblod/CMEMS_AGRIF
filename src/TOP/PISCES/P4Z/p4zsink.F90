@@ -37,9 +37,11 @@ MODULE p4zsink
 
    INTEGER  :: ik100
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/TOP 4.0 , NEMO Consortium (2018)
-   !! $Id: p4zsink.F90 10425 2018-12-19 21:54:16Z smasson $ 
+   !! $Id: p4zsink.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -48,7 +50,7 @@ CONTAINS
    !!   'standard sinking parameterisation'                  ???
    !!----------------------------------------------------------------------
 
-   SUBROUTINE p4z_sink ( kt, knt )
+   SUBROUTINE p4z_sink ( kt, knt, Kbb, Kmm, Krhs )
       !!---------------------------------------------------------------------
       !!                     ***  ROUTINE p4z_sink  ***
       !!
@@ -58,11 +60,10 @@ CONTAINS
       !! ** Method  : - ???
       !!---------------------------------------------------------------------
       INTEGER, INTENT(in) :: kt, knt
+      INTEGER, INTENT(in) :: Kbb, Kmm, Krhs  ! time level indices
       INTEGER  ::   ji, jj, jk
       CHARACTER (len=25) :: charout
       REAL(wp) :: zmax, zfact
-      REAL(wp), ALLOCATABLE, DIMENSION(:,:,:) :: zw3d
-      REAL(wp), ALLOCATABLE, DIMENSION(:,:  ) :: zw2d
       !!---------------------------------------------------------------------
       !
       IF( ln_timing )   CALL timing_start('p4z_sink')
@@ -78,15 +79,11 @@ CONTAINS
       !    Sinking speeds of detritus is increased with depth as shown
       !    by data and from the coagulation theory
       !    -----------------------------------------------------------
-      DO jk = 1, jpkm1
-         DO jj = 1, jpj
-            DO ji = 1,jpi
-               zmax  = MAX( heup_01(ji,jj), hmld(ji,jj) )
-               zfact = MAX( 0., gdepw_n(ji,jj,jk+1) - zmax ) / wsbio2scale
-               wsbio4(ji,jj,jk) = wsbio2 + MAX(0., ( wsbio2max - wsbio2 )) * zfact
-            END DO
-         END DO
-      END DO
+      DO_3D_11_11( 1, jpkm1 )
+         zmax  = MAX( heup_01(ji,jj), hmld(ji,jj) )
+         zfact = MAX( 0., gdepw(ji,jj,jk+1,Kmm) - zmax ) / wsbio2scale
+         wsbio4(ji,jj,jk) = wsbio2 + MAX(0., ( wsbio2max - wsbio2 )) * zfact
+      END_3D
 
       ! limit the values of the sinking speeds to avoid numerical instabilities  
       wsbio3(:,:,:) = wsbio
@@ -103,12 +100,12 @@ CONTAINS
 
       !   Compute the sedimentation term using p4zsink2 for all the sinking particles
       !   -----------------------------------------------------
-      CALL trc_sink( kt, wsbio3, sinking , jppoc, rfact2 )
-      CALL trc_sink( kt, wsbio3, sinkfer , jpsfe, rfact2 )
-      CALL trc_sink( kt, wsbio4, sinking2, jpgoc, rfact2 )
-      CALL trc_sink( kt, wsbio4, sinkfer2, jpbfe, rfact2 )
-      CALL trc_sink( kt, wsbio4, sinksil , jpgsi, rfact2 )
-      CALL trc_sink( kt, wsbio4, sinkcal , jpcal, rfact2 )
+      CALL trc_sink( kt, Kbb, Kmm, wsbio3, sinking , jppoc, rfact2 )
+      CALL trc_sink( kt, Kbb, Kmm, wsbio3, sinkfer , jpsfe, rfact2 )
+      CALL trc_sink( kt, Kbb, Kmm, wsbio4, sinking2, jpgoc, rfact2 )
+      CALL trc_sink( kt, Kbb, Kmm, wsbio4, sinkfer2, jpbfe, rfact2 )
+      CALL trc_sink( kt, Kbb, Kmm, wsbio4, sinksil , jpgsi, rfact2 )
+      CALL trc_sink( kt, Kbb, Kmm, wsbio4, sinkcal , jpcal, rfact2 )
 
       IF( ln_p5z ) THEN
          sinkingn (:,:,:) = 0.e0
@@ -118,63 +115,35 @@ CONTAINS
 
          !   Compute the sedimentation term using p4zsink2 for all the sinking particles
          !   -----------------------------------------------------
-         CALL trc_sink( kt, wsbio3, sinkingn , jppon, rfact2 )
-         CALL trc_sink( kt, wsbio3, sinkingp , jppop, rfact2 )
-         CALL trc_sink( kt, wsbio4, sinking2n, jpgon, rfact2 )
-         CALL trc_sink( kt, wsbio4, sinking2p, jpgop, rfact2 )
+         CALL trc_sink( kt, Kbb, Kmm, wsbio3, sinkingn , jppon, rfact2 )
+         CALL trc_sink( kt, Kbb, Kmm, wsbio3, sinkingp , jppop, rfact2 )
+         CALL trc_sink( kt, Kbb, Kmm, wsbio4, sinking2n, jpgon, rfact2 )
+         CALL trc_sink( kt, Kbb, Kmm, wsbio4, sinking2p, jpgop, rfact2 )
       ENDIF
 
      ! Total carbon export per year
      IF( iom_use( "tcexp" ) .OR. ( ln_check_mass .AND. kt == nitend .AND. knt == nrdttrc )  )  &
         &   t_oce_co2_exp = glob_sum( 'p4zsink', ( sinking(:,:,ik100) + sinking2(:,:,ik100) ) * e1e2t(:,:) * tmask(:,:,1) )
      !
-     IF( lk_iomput ) THEN
-       IF( knt == nrdttrc ) THEN
-          ALLOCATE( zw2d(jpi,jpj), zw3d(jpi,jpj,jpk) )
-          zfact = 1.e+3 * rfact2r  !  conversion from mol/l/kt to  mol/m3/s
-          !
-          IF( iom_use( "EPC100" ) )  THEN
-              zw2d(:,:) = ( sinking(:,:,ik100) + sinking2(:,:,ik100) ) * zfact * tmask(:,:,1) ! Export of carbon at 100m
-              CALL iom_put( "EPC100"  , zw2d )
-          ENDIF
-          IF( iom_use( "EPFE100" ) )  THEN
-              zw2d(:,:) = ( sinkfer(:,:,ik100) + sinkfer2(:,:,ik100) ) * zfact * tmask(:,:,1) ! Export of iron at 100m
-              CALL iom_put( "EPFE100"  , zw2d )
-          ENDIF
-          IF( iom_use( "EPCAL100" ) )  THEN
-              zw2d(:,:) = sinkcal(:,:,ik100) * zfact * tmask(:,:,1) ! Export of calcite at 100m
-              CALL iom_put( "EPCAL100"  , zw2d )
-          ENDIF
-          IF( iom_use( "EPSI100" ) )  THEN
-              zw2d(:,:) =  sinksil(:,:,ik100) * zfact * tmask(:,:,1) ! Export of bigenic silica at 100m
-              CALL iom_put( "EPSI100"  , zw2d )
-          ENDIF
-          IF( iom_use( "EXPC" ) )  THEN
-              zw3d(:,:,:) = ( sinking(:,:,:) + sinking2(:,:,:) ) * zfact * tmask(:,:,:) ! Export of carbon in the water column
-              CALL iom_put( "EXPC"  , zw3d )
-          ENDIF
-          IF( iom_use( "EXPFE" ) )  THEN
-              zw3d(:,:,:) = ( sinkfer(:,:,:) + sinkfer2(:,:,:) ) * zfact * tmask(:,:,:) ! Export of iron 
-              CALL iom_put( "EXPFE"  , zw3d )
-          ENDIF
-          IF( iom_use( "EXPCAL" ) )  THEN
-              zw3d(:,:,:) = sinkcal(:,:,:) * zfact * tmask(:,:,:) ! Export of calcite 
-              CALL iom_put( "EXPCAL"  , zw3d )
-          ENDIF
-          IF( iom_use( "EXPSI" ) )  THEN
-              zw3d(:,:,:) = sinksil(:,:,:) * zfact * tmask(:,:,:) ! Export of bigenic silica
-              CALL iom_put( "EXPSI"  , zw3d )
-          ENDIF
-          IF( iom_use( "tcexp" ) )  CALL iom_put( "tcexp" , t_oce_co2_exp * zfact )   ! molC/s
-          ! 
-          DEALLOCATE( zw2d, zw3d )
-        ENDIF
+     IF( lk_iomput .AND.  knt == nrdttrc ) THEN
+       zfact = 1.e+3 * rfact2r  !  conversion from mol/l/kt to  mol/m3/s
+       !
+       CALL iom_put( "EPC100"  , ( sinking(:,:,ik100) + sinking2(:,:,ik100) ) * zfact * tmask(:,:,1) ) ! Export of carbon at 100m 
+       CALL iom_put( "EPFE100" , ( sinkfer(:,:,ik100) + sinkfer2(:,:,ik100) ) * zfact * tmask(:,:,1) ) ! Export of iron at 100m 
+       CALL iom_put( "EPCAL100", sinkcal(:,:,ik100) * zfact * tmask(:,:,1) )      ! Export of calcite at 100m 
+       CALL iom_put( "EPSI100" , sinksil(:,:,ik100) * zfact * tmask(:,:,1) )          ! Export of bigenic silica at 100m 
+       CALL iom_put( "EXPC"    , ( sinking(:,:,:) + sinking2(:,:,:) ) * zfact * tmask(:,:,:) ) ! Export of carbon in the water column 
+       CALL iom_put( "EXPFE"   , ( sinkfer(:,:,:) + sinkfer2(:,:,:) ) * zfact * tmask(:,:,:) ) ! Export of iron  
+       CALL iom_put( "EXPCAL"  , sinkcal(:,:,:) * zfact * tmask(:,:,:) )      ! Export of calcite 
+       CALL iom_put( "EXPSI"   , sinksil(:,:,:) * zfact * tmask(:,:,:) )      ! Export of bigenic silica
+       CALL iom_put( "tcexp"   , t_oce_co2_exp * zfact )   ! molC/s
+       ! 
       ENDIF
       !
-      IF(ln_ctl)   THEN  ! print mean trends (used for debugging)
+      IF(sn_cfctl%l_prttrc)   THEN  ! print mean trends (used for debugging)
          WRITE(charout, FMT="('sink')")
          CALL prt_ctl_trc_info(charout)
-         CALL prt_ctl_trc(tab4d=tra, mask=tmask, clinfo=ctrcnm)
+         CALL prt_ctl_trc(tab4d=tr(:,:,:,:,Krhs), mask=tmask, clinfo=ctrcnm)
       ENDIF
       !
       IF( ln_timing )   CALL timing_stop('p4z_sink')

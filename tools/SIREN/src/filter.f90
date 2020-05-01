@@ -2,8 +2,6 @@
 ! NEMO system team, System and Interface for oceanic RElocable Nesting
 !----------------------------------------------------------------------
 !
-! MODULE: filter
-!
 ! DESCRIPTION:
 !> @brief This module is filter manager.
 !>
@@ -54,12 +52,13 @@
 !>
 !> @author
 !> J.Paul
-! REVISION HISTORY:
+!>
 !> @date November, 2013 - Initial Version
-!
-!> @note Software governed by the CeCILL licence     (./LICENSE)
+!>
+!> @note Software governed by the CeCILL licence     (NEMOGCM/NEMO_CeCILL.txt)
 !----------------------------------------------------------------------
 MODULE filter
+
    USE kind                            ! F90 kind parameter
    USE phycst                          ! physical constant
    USE logger                          ! log file manager
@@ -67,6 +66,7 @@ MODULE filter
    use att                             ! attribute manager
    USE var                             ! variable manager
    USE extrap                          ! extrapolation manager
+
    IMPLICIT NONE
    ! NOTE_avoid_public_variables_if_possible
 
@@ -101,6 +101,8 @@ MODULE filter
    END INTERFACE filter_fill_value
 
 CONTAINS
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE filter__fill_value_wrapper(td_var)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine filter variable value.
@@ -111,11 +113,12 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] td_var variable structure 
    !-------------------------------------------------------------------
-   SUBROUTINE filter__fill_value_wrapper( td_var )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR), INTENT(INOUT) :: td_var
 
@@ -243,6 +246,9 @@ CONTAINS
 
       ENDIF
    END SUBROUTINE filter__fill_value_wrapper
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE filter__fill_value(td_var, cd_name, &
+         &                       dd_cutoff, id_radius, dd_alpha)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine filtering variable value, given cut-off frequency
@@ -255,16 +261,16 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] td_var variable 
    !> @param[in] cd_name   filter name
    !> @param[in] dd_cutoff cut-off frequency
    !> @param[in] id_radius filter halo radius
    !> @param[in] dd_alpha  filter parameter
    !-------------------------------------------------------------------
-   SUBROUTINE filter__fill_value( td_var, cd_name, &
-   &                              dd_cutoff, id_radius, dd_alpha )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR)      , INTENT(INOUT) :: td_var
       CHARACTER(LEN=*), INTENT(IN   ) :: cd_name
@@ -334,6 +340,9 @@ CONTAINS
       CALL extrap_del_extrabands(td_var, id_radius, id_radius)
 
    END SUBROUTINE filter__fill_value
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE filter__3D_fill_value(dd_value, dd_fill, cd_name, &
+         &                          dd_cutoff, id_radius, dd_alpha)
    !-------------------------------------------------------------------
    !> @brief This subroutine compute filtered value of 3D array. 
    !>
@@ -343,10 +352,10 @@ CONTAINS
    !>
    !> @warning array of value should have been already extrapolated before
    !> running this subroutine.
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] dd_value  array of value to be filtered 
    !> @param[in] dd_fill      fill value 
    !> @param[in] cd_name      filter name
@@ -354,9 +363,9 @@ CONTAINS
    !> @param[in] id_radius    filter halo radius
    !> @param[in] dd_alpha     filter parameter
    !-------------------------------------------------------------------
-   SUBROUTINE filter__3D_fill_value( dd_value, dd_fill, cd_name, &
-   &                                 dd_cutoff, id_radius, dd_alpha)
+
       IMPLICIT NONE
+
       ! Argument      
       REAL(dp)        , DIMENSION(:,:,:), INTENT(INOUT) :: dd_value
       REAL(dp)        ,                   INTENT(IN   ) :: dd_fill
@@ -386,9 +395,12 @@ CONTAINS
       DEALLOCATE( dl_coef )
 
    END SUBROUTINE filter__3D_fill_value
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE filter__2D_fill_value(dd_value, dd_fill, cd_name, &
+         &                          dd_cutoff, id_radius, dd_alpha)
    !-------------------------------------------------------------------
    !> @brief This subroutine compute filtered value of 2D array.
-   !
+   !>
    !> @details
    !>    First compute filter coefficient.
    !>    Then apply it on variable value.
@@ -398,7 +410,7 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] dd_value  array of value to be filtered 
    !> @param[in] dd_fill      fill value 
    !> @param[in] cd_name      filter name
@@ -406,9 +418,9 @@ CONTAINS
    !> @param[in] id_radius    filter halo radius
    !> @param[in] dd_alpha     filter parameter
    !-------------------------------------------------------------------
-   SUBROUTINE filter__2D_fill_value( dd_value, dd_fill, cd_name, &
-   &                                 dd_cutoff, id_radius, dd_alpha)
+
       IMPLICIT NONE
+
       ! Argument
       REAL(dp)        , DIMENSION(:,:), INTENT(INOUT) :: dd_value
       REAL(dp)        ,                 INTENT(IN   ) :: dd_fill
@@ -432,9 +444,12 @@ CONTAINS
       DEALLOCATE( dl_coef )
 
    END SUBROUTINE filter__2D_fill_value
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE filter__1D_fill_value(dd_value, dd_fill, cd_name, &
+         &                          dd_cutoff, id_radius, dd_alpha)
    !-------------------------------------------------------------------
    !> @brief This subroutine compute filtered value of 1D array.
-   !
+   !>
    !> @details
    !>    First compute filter coefficient.
    !>    Then apply it on variable value.
@@ -444,7 +459,7 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] dd_value  array of value to be filtered 
    !> @param[in] dd_fill      fill value 
    !> @param[in] cd_name      filter name
@@ -452,9 +467,9 @@ CONTAINS
    !> @param[in] id_radius    filter halo radius
    !> @param[in] dd_alpha     filter parameter
    !-------------------------------------------------------------------
-   SUBROUTINE filter__1D_fill_value( dd_value, dd_fill, cd_name, &
-   &                                 dd_cutoff, id_radius, dd_alpha)
+
       IMPLICIT NONE
+
       ! Argument      
       REAL(dp)        , DIMENSION(:), INTENT(INOUT) :: dd_value
       REAL(dp)        ,               INTENT(IN   ) :: dd_fill
@@ -478,6 +493,8 @@ CONTAINS
       DEALLOCATE( dl_coef )
 
    END SUBROUTINE filter__1D_fill_value
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE filter__2D(dd_value, dd_fill, dd_coef, id_radius)
    !-------------------------------------------------------------------
    !> @brief This subroutine filtered 2D array of value 
    !>
@@ -487,14 +504,15 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] dd_value  array of value to be filtered 
    !> @param[in] dd_fill      fill value 
    !> @param[in] dd_coef      filter coefficent array
    !> @param[in] id_radius    filter halo radius
    !-------------------------------------------------------------------
-   SUBROUTINE filter__2D(dd_value, dd_fill, dd_coef, id_radius)
+
       IMPLICIT NONE
+
       ! Argument      
       REAL(dp)        , DIMENSION(:,:), INTENT(INOUT) :: dd_value
       REAL(dp)        ,                 INTENT(IN   ) :: dd_fill 
@@ -533,23 +551,26 @@ CONTAINS
       DEALLOCATE(dl_value)
 
    END SUBROUTINE filter__2D
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE filter__1D(dd_value, dd_fill, dd_coef, id_radius)
    !-------------------------------------------------------------------
    !> @brief This subroutine filtered 1D array of value  
-   !
+   !>
    !> @details
    !>    loop on first dimension, 
    !>    and apply coefficient 1D array on each point
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] dd_value  array of value to be filtered 
    !> @param[in] dd_fill      fill value 
    !> @param[in] dd_coef      filter coefficent array
    !> @param[in] id_radius    filter halo radius
    !-------------------------------------------------------------------
-   SUBROUTINE filter__1D(dd_value, dd_fill, dd_coef, id_radius)
+
       IMPLICIT NONE
+
       ! Argument      
       REAL(dp)        , DIMENSION(:), INTENT(INOUT) :: dd_value
       REAL(dp)        ,               INTENT(IN   ) :: dd_fill 
@@ -579,9 +600,12 @@ CONTAINS
       DEALLOCATE(dl_value)
 
    END SUBROUTINE filter__1D
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION filter__2D_coef(cd_name, dd_cutoff, id_radius, dd_alpha) &
+         & RESULT (df_coef)
    !-------------------------------------------------------------------
    !> @brief This function compute filter coefficient. 
-   !
+   !>
    !> @details
    !> 
    !> filter could be choose between :
@@ -592,18 +616,19 @@ CONTAINS
    !> - butterworth
    !> Cut-off frequency could be specify.
    !> As well as a filter parameter for gauss and butterworth filter
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] cd_name   filter name
    !> @param[in] dd_cutoff cut-off frequency
    !> @param[in] id_radius filter halo radius
    !> @param[in] dd_alpha  filter parameter 
    !> @return array of filter coefficient
    !-------------------------------------------------------------------
-   FUNCTION filter__2D_coef(cd_name, dd_cutoff, id_radius, dd_alpha)
+
       IMPLICIT NONE
+
       ! Argument      
       CHARACTER(LEN=*), INTENT(IN) :: cd_name
       REAL(dp)        , INTENT(IN) :: dd_cutoff
@@ -611,7 +636,7 @@ CONTAINS
       REAL(dp)        , INTENT(IN) :: dd_alpha
 
       ! function
-      REAL(dp), DIMENSION(2*id_radius+1,2*id_radius+1) :: filter__2D_coef
+      REAL(dp), DIMENSION(2*id_radius+1,2*id_radius+1) :: df_coef
 
       ! local variable
 
@@ -624,23 +649,26 @@ CONTAINS
 
       SELECT CASE(TRIM(fct_lower(cd_name)))
       CASE('hann')
-         filter__2D_coef(:,:)=filter__2D_hann(dd_cutoff, id_radius)
+         df_coef(:,:)=filter__2D_hann(dd_cutoff, id_radius)
       CASE('hamming')
-         filter__2D_coef(:,:)=filter__2D_hamming(dd_cutoff, id_radius)
+         df_coef(:,:)=filter__2D_hamming(dd_cutoff, id_radius)
       CASE('blackman')
-         filter__2D_coef(:,:)=filter__2D_blackman(dd_cutoff, id_radius)
+         df_coef(:,:)=filter__2D_blackman(dd_cutoff, id_radius)
       CASE('gauss')
-         filter__2D_coef(:,:)=filter__2D_gauss(dd_cutoff, id_radius, dd_alpha)
+         df_coef(:,:)=filter__2D_gauss(dd_cutoff, id_radius, dd_alpha)
       CASE('butterworth')
-         filter__2D_coef(:,:)=filter__2D_butterworth(dd_cutoff, id_radius, dd_alpha)
+         df_coef(:,:)=filter__2D_butterworth(dd_cutoff, id_radius, dd_alpha)
       CASE DEFAULT
          CALL logger_error("FILTER COEF: invalid filter name :"//TRIM(cd_name))
       END SELECT
 
    END FUNCTION filter__2D_coef
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION filter__1D_coef(cd_name, dd_cutoff, id_radius, dd_alpha) &
+         & RESULT (df_coef)
    !-------------------------------------------------------------------
    !> @brief This function compute filter coefficient. 
-   !
+   !>
    !> @details
    !> 
    !> filter could be choose between :
@@ -651,18 +679,19 @@ CONTAINS
    !> - butterworth
    !> Cut-off frequency could be specify.
    !> As well as a filter parameter for gauss an butterworth filter
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] cd_name   filter name
    !> @param[in] dd_cutoff cut-off frequency
    !> @param[in] id_radius filter halo radius
    !> @param[in] dd_alpha  filter parameter 
    !> @return array of filter coefficient
    !-------------------------------------------------------------------
-   FUNCTION filter__1D_coef(cd_name, dd_cutoff, id_radius, dd_alpha)
+
       IMPLICIT NONE
+
       ! Argument      
       CHARACTER(LEN=*), INTENT(IN) :: cd_name
       REAL(dp)        , INTENT(IN) :: dd_cutoff
@@ -670,7 +699,7 @@ CONTAINS
       REAL(dp)        , INTENT(IN) :: dd_alpha
 
       ! function
-      REAL(dp), DIMENSION(2*id_radius+1) :: filter__1D_coef
+      REAL(dp), DIMENSION(2*id_radius+1) :: df_coef
 
       ! local variable
 
@@ -679,40 +708,44 @@ CONTAINS
 
       SELECT CASE(TRIM(fct_lower(cd_name)))
       CASE('hann')
-         filter__1D_coef(:)=filter__1D_hann(dd_cutoff, id_radius)
+         df_coef(:)=filter__1D_hann(dd_cutoff, id_radius)
       CASE('hamming')
-         filter__1D_coef(:)=filter__1D_hamming(dd_cutoff, id_radius)
+         df_coef(:)=filter__1D_hamming(dd_cutoff, id_radius)
       CASE('blackman')
-         filter__1D_coef(:)=filter__1D_blackman(dd_cutoff, id_radius)
+         df_coef(:)=filter__1D_blackman(dd_cutoff, id_radius)
       CASE('gauss')
-         filter__1D_coef(:)=filter__1D_gauss(dd_cutoff, id_radius, dd_alpha)
+         df_coef(:)=filter__1D_gauss(dd_cutoff, id_radius, dd_alpha)
       CASE('butterworth')
-         filter__1D_coef(:)=filter__1D_butterworth(dd_cutoff, id_radius, dd_alpha)
+         df_coef(:)=filter__1D_butterworth(dd_cutoff, id_radius, dd_alpha)
       CASE DEFAULT
          CALL logger_error("FILTER COEF: invalid filter name :"//TRIM(cd_name))
       END SELECT
 
    END FUNCTION filter__1D_coef
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION filter__1D_hann(dd_cutoff, id_radius) &
+         & RESULT (df_coef)
    !-------------------------------------------------------------------
    !> @brief This function compute coefficient for HANN filter.
-   !
+   !>
    !> @details
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] dd_cutoff cut-off frequency
    !> @param[in] id_radius filter halo radius
    !> @return array of hann filter coefficient 
    !-------------------------------------------------------------------
-   FUNCTION filter__1D_hann(dd_cutoff, id_radius)
+
       IMPLICIT NONE
+
       ! Argument      
       REAL(dp)        , INTENT(IN) :: dd_cutoff 
       INTEGER(i4)     , INTENT(IN) :: id_radius
 
       ! function
-      REAL(dp), DIMENSION(2*id_radius+1) :: filter__1D_hann
+      REAL(dp), DIMENSION(2*id_radius+1) :: df_coef
 
       ! local variable
       REAL(dp) :: dl_rad
@@ -725,48 +758,52 @@ CONTAINS
       IF( dd_cutoff < 1 )THEN
          CALL logger_error("FILTER COEF: cut-off frequency "//&
          &  "should be greater than or equal to 1. No filter will be apply ")
-         filter__1D_hann(:)=0.
-         filter__1D_hann(id_radius+1)=1.
+         df_coef(:)=0.
+         df_coef(id_radius+1)=1.
       ELSE
          DO ji=1,2*id_radius+1
 
             dl_rad=SQRT(REAL(ji-id_radius+1,dp)**2 )
             
             IF( dl_rad < dd_cutoff )THEN
-               filter__1D_hann(ji)=0.5 + 0.5*COS(dp_pi*dl_rad/dd_cutoff)
+               df_coef(ji)=0.5 + 0.5*COS(dp_pi*dl_rad/dd_cutoff)
             ELSE
-               filter__1D_hann(ji)=0
+               df_coef(ji)=0
             ENDIF
 
          ENDDO
 
          ! normalize
-         dl_sum=SUM(filter__1D_hann(:))
+         dl_sum=SUM(df_coef(:))
 
-         filter__1D_hann(:)=filter__1D_hann(:)/dl_sum
+         df_coef(:)=df_coef(:)/dl_sum
       ENDIF
 
    END FUNCTION filter__1D_hann
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION filter__2D_hann(dd_cutoff, id_radius) &
+         & RESULT (df_coef)
    !-------------------------------------------------------------------
    !> @brief This function compute coefficient for HANN filter.
-   !
+   !>
    !> @details
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] dd_cutoff cut-off frequency
    !> @param[in] id_radius filter halo radius
    !> @return array of hann filter coefficient 
    !-------------------------------------------------------------------
-   FUNCTION filter__2D_hann(dd_cutoff, id_radius)
+
       IMPLICIT NONE
+
       ! Argument      
       REAL(dp)   , INTENT(IN) :: dd_cutoff 
       INTEGER(i4), INTENT(IN) :: id_radius
 
       ! function
-      REAL(dp), DIMENSION(2*id_radius+1,2*id_radius+1) :: filter__2D_hann
+      REAL(dp), DIMENSION(2*id_radius+1,2*id_radius+1) :: df_coef
 
       ! local variable
       REAL(dp) :: dl_rad
@@ -780,8 +817,8 @@ CONTAINS
       IF( dd_cutoff < 1.0_dp )THEN
          CALL logger_error("FILTER COEF: cut-off frequency "//&
          &  "should be greater than or equal to 1. No filter will be apply ")
-         filter__2D_hann(:,:)=0.
-         filter__2D_hann(id_radius+1,id_radius+1)=1.
+         df_coef(:,:)=0.
+         df_coef(id_radius+1,id_radius+1)=1.
       ELSE
          DO jj=1,2*id_radius+1
             DO ji=1,2*id_radius+1
@@ -791,41 +828,45 @@ CONTAINS
                &             REAL(jj-(id_radius+1),dp)**2 )
                
                IF( dl_rad < dd_cutoff )THEN
-                  filter__2D_hann(ji,jj)=0.5 + 0.5*COS(dp_pi*dl_rad/dd_cutoff)
+                  df_coef(ji,jj)=0.5 + 0.5*COS(dp_pi*dl_rad/dd_cutoff)
                ELSE
-                  filter__2D_hann(ji,jj)=0
+                  df_coef(ji,jj)=0
                ENDIF
 
             ENDDO
          ENDDO
 
          ! normalize
-         dl_sum=SUM(filter__2D_hann(:,:))
+         dl_sum=SUM(df_coef(:,:))
 
-         filter__2D_hann(:,:)=filter__2D_hann(:,:)/dl_sum
+         df_coef(:,:)=df_coef(:,:)/dl_sum
       ENDIF
 
    END FUNCTION filter__2D_hann
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION filter__1D_hamming(dd_cutoff, id_radius) &
+         & RESULT (df_coef)
    !-------------------------------------------------------------------
    !> @brief This function compute coefficient for HAMMING filter.
-   !
+   !>
    !> @details
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] dd_cutoff cut-off frequency
    !> @param[in] id_radius filter halo radius
    !> @return array of hamming filter coefficient 
    !-------------------------------------------------------------------
-   FUNCTION filter__1D_hamming(dd_cutoff, id_radius)
+
       IMPLICIT NONE
+
       ! Argument      
       REAL(dp)        , INTENT(IN) :: dd_cutoff 
       INTEGER(i4)     , INTENT(IN) :: id_radius
 
       ! function
-      REAL(dp), DIMENSION(2*id_radius+1) :: filter__1D_hamming
+      REAL(dp), DIMENSION(2*id_radius+1) :: df_coef
 
       ! local variable
       REAL(dp) :: dl_rad
@@ -838,49 +879,52 @@ CONTAINS
       IF( dd_cutoff < 1 )THEN
          CALL logger_error("FILTER COEF: cut-off frequency "//&
          &  "should be greater than or equal to 1. No filter will be apply ")
-         filter__1D_hamming(:)=0.
-         filter__1D_hamming(id_radius+11)=1.
+         df_coef(:)=0.
+         df_coef(id_radius+11)=1.
       ELSE
          DO ji=1,2*id_radius+1
 
             dl_rad= SQRT( REAL(ji-(id_radius+1),dp)**2 )
          
             IF( dl_rad < dd_cutoff )THEN
-               filter__1D_hamming(ji)= 0.54 &
-               &                     + 0.46*COS(dp_pi*dl_rad/dd_cutoff)
+               df_coef(ji)= 0.54 + 0.46*COS(dp_pi*dl_rad/dd_cutoff)
             ELSE
-               filter__1D_hamming(ji)=0
+               df_coef(ji)=0
             ENDIF
 
          ENDDO
 
          ! normalize
-         dl_sum=SUM(filter__1D_hamming(:))
+         dl_sum=SUM(df_coef(:))
 
-         filter__1D_hamming(:)=filter__1D_hamming(:)/dl_sum
+         df_coef(:)=df_coef(:)/dl_sum
       ENDIF
 
    END FUNCTION filter__1D_hamming
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION filter__2D_hamming(dd_cutoff, id_radius) &
+         & RESULT (df_coef)
    !-------------------------------------------------------------------
    !> @brief This function compute coefficient for HAMMING filter.
-   !
+   !>
    !> @details
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] dd_cutoff cut-off frequency
    !> @param[in] id_radius filter halo radius
    !> @return array of hamming filter coefficient 
    !-------------------------------------------------------------------
-   FUNCTION filter__2D_hamming(dd_cutoff, id_radius)
+
       IMPLICIT NONE
+
       ! Argument      
       REAL(dp)        , INTENT(IN) :: dd_cutoff 
       INTEGER(i4)     , INTENT(IN) :: id_radius
 
       ! function
-      REAL(dp), DIMENSION(2*id_radius+1,2*id_radius+1) :: filter__2D_hamming
+      REAL(dp), DIMENSION(2*id_radius+1,2*id_radius+1) :: df_coef
 
       ! local variable
       REAL(dp) :: dl_rad
@@ -894,52 +938,55 @@ CONTAINS
       IF( dd_cutoff < 1 )THEN
          CALL logger_error("FILTER COEF: cut-off frequency "//&
          &  "should be greater than or equal to 1. No filter will be apply ")
-         filter__2D_hamming(:,:)=0.
-         filter__2D_hamming(id_radius+1,id_radius+1)=1.
+         df_coef(:,:)=0.
+         df_coef(id_radius+1,id_radius+1)=1.
       ELSE
          DO jj=1,2*id_radius+1
             DO ji=1,2*id_radius+1
 
                dl_rad= SQRT( REAL(ji-(id_radius+1),dp)**2 + &
-               &             REAL(jj-(id_radius+1),dp)**2 )
+                  &          REAL(jj-(id_radius+1),dp)**2 )
             
                IF( dl_rad < dd_cutoff )THEN
-                  filter__2D_hamming(ji,jj)= 0.54 &
-                  &                        + 0.46*COS(dp_pi*dl_rad/dd_cutoff)
+                  df_coef(ji,jj)= 0.54 + 0.46*COS(dp_pi*dl_rad/dd_cutoff)
                ELSE
-                  filter__2D_hamming(ji,jj)=0
+                  df_coef(ji,jj)=0
                ENDIF
 
             ENDDO
          ENDDO
 
          ! normalize
-         dl_sum=SUM(filter__2D_hamming(:,:))
+         dl_sum=SUM(df_coef(:,:))
 
-         filter__2D_hamming(:,:)=filter__2D_hamming(:,:)/dl_sum
+         df_coef(:,:)=df_coef(:,:)/dl_sum
       ENDIF
 
    END FUNCTION filter__2D_hamming
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION filter__1D_blackman(dd_cutoff, id_radius) &
+         & RESULT (df_coef)
    !-------------------------------------------------------------------
    !> @brief This function compute coefficient for BLACKMAN filter.
-   !
+   !>
    !> @details
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] dd_cutoff cut-off frequency
    !> @param[in] id_radius filter halo radius
    !> @return array of blackman filter coefficient 
    !-------------------------------------------------------------------
-   FUNCTION filter__1D_blackman(dd_cutoff, id_radius)
+
       IMPLICIT NONE
+
       ! Argument      
       REAL(dp)        , INTENT(IN) :: dd_cutoff
       INTEGER(i4)     , INTENT(IN) :: id_radius
 
       ! function
-      REAL(dp), DIMENSION(2*id_radius+1) :: filter__1D_blackman
+      REAL(dp), DIMENSION(2*id_radius+1) :: df_coef
 
       ! local variable
       REAL(dp) :: dl_rad
@@ -952,30 +999,32 @@ CONTAINS
       IF( dd_cutoff < 1 )THEN
          CALL logger_error("FILTER COEF: cut-off frequency "//&
          &  "should be greater than or equal to 1. No filter will be apply ")
-         filter__1D_blackman(:)=0.
-         filter__1D_blackman(id_radius+1)=1.
+         df_coef(:)=0.
+         df_coef(id_radius+1)=1.
       ELSE      
          DO ji=1,2*id_radius+1
 
             dl_rad= SQRT( REAL(ji-(id_radius+1),dp)**2 )
             
             IF( dl_rad < dd_cutoff )THEN
-               filter__1D_blackman(ji)= 0.42 &
-               &                      + 0.5 *COS(  dp_pi*dl_rad/dd_cutoff) &
-               &                      + 0.08*COS(2*dp_pi*dl_rad/dd_cutoff)
+               df_coef(ji)= 0.42 + 0.5 *COS(  dp_pi*dl_rad/dd_cutoff) &
+                  &              + 0.08*COS(2*dp_pi*dl_rad/dd_cutoff)
             ELSE
-               filter__1D_blackman(ji)=0
+               df_coef(ji)=0
             ENDIF                                
 
          ENDDO
 
          ! normalize
-         dl_sum=SUM(filter__1D_blackman(:))
+         dl_sum=SUM(df_coef(:))
 
-         filter__1D_blackman(:)=filter__1D_blackman(:)/dl_sum
+         df_coef(:)=df_coef(:)/dl_sum
       ENDIF
 
    END FUNCTION filter__1D_blackman
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION filter__2D_blackman(dd_cutoff, id_radius) &
+         & RESULT (df_coef)
    !-------------------------------------------------------------------
    !> @brief This function compute coefficient for BLACKMAN filter.
    !>
@@ -988,14 +1037,15 @@ CONTAINS
    !> @param[in] id_radius filter halo radius
    !> @return array of blackman filter coefficient 
    !-------------------------------------------------------------------
-   FUNCTION filter__2D_blackman(dd_cutoff, id_radius)
+
       IMPLICIT NONE
+
       ! Argument      
       REAL(dp)        , INTENT(IN) :: dd_cutoff 
       INTEGER(i4)     , INTENT(IN) :: id_radius
 
       ! function
-      REAL(dp), DIMENSION(2*id_radius+1,2*id_radius+1) :: filter__2D_blackman
+      REAL(dp), DIMENSION(2*id_radius+1,2*id_radius+1) :: df_coef
 
       ! local variable
       REAL(dp) :: dl_rad
@@ -1009,8 +1059,8 @@ CONTAINS
       IF( dd_cutoff < 1 )THEN
          CALL logger_error("FILTER COEF: cut-off frequency "//&
          &  "should be greater than or equal to 1. No filter will be apply ")
-         filter__2D_blackman(:,:)=0.
-         filter__2D_blackman(id_radius+1,id_radius+1)=1.
+         df_coef(:,:)=0.
+         df_coef(id_radius+1,id_radius+1)=1.
       ELSE      
          DO jj=1,2*id_radius+1
             DO ji=1,2*id_radius+1
@@ -1019,23 +1069,25 @@ CONTAINS
                &             REAL(jj-(id_radius+1),dp)**2 )
                
                IF( dl_rad < dd_cutoff )THEN
-                  filter__2D_blackman(ji,jj)= 0.42 &
-                  &                         + 0.5 *COS(  dp_pi*dl_rad/dd_cutoff) &
-                  &                         + 0.08*COS(2*dp_pi*dl_rad/dd_cutoff)
+                  df_coef(ji,jj)= 0.42 + 0.5 *COS(  dp_pi*dl_rad/dd_cutoff) &
+                     &                 + 0.08*COS(2*dp_pi*dl_rad/dd_cutoff)
                ELSE
-                  filter__2D_blackman(ji,jj)=0
+                  df_coef(ji,jj)=0
                ENDIF                                
 
             ENDDO
          ENDDO
 
          ! normalize
-         dl_sum=SUM(filter__2D_blackman(:,:))
+         dl_sum=SUM(df_coef(:,:))
 
-         filter__2D_blackman(:,:)=filter__2D_blackman(:,:)/dl_sum
+         df_coef(:,:)=df_coef(:,:)/dl_sum
       ENDIF
 
    END FUNCTION filter__2D_blackman
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION filter__1D_gauss(dd_cutoff, id_radius, dd_alpha) &
+         & RESULT (df_coef)
    !-------------------------------------------------------------------
    !> @brief This function compute coefficient for GAUSS filter.
    !>
@@ -1049,15 +1101,16 @@ CONTAINS
    !> @param[in] dd_alpha  filter parameter
    !> @return array of gauss filter coefficient 
    !-------------------------------------------------------------------
-   FUNCTION filter__1D_gauss(dd_cutoff, id_radius, dd_alpha)
+
       IMPLICIT NONE
+
       ! Argument      
       REAL(dp)        , INTENT(IN) :: dd_cutoff 
       INTEGER(i4)     , INTENT(IN) :: id_radius
       REAL(dp)        , INTENT(IN) :: dd_alpha 
 
       ! function
-      REAL(dp), DIMENSION(2*id_radius+1) :: filter__1D_gauss
+      REAL(dp), DIMENSION(2*id_radius+1) :: df_coef
 
       ! local variable
       REAL(dp) :: dl_rad
@@ -1070,24 +1123,27 @@ CONTAINS
       IF( dd_cutoff < 1 )THEN
          CALL logger_error("FILTER COEF: cut-off frequency "//&
          &  "should be greater than or equal to 1. No filter will be apply ")
-         filter__1D_gauss(:)=0.
-         filter__1D_gauss(id_radius+1)=1.
+         df_coef(:)=0.
+         df_coef(id_radius+1)=1.
       ELSE
          DO ji=1,2*id_radius+1
 
             dl_rad= SQRT( REAL(ji-(id_radius+1),dp)**2 )
             
-            filter__1D_gauss(ji)=EXP(-(dd_alpha*dl_rad**2)/(2*dd_cutoff**2))
+            df_coef(ji)=EXP(-(dd_alpha*dl_rad**2)/(2*dd_cutoff**2))
 
          ENDDO
 
          ! normalize
-         dl_sum=SUM(filter__1D_gauss(:))
+         dl_sum=SUM(df_coef(:))
 
-         filter__1D_gauss(:)=filter__1D_gauss(:)/dl_sum
+         df_coef(:)=df_coef(:)/dl_sum
       ENDIF
 
    END FUNCTION filter__1D_gauss
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION filter__2D_gauss(dd_cutoff, id_radius, dd_alpha) &
+         & RESULT (df_coef)
    !-------------------------------------------------------------------
    !> @brief This function compute coefficient for GAUSS filter.
    !>
@@ -1101,15 +1157,16 @@ CONTAINS
    !> @param[in] dd_alpha  filter parameter
    !> @return array of gauss filter coefficient 
    !-------------------------------------------------------------------
-   FUNCTION filter__2D_gauss(dd_cutoff, id_radius, dd_alpha)
+
       IMPLICIT NONE
+
       ! Argument      
       REAL(dp)        , INTENT(IN) :: dd_cutoff 
       INTEGER(i4)     , INTENT(IN) :: id_radius
       REAL(dp)        , INTENT(IN) :: dd_alpha 
 
       ! function
-      REAL(dp), DIMENSION(2*id_radius+1,2*id_radius+1) :: filter__2D_gauss
+      REAL(dp), DIMENSION(2*id_radius+1,2*id_radius+1) :: df_coef
 
       ! local variable
       REAL(dp) :: dl_rad
@@ -1123,27 +1180,30 @@ CONTAINS
       IF( dd_cutoff < 1 )THEN
          CALL logger_error("FILTER COEF: cut-off frequency "//&
          &  "should be greater than or equal to 1. No filter will be apply ")
-         filter__2D_gauss(:,:)=0.
-         filter__2D_gauss(id_radius+1,id_radius+1)=1.
+         df_coef(:,:)=0.
+         df_coef(id_radius+1,id_radius+1)=1.
       ELSE
          DO jj=1,2*id_radius+1
             DO ji=1,2*id_radius+1
 
                dl_rad= SQRT( REAL(ji-(id_radius+1),dp)**2 + &
-               &             REAL(jj-(id_radius+1),dp)**2 )
+                  &          REAL(jj-(id_radius+1),dp)**2 )
                
-               filter__2D_gauss(ji,jj)=EXP(-(dd_alpha*dl_rad**2)/(2*dd_cutoff**2))
+               df_coef(ji,jj)=EXP(-(dd_alpha*dl_rad**2)/(2*dd_cutoff**2))
 
             ENDDO
          ENDDO
 
          ! normalize
-         dl_sum=SUM(filter__2D_gauss(:,:))
+         dl_sum=SUM(df_coef(:,:))
 
-         filter__2D_gauss(:,:)=filter__2D_gauss(:,:)/dl_sum
+         df_coef(:,:)=df_coef(:,:)/dl_sum
       ENDIF
 
    END FUNCTION filter__2D_gauss
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION filter__1D_butterworth(dd_cutoff, id_radius, dd_alpha) &
+         & RESULT (df_coef)
    !-------------------------------------------------------------------
    !> @brief This function compute coefficient for BUTTERWORTH filter.
    !>
@@ -1157,15 +1217,16 @@ CONTAINS
    !> @param[in] dd_alpha  filter parameter
    !> @return array of butterworth filter coefficient 
    !-------------------------------------------------------------------
-   FUNCTION filter__1D_butterworth(dd_cutoff, id_radius, dd_alpha)
+
       IMPLICIT NONE
+
       ! Argument      
       REAL(dp)        , INTENT(IN) :: dd_cutoff 
       INTEGER(i4)     , INTENT(IN) :: id_radius
       REAL(dp)        , INTENT(IN) :: dd_alpha 
 
       ! function
-      REAL(dp), DIMENSION(2*id_radius+1) :: filter__1D_butterworth
+      REAL(dp), DIMENSION(2*id_radius+1) :: df_coef
 
       ! local variable
       REAL(dp) :: dl_rad
@@ -1178,24 +1239,27 @@ CONTAINS
       IF( dd_cutoff <= 1 )THEN
          CALL logger_error("FILTER COEF: cut-off frequency "//&
          &  "should be greater than 1. No filter will be apply ")
-         filter__1D_butterworth(:)=0.
-         filter__1D_butterworth(id_radius+1)=1.
+         df_coef(:)=0.
+         df_coef(id_radius+1)=1.
       ELSE
          DO ji=1,2*id_radius+1
 
             dl_rad= SQRT( REAL(ji-(id_radius+1),dp)**2 )
             
-            filter__1D_butterworth(ji)= 1 / (1+(dl_rad**2/dd_cutoff**2)**dd_alpha)
+            df_coef(ji)= 1 / (1+(dl_rad**2/dd_cutoff**2)**dd_alpha)
 
          ENDDO
 
          ! normalize
-         dl_sum=SUM(filter__1D_butterworth(:))
+         dl_sum=SUM(df_coef(:))
 
-         filter__1D_butterworth(:)=filter__1D_butterworth(:)/dl_sum
+         df_coef(:)=df_coef(:)/dl_sum
       ENDIF
 
    END FUNCTION filter__1D_butterworth
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION filter__2D_butterworth(dd_cutoff,  id_radius, dd_alpha) &
+         & RESULT (df_coef)
    !-------------------------------------------------------------------
    !> @brief This function compute coefficient for BUTTERWORTH filter.
    !>
@@ -1209,15 +1273,16 @@ CONTAINS
    !> @param[in] dd_alpha  filter parameter
    !> @return array of butterworth filter coefficient 
    !-------------------------------------------------------------------
-   FUNCTION filter__2D_butterworth(dd_cutoff,  id_radius, dd_alpha)
+
       IMPLICIT NONE
+
       ! Argument      
       REAL(dp)        , INTENT(IN) :: dd_cutoff 
       INTEGER(i4)     , INTENT(IN) :: id_radius
       REAL(dp)        , INTENT(IN) :: dd_alpha 
 
       ! function
-      REAL(dp), DIMENSION(2*id_radius+1,2*id_radius+1) :: filter__2D_butterworth
+      REAL(dp), DIMENSION(2*id_radius+1,2*id_radius+1) :: df_coef
 
       ! local variable
       REAL(dp) :: dl_rad
@@ -1231,26 +1296,27 @@ CONTAINS
       IF( dd_cutoff <= 1 )THEN
          CALL logger_error("FILTER COEF: cut-off frequency "//&
          &  "should be greater than 1. No filter will be apply ")
-         filter__2D_butterworth(:,:)=0.
-         filter__2D_butterworth(id_radius+1,id_radius+1)=1.
+         df_coef(:,:)=0.
+         df_coef(id_radius+1,id_radius+1)=1.
       ELSE
          DO jj=1,2*id_radius+1
             DO ji=1,2*id_radius+1
 
                dl_rad= SQRT( REAL(ji-(id_radius+1),dp)**2 + &
-               &             REAL(jj-(id_radius+1),dp)**2 )
+                  &          REAL(jj-(id_radius+1),dp)**2 )
                
-               filter__2D_butterworth(ji,jj)= 1 / (1+(dl_rad**2/dd_cutoff**2)**dd_alpha)
+               df_coef(ji,jj)= 1 / (1+(dl_rad**2/dd_cutoff**2)**dd_alpha)
 
             ENDDO
          ENDDO
 
          ! normalize
-         dl_sum=SUM(filter__2D_butterworth(:,:))
+         dl_sum=SUM(df_coef(:,:))
 
-         filter__2D_butterworth(:,:)=filter__2D_butterworth(:,:)/dl_sum
+         df_coef(:,:)=df_coef(:,:)/dl_sum
       ENDIF
 
    END FUNCTION filter__2D_butterworth
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 END MODULE filter
 

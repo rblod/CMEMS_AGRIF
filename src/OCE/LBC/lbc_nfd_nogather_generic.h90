@@ -73,11 +73,7 @@
       ipf = F_SIZE(ptab)   ! 5th    -      use in "multi" case (array of pointers)
       !
       ! Security check for further developments
-      IF ( ipf > 1 ) THEN
-        write(6,*) 'lbc_nfd_nogather: multiple fields not allowed. Revise implementation' 
-        write(6,*) 'You should not be there...' 
-        STOP
-      ENDIF
+      IF ( ipf > 1 ) CALL ctl_stop( 'STOP', 'lbc_nfd_nogather: multiple fields not allowed. Revise implementation...' )
       !
       ijpj   = 1    ! index of first modified line 
       ijpjp1 = 2    ! index + 1

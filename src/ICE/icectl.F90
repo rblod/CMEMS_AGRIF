@@ -11,8 +11,9 @@ MODULE icectl
    !!----------------------------------------------------------------------
    !!   'key_si3'                                       SI3 sea-ice model
    !!----------------------------------------------------------------------
-   !!    ice_cons_hsm     : conservation tests on heat, salt and mass
-   !!    ice_cons_final   : conservation tests on heat, salt and mass at end of time step
+   !!    ice_cons_hsm     : conservation tests on heat, salt and mass during a  time step (global) 
+   !!    ice_cons_final   : conservation tests on heat, salt and mass at end of time step (global)
+   !!    ice_cons2D       : conservation tests on heat, salt and mass at each gridcell
    !!    ice_ctl          : control prints in case of crash
    !!    ice_prt          : control prints at a given grid point
    !!    ice_prt3D        : control prints of ice arrays
@@ -26,6 +27,7 @@ MODULE icectl
    USE sbc_ice        ! Surface boundary condition: ice   fields
    !
    USE in_out_manager ! I/O manager
+   USE iom            ! I/O manager library
    USE lib_mpp        ! MPP library
    USE lib_fortran    ! fortran utilities (glob_sum + no signed zero)
    USE timing         ! Timing
@@ -36,15 +38,22 @@ MODULE icectl
 
    PUBLIC   ice_cons_hsm
    PUBLIC   ice_cons_final
+   PUBLIC   ice_cons2D
    PUBLIC   ice_ctl
    PUBLIC   ice_prt
    PUBLIC   ice_prt3D
 
+   ! thresold rates for conservation
+   !    these values are changed by the namelist parameter rn_icechk, so that threshold = zchk * rn_icechk
+   REAL(wp), PARAMETER ::   zchk_m   = 2.5e-7   ! kg/m2/s <=> 1e-6 m of ice per hour spuriously gained/lost
+   REAL(wp), PARAMETER ::   zchk_s   = 2.5e-6   ! g/m2/s  <=> 1e-6 m of ice per hour spuriously gained/lost (considering s=10g/kg)
+   REAL(wp), PARAMETER ::   zchk_t   = 7.5e-2   ! W/m2    <=> 1e-6 m of ice per hour spuriously gained/lost (considering Lf=3e5J/kg)
+   
    !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/ICE 4.0 , NEMO Consortium (2018)
-   !! $Id: icectl.F90 10538 2019-01-17 10:41:10Z clem $
+   !! $Id: icectl.F90 12649 2020-04-03 07:11:57Z smasson $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -58,8 +67,7 @@ CONTAINS
       !!
       !! ** Method  : This is an online diagnostics which can be activated with ln_icediachk=true
       !!              It prints in ocean.output if there is a violation of conservation at each time-step
-      !!              The thresholds (zv_sill, zs_sill, zt_sill) which determine violations are set to
-      !!              a minimum of 1 mm of ice (over the ice area) that is lost/gained spuriously during 100 years.
+      !!              The thresholds (zchk_m, zchk_s, zchk_t) determine violations
       !!              For salt and heat thresholds, ice is considered to have a salinity of 10 
       !!              and a heat content of 3e5 J/kg (=latent heat of fusion) 
       !!-------------------------------------------------------------------
@@ -67,109 +75,96 @@ CONTAINS
       CHARACTER(len=*), INTENT(in)    ::   cd_routine    ! name of the routine
       REAL(wp)        , INTENT(inout) ::   pdiag_v, pdiag_s, pdiag_t, pdiag_fv, pdiag_fs, pdiag_ft
       !!
-      REAL(wp) ::   zv, zs, zt, zfs, zfv, zft
-      REAL(wp) ::   zvmin, zamin, zamax 
+      REAL(wp) ::   zdiag_mass, zdiag_salt, zdiag_heat, &
+         &          zdiag_vmin, zdiag_amin, zdiag_amax, zdiag_eimin, zdiag_esmin, zdiag_smin
       REAL(wp) ::   zvtrp, zetrp
-      REAL(wp) ::   zarea, zv_sill, zs_sill, zt_sill
-      REAL(wp), PARAMETER ::   zconv = 1.e-9 ! convert W to GW and kg to Mt
+      REAL(wp) ::   zarea
       !!-------------------------------------------------------------------
       !
       IF( icount == 0 ) THEN
-         !                          ! water flux
-         pdiag_fv = glob_sum( 'icectl',                                                                       &
-            &                 -( wfx_bog(:,:) + wfx_bom(:,:) + wfx_sum(:,:) + wfx_sni(:,:) +                  &
-            &                    wfx_opw(:,:) + wfx_res(:,:) + wfx_dyn(:,:) + wfx_lam(:,:) + wfx_pnd(:,:)  +  &
-            &                    wfx_snw_sni(:,:) + wfx_snw_sum(:,:) + wfx_snw_dyn(:,:) + wfx_snw_sub(:,:) +  &
-            &                    wfx_ice_sub(:,:) + wfx_spr(:,:)  &
-            &                  ) * e1e2t(:,:) ) * zconv
-         !
-         !                          ! salt flux
-         pdiag_fs = glob_sum( 'icectl',                                                                     &
-            &                  ( sfx_bri(:,:) + sfx_bog(:,:) + sfx_bom(:,:) + sfx_sum(:,:) + sfx_sni(:,:) +  &
-            &                    sfx_opw(:,:) + sfx_res(:,:) + sfx_dyn(:,:) + sfx_sub(:,:) + sfx_lam(:,:)    &
-            &                  ) *  e1e2t(:,:) ) * zconv 
-         !
-         !                          ! heat flux
-         pdiag_ft = glob_sum( 'icectl',                                                                    &
-            &                  ( hfx_sum(:,:) + hfx_bom(:,:) + hfx_bog(:,:) + hfx_dif(:,:) + hfx_opw(:,:) + hfx_snw(:,:)  & 
-            &                  - hfx_thd(:,:) - hfx_dyn(:,:) - hfx_res(:,:) - hfx_sub(:,:) - hfx_spr(:,:)   &
-            &                  ) *  e1e2t(:,:) ) * zconv
 
-         pdiag_v = glob_sum( 'icectl', SUM( v_i * rhoi + v_s * rhos, dim=3 ) * e1e2t * zconv )
+         pdiag_v = glob_sum( 'icectl',   SUM( v_i * rhoi + v_s * rhos, dim=3 ) * e1e2t )
+         pdiag_s = glob_sum( 'icectl',   SUM( sv_i * rhoi            , dim=3 ) * e1e2t )
+         pdiag_t = glob_sum( 'icectl', ( SUM( SUM( e_i, dim=4 ), dim=3 ) + SUM( SUM( e_s, dim=4 ), dim=3 ) ) * e1e2t )
 
-         pdiag_s = glob_sum( 'icectl', SUM( sv_i * rhoi            , dim=3 ) * e1e2t * zconv )
-
-         pdiag_t = glob_sum( 'icectl', (  SUM( SUM( e_i(:,:,1:nlay_i,:), dim=4 ), dim=3 )     &
-            &                 + SUM( SUM( e_s(:,:,1:nlay_s,:), dim=4 ), dim=3 ) ) * e1e2t ) * zconv
+         ! mass flux
+         pdiag_fv = glob_sum( 'icectl',  &
+            &                         ( wfx_bog + wfx_bom + wfx_sum + wfx_sni + wfx_opw + wfx_res + wfx_dyn + wfx_lam + wfx_pnd + &
+            &                           wfx_snw_sni + wfx_snw_sum + wfx_snw_dyn + wfx_snw_sub + wfx_ice_sub + wfx_spr ) * e1e2t )
+         ! salt flux
+         pdiag_fs = glob_sum( 'icectl',  &
+            &                         ( sfx_bri + sfx_bog + sfx_bom + sfx_sum + sfx_sni + &
+            &                           sfx_opw + sfx_res + sfx_dyn + sfx_sub + sfx_lam ) * e1e2t )
+         ! heat flux
+         pdiag_ft = glob_sum( 'icectl',  &
+            &                         (   hfx_sum + hfx_bom + hfx_bog + hfx_dif + hfx_opw + hfx_snw  &
+            &                           - hfx_thd - hfx_dyn - hfx_res - hfx_sub - hfx_spr ) * e1e2t )
 
       ELSEIF( icount == 1 ) THEN
 
-         ! water flux
-         zfv = glob_sum( 'icectl',                                                                        &
-            &             -( wfx_bog(:,:) + wfx_bom(:,:) + wfx_sum(:,:) + wfx_sni(:,:) +                  &
-            &                wfx_opw(:,:) + wfx_res(:,:) + wfx_dyn(:,:) + wfx_lam(:,:) + wfx_pnd(:,:)  +  &
-            &                wfx_snw_sni(:,:) + wfx_snw_sum(:,:) + wfx_snw_dyn(:,:) + wfx_snw_sub(:,:) +  &
-            &                wfx_ice_sub(:,:) + wfx_spr(:,:)  &
-            &              ) * e1e2t(:,:) ) * zconv - pdiag_fv
+         ! -- mass diag -- !
+         zdiag_mass = ( glob_sum( 'icectl', SUM( v_i * rhoi + v_s * rhos, dim=3 ) * e1e2t ) - pdiag_v ) * r1_Dt_ice       &
+            &         + glob_sum( 'icectl', ( wfx_bog + wfx_bom + wfx_sum + wfx_sni + wfx_opw + wfx_res + wfx_dyn +       &
+            &                                 wfx_lam + wfx_pnd + wfx_snw_sni + wfx_snw_sum + wfx_snw_dyn + wfx_snw_sub + &
+            &                                 wfx_ice_sub + wfx_spr ) * e1e2t )                                           &
+            &         - pdiag_fv
+         !
+         ! -- salt diag -- !
+         zdiag_salt = ( glob_sum( 'icectl', SUM( sv_i * rhoi , dim=3 ) * e1e2t ) - pdiag_s ) * r1_Dt_ice  &
+            &         + glob_sum( 'icectl', ( sfx_bri + sfx_bog + sfx_bom + sfx_sum + sfx_sni +           &
+            &                                 sfx_opw + sfx_res + sfx_dyn + sfx_sub + sfx_lam ) * e1e2t ) &
+            &         - pdiag_fs
+         !
+         ! -- heat diag -- !
+         zdiag_heat = ( glob_sum( 'icectl', ( SUM(SUM(e_i, dim=4), dim=3) + SUM(SUM(e_s, dim=4), dim=3) ) * e1e2t ) - pdiag_t &
+            &         ) * r1_Dt_ice                                                                                           &
+            &         + glob_sum( 'icectl', (  hfx_sum + hfx_bom + hfx_bog + hfx_dif + hfx_opw + hfx_snw                      &
+            &                                - hfx_thd - hfx_dyn - hfx_res - hfx_sub - hfx_spr ) * e1e2t )                    &
+            &         - pdiag_ft
 
-         ! salt flux
-         zfs = glob_sum( 'icectl',                                                                       &
-            &              ( sfx_bri(:,:) + sfx_bog(:,:) + sfx_bom(:,:) + sfx_sum(:,:) + sfx_sni(:,:) +  &
-            &                sfx_opw(:,:) + sfx_res(:,:) + sfx_dyn(:,:) + sfx_sub(:,:) + sfx_lam(:,:)    & 
-            &              ) * e1e2t(:,:) ) * zconv - pdiag_fs
+         ! -- min/max diag -- !
+         zdiag_amax  = glob_max( 'icectl', SUM( a_i, dim=3 ) )
+         zdiag_vmin  = glob_min( 'icectl', v_i )
+         zdiag_amin  = glob_min( 'icectl', a_i )
+         zdiag_smin  = glob_min( 'icectl', sv_i )
+         zdiag_eimin = glob_min( 'icectl', SUM( e_i, dim=3 ) )
+         zdiag_esmin = glob_min( 'icectl', SUM( e_s, dim=3 ) )
 
-         ! heat flux
-         zft = glob_sum( 'icectl',                                                                      &
-            &              ( hfx_sum(:,:) + hfx_bom(:,:) + hfx_bog(:,:) + hfx_dif(:,:) + hfx_opw(:,:) + hfx_snw(:,:)  & 
-            &              - hfx_thd(:,:) - hfx_dyn(:,:) - hfx_res(:,:) - hfx_sub(:,:) - hfx_spr(:,:)   &
-            &              ) * e1e2t(:,:) ) * zconv - pdiag_ft
- 
-         ! outputs
-         zv = ( ( glob_sum( 'icectl', SUM( v_i * rhoi + v_s * rhos, dim=3 ) * e1e2t ) * zconv  &
-            &     - pdiag_v ) * r1_rdtice - zfv ) * rday
+         ! -- advection scheme is conservative? -- !
+         zvtrp = glob_sum( 'icectl', ( diag_trp_vi * rhoi + diag_trp_vs * rhos ) * e1e2t ) ! must be close to 0 (only for Prather)
+         zetrp = glob_sum( 'icectl', ( diag_trp_ei        + diag_trp_es        ) * e1e2t ) ! must be close to 0 (only for Prather)
 
-         zs = ( ( glob_sum( 'icectl', SUM( sv_i * rhoi            , dim=3 ) * e1e2t ) * zconv  &
-            &     - pdiag_s ) * r1_rdtice + zfs ) * rday
+         ! ice area (+epsi10 to set a threshold > 0 when there is no ice) 
+         zarea = glob_sum( 'icectl', SUM( a_i + epsi10, dim=3 ) * e1e2t )
 
-         zt = ( glob_sum( 'icectl',                                                                &
-            &             (  SUM( SUM( e_i(:,:,1:nlay_i,:), dim=4 ), dim=3 )                       &
-            &              + SUM( SUM( e_s(:,:,1:nlay_s,:), dim=4 ), dim=3 ) ) * e1e2t ) * zconv   &
-            &   - pdiag_t ) * r1_rdtice + zft
-
-         ! zvtrp and zetrp must be close to 0 if the advection scheme is conservative
-         zvtrp = glob_sum( 'icectl', ( diag_trp_vi * rhoi + diag_trp_vs * rhos ) * e1e2t  ) * zconv * rday 
-         zetrp = glob_sum( 'icectl', ( diag_trp_ei        + diag_trp_es        ) * e1e2t  ) * zconv
-
-         zvmin = glob_min( 'icectl', v_i )
-         zamax = glob_max( 'icectl', SUM( a_i, dim=3 ) )
-         zamin = glob_min( 'icectl', a_i )
-
-         ! set threshold values and calculate the ice area (+epsi10 to set a threshold > 0 when there is no ice) 
-         zarea   = glob_sum( 'icectl', SUM( a_i + epsi10, dim=3 ) * e1e2t ) * zconv ! in 1.e9 m2
-         zv_sill = zarea * 2.5e-5
-         zs_sill = zarea * 25.e-5
-         zt_sill = zarea * 10.e-5
-
-         IF(lwp) THEN
-            IF ( ABS( zv   ) > zv_sill )   WRITE(numout,*) 'violation volume [Mt/day]     (',cd_routine,') = ',zv
-            IF ( ABS( zs   ) > zs_sill )   WRITE(numout,*) 'violation saline [psu*Mt/day] (',cd_routine,') = ',zs
-            IF ( ABS( zt   ) > zt_sill )   WRITE(numout,*) 'violation enthalpy [GW]       (',cd_routine,') = ',zt
-            IF ( zvmin < -epsi10 )         WRITE(numout,*) 'violation v_i<0  [m]          (',cd_routine,') = ',zvmin
-            IF ( zamax > MAX( rn_amax_n, rn_amax_s ) + epsi10   &
-               & .AND. cd_routine /= 'icedyn_adv' .AND. cd_routine /= 'icedyn_rdgrft' .AND. cd_routine /= 'Hbig' ) &
-               &                           WRITE(numout,*) 'violation a_i>amax            (',cd_routine,') = ',zamax
-            IF ( zamin < -epsi10 )         WRITE(numout,*) 'violation a_i<0               (',cd_routine,') = ',zamin
-!clem: the following check fails when using UMx advection scheme (see comments in icedyn_adv.F90)
-!            IF ( ABS(zvtrp ) > zv_sill .AND. cd_routine == 'icedyn_adv' ) THEN
-!                                           WRITE(numout,*) 'violation vtrp [Mt/day]       (',cd_routine,') = ',zvtrp
-!                                           WRITE(numout,*) 'violation etrp [GW]           (',cd_routine,') = ',zetrp
-!            ENDIF
+         IF( lwp ) THEN
+            ! check conservation issues
+            IF( ABS(zdiag_mass) > zchk_m * rn_icechk_glo * zarea ) &
+               &                   WRITE(numout,*)   cd_routine,' : violation mass cons. [kg] = ',zdiag_mass * rDt_ice
+            IF( ABS(zdiag_salt) > zchk_s * rn_icechk_glo * zarea ) &
+               &                   WRITE(numout,*)   cd_routine,' : violation salt cons. [g]  = ',zdiag_salt * rDt_ice
+            IF( ABS(zdiag_heat) > zchk_t * rn_icechk_glo * zarea ) &
+               &                   WRITE(numout,*)   cd_routine,' : violation heat cons. [J]  = ',zdiag_heat * rDt_ice
+            ! check negative values
+            IF( zdiag_vmin  < 0. ) WRITE(numout,*)   cd_routine,' : violation v_i < 0         = ',zdiag_vmin
+            IF( zdiag_amin  < 0. ) WRITE(numout,*)   cd_routine,' : violation a_i < 0         = ',zdiag_amin
+            IF( zdiag_smin  < 0. ) WRITE(numout,*)   cd_routine,' : violation s_i < 0         = ',zdiag_smin
+            IF( zdiag_eimin < 0. ) WRITE(numout,*)   cd_routine,' : violation e_i < 0         = ',zdiag_eimin
+            IF( zdiag_esmin < 0. ) WRITE(numout,*)   cd_routine,' : violation e_s < 0         = ',zdiag_esmin
+            ! check maximum ice concentration
+            IF( zdiag_amax > MAX(rn_amax_n,rn_amax_s)+epsi10 .AND. cd_routine /= 'icedyn_adv' .AND. cd_routine /= 'icedyn_rdgrft' ) &
+               &                   WRITE(numout,*)   cd_routine,' : violation a_i > amax      = ',zdiag_amax
+            ! check if advection scheme is conservative
+            !    only check for Prather because Ultimate-Macho uses corrective fluxes (wfx etc)
+            !    so the formulation for conservation is different (and not coded) 
+            !    it does not mean UM is not conservative (it is checked with above prints) => update (09/2019): same for Prather now
+            !IF( ln_adv_Pra .AND. ABS(zvtrp) > zchk_m * rn_icechk_glo * zarea .AND. cd_routine == 'icedyn_adv' ) &
+            !   &                   WRITE(numout,*)   cd_routine,' : violation adv scheme [kg] = ',zvtrp * rDt_ice
          ENDIF
          !
       ENDIF
 
    END SUBROUTINE ice_cons_hsm
-
 
    SUBROUTINE ice_cons_final( cd_routine )
       !!-------------------------------------------------------------------
@@ -179,40 +174,176 @@ CONTAINS
       !!
       !! ** Method  : This is an online diagnostics which can be activated with ln_icediachk=true
       !!              It prints in ocean.output if there is a violation of conservation at each time-step
-      !!              The thresholds (zv_sill, zs_sill, zt_sill) which determine the violation are set to
-      !!              a minimum of 1 mm of ice (over the ice area) that is lost/gained spuriously during 100 years.
+      !!              The thresholds (zchk_m, zchk_s, zchk_t) determine the violations
       !!              For salt and heat thresholds, ice is considered to have a salinity of 10 
       !!              and a heat content of 3e5 J/kg (=latent heat of fusion) 
       !!-------------------------------------------------------------------
-      CHARACTER(len=*), INTENT(in)    :: cd_routine    ! name of the routine
-      REAL(wp)                        :: zhfx, zsfx, zvfx
-      REAL(wp)                        :: zarea, zv_sill, zs_sill, zt_sill
-      REAL(wp), PARAMETER             :: zconv = 1.e-9 ! convert W to GW and kg to Mt
+      CHARACTER(len=*), INTENT(in) ::   cd_routine    ! name of the routine
+      REAL(wp) ::   zdiag_mass, zdiag_salt, zdiag_heat
+      REAL(wp) ::   zarea
       !!-------------------------------------------------------------------
 
       ! water flux
-      zvfx  = glob_sum( 'icectl', ( wfx_ice + wfx_snw + wfx_spr + wfx_sub + diag_vice + diag_vsnw ) * e1e2t ) * zconv * rday
+      ! -- mass diag -- !
+      zdiag_mass = glob_sum( 'icectl', ( wfx_ice + wfx_snw + wfx_spr + wfx_sub + diag_vice + diag_vsnw ) * e1e2t )
 
-      ! salt flux
-      zsfx  = glob_sum( 'icectl', ( sfx + diag_sice ) * e1e2t ) * zconv * rday
+      ! -- salt diag -- !
+      zdiag_salt = glob_sum( 'icectl', ( sfx + diag_sice ) * e1e2t )
 
-      ! heat flux
-      zhfx  = glob_sum( 'icectl', ( qt_atm_oi - qt_oce_ai - diag_heat ) * e1e2t ) * zconv
+      ! -- heat diag -- !
+      ! clem: not the good formulation
+      !!zdiag_heat  = glob_sum( 'icectl', ( qt_oce_ai - qt_atm_oi + diag_heat + hfx_thd + hfx_dyn + hfx_res + hfx_sub + hfx_spr  &
+      !!   &                              ) * e1e2t )
 
-      ! set threshold values and calculate the ice area (+epsi10 to set a threshold > 0 when there is no ice) 
-      zarea   = glob_sum( 'icectl', SUM( a_i + epsi10, dim=3 ) * e1e2t ) * zconv ! in 1.e9 m2
-      zv_sill = zarea * 2.5e-5
-      zs_sill = zarea * 25.e-5
-      zt_sill = zarea * 10.e-5
+      ! ice area (+epsi10 to set a threshold > 0 when there is no ice) 
+      zarea = glob_sum( 'icectl', SUM( a_i + epsi10, dim=3 ) * e1e2t )
 
-      IF(lwp) THEN
-         IF( ABS( zvfx ) > zv_sill )   WRITE(numout,*) 'violation vfx  [Mt/day]       (',cd_routine,') = ',zvfx
-         IF( ABS( zsfx ) > zs_sill )   WRITE(numout,*) 'violation sfx  [psu*Mt/day]   (',cd_routine,') = ',zsfx
-         IF( ABS( zhfx ) > zt_sill )   WRITE(numout,*) 'violation hfx  [GW]           (',cd_routine,') = ',zhfx
+      IF( lwp ) THEN
+         IF( ABS(zdiag_mass) > zchk_m * rn_icechk_glo * zarea ) &
+            &                   WRITE(numout,*) cd_routine,' : violation mass cons. [kg] = ',zdiag_mass * rDt_ice
+         IF( ABS(zdiag_salt) > zchk_s * rn_icechk_glo * zarea ) &
+            &                   WRITE(numout,*) cd_routine,' : violation salt cons. [g]  = ',zdiag_salt * rDt_ice
+         !!IF( ABS(zdiag_heat) > zchk_t * rn_icechk_glo * zarea ) WRITE(numout,*) cd_routine,' : violation heat cons. [J]  = ',zdiag_heat * rDt_ice
       ENDIF
       !
    END SUBROUTINE ice_cons_final
 
+   SUBROUTINE ice_cons2D( icount, cd_routine, pdiag_v, pdiag_s, pdiag_t, pdiag_fv, pdiag_fs, pdiag_ft )
+      !!-------------------------------------------------------------------
+      !!                       ***  ROUTINE ice_cons2D ***
+      !!
+      !! ** Purpose : Test the conservation of heat, salt and mass for each ice routine
+      !!                     + test if ice concentration and volume are > 0
+      !!
+      !! ** Method  : This is an online diagnostics which can be activated with ln_icediachk=true
+      !!              It stops the code if there is a violation of conservation at any gridcell
+      !!-------------------------------------------------------------------
+      INTEGER         , INTENT(in) ::   icount        ! called at: =0 the begining of the routine, =1  the end
+      CHARACTER(len=*), INTENT(in) ::   cd_routine    ! name of the routine
+      REAL(wp)        , DIMENSION(jpi,jpj), INTENT(inout) ::   pdiag_v, pdiag_s, pdiag_t, pdiag_fv, pdiag_fs, pdiag_ft
+      !!
+      REAL(wp), DIMENSION(jpi,jpj) ::   zdiag_mass, zdiag_salt, zdiag_heat, &
+         &                              zdiag_amin, zdiag_vmin, zdiag_smin, zdiag_emin !!, zdiag_amax  
+      INTEGER ::   jl, jk
+      LOGICAL ::   ll_stop_m = .FALSE.
+      LOGICAL ::   ll_stop_s = .FALSE.
+      LOGICAL ::   ll_stop_t = .FALSE.
+      CHARACTER(len=120) ::   clnam   ! filename for the output
+      !!-------------------------------------------------------------------
+      !
+      IF( icount == 0 ) THEN
+
+         pdiag_v = SUM( v_i  * rhoi + v_s * rhos, dim=3 )
+         pdiag_s = SUM( sv_i * rhoi             , dim=3 )
+         pdiag_t = SUM( SUM( e_i, dim=4 ), dim=3 ) + SUM( SUM( e_s, dim=4 ), dim=3 )
+
+         ! mass flux
+         pdiag_fv = wfx_bog + wfx_bom + wfx_sum + wfx_sni + wfx_opw + wfx_res + wfx_dyn + wfx_lam + wfx_pnd  +  &
+            &       wfx_snw_sni + wfx_snw_sum + wfx_snw_dyn + wfx_snw_sub + wfx_ice_sub + wfx_spr
+         ! salt flux
+         pdiag_fs = sfx_bri + sfx_bog + sfx_bom + sfx_sum + sfx_sni + sfx_opw + sfx_res + sfx_dyn + sfx_sub + sfx_lam 
+         ! heat flux
+         pdiag_ft =   hfx_sum + hfx_bom + hfx_bog + hfx_dif + hfx_opw + hfx_snw  & 
+            &       - hfx_thd - hfx_dyn - hfx_res - hfx_sub - hfx_spr
+
+      ELSEIF( icount == 1 ) THEN
+
+         ! -- mass diag -- !
+         zdiag_mass =   ( SUM( v_i * rhoi + v_s * rhos, dim=3 ) - pdiag_v ) * r1_Dt_ice                             &
+            &         + ( wfx_bog + wfx_bom + wfx_sum + wfx_sni + wfx_opw + wfx_res + wfx_dyn + wfx_lam + wfx_pnd + &
+            &             wfx_snw_sni + wfx_snw_sum + wfx_snw_dyn + wfx_snw_sub + wfx_ice_sub + wfx_spr )           &
+            &         - pdiag_fv
+         IF( MAXVAL( ABS(zdiag_mass) ) > zchk_m * rn_icechk_cel )   ll_stop_m = .TRUE.
+         !
+         ! -- salt diag -- !
+         zdiag_salt =   ( SUM( sv_i * rhoi , dim=3 ) - pdiag_s ) * r1_Dt_ice                                                  &
+            &         + ( sfx_bri + sfx_bog + sfx_bom + sfx_sum + sfx_sni + sfx_opw + sfx_res + sfx_dyn + sfx_sub + sfx_lam ) &
+            &         - pdiag_fs
+         IF( MAXVAL( ABS(zdiag_salt) ) > zchk_s * rn_icechk_cel )   ll_stop_s = .TRUE.
+         !
+         ! -- heat diag -- !
+         zdiag_heat =   ( SUM( SUM( e_i, dim=4 ), dim=3 ) + SUM( SUM( e_s, dim=4 ), dim=3 ) - pdiag_t ) * r1_Dt_ice &
+            &         + (  hfx_sum + hfx_bom + hfx_bog + hfx_dif + hfx_opw + hfx_snw                                & 
+            &            - hfx_thd - hfx_dyn - hfx_res - hfx_sub - hfx_spr )                                        &
+            &         - pdiag_ft
+         IF( MAXVAL( ABS(zdiag_heat) ) > zchk_t * rn_icechk_cel )   ll_stop_t = .TRUE.
+         !
+         ! -- other diags -- !
+         ! a_i < 0
+         zdiag_amin(:,:) = 0._wp
+         DO jl = 1, jpl
+            WHERE( a_i(:,:,jl) < 0._wp )   zdiag_amin(:,:) = 1._wp
+         ENDDO
+         ! v_i < 0
+         zdiag_vmin(:,:) = 0._wp
+         DO jl = 1, jpl
+            WHERE( v_i(:,:,jl) < 0._wp )   zdiag_vmin(:,:) = 1._wp
+         ENDDO
+         ! s_i < 0
+         zdiag_smin(:,:) = 0._wp
+         DO jl = 1, jpl
+            WHERE( s_i(:,:,jl) < 0._wp )   zdiag_smin(:,:) = 1._wp
+         ENDDO
+         ! e_i < 0
+         zdiag_emin(:,:) = 0._wp
+         DO jl = 1, jpl
+            DO jk = 1, nlay_i
+               WHERE( e_i(:,:,jk,jl) < 0._wp )   zdiag_emin(:,:) = 1._wp
+            ENDDO
+         ENDDO
+         ! a_i > amax
+         !WHERE( SUM( a_i, dim=3 ) > ( MAX( rn_amax_n, rn_amax_s ) + epsi10 )   ;   zdiag_amax(:,:) = 1._wp
+         !ELSEWHERE                                                             ;   zdiag_amax(:,:) = 0._wp
+         !END WHERE
+
+         IF( ll_stop_m .OR. ll_stop_s .OR. ll_stop_t ) THEN
+            clnam = 'diag_ice_conservation_'//cd_routine
+            CALL ice_cons_wri( clnam, zdiag_mass, zdiag_salt, zdiag_heat, zdiag_amin, zdiag_vmin, zdiag_smin, zdiag_emin )
+         ENDIF
+
+         IF( ll_stop_m )   CALL ctl_stop( 'STOP', cd_routine//': ice mass conservation issue' )
+         IF( ll_stop_s )   CALL ctl_stop( 'STOP', cd_routine//': ice salt conservation issue' )
+         IF( ll_stop_t )   CALL ctl_stop( 'STOP', cd_routine//': ice heat conservation issue' )
+         
+      ENDIF
+
+   END SUBROUTINE ice_cons2D
+
+   SUBROUTINE ice_cons_wri( cdfile_name, pdiag_mass, pdiag_salt, pdiag_heat, pdiag_amin, pdiag_vmin, pdiag_smin, pdiag_emin )
+      !!---------------------------------------------------------------------
+      !!                 ***  ROUTINE ice_cons_wri  ***
+      !!        
+      !! ** Purpose :   create a NetCDF file named cdfile_name which contains 
+      !!                the instantaneous fields when conservation issue occurs
+      !!
+      !! ** Method  :   NetCDF files using ioipsl
+      !!----------------------------------------------------------------------
+      CHARACTER(len=*), INTENT( in ) ::   cdfile_name      ! name of the file created
+      REAL(wp), DIMENSION(:,:), INTENT( in ) ::   pdiag_mass, pdiag_salt, pdiag_heat, &
+         &                                        pdiag_amin, pdiag_vmin, pdiag_smin, pdiag_emin !!, pdiag_amax  
+      !!
+      INTEGER ::   inum
+      !!----------------------------------------------------------------------
+      ! 
+      IF(lwp) WRITE(numout,*)
+      IF(lwp) WRITE(numout,*) 'ice_cons_wri : single instantaneous ice state'
+      IF(lwp) WRITE(numout,*) '~~~~~~~~~~~~~  named :', cdfile_name, '...nc'
+      IF(lwp) WRITE(numout,*)                
+
+      CALL iom_open( TRIM(cdfile_name), inum, ldwrt = .TRUE., kdlev = jpl, cdcomp = 'ICE' )
+      
+      CALL iom_rstput( 0, 0, inum, 'cons_mass', pdiag_mass(:,:) , ktype = jp_r8 )    ! ice mass spurious lost/gain
+      CALL iom_rstput( 0, 0, inum, 'cons_salt', pdiag_salt(:,:) , ktype = jp_r8 )    ! ice salt spurious lost/gain
+      CALL iom_rstput( 0, 0, inum, 'cons_heat', pdiag_heat(:,:) , ktype = jp_r8 )    ! ice heat spurious lost/gain
+      ! other diags
+      CALL iom_rstput( 0, 0, inum, 'aneg_count', pdiag_amin(:,:) , ktype = jp_r8 )    ! 
+      CALL iom_rstput( 0, 0, inum, 'vneg_count', pdiag_vmin(:,:) , ktype = jp_r8 )    ! 
+      CALL iom_rstput( 0, 0, inum, 'sneg_count', pdiag_smin(:,:) , ktype = jp_r8 )    ! 
+      CALL iom_rstput( 0, 0, inum, 'eneg_count', pdiag_emin(:,:) , ktype = jp_r8 )    ! 
+      
+      CALL iom_close( inum )
+
+   END SUBROUTINE ice_cons_wri
    
    SUBROUTINE ice_ctl( kt )
       !!-------------------------------------------------------------------
@@ -235,173 +366,117 @@ CONTAINS
       ! Alert if incompatible volume and concentration
       ialert_id = 2 ! reference number of this alert
       cl_alname(ialert_id) = ' Incompat vol and con         '    ! name of the alert
-
       DO jl = 1, jpl
-         DO jj = 1, jpj
-            DO ji = 1, jpi
-               IF(  v_i(ji,jj,jl) /= 0._wp   .AND.   a_i(ji,jj,jl) == 0._wp   ) THEN
-                  !WRITE(numout,*) ' ALERTE 2 :   Incompatible volume and concentration '
-                  !WRITE(numout,*) ' at_i     ', at_i(ji,jj)
-                  !WRITE(numout,*) ' Point - category', ji, jj, jl
-                  !WRITE(numout,*) ' a_i *** a_i_b   ', a_i      (ji,jj,jl), a_i_b  (ji,jj,jl)
-                  !WRITE(numout,*) ' v_i *** v_i_b   ', v_i      (ji,jj,jl), v_i_b  (ji,jj,jl)
-                  inb_alp(ialert_id) = inb_alp(ialert_id) + 1
-               ENDIF
-            END DO
-         END DO
+         DO_2D_11_11
+            IF(  v_i(ji,jj,jl) /= 0._wp   .AND.   a_i(ji,jj,jl) == 0._wp   ) THEN
+               WRITE(numout,*) ' ALERTE 2 :   Incompatible volume and concentration '
+               inb_alp(ialert_id) = inb_alp(ialert_id) + 1
+            ENDIF
+         END_2D
       END DO
 
       ! Alerte if very thick ice
       ialert_id = 3 ! reference number of this alert
       cl_alname(ialert_id) = ' Very thick ice               ' ! name of the alert
       jl = jpl 
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-            IF(   h_i(ji,jj,jl)  >  50._wp   ) THEN
-               !CALL ice_prt( kt, ji, jj, 2, ' ALERTE 3 :   Very thick ice ' )
-               inb_alp(ialert_id) = inb_alp(ialert_id) + 1
-            ENDIF
-         END DO
-      END DO
+      DO_2D_11_11
+         IF(   h_i(ji,jj,jl)  >  50._wp   ) THEN
+            WRITE(numout,*) ' ALERTE 3 :   Very thick ice'
+            !CALL ice_prt( kt, ji, jj, 2, ' ALERTE 3 :   Very thick ice ' )
+            inb_alp(ialert_id) = inb_alp(ialert_id) + 1
+         ENDIF
+      END_2D
 
       ! Alert if very fast ice
       ialert_id = 4 ! reference number of this alert
       cl_alname(ialert_id) = ' Very fast ice               ' ! name of the alert
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-            IF(   MAX( ABS( u_ice(ji,jj) ), ABS( v_ice(ji,jj) ) ) > 1.5  .AND.  &
-               &  at_i(ji,jj) > 0._wp   ) THEN
-               !CALL ice_prt( kt, ji, jj, 1, ' ALERTE 4 :   Very fast ice ' )
-               !WRITE(numout,*) ' ice strength             : ', strength(ji,jj)
-               !WRITE(numout,*) ' oceanic stress utau      : ', utau(ji,jj) 
-               !WRITE(numout,*) ' oceanic stress vtau      : ', vtau(ji,jj)
-               !WRITE(numout,*) ' sea-ice stress utau_ice  : ', utau_ice(ji,jj) 
-               !WRITE(numout,*) ' sea-ice stress vtau_ice  : ', vtau_ice(ji,jj)
-               !WRITE(numout,*) ' sst                      : ', sst_m(ji,jj)
-               !WRITE(numout,*) ' sss                      : ', sss_m(ji,jj)
-               !WRITE(numout,*) 
-               inb_alp(ialert_id) = inb_alp(ialert_id) + 1
-            ENDIF
-         END DO
-      END DO
+      DO_2D_11_11
+         IF(   MAX( ABS( u_ice(ji,jj) ), ABS( v_ice(ji,jj) ) ) > 2.  .AND.  &
+            &  at_i(ji,jj) > 0._wp   ) THEN
+            WRITE(numout,*) ' ALERTE 4 :   Very fast ice'
+            !CALL ice_prt( kt, ji, jj, 1, ' ALERTE 4 :   Very fast ice ' )
+            inb_alp(ialert_id) = inb_alp(ialert_id) + 1
+         ENDIF
+      END_2D
+
+      ! Alert on salt flux
+      ialert_id = 5 ! reference number of this alert
+      cl_alname(ialert_id) = ' High salt flux               ' ! name of the alert
+      DO_2D_11_11
+         IF( ABS( sfx (ji,jj) ) > 1.0e-2 ) THEN  ! = 1 psu/day for 1m ocean depth
+            WRITE(numout,*) ' ALERTE 5 :   High salt flux'
+            !CALL ice_prt( kt, ji, jj, 3, ' ALERTE 5 :   High salt flux ' )
+            inb_alp(ialert_id) = inb_alp(ialert_id) + 1
+         ENDIF
+      END_2D
 
       ! Alert if there is ice on continents
       ialert_id = 6 ! reference number of this alert
       cl_alname(ialert_id) = ' Ice on continents           ' ! name of the alert
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-            IF(   tmask(ji,jj,1) <= 0._wp   .AND.   at_i(ji,jj) > 0._wp   ) THEN 
-               !CALL ice_prt( kt, ji, jj, 1, ' ALERTE 6 :   Ice on continents ' )
-               !WRITE(numout,*) ' masks s, u, v        : ', tmask(ji,jj,1), umask(ji,jj,1), vmask(ji,jj,1) 
-               !WRITE(numout,*) ' sst                  : ', sst_m(ji,jj)
-               !WRITE(numout,*) ' sss                  : ', sss_m(ji,jj)
-               !WRITE(numout,*) ' at_i(ji,jj)          : ', at_i(ji,jj)
-               !WRITE(numout,*) ' v_ice(ji,jj)         : ', v_ice(ji,jj)
-               !WRITE(numout,*) ' v_ice(ji,jj-1)       : ', v_ice(ji,jj-1)
-               !WRITE(numout,*) ' u_ice(ji-1,jj)       : ', u_ice(ji-1,jj)
-               !WRITE(numout,*) ' u_ice(ji,jj)         : ', v_ice(ji,jj)
-               !
-               inb_alp(ialert_id) = inb_alp(ialert_id) + 1
-            ENDIF
-         END DO
-      END DO
+      DO_2D_11_11
+         IF(   tmask(ji,jj,1) <= 0._wp   .AND.   at_i(ji,jj) > 0._wp   ) THEN 
+            WRITE(numout,*) ' ALERTE 6 :   Ice on continents'
+            !CALL ice_prt( kt, ji, jj, 1, ' ALERTE 6 :   Ice on continents ' )
+            inb_alp(ialert_id) = inb_alp(ialert_id) + 1
+         ENDIF
+      END_2D
 
 !
 !     ! Alert if very fresh ice
       ialert_id = 7 ! reference number of this alert
       cl_alname(ialert_id) = ' Very fresh ice               ' ! name of the alert
       DO jl = 1, jpl
-         DO jj = 1, jpj
-            DO ji = 1, jpi
-               IF( s_i(ji,jj,jl) < 0.1 .AND. a_i(ji,jj,jl) > 0._wp ) THEN
+         DO_2D_11_11
+            IF( s_i(ji,jj,jl) < 0.1 .AND. a_i(ji,jj,jl) > 0._wp ) THEN
+               WRITE(numout,*) ' ALERTE 7 :   Very fresh ice'
 !                 CALL ice_prt(kt,ji,jj,1, ' ALERTE 7 :   Very fresh ice ' )
-!                 WRITE(numout,*) ' sst                  : ', sst_m(ji,jj)
-!                 WRITE(numout,*) ' sss                  : ', sss_m(ji,jj)
-!                 WRITE(numout,*) 
-                  inb_alp(ialert_id) = inb_alp(ialert_id) + 1
-               ENDIF
-            END DO
-         END DO
+               inb_alp(ialert_id) = inb_alp(ialert_id) + 1
+            ENDIF
+         END_2D
       END DO
 !
+      ! Alert if qns very big
+      ialert_id = 8 ! reference number of this alert
+      cl_alname(ialert_id) = ' fnsolar very big             ' ! name of the alert
+      DO_2D_11_11
+         IF( ABS( qns(ji,jj) ) > 1500._wp .AND. at_i(ji,jj) > 0._wp ) THEN
+            !
+            WRITE(numout,*) ' ALERTE 8 :   Very high non-solar heat flux'
+            !CALL ice_prt( kt, ji, jj, 2, '   ')
+            inb_alp(ialert_id) = inb_alp(ialert_id) + 1
+            !
+         ENDIF
+      END_2D
+      !+++++
 
 !     ! Alert if too old ice
       ialert_id = 9 ! reference number of this alert
       cl_alname(ialert_id) = ' Very old   ice               ' ! name of the alert
       DO jl = 1, jpl
-         DO jj = 1, jpj
-            DO ji = 1, jpi
-               IF ( ( ( ABS( o_i(ji,jj,jl) ) > rdt_ice ) .OR. &
-                      ( ABS( o_i(ji,jj,jl) ) < 0._wp) ) .AND. &
-                             ( a_i(ji,jj,jl) > 0._wp ) ) THEN
-                  !CALL ice_prt( kt, ji, jj, 1, ' ALERTE 9 :   Wrong ice age ')
-                  inb_alp(ialert_id) = inb_alp(ialert_id) + 1
-               ENDIF
-            END DO
-         END DO
-      END DO
- 
-      ! Alert on salt flux
-      ialert_id = 5 ! reference number of this alert
-      cl_alname(ialert_id) = ' High salt flux               ' ! name of the alert
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-            IF( ABS( sfx (ji,jj) ) > 1.0e-2 ) THEN  ! = 1 psu/day for 1m ocean depth
-               !CALL ice_prt( kt, ji, jj, 3, ' ALERTE 5 :   High salt flux ' )
-               !DO jl = 1, jpl
-                  !WRITE(numout,*) ' Category no: ', jl
-                  !WRITE(numout,*) ' a_i        : ', a_i      (ji,jj,jl) , ' a_i_b      : ', a_i_b  (ji,jj,jl)   
-                  !WRITE(numout,*) ' v_i        : ', v_i      (ji,jj,jl) , ' v_i_b      : ', v_i_b  (ji,jj,jl)   
-                  !WRITE(numout,*) ' '
-               !END DO
+         DO_2D_11_11
+            IF ( ( ( ABS( o_i(ji,jj,jl) ) > rDt_ice ) .OR. &
+                   ( ABS( o_i(ji,jj,jl) ) < 0._wp) ) .AND. &
+                          ( a_i(ji,jj,jl) > 0._wp ) ) THEN
+               WRITE(numout,*) ' ALERTE 9 :   Wrong ice age'
+               !CALL ice_prt( kt, ji, jj, 1, ' ALERTE 9 :   Wrong ice age ')
                inb_alp(ialert_id) = inb_alp(ialert_id) + 1
             ENDIF
-         END DO
+         END_2D
       END DO
-
-      ! Alert if qns very big
-      ialert_id = 8 ! reference number of this alert
-      cl_alname(ialert_id) = ' fnsolar very big             ' ! name of the alert
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-            IF( ABS( qns(ji,jj) ) > 1500._wp .AND. at_i(ji,jj) > 0._wp ) THEN
-               !
-               !WRITE(numout,*) ' ALERTE 8 :   Very high non-solar heat flux'
-               !WRITE(numout,*) ' ji, jj    : ', ji, jj
-               !WRITE(numout,*) ' qns       : ', qns(ji,jj)
-               !WRITE(numout,*) ' sst       : ', sst_m(ji,jj)
-               !WRITE(numout,*) ' sss       : ', sss_m(ji,jj)
-               !
-               !CALL ice_prt( kt, ji, jj, 2, '   ')
-               inb_alp(ialert_id) = inb_alp(ialert_id) + 1
-               !
-            ENDIF
-         END DO
-      END DO
-      !+++++
- 
+  
       ! Alert if very warm ice
       ialert_id = 10 ! reference number of this alert
       cl_alname(ialert_id) = ' Very warm ice                ' ! name of the alert
       inb_alp(ialert_id) = 0
       DO jl = 1, jpl
-         DO jk = 1, nlay_i
-            DO jj = 1, jpj
-               DO ji = 1, jpi
-                  ztmelts    =  -rTmlt * sz_i(ji,jj,jk,jl) + rt0
-                  IF( t_i(ji,jj,jk,jl) >= ztmelts  .AND.  v_i(ji,jj,jl) > 1.e-10   &
-                     &                             .AND.  a_i(ji,jj,jl) > 0._wp   ) THEN
-                     !WRITE(numout,*) ' ALERTE 10 :   Very warm ice'
-                     !WRITE(numout,*) ' ji, jj, jk, jl : ', ji, jj, jk, jl
-                     !WRITE(numout,*) ' t_i : ', t_i(ji,jj,jk,jl)
-                     !WRITE(numout,*) ' e_i : ', e_i(ji,jj,jk,jl)
-                     !WRITE(numout,*) ' sz_i: ', sz_i(ji,jj,jk,jl)
-                     !WRITE(numout,*) ' ztmelts : ', ztmelts
-                     inb_alp(ialert_id) = inb_alp(ialert_id) + 1
-                  ENDIF
-               END DO
-            END DO
-         END DO
+         DO_3D_11_11( 1, nlay_i )
+            ztmelts    =  -rTmlt * sz_i(ji,jj,jk,jl) + rt0
+            IF( t_i(ji,jj,jk,jl) > ztmelts  .AND.  v_i(ji,jj,jl) > 1.e-10   &
+               &                            .AND.  a_i(ji,jj,jl) > 0._wp   ) THEN
+               WRITE(numout,*) ' ALERTE 10 :   Very warm ice'
+              inb_alp(ialert_id) = inb_alp(ialert_id) + 1
+            ENDIF
+         END_3D
       END DO
 
       ! sum of the alerts on all processors
@@ -424,7 +499,6 @@ CONTAINS
      !
    END SUBROUTINE ice_ctl
  
-   
    SUBROUTINE ice_prt( kt, ki, kj, kn, cd1 )
       !!-------------------------------------------------------------------
       !!                   ***  ROUTINE ice_prt *** 
@@ -432,7 +506,7 @@ CONTAINS
       !! ** Purpose :   Writes global ice state on the (i,j) point 
       !!                in ocean.ouput 
       !!                3 possibilities exist 
-      !!                n = 1/-1 -> simple ice state (plus Mechanical Check if -1)
+      !!                n = 1/-1 -> simple ice state
       !!                n = 2    -> exhaustive state
       !!                n = 3    -> ice/ocean salt fluxes
       !!
@@ -471,8 +545,8 @@ CONTAINS
                WRITE(numout,*)
                WRITE(numout,*) ' - Cell values '
                WRITE(numout,*) '   ~~~~~~~~~~~ '
-               WRITE(numout,*) ' cell area     : ', e1e2t(ji,jj)
                WRITE(numout,*) ' at_i          : ', at_i(ji,jj)       
+               WRITE(numout,*) ' ato_i         : ', ato_i(ji,jj)       
                WRITE(numout,*) ' vt_i          : ', vt_i(ji,jj)       
                WRITE(numout,*) ' vt_s          : ', vt_s(ji,jj)       
                DO jl = 1, jpl
@@ -492,15 +566,6 @@ CONTAINS
                   WRITE(numout,*)
                END DO
             ENDIF
-            IF( kn == -1 ) THEN
-               WRITE(numout,*) ' Mechanical Check ************** '
-               WRITE(numout,*) ' Check what means ice divergence '
-               WRITE(numout,*) ' Total ice concentration ', at_i (ji,jj)
-               WRITE(numout,*) ' Total lead fraction     ', ato_i(ji,jj)
-               WRITE(numout,*) ' Sum of both             ', ato_i(ji,jj) + at_i(ji,jj)
-               WRITE(numout,*) ' Sum of both minus 1     ', ato_i(ji,jj) + at_i(ji,jj) - 1.00
-            ENDIF
-            
 
             !--------------------
             !  Exhaustive state
@@ -514,7 +579,6 @@ CONTAINS
                WRITE(numout,*) 
                WRITE(numout,*) ' - Cell values '
                WRITE(numout,*) '   ~~~~~~~~~~~ '
-               WRITE(numout,*) ' cell area     : ', e1e2t(ji,jj)
                WRITE(numout,*) ' at_i          : ', at_i(ji,jj)       
                WRITE(numout,*) ' vt_i          : ', vt_i(ji,jj)       
                WRITE(numout,*) ' vt_s          : ', vt_s(ji,jj)       
@@ -586,7 +650,7 @@ CONTAINS
                WRITE(numout,*) ' hfx_thd      : ', hfx_thd(ji,jj)
                WRITE(numout,*) ' hfx_res      : ', hfx_res(ji,jj)
                WRITE(numout,*) ' qsb_ice_bot  : ', qsb_ice_bot(ji,jj) 
-               WRITE(numout,*) ' qlead        : ', qlead(ji,jj) * r1_rdtice
+               WRITE(numout,*) ' qlead        : ', qlead(ji,jj) * r1_Dt_ice
                WRITE(numout,*)
                WRITE(numout,*) ' - Salt fluxes at bottom interface ***'
                WRITE(numout,*) ' emp       : ', emp    (ji,jj)
@@ -610,11 +674,11 @@ CONTAINS
       !!-------------------------------------------------------------------
       !!                  ***  ROUTINE ice_prt3D ***
       !!
-      !! ** Purpose : CTL prints of ice arrays in case ln_ctl is activated 
+      !! ** Purpose : CTL prints of ice arrays in case sn_cfctl%prtctl is activated 
       !!
       !!-------------------------------------------------------------------
-      CHARACTER(len=*), INTENT(in)  :: cd_routine    ! name of the routine
-      INTEGER                       :: jk, jl        ! dummy loop indices
+      CHARACTER(len=*), INTENT(in) ::   cd_routine    ! name of the routine
+      INTEGER                      ::   jk, jl        ! dummy loop indices
       
       CALL prt_ctl_info(' ========== ')
       CALL prt_ctl_info( cd_routine )
@@ -660,20 +724,13 @@ CONTAINS
       END DO
       
       CALL prt_ctl_info(' ')
-      CALL prt_ctl_info(' - Heat / FW fluxes : ')
-      CALL prt_ctl_info('   ~~~~~~~~~~~~~~~~~~ ')
-      CALL prt_ctl(tab2d_1=sst_m  , clinfo1= ' sst   : ', tab2d_2=sss_m     , clinfo2= ' sss       : ')
-      CALL prt_ctl(tab2d_1=qsr    , clinfo1= ' qsr   : ', tab2d_2=qns       , clinfo2= ' qns       : ')
-      CALL prt_ctl(tab2d_1=emp    , clinfo1= ' emp   : ', tab2d_2=sfx       , clinfo2= ' sfx       : ')
-      
-      CALL prt_ctl_info(' ')
       CALL prt_ctl_info(' - Stresses : ')
       CALL prt_ctl_info('   ~~~~~~~~~~ ')
       CALL prt_ctl(tab2d_1=utau       , clinfo1= ' utau      : ', tab2d_2=vtau       , clinfo2= ' vtau      : ')
       CALL prt_ctl(tab2d_1=utau_ice   , clinfo1= ' utau_ice  : ', tab2d_2=vtau_ice   , clinfo2= ' vtau_ice  : ')
       
    END SUBROUTINE ice_prt3D
-
+      
 #else
    !!----------------------------------------------------------------------
    !!   Default option         Empty Module           No SI3 sea-ice model

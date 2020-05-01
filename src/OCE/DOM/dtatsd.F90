@@ -34,9 +34,11 @@ MODULE dtatsd
 
    TYPE(FLD), ALLOCATABLE, DIMENSION(:) ::   sf_tsd   ! structure of input SST (file informations, fields read)
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: dtatsd.F90 10213 2018-10-23 14:40:09Z aumont $ 
+   !! $Id: dtatsd.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -64,12 +66,10 @@ CONTAINS
       !  Initialisation
       ierr0 = 0  ;  ierr1 = 0  ;  ierr2 = 0  ;  ierr3 = 0
       !
-      REWIND( numnam_ref )              ! Namelist namtsd in reference namelist : 
       READ  ( numnam_ref, namtsd, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namtsd in reference namelist', lwp )
-      REWIND( numnam_cfg )              ! Namelist namtsd in configuration namelist : Parameters of the run
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namtsd in reference namelist' )
       READ  ( numnam_cfg, namtsd, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namtsd in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namtsd in configuration namelist' )
       IF(lwm) WRITE ( numond, namtsd )
 
       IF( PRESENT( ld_tradmp ) )   ln_tsd_dmp = .TRUE.     ! forces the initialization when tradmp is used
@@ -185,34 +185,32 @@ CONTAINS
             WRITE(numout,*) 'dta_tsd: interpolates T & S data onto the s- or mixed s-z-coordinate mesh'
          ENDIF
          !
-         DO jj = 1, jpj                         ! vertical interpolation of T & S
-            DO ji = 1, jpi
-               DO jk = 1, jpk                        ! determines the intepolated T-S profiles at each (i,j) points
-                  zl = gdept_0(ji,jj,jk)
-                  IF(     zl < gdept_1d(1  ) ) THEN          ! above the first level of data
-                     ztp(jk) =  ptsd(ji,jj,1    ,jp_tem)
-                     zsp(jk) =  ptsd(ji,jj,1    ,jp_sal)
-                  ELSEIF( zl > gdept_1d(jpk) ) THEN          ! below the last level of data
-                     ztp(jk) =  ptsd(ji,jj,jpkm1,jp_tem)
-                     zsp(jk) =  ptsd(ji,jj,jpkm1,jp_sal)
-                  ELSE                                      ! inbetween : vertical interpolation between jkk & jkk+1
-                     DO jkk = 1, jpkm1                                  ! when  gdept(jkk) < zl < gdept(jkk+1)
-                        IF( (zl-gdept_1d(jkk)) * (zl-gdept_1d(jkk+1)) <= 0._wp ) THEN
-                           zi = ( zl - gdept_1d(jkk) ) / (gdept_1d(jkk+1)-gdept_1d(jkk))
-                           ztp(jk) = ptsd(ji,jj,jkk,jp_tem) + ( ptsd(ji,jj,jkk+1,jp_tem) - ptsd(ji,jj,jkk,jp_tem) ) * zi 
-                           zsp(jk) = ptsd(ji,jj,jkk,jp_sal) + ( ptsd(ji,jj,jkk+1,jp_sal) - ptsd(ji,jj,jkk,jp_sal) ) * zi
-                        ENDIF
-                     END DO
-                  ENDIF
-               END DO
-               DO jk = 1, jpkm1
-                  ptsd(ji,jj,jk,jp_tem) = ztp(jk) * tmask(ji,jj,jk)     ! mask required for mixed zps-s-coord
-                  ptsd(ji,jj,jk,jp_sal) = zsp(jk) * tmask(ji,jj,jk)
-               END DO
-               ptsd(ji,jj,jpk,jp_tem) = 0._wp
-               ptsd(ji,jj,jpk,jp_sal) = 0._wp
+         DO_2D_11_11
+            DO jk = 1, jpk                        ! determines the intepolated T-S profiles at each (i,j) points
+               zl = gdept_0(ji,jj,jk)
+               IF(     zl < gdept_1d(1  ) ) THEN          ! above the first level of data
+                  ztp(jk) =  ptsd(ji,jj,1    ,jp_tem)
+                  zsp(jk) =  ptsd(ji,jj,1    ,jp_sal)
+               ELSEIF( zl > gdept_1d(jpk) ) THEN          ! below the last level of data
+                  ztp(jk) =  ptsd(ji,jj,jpkm1,jp_tem)
+                  zsp(jk) =  ptsd(ji,jj,jpkm1,jp_sal)
+               ELSE                                      ! inbetween : vertical interpolation between jkk & jkk+1
+                  DO jkk = 1, jpkm1                                  ! when  gdept(jkk) < zl < gdept(jkk+1)
+                     IF( (zl-gdept_1d(jkk)) * (zl-gdept_1d(jkk+1)) <= 0._wp ) THEN
+                        zi = ( zl - gdept_1d(jkk) ) / (gdept_1d(jkk+1)-gdept_1d(jkk))
+                        ztp(jk) = ptsd(ji,jj,jkk,jp_tem) + ( ptsd(ji,jj,jkk+1,jp_tem) - ptsd(ji,jj,jkk,jp_tem) ) * zi 
+                        zsp(jk) = ptsd(ji,jj,jkk,jp_sal) + ( ptsd(ji,jj,jkk+1,jp_sal) - ptsd(ji,jj,jkk,jp_sal) ) * zi
+                     ENDIF
+                  END DO
+               ENDIF
             END DO
-         END DO
+            DO jk = 1, jpkm1
+               ptsd(ji,jj,jk,jp_tem) = ztp(jk) * tmask(ji,jj,jk)     ! mask required for mixed zps-s-coord
+               ptsd(ji,jj,jk,jp_sal) = zsp(jk) * tmask(ji,jj,jk)
+            END DO
+            ptsd(ji,jj,jpk,jp_tem) = 0._wp
+            ptsd(ji,jj,jpk,jp_sal) = 0._wp
+         END_2D
          ! 
       ELSE                                !==   z- or zps- coordinate   ==!
          !                             
@@ -220,22 +218,20 @@ CONTAINS
          ptsd(:,:,:,jp_sal) = ptsd(:,:,:,jp_sal) * tmask(:,:,:)
          !
          IF( ln_zps ) THEN                      ! zps-coordinate (partial steps) interpolation at the last ocean level
-            DO jj = 1, jpj
-               DO ji = 1, jpi
-                  ik = mbkt(ji,jj) 
-                  IF( ik > 1 ) THEN
-                     zl = ( gdept_1d(ik) - gdept_0(ji,jj,ik) ) / ( gdept_1d(ik) - gdept_1d(ik-1) )
-                     ptsd(ji,jj,ik,jp_tem) = (1.-zl) * ptsd(ji,jj,ik,jp_tem) + zl * ptsd(ji,jj,ik-1,jp_tem)
-                     ptsd(ji,jj,ik,jp_sal) = (1.-zl) * ptsd(ji,jj,ik,jp_sal) + zl * ptsd(ji,jj,ik-1,jp_sal)
-                  ENDIF
-                  ik = mikt(ji,jj)
-                  IF( ik > 1 ) THEN
-                     zl = ( gdept_0(ji,jj,ik) - gdept_1d(ik) ) / ( gdept_1d(ik+1) - gdept_1d(ik) ) 
-                     ptsd(ji,jj,ik,jp_tem) = (1.-zl) * ptsd(ji,jj,ik,jp_tem) + zl * ptsd(ji,jj,ik+1,jp_tem)
-                     ptsd(ji,jj,ik,jp_sal) = (1.-zl) * ptsd(ji,jj,ik,jp_sal) + zl * ptsd(ji,jj,ik+1,jp_sal)
-                  END IF
-               END DO
-            END DO
+            DO_2D_11_11
+               ik = mbkt(ji,jj) 
+               IF( ik > 1 ) THEN
+                  zl = ( gdept_1d(ik) - gdept_0(ji,jj,ik) ) / ( gdept_1d(ik) - gdept_1d(ik-1) )
+                  ptsd(ji,jj,ik,jp_tem) = (1.-zl) * ptsd(ji,jj,ik,jp_tem) + zl * ptsd(ji,jj,ik-1,jp_tem)
+                  ptsd(ji,jj,ik,jp_sal) = (1.-zl) * ptsd(ji,jj,ik,jp_sal) + zl * ptsd(ji,jj,ik-1,jp_sal)
+               ENDIF
+               ik = mikt(ji,jj)
+               IF( ik > 1 ) THEN
+                  zl = ( gdept_0(ji,jj,ik) - gdept_1d(ik) ) / ( gdept_1d(ik+1) - gdept_1d(ik) ) 
+                  ptsd(ji,jj,ik,jp_tem) = (1.-zl) * ptsd(ji,jj,ik,jp_tem) + zl * ptsd(ji,jj,ik+1,jp_tem)
+                  ptsd(ji,jj,ik,jp_sal) = (1.-zl) * ptsd(ji,jj,ik,jp_sal) + zl * ptsd(ji,jj,ik+1,jp_sal)
+               END IF
+            END_2D
          ENDIF
          !
       ENDIF

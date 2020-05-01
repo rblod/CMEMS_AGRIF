@@ -63,7 +63,7 @@ set -o posix
 # EVOLUTIONS
 # ==========
 #
-# $Id: maketools 10082 2018-09-04 15:04:24Z nicolasmartin $
+# $Id: maketools 12415 2020-02-19 20:29:26Z smueller $
 #
 #
 #
@@ -144,9 +144,6 @@ export NEMO_TDIR=${NEMO_TDIR:-$TOOLS_DIR}
 [ "${NEW_CONF}" == help ] && printf "%s\n"  "Available tools :" `ls ${TOOLS_DIR}|grep -v COMPILE | grep -v maketools` && exit
 [ "${CMP_NAM}" ==  help ] && . ${COMPIL_DIR}/Flist_archfile.sh all && exit
 
-#- When used for the first time, choose a compiler ---
-. ${COMPIL_DIR}/Fcheck_archfile.sh arch_tools.fcm cpp.fcm ${CMP_NAM} || exit
-
 #- Choose a default tool if needed ---
 #- REBUILD or last one used ---
 . ${COMPIL_DIR}/Fcheck_config.sh tools.txt ${NEW_CONF} || exit
@@ -155,7 +152,11 @@ export NEMO_TDIR=${NEMO_TDIR:-$TOOLS_DIR}
 echo "${NEW_CONF} "  > ${COMPIL_DIR}/tools.txt
 
 #- Make the building directory
-. ${COMPIL_DIR}/Fmake_bld.sh ${TOOLS_DIR} ${NEW_CONF} ${NEMO_TDIR} || exit
+. ${COMPIL_DIR}/Fmake_tools_bld.sh ${TOOLS_DIR} ${NEW_CONF} ${NEMO_TDIR} || exit
+
+#- At this stage cpp keys have been updated. we can check the arch file
+#- When used for the first time, choose a compiler ---
+. ${COMPIL_DIR}/Fcheck_archfile.sh arch_tools.fcm cpp_tools.fcm ${CMP_NAM} || exit
 
 #-
 #_ END OF CONFIGURATION PHASE

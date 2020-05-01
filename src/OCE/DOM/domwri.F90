@@ -15,6 +15,7 @@ MODULE domwri
    !!   dom_uniq       : identify unique point of a grid (TUVF)
    !!   dom_stiff      : diagnose maximum grid stiffness/hydrostatic consistency (s-coordinate)
    !!----------------------------------------------------------------------
+   !
    USE dom_oce         ! ocean space and time domain
    USE phycst ,   ONLY :   rsmall
    USE wet_dry,   ONLY :   ll_wd  ! Wetting and drying
@@ -31,10 +32,10 @@ MODULE domwri
    PUBLIC   dom_stiff            ! routine called by inidom.F90
 
    !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: domwri.F90 10425 2018-12-19 21:54:16Z smasson $ 
+   !! $Id: domwri.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -98,25 +99,19 @@ CONTAINS
       CALL iom_rstput( 0, 0, inum, 'fmask', fmask, ktype = jp_i1 )
       
       CALL dom_uniq( zprw, 'T' )
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-            zprt(ji,jj) = ssmask(ji,jj) * zprw(ji,jj)                        !    ! unique point mask
-         END DO
-      END DO                             !    ! unique point mask
+      DO_2D_11_11
+         zprt(ji,jj) = ssmask(ji,jj) * zprw(ji,jj)                        !    ! unique point mask
+      END_2D
       CALL iom_rstput( 0, 0, inum, 'tmaskutil', zprt, ktype = jp_i1 )  
       CALL dom_uniq( zprw, 'U' )
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-            zprt(ji,jj) = ssumask(ji,jj) * zprw(ji,jj)                        !    ! unique point mask
-         END DO
-      END DO
+      DO_2D_11_11
+         zprt(ji,jj) = ssumask(ji,jj) * zprw(ji,jj)                        !    ! unique point mask
+      END_2D
       CALL iom_rstput( 0, 0, inum, 'umaskutil', zprt, ktype = jp_i1 )  
       CALL dom_uniq( zprw, 'V' )
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-            zprt(ji,jj) = ssvmask(ji,jj) * zprw(ji,jj)                        !    ! unique point mask
-         END DO
-      END DO
+      DO_2D_11_11
+         zprt(ji,jj) = ssvmask(ji,jj) * zprw(ji,jj)                        !    ! unique point mask
+      END_2D
       CALL iom_rstput( 0, 0, inum, 'vmaskutil', zprt, ktype = jp_i1 )  
 !!gm  ssfmask has been removed  ==>> find another solution to defined fmaskutil
 !!    Here we just remove the output of fmaskutil.
@@ -154,17 +149,21 @@ CONTAINS
       CALL iom_rstput( 0, 0, inum, 'ff_t', ff_t, ktype = jp_r8 )
       
       ! note that mbkt is set to 1 over land ==> use surface tmask
-      zprt(:,:) = ssmask(:,:) * REAL( mbkt(:,:) , wp )
+      zprt(:,:) = REAL( mbkt(:,:) , wp )
       CALL iom_rstput( 0, 0, inum, 'mbathy', zprt, ktype = jp_i4 )     !    ! nb of ocean T-points
-      zprt(:,:) = ssmask(:,:) * REAL( mikt(:,:) , wp )
+      zprt(:,:) = REAL( mikt(:,:) , wp )
       CALL iom_rstput( 0, 0, inum, 'misf', zprt, ktype = jp_i4 )       !    ! nb of ocean T-points
-      zprt(:,:) = ssmask(:,:) * REAL( risfdep(:,:) , wp )
-      CALL iom_rstput( 0, 0, inum, 'isfdraft', zprt, ktype = jp_r8 )   !    ! nb of ocean T-points
       !															             ! vertical mesh
-      CALL iom_rstput( 0, 0, inum, 'e3t_0', e3t_0, ktype = jp_r8  )    !    ! scale factors
-      CALL iom_rstput( 0, 0, inum, 'e3u_0', e3u_0, ktype = jp_r8  )
-      CALL iom_rstput( 0, 0, inum, 'e3v_0', e3v_0, ktype = jp_r8  )
-      CALL iom_rstput( 0, 0, inum, 'e3w_0', e3w_0, ktype = jp_r8  )
+      CALL iom_rstput( 0, 0, inum, 'e3t_1d', e3t_1d, ktype = jp_r8  )    !    ! scale factors
+      CALL iom_rstput( 0, 0, inum, 'e3w_1d', e3w_1d, ktype = jp_r8  )
+      
+      CALL iom_rstput( 0, 0, inum, 'e3t_0' , e3t_0 , ktype = jp_r8  )
+      CALL iom_rstput( 0, 0, inum, 'e3u_0' , e3u_0 , ktype = jp_r8  )
+      CALL iom_rstput( 0, 0, inum, 'e3v_0' , e3v_0 , ktype = jp_r8  )
+      CALL iom_rstput( 0, 0, inum, 'e3f_0' , e3f_0 , ktype = jp_r8  )
+      CALL iom_rstput( 0, 0, inum, 'e3w_0' , e3w_0 , ktype = jp_r8  )
+      CALL iom_rstput( 0, 0, inum, 'e3uw_0', e3uw_0, ktype = jp_r8  )
+      CALL iom_rstput( 0, 0, inum, 'e3vw_0', e3vw_0, ktype = jp_r8  )
       !
       CALL iom_rstput( 0, 0, inum, 'gdept_1d' , gdept_1d , ktype = jp_r8 )  ! stretched system
       CALL iom_rstput( 0, 0, inum, 'gdepw_1d' , gdepw_1d , ktype = jp_r8 )

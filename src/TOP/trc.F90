@@ -17,24 +17,22 @@ MODULE trc
    PUBLIC   trc_alloc   ! called by nemogcm.F90
 
    !                                     !!- logical units of passive tracers
-   INTEGER, PUBLIC ::   numnat_ref = -1   !: reference passive tracer namelist_top_ref
-   INTEGER, PUBLIC ::   numnat_cfg = -1   !: reference passive tracer namelist_top_cfg
    INTEGER, PUBLIC ::   numont     = -1   !: reference passive tracer namelist output output.namelist.top
-   INTEGER, PUBLIC ::   numtrc_ref = -1   !: reference passive tracer namelist_top_ref
-   INTEGER, PUBLIC ::   numtrc_cfg = -1   !: reference passive tracer namelist_top_cfg
    INTEGER, PUBLIC ::   numonr     = -1   !: reference passive tracer namelist output output.namelist.top
    INTEGER, PUBLIC ::   numstr            !: tracer statistics
    INTEGER, PUBLIC ::   numrtr            !: trc restart (read )
    INTEGER, PUBLIC ::   numrtw            !: trc restart ( write )
+   CHARACTER(:), ALLOCATABLE, PUBLIC ::   numnat_ref   !: character buffer for reference passive tracer namelist_top_ref
+   CHARACTER(:), ALLOCATABLE, PUBLIC ::   numnat_cfg   !: character buffer for configuration specific passive tracer namelist_top_cfg
+   CHARACTER(:), ALLOCATABLE, PUBLIC ::   numtrc_ref   !: character buffer for reference passive tracer namelist_trc_ref
+   CHARACTER(:), ALLOCATABLE, PUBLIC ::   numtrc_cfg   !: character buffer for configuration specific passive tracer namelist_trc_cfg
 
    !! passive tracers fields (before,now,after)
    !! --------------------------------------------------
    REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:)       ::  trai           !: initial total tracer
    REAL(wp), PUBLIC                                        ::  areatot        !: total volume 
    REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:  ) ::  cvol           !: volume correction -degrad option- 
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:,:) ::  trn            !: tracer concentration for now time step
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:,:) ::  tra            !: tracer concentration for next time step
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:,:) ::  trb            !: tracer concentration for before time step
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:,:,:) ::  tr           !: tracer concentration 
    REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:  ) ::  sbc_trc_b      !: Before sbc fluxes for tracers
    REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:  ) ::  sbc_trc        !: Now sbc fluxes for tracers
 
@@ -62,10 +60,10 @@ MODULE trc
    CHARACTER(len = 256), PUBLIC ::   cn_trcrst_indir    !: restart input directory
    CHARACTER(len = 80) , PUBLIC ::   cn_trcrst_out      !: suffix of pass. tracer restart name (output)
    CHARACTER(len = 256), PUBLIC ::   cn_trcrst_outdir   !: restart output directory
-   REAL(wp)            , PUBLIC ::   rdttrc             !: passive tracer time step
-   REAL(wp)            , PUBLIC ::   r2dttrc            !: = 2*rdttrc except at nit000 (=rdttrc) if neuler=0
+   REAL(wp)            , PUBLIC ::   rDt_trc            !: = 2*rn_Dt except at nit000 (=rn_Dt) if l_1st_euler=.true.
    LOGICAL             , PUBLIC ::   ln_top_euler       !: boolean term for euler integration 
    LOGICAL             , PUBLIC ::   ln_trcdta          !: Read inputs data from files
+   LOGICAL             , PUBLIC ::   ln_trcbc           !: Enable surface, lateral or open boundaries conditions
    LOGICAL             , PUBLIC ::   ln_trcdmp          !: internal damping flag
    LOGICAL             , PUBLIC ::   ln_trcdmp_clo      !: internal damping flag on closed seas
    INTEGER             , PUBLIC ::   nittrc000          !: first time step of passive tracers model
@@ -116,7 +114,9 @@ MODULE trc
    LOGICAL , PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:) ::   ln_trc_sbc    !: Use surface boundary condition data
    LOGICAL , PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:) ::   ln_trc_cbc    !: Use coastal boundary condition data
    LOGICAL , PUBLIC                                  ::   ln_rnf_ctl    !: remove runoff dilution on tracers
-   REAL(wp), PUBLIC                                  ::   rn_bc_time    !: Time scaling factor for SBC and CBC data (seconds in a day)
+   REAL(wp), PUBLIC                                  ::   rn_sbc_time   !: Time scaling factor for SBC data (seconds in a day)
+   REAL(wp), PUBLIC                                  ::   rn_cbc_time   !: Time scaling factor for CBC data (seconds in a day)
+   LOGICAL , PUBLIC                                  ::   lltrcbc       !: Applying one of the boundary conditions 
    !
    CHARACTER(len=20), PUBLIC, DIMENSION(jp_bdy) :: cn_trc_dflt   ! Default OBC condition for all tracers
    CHARACTER(len=20), PUBLIC, DIMENSION(jp_bdy) :: cn_trc        ! Choice of boundary condition for tracers
@@ -129,9 +129,11 @@ MODULE trc
    TYPE(OBC_DATA), PUBLIC, ALLOCATABLE, DIMENSION(:,:), TARGET ::   trcdta_bdy   !: bdy external data (local process)
 !$AGRIF_END_DO_NOT_TREAT
    !
+   !! Substitutions
+#include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/TOP 4.0 , NEMO Consortium (2018)
-   !! $Id: trc.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: trc.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -146,7 +148,7 @@ CONTAINS
       !!-------------------------------------------------------------------
       ierr(:) = 0
       !
-      ALLOCATE( trn(jpi,jpj,jpk,jptra), trb(jpi,jpj,jpk,jptra), tra(jpi,jpj,jpk,jptra),       &  
+      ALLOCATE( tr(jpi,jpj,jpk,jptra,jpt)                                             ,       &  
          &      trc_i(jpi,jpj,jptra)  , trc_o(jpi,jpj,jptra)                          ,       &
          &      gtru (jpi,jpj,jptra)  , gtrv (jpi,jpj,jptra)                          ,       &
          &      gtrui(jpi,jpj,jptra)  , gtrvi(jpi,jpj,jptra)                          ,       &

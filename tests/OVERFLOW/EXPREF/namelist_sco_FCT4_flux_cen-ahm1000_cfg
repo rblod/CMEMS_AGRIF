@@ -32,7 +32,7 @@
 !-----------------------------------------------------------------------
 &namdom        !   space and time domain (bathymetry, mesh, timestep)
 !-----------------------------------------------------------------------
-   rn_rdt      =   10.     !  time step for the dynamics (and tracer if nn_acc=0)
+   rn_Dt      =   10.     !  time step for the dynamics (and tracer if nn_acc=0)
    rn_atfp     =    0.1    !  asselin time filter parameter
 /
 !-----------------------------------------------------------------------
@@ -154,10 +154,10 @@
       ln_bt_fw      = .true.     ! Forward integration of barotropic Eqs.
       ln_bt_av      = .true.     ! Time filtering of barotropic variables
          nn_bt_flt     = 1          ! Time filter choice  = 0 None
-         !                          !                     = 1 Boxcar over   nn_baro sub-steps
-         !                          !                     = 2 Boxcar over 2*nn_baro  "    "
+         !                          !                     = 1 Boxcar over   nn_e sub-steps
+         !                          !                     = 2 Boxcar over 2*nn_e  "    "
       ln_bt_auto    = .true.     ! Number of sub-step defined from:
-         nn_baro      =  1         ! =F : the number of sub-step in rn_rdt seconds
+         nn_e      =  1         ! =F : the number of sub-step in rn_Dt seconds
 /
 !-----------------------------------------------------------------------
 &namdyn_ldf    !   lateral diffusion on momentum                        (default: NO selection)

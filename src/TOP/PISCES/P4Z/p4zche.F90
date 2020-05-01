@@ -129,14 +129,16 @@ MODULE p4zche
    ! - SOLVE_AT_GENERAL
    INTEGER :: niter_atgen    = jp_maxniter_atgen
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/TOP 4.0 , NEMO Consortium (2018)
-   !! $Id: p4zche.F90 10425 2018-12-19 21:54:16Z smasson $ 
+   !! $Id: p4zche.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE p4z_che
+   SUBROUTINE p4z_che( Kbb, Kmm )
       !!---------------------------------------------------------------------
       !!                     ***  ROUTINE p4z_che  ***
       !!
@@ -144,6 +146,7 @@ CONTAINS
       !!
       !! ** Method  : - ...
       !!---------------------------------------------------------------------
+      INTEGER, INTENT(in) ::   Kbb, Kmm  ! time level indices
       INTEGER  ::   ji, jj, jk
       REAL(wp) ::   ztkel, ztkel1, zt , zsal  , zsal2 , zbuf1 , zbuf2
       REAL(wp) ::   ztgg , ztgg2, ztgg3 , ztgg4 , ztgg5
@@ -163,9 +166,9 @@ CONTAINS
       ! practical salinity
       ! -------------------------------------------------------------
       IF (neos == -1) THEN
-         salinprac(:,:,:) = tsn(:,:,:,jp_sal) * 35.0 / 35.16504
+         salinprac(:,:,:) = ts(:,:,:,jp_sal,Kmm) * 35.0 / 35.16504
       ELSE
-         salinprac(:,:,:) = tsn(:,:,:,jp_sal)
+         salinprac(:,:,:) = ts(:,:,:,jp_sal,Kmm)
       ENDIF
 
       !
@@ -174,16 +177,12 @@ CONTAINS
       ! potential temperature to in situ temperature. The errors is less than 
       ! 0.04°C relative to an exact computation
       ! ---------------------------------------------------------------------
-      DO jk = 1, jpk
-         DO jj = 1, jpj
-            DO ji = 1, jpi
-               zpres = gdept_n(ji,jj,jk) / 1000.
-               za1 = 0.04 * ( 1.0 + 0.185 * tsn(ji,jj,jk,jp_tem) + 0.035 * (salinprac(ji,jj,jk) - 35.0) )
-               za2 = 0.0075 * ( 1.0 - tsn(ji,jj,jk,jp_tem) / 30.0 )
-               tempis(ji,jj,jk) = tsn(ji,jj,jk,jp_tem) - za1 * zpres + za2 * zpres**2
-            END DO
-         END DO
-      END DO
+      DO_3D_11_11( 1, jpk )
+         zpres = gdept(ji,jj,jk,Kmm) / 1000.
+         za1 = 0.04 * ( 1.0 + 0.185 * ts(ji,jj,jk,jp_tem,Kmm) + 0.035 * (salinprac(ji,jj,jk) - 35.0) )
+         za2 = 0.0075 * ( 1.0 - ts(ji,jj,jk,jp_tem,Kmm) / 30.0 )
+         tempis(ji,jj,jk) = ts(ji,jj,jk,jp_tem,Kmm) - za1 * zpres + za2 * zpres**2
+      END_3D
       !
       ! CHEMICAL CONSTANTS - SURFACE LAYER
       ! ----------------------------------
@@ -244,7 +243,7 @@ CONTAINS
                ! SET PRESSION ACCORDING TO SAUNDER (1980)
                zplat   = SIN ( ABS(gphit(ji,jj)*3.141592654/180.) )
                zc1 = 5.92E-3 + zplat**2 * 5.25E-3
-               zpres = ((1-zc1)-SQRT(((1-zc1)**2)-(8.84E-6*gdept_n(ji,jj,jk)))) / 4.42E-6
+               zpres = ((1-zc1)-SQRT(((1-zc1)**2)-(8.84E-6*gdept(ji,jj,jk,Kmm)))) / 4.42E-6
                zpres = zpres / 10.0
 
                ! SET ABSOLUTE TEMPERATURE
@@ -447,7 +446,7 @@ CONTAINS
       !
    END SUBROUTINE p4z_che
 
-   SUBROUTINE ahini_for_at(p_hini)
+   SUBROUTINE ahini_for_at(p_hini, Kbb )
       !!---------------------------------------------------------------------
       !!                     ***  ROUTINE ahini_for_at  ***
       !!
@@ -461,6 +460,7 @@ CONTAINS
       !!                    a solution
       !!---------------------------------------------------------------------
       REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(OUT)  ::  p_hini
+      INTEGER,                          INTENT(in)   ::  Kbb      ! time level indices
       INTEGER  ::   ji, jj, jk
       REAL(wp)  ::  zca1, zba1
       REAL(wp)  ::  zd, zsqrtd, zhmin
@@ -470,44 +470,40 @@ CONTAINS
 
       IF( ln_timing )  CALL timing_start('ahini_for_at')
       !
-      DO jk = 1, jpk
-        DO jj = 1, jpj
-          DO ji = 1, jpi
-            p_alkcb  = trb(ji,jj,jk,jptal) * 1000. / (rhop(ji,jj,jk) + rtrn)
-            p_dictot = trb(ji,jj,jk,jpdic) * 1000. / (rhop(ji,jj,jk) + rtrn)
-            p_bortot = borat(ji,jj,jk)
-            IF (p_alkcb <= 0.) THEN
-                p_hini(ji,jj,jk) = 1.e-3
-            ELSEIF (p_alkcb >= (2.*p_dictot + p_bortot)) THEN
-                p_hini(ji,jj,jk) = 1.e-10_wp
-            ELSE
-                zca1 = p_dictot/( p_alkcb + rtrn )
-                zba1 = p_bortot/ (p_alkcb + rtrn )
-           ! Coefficients of the cubic polynomial
-                za2 = aKb3(ji,jj,jk)*(1. - zba1) + ak13(ji,jj,jk)*(1.-zca1)
-                za1 = ak13(ji,jj,jk)*akb3(ji,jj,jk)*(1. - zba1 - zca1)    &
-                &     + ak13(ji,jj,jk)*ak23(ji,jj,jk)*(1. - (zca1+zca1))
-                za0 = ak13(ji,jj,jk)*ak23(ji,jj,jk)*akb3(ji,jj,jk)*(1. - zba1 - (zca1+zca1))
-                                        ! Taylor expansion around the minimum
-                zd = za2*za2 - 3.*za1   ! Discriminant of the quadratic equation
-                                        ! for the minimum close to the root
+      DO_3D_11_11( 1, jpk )
+      p_alkcb  = tr(ji,jj,jk,jptal,Kbb) * 1000. / (rhop(ji,jj,jk) + rtrn)
+      p_dictot = tr(ji,jj,jk,jpdic,Kbb) * 1000. / (rhop(ji,jj,jk) + rtrn)
+      p_bortot = borat(ji,jj,jk)
+      IF (p_alkcb <= 0.) THEN
+          p_hini(ji,jj,jk) = 1.e-3
+      ELSEIF (p_alkcb >= (2.*p_dictot + p_bortot)) THEN
+          p_hini(ji,jj,jk) = 1.e-10_wp
+      ELSE
+          zca1 = p_dictot/( p_alkcb + rtrn )
+          zba1 = p_bortot/ (p_alkcb + rtrn )
+     ! Coefficients of the cubic polynomial
+          za2 = aKb3(ji,jj,jk)*(1. - zba1) + ak13(ji,jj,jk)*(1.-zca1)
+          za1 = ak13(ji,jj,jk)*akb3(ji,jj,jk)*(1. - zba1 - zca1)    &
+          &     + ak13(ji,jj,jk)*ak23(ji,jj,jk)*(1. - (zca1+zca1))
+          za0 = ak13(ji,jj,jk)*ak23(ji,jj,jk)*akb3(ji,jj,jk)*(1. - zba1 - (zca1+zca1))
+                                  ! Taylor expansion around the minimum
+          zd = za2*za2 - 3.*za1   ! Discriminant of the quadratic equation
+                                  ! for the minimum close to the root
 
-                IF(zd > 0.) THEN        ! If the discriminant is positive
-                  zsqrtd = SQRT(zd)
-                  IF(za2 < 0) THEN
-                    zhmin = (-za2 + zsqrtd)/3.
-                  ELSE
-                    zhmin = -za1/(za2 + zsqrtd)
-                  ENDIF
-                  p_hini(ji,jj,jk) = zhmin + SQRT(-(za0 + zhmin*(za1 + zhmin*(za2 + zhmin)))/zsqrtd)
-                ELSE
-                  p_hini(ji,jj,jk) = 1.e-7
-                ENDIF
-             !
-             ENDIF
-          END DO
-        END DO
-      END DO
+          IF(zd > 0.) THEN        ! If the discriminant is positive
+            zsqrtd = SQRT(zd)
+            IF(za2 < 0) THEN
+              zhmin = (-za2 + zsqrtd)/3.
+            ELSE
+              zhmin = -za1/(za2 + zsqrtd)
+            ENDIF
+            p_hini(ji,jj,jk) = zhmin + SQRT(-(za0 + zhmin*(za1 + zhmin*(za2 + zhmin)))/zsqrtd)
+          ELSE
+            p_hini(ji,jj,jk) = 1.e-7
+          ENDIF
+       !
+       ENDIF
+      END_3D
       !
       IF( ln_timing )  CALL timing_stop('ahini_for_at')
       !
@@ -515,7 +511,7 @@ CONTAINS
 
    !===============================================================================
 
-   SUBROUTINE anw_infsup( p_alknw_inf, p_alknw_sup )
+   SUBROUTINE anw_infsup( p_alknw_inf, p_alknw_sup, Kbb )
 
    ! Subroutine returns the lower and upper bounds of "non-water-selfionization"
    ! contributions to total alkalinity (the infimum and the supremum), i.e
@@ -524,16 +520,17 @@ CONTAINS
    ! Argument variables
    REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(OUT) :: p_alknw_inf
    REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(OUT) :: p_alknw_sup
+   INTEGER,                          INTENT(in)  ::  Kbb      ! time level indices
 
-   p_alknw_inf(:,:,:) =  -trb(:,:,:,jppo4) * 1000. / (rhop(:,:,:) + rtrn) - sulfat(:,:,:)  &
+   p_alknw_inf(:,:,:) =  -tr(:,:,:,jppo4,Kbb) * 1000. / (rhop(:,:,:) + rtrn) - sulfat(:,:,:)  &
    &              - fluorid(:,:,:)
-   p_alknw_sup(:,:,:) =   (2. * trb(:,:,:,jpdic) + 2. * trb(:,:,:,jppo4) + trb(:,:,:,jpsil) )    &
+   p_alknw_sup(:,:,:) =   (2. * tr(:,:,:,jpdic,Kbb) + 2. * tr(:,:,:,jppo4,Kbb) + tr(:,:,:,jpsil,Kbb) )    &
    &               * 1000. / (rhop(:,:,:) + rtrn) + borat(:,:,:) 
 
    END SUBROUTINE anw_infsup
 
 
-   SUBROUTINE solve_at_general( p_hini, zhi )
+   SUBROUTINE solve_at_general( p_hini, zhi, Kbb )
 
    ! Universal pH solver that converges from any given initial value,
    ! determines upper an lower bounds for the solution if required
@@ -542,6 +539,7 @@ CONTAINS
    !--------------------
    REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(IN)   :: p_hini
    REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(OUT)  :: zhi
+   INTEGER,                          INTENT(in)   :: Kbb  ! time level indices
 
    ! Local variables
    !-----------------
@@ -564,232 +562,224 @@ CONTAINS
 
    IF( ln_timing )  CALL timing_start('solve_at_general')
 
-   CALL anw_infsup( zalknw_inf, zalknw_sup )
+   CALL anw_infsup( zalknw_inf, zalknw_sup, Kbb )
 
    rmask(:,:,:) = tmask(:,:,:)
    zhi(:,:,:)   = 0.
 
    ! TOTAL H+ scale: conversion factor for Htot = aphscale * Hfree
-   DO jk = 1, jpk
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-            IF (rmask(ji,jj,jk) == 1.) THEN
-               p_alktot = trb(ji,jj,jk,jptal) * 1000. / (rhop(ji,jj,jk) + rtrn)
-               aphscale = 1. + sulfat(ji,jj,jk)/aks3(ji,jj,jk)
-               zh_ini = p_hini(ji,jj,jk)
+   DO_3D_11_11( 1, jpk )
+      IF (rmask(ji,jj,jk) == 1.) THEN
+         p_alktot = tr(ji,jj,jk,jptal,Kbb) * 1000. / (rhop(ji,jj,jk) + rtrn)
+         aphscale = 1. + sulfat(ji,jj,jk)/aks3(ji,jj,jk)
+         zh_ini = p_hini(ji,jj,jk)
 
-               zdelta = (p_alktot-zalknw_inf(ji,jj,jk))**2 + 4.*akw3(ji,jj,jk)/aphscale
+         zdelta = (p_alktot-zalknw_inf(ji,jj,jk))**2 + 4.*akw3(ji,jj,jk)/aphscale
 
-               IF(p_alktot >= zalknw_inf(ji,jj,jk)) THEN
-                 zh_min(ji,jj,jk) = 2.*akw3(ji,jj,jk) /( p_alktot-zalknw_inf(ji,jj,jk) + SQRT(zdelta) )
-               ELSE
-                 zh_min(ji,jj,jk) = aphscale*(-(p_alktot-zalknw_inf(ji,jj,jk)) + SQRT(zdelta) ) / 2.
-               ENDIF
+         IF(p_alktot >= zalknw_inf(ji,jj,jk)) THEN
+           zh_min(ji,jj,jk) = 2.*akw3(ji,jj,jk) /( p_alktot-zalknw_inf(ji,jj,jk) + SQRT(zdelta) )
+         ELSE
+           zh_min(ji,jj,jk) = aphscale*(-(p_alktot-zalknw_inf(ji,jj,jk)) + SQRT(zdelta) ) / 2.
+         ENDIF
 
-               zdelta = (p_alktot-zalknw_sup(ji,jj,jk))**2 + 4.*akw3(ji,jj,jk)/aphscale
+         zdelta = (p_alktot-zalknw_sup(ji,jj,jk))**2 + 4.*akw3(ji,jj,jk)/aphscale
 
-               IF(p_alktot <= zalknw_sup(ji,jj,jk)) THEN
-                 zh_max(ji,jj,jk) = aphscale*(-(p_alktot-zalknw_sup(ji,jj,jk)) + SQRT(zdelta) ) / 2.
-               ELSE
-                 zh_max(ji,jj,jk) = 2.*akw3(ji,jj,jk) /( p_alktot-zalknw_sup(ji,jj,jk) + SQRT(zdelta) )
-               ENDIF
+         IF(p_alktot <= zalknw_sup(ji,jj,jk)) THEN
+           zh_max(ji,jj,jk) = aphscale*(-(p_alktot-zalknw_sup(ji,jj,jk)) + SQRT(zdelta) ) / 2.
+         ELSE
+           zh_max(ji,jj,jk) = 2.*akw3(ji,jj,jk) /( p_alktot-zalknw_sup(ji,jj,jk) + SQRT(zdelta) )
+         ENDIF
 
-               zhi(ji,jj,jk) = MAX(MIN(zh_max(ji,jj,jk), zh_ini), zh_min(ji,jj,jk))
-            ENDIF
-         END DO
-      END DO
-   END DO
+         zhi(ji,jj,jk) = MAX(MIN(zh_max(ji,jj,jk), zh_ini), zh_min(ji,jj,jk))
+      ENDIF
+   END_3D
 
    zeqn_absmin(:,:,:) = HUGE(1._wp)
 
    DO jn = 1, jp_maxniter_atgen 
-   DO jk = 1, jpk
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-            IF (rmask(ji,jj,jk) == 1.) THEN
-               zfact = rhop(ji,jj,jk) / 1000. + rtrn
-               p_alktot = trb(ji,jj,jk,jptal) / zfact
-               zdic  = trb(ji,jj,jk,jpdic) / zfact
-               zbot  = borat(ji,jj,jk)
-               zpt = trb(ji,jj,jk,jppo4) / zfact * po4r
-               zsit = trb(ji,jj,jk,jpsil) / zfact
-               zst = sulfat (ji,jj,jk)
-               zft = fluorid(ji,jj,jk)
-               aphscale = 1. + sulfat(ji,jj,jk)/aks3(ji,jj,jk)
-               zh = zhi(ji,jj,jk)
-               zh_prev = zh
+   DO_3D_11_11( 1, jpk )
+      IF (rmask(ji,jj,jk) == 1.) THEN
+         zfact = rhop(ji,jj,jk) / 1000. + rtrn
+         p_alktot = tr(ji,jj,jk,jptal,Kbb) / zfact
+         zdic  = tr(ji,jj,jk,jpdic,Kbb) / zfact
+         zbot  = borat(ji,jj,jk)
+         zpt = tr(ji,jj,jk,jppo4,Kbb) / zfact * po4r
+         zsit = tr(ji,jj,jk,jpsil,Kbb) / zfact
+         zst = sulfat (ji,jj,jk)
+         zft = fluorid(ji,jj,jk)
+         aphscale = 1. + sulfat(ji,jj,jk)/aks3(ji,jj,jk)
+         zh = zhi(ji,jj,jk)
+         zh_prev = zh
 
-               ! H2CO3 - HCO3 - CO3 : n=2, m=0
-               znumer_dic = 2.*ak13(ji,jj,jk)*ak23(ji,jj,jk) + zh*ak13(ji,jj,jk)
-               zdenom_dic = ak13(ji,jj,jk)*ak23(ji,jj,jk) + zh*(ak13(ji,jj,jk) + zh)
-               zalk_dic   = zdic * (znumer_dic/zdenom_dic)
-               zdnumer_dic = ak13(ji,jj,jk)*ak13(ji,jj,jk)*ak23(ji,jj,jk) + zh     &
-                             *(4.*ak13(ji,jj,jk)*ak23(ji,jj,jk) + zh*ak13(ji,jj,jk))
-               zdalk_dic   = -zdic*(zdnumer_dic/zdenom_dic**2)
+         ! H2CO3 - HCO3 - CO3 : n=2, m=0
+         znumer_dic = 2.*ak13(ji,jj,jk)*ak23(ji,jj,jk) + zh*ak13(ji,jj,jk)
+         zdenom_dic = ak13(ji,jj,jk)*ak23(ji,jj,jk) + zh*(ak13(ji,jj,jk) + zh)
+         zalk_dic   = zdic * (znumer_dic/zdenom_dic)
+         zdnumer_dic = ak13(ji,jj,jk)*ak13(ji,jj,jk)*ak23(ji,jj,jk) + zh     &
+                       *(4.*ak13(ji,jj,jk)*ak23(ji,jj,jk) + zh*ak13(ji,jj,jk))
+         zdalk_dic   = -zdic*(zdnumer_dic/zdenom_dic**2)
 
 
-               ! B(OH)3 - B(OH)4 : n=1, m=0
-               znumer_bor = akb3(ji,jj,jk)
-               zdenom_bor = akb3(ji,jj,jk) + zh
-               zalk_bor   = zbot * (znumer_bor/zdenom_bor)
-               zdnumer_bor = akb3(ji,jj,jk)
-               zdalk_bor   = -zbot*(zdnumer_bor/zdenom_bor**2)
+         ! B(OH)3 - B(OH)4 : n=1, m=0
+         znumer_bor = akb3(ji,jj,jk)
+         zdenom_bor = akb3(ji,jj,jk) + zh
+         zalk_bor   = zbot * (znumer_bor/zdenom_bor)
+         zdnumer_bor = akb3(ji,jj,jk)
+         zdalk_bor   = -zbot*(zdnumer_bor/zdenom_bor**2)
 
 
-               ! H3PO4 - H2PO4 - HPO4 - PO4 : n=3, m=1
-               znumer_po4 = 3.*ak1p3(ji,jj,jk)*ak2p3(ji,jj,jk)*ak3p3(ji,jj,jk)  &
-               &            + zh*(2.*ak1p3(ji,jj,jk)*ak2p3(ji,jj,jk) + zh* ak1p3(ji,jj,jk))
-               zdenom_po4 = ak1p3(ji,jj,jk)*ak2p3(ji,jj,jk)*ak3p3(ji,jj,jk)     &
-               &            + zh*( ak1p3(ji,jj,jk)*ak2p3(ji,jj,jk) + zh*(ak1p3(ji,jj,jk) + zh))
-               zalk_po4   = zpt * (znumer_po4/zdenom_po4 - 1.) ! Zero level of H3PO4 = 1
-               zdnumer_po4 = ak1p3(ji,jj,jk)*ak2p3(ji,jj,jk)*ak1p3(ji,jj,jk)*ak2p3(ji,jj,jk)*ak3p3(ji,jj,jk)  &
-               &             + zh*(4.*ak1p3(ji,jj,jk)*ak1p3(ji,jj,jk)*ak2p3(ji,jj,jk)*ak3p3(ji,jj,jk)         &
-               &             + zh*(9.*ak1p3(ji,jj,jk)*ak2p3(ji,jj,jk)*ak3p3(ji,jj,jk)                         &
-               &             + ak1p3(ji,jj,jk)*ak1p3(ji,jj,jk)*ak2p3(ji,jj,jk)                                &
-               &             + zh*(4.*ak1p3(ji,jj,jk)*ak2p3(ji,jj,jk) + zh * ak1p3(ji,jj,jk) ) ) )
-               zdalk_po4   = -zpt * (zdnumer_po4/zdenom_po4**2)
+         ! H3PO4 - H2PO4 - HPO4 - PO4 : n=3, m=1
+         znumer_po4 = 3.*ak1p3(ji,jj,jk)*ak2p3(ji,jj,jk)*ak3p3(ji,jj,jk)  &
+         &            + zh*(2.*ak1p3(ji,jj,jk)*ak2p3(ji,jj,jk) + zh* ak1p3(ji,jj,jk))
+         zdenom_po4 = ak1p3(ji,jj,jk)*ak2p3(ji,jj,jk)*ak3p3(ji,jj,jk)     &
+         &            + zh*( ak1p3(ji,jj,jk)*ak2p3(ji,jj,jk) + zh*(ak1p3(ji,jj,jk) + zh))
+         zalk_po4   = zpt * (znumer_po4/zdenom_po4 - 1.) ! Zero level of H3PO4 = 1
+         zdnumer_po4 = ak1p3(ji,jj,jk)*ak2p3(ji,jj,jk)*ak1p3(ji,jj,jk)*ak2p3(ji,jj,jk)*ak3p3(ji,jj,jk)  &
+         &             + zh*(4.*ak1p3(ji,jj,jk)*ak1p3(ji,jj,jk)*ak2p3(ji,jj,jk)*ak3p3(ji,jj,jk)         &
+         &             + zh*(9.*ak1p3(ji,jj,jk)*ak2p3(ji,jj,jk)*ak3p3(ji,jj,jk)                         &
+         &             + ak1p3(ji,jj,jk)*ak1p3(ji,jj,jk)*ak2p3(ji,jj,jk)                                &
+         &             + zh*(4.*ak1p3(ji,jj,jk)*ak2p3(ji,jj,jk) + zh * ak1p3(ji,jj,jk) ) ) )
+         zdalk_po4   = -zpt * (zdnumer_po4/zdenom_po4**2)
 
-               ! H4SiO4 - H3SiO4 : n=1, m=0
-               znumer_sil = aksi3(ji,jj,jk)
-               zdenom_sil = aksi3(ji,jj,jk) + zh
-               zalk_sil   = zsit * (znumer_sil/zdenom_sil)
-               zdnumer_sil = aksi3(ji,jj,jk)
-               zdalk_sil   = -zsit * (zdnumer_sil/zdenom_sil**2)
+         ! H4SiO4 - H3SiO4 : n=1, m=0
+         znumer_sil = aksi3(ji,jj,jk)
+         zdenom_sil = aksi3(ji,jj,jk) + zh
+         zalk_sil   = zsit * (znumer_sil/zdenom_sil)
+         zdnumer_sil = aksi3(ji,jj,jk)
+         zdalk_sil   = -zsit * (zdnumer_sil/zdenom_sil**2)
 
-               ! HSO4 - SO4 : n=1, m=1
-               aphscale = 1.0 + zst/aks3(ji,jj,jk)
-               znumer_so4 = aks3(ji,jj,jk) * aphscale
-               zdenom_so4 = aks3(ji,jj,jk) * aphscale + zh
-               zalk_so4   = zst * (znumer_so4/zdenom_so4 - 1.)
-               zdnumer_so4 = aks3(ji,jj,jk)
-               zdalk_so4   = -zst * (zdnumer_so4/zdenom_so4**2)
+         ! HSO4 - SO4 : n=1, m=1
+         aphscale = 1.0 + zst/aks3(ji,jj,jk)
+         znumer_so4 = aks3(ji,jj,jk) * aphscale
+         zdenom_so4 = aks3(ji,jj,jk) * aphscale + zh
+         zalk_so4   = zst * (znumer_so4/zdenom_so4 - 1.)
+         zdnumer_so4 = aks3(ji,jj,jk)
+         zdalk_so4   = -zst * (zdnumer_so4/zdenom_so4**2)
 
-               ! HF - F : n=1, m=1
-               znumer_flu =  akf3(ji,jj,jk)
-               zdenom_flu =  akf3(ji,jj,jk) + zh
-               zalk_flu   =  zft * (znumer_flu/zdenom_flu - 1.)
-               zdnumer_flu = akf3(ji,jj,jk)
-               zdalk_flu   = -zft * (zdnumer_flu/zdenom_flu**2)
+         ! HF - F : n=1, m=1
+         znumer_flu =  akf3(ji,jj,jk)
+         zdenom_flu =  akf3(ji,jj,jk) + zh
+         zalk_flu   =  zft * (znumer_flu/zdenom_flu - 1.)
+         zdnumer_flu = akf3(ji,jj,jk)
+         zdalk_flu   = -zft * (zdnumer_flu/zdenom_flu**2)
 
-               ! H2O - OH
-               aphscale = 1.0 + zst/aks3(ji,jj,jk)
-               zalk_wat   = akw3(ji,jj,jk)/zh - zh/aphscale
-               zdalk_wat  = -akw3(ji,jj,jk)/zh**2 - 1./aphscale
+         ! H2O - OH
+         aphscale = 1.0 + zst/aks3(ji,jj,jk)
+         zalk_wat   = akw3(ji,jj,jk)/zh - zh/aphscale
+         zdalk_wat  = -akw3(ji,jj,jk)/zh**2 - 1./aphscale
 
-               ! CALCULATE [ALK]([CO3--], [HCO3-])
-               zeqn = zalk_dic + zalk_bor + zalk_po4 + zalk_sil   &
-               &      + zalk_so4 + zalk_flu                       &
-               &      + zalk_wat - p_alktot
+         ! CALCULATE [ALK]([CO3--], [HCO3-])
+         zeqn = zalk_dic + zalk_bor + zalk_po4 + zalk_sil   &
+         &      + zalk_so4 + zalk_flu                       &
+         &      + zalk_wat - p_alktot
 
-               zalka = p_alktot - (zalk_bor + zalk_po4 + zalk_sil   &
-               &       + zalk_so4 + zalk_flu + zalk_wat)
+         zalka = p_alktot - (zalk_bor + zalk_po4 + zalk_sil   &
+         &       + zalk_so4 + zalk_flu + zalk_wat)
 
-               zdeqndh = zdalk_dic + zdalk_bor + zdalk_po4 + zdalk_sil &
-               &         + zdalk_so4 + zdalk_flu + zdalk_wat
+         zdeqndh = zdalk_dic + zdalk_bor + zdalk_po4 + zdalk_sil &
+         &         + zdalk_so4 + zdalk_flu + zdalk_wat
 
-               ! Adapt bracketing interval
-               IF(zeqn > 0._wp) THEN
-                 zh_min(ji,jj,jk) = zh_prev
-               ELSEIF(zeqn < 0._wp) THEN
-                 zh_max(ji,jj,jk) = zh_prev
-               ENDIF
+         ! Adapt bracketing interval
+         IF(zeqn > 0._wp) THEN
+           zh_min(ji,jj,jk) = zh_prev
+         ELSEIF(zeqn < 0._wp) THEN
+           zh_max(ji,jj,jk) = zh_prev
+         ENDIF
 
-               IF(ABS(zeqn) >= 0.5_wp*zeqn_absmin(ji,jj,jk)) THEN
-               ! if the function evaluation at the current point is
-               ! not decreasing faster than with a bisection step (at least linearly)
-               ! in absolute value take one bisection step on [ph_min, ph_max]
-               ! ph_new = (ph_min + ph_max)/2d0
-               !
+         IF(ABS(zeqn) >= 0.5_wp*zeqn_absmin(ji,jj,jk)) THEN
+         ! if the function evaluation at the current point is
+         ! not decreasing faster than with a bisection step (at least linearly)
+         ! in absolute value take one bisection step on [ph_min, ph_max]
+         ! ph_new = (ph_min + ph_max)/2d0
+         !
+         ! In terms of [H]_new:
+         ! [H]_new = 10**(-ph_new)
+         !         = 10**(-(ph_min + ph_max)/2d0)
+         !         = SQRT(10**(-(ph_min + phmax)))
+         !         = SQRT(zh_max * zh_min)
+            zh = SQRT(zh_max(ji,jj,jk) * zh_min(ji,jj,jk))
+            zh_lnfactor = (zh - zh_prev)/zh_prev ! Required to test convergence below
+         ELSE
+         ! dzeqn/dpH = dzeqn/d[H] * d[H]/dpH
+         !           = -zdeqndh * LOG(10) * [H]
+         ! \Delta pH = -zeqn/(zdeqndh*d[H]/dpH) = zeqn/(zdeqndh*[H]*LOG(10))
+         !
+         ! pH_new = pH_old + \deltapH
+         !
+         ! [H]_new = 10**(-pH_new)
+         !         = 10**(-pH_old - \Delta pH)
+         !         = [H]_old * 10**(-zeqn/(zdeqndh*[H]_old*LOG(10)))
+         !         = [H]_old * EXP(-LOG(10)*zeqn/(zdeqndh*[H]_old*LOG(10)))
+         !         = [H]_old * EXP(-zeqn/(zdeqndh*[H]_old))
+
+            zh_lnfactor = -zeqn/(zdeqndh*zh_prev)
+
+            IF(ABS(zh_lnfactor) > pz_exp_threshold) THEN
+               zh          = zh_prev*EXP(zh_lnfactor)
+            ELSE
+               zh_delta    = zh_lnfactor*zh_prev
+               zh          = zh_prev + zh_delta
+            ENDIF
+
+            IF( zh < zh_min(ji,jj,jk) ) THEN
+               ! if [H]_new < [H]_min
+               ! i.e., if ph_new > ph_max then
+               ! take one bisection step on [ph_prev, ph_max]
+               ! ph_new = (ph_prev + ph_max)/2d0
                ! In terms of [H]_new:
                ! [H]_new = 10**(-ph_new)
-               !         = 10**(-(ph_min + ph_max)/2d0)
-               !         = SQRT(10**(-(ph_min + phmax)))
-               !         = SQRT(zh_max * zh_min)
-                  zh = SQRT(zh_max(ji,jj,jk) * zh_min(ji,jj,jk))
-                  zh_lnfactor = (zh - zh_prev)/zh_prev ! Required to test convergence below
-               ELSE
-               ! dzeqn/dpH = dzeqn/d[H] * d[H]/dpH
-               !           = -zdeqndh * LOG(10) * [H]
-               ! \Delta pH = -zeqn/(zdeqndh*d[H]/dpH) = zeqn/(zdeqndh*[H]*LOG(10))
-               !
-               ! pH_new = pH_old + \deltapH
-               !
-               ! [H]_new = 10**(-pH_new)
-               !         = 10**(-pH_old - \Delta pH)
-               !         = [H]_old * 10**(-zeqn/(zdeqndh*[H]_old*LOG(10)))
-               !         = [H]_old * EXP(-LOG(10)*zeqn/(zdeqndh*[H]_old*LOG(10)))
-               !         = [H]_old * EXP(-zeqn/(zdeqndh*[H]_old))
-
-                  zh_lnfactor = -zeqn/(zdeqndh*zh_prev)
-
-                  IF(ABS(zh_lnfactor) > pz_exp_threshold) THEN
-                     zh          = zh_prev*EXP(zh_lnfactor)
-                  ELSE
-                     zh_delta    = zh_lnfactor*zh_prev
-                     zh          = zh_prev + zh_delta
-                  ENDIF
-
-                  IF( zh < zh_min(ji,jj,jk) ) THEN
-                     ! if [H]_new < [H]_min
-                     ! i.e., if ph_new > ph_max then
-                     ! take one bisection step on [ph_prev, ph_max]
-                     ! ph_new = (ph_prev + ph_max)/2d0
-                     ! In terms of [H]_new:
-                     ! [H]_new = 10**(-ph_new)
-                     !         = 10**(-(ph_prev + ph_max)/2d0)
-                     !         = SQRT(10**(-(ph_prev + phmax)))
-                     !         = SQRT([H]_old*10**(-ph_max))
-                     !         = SQRT([H]_old * zh_min)
-                     zh                = SQRT(zh_prev * zh_min(ji,jj,jk))
-                     zh_lnfactor       = (zh - zh_prev)/zh_prev ! Required to test convergence below
-                  ENDIF
-
-                  IF( zh > zh_max(ji,jj,jk) ) THEN
-                     ! if [H]_new > [H]_max
-                     ! i.e., if ph_new < ph_min, then
-                     ! take one bisection step on [ph_min, ph_prev]
-                     ! ph_new = (ph_prev + ph_min)/2d0
-                     ! In terms of [H]_new:
-                     ! [H]_new = 10**(-ph_new)
-                     !         = 10**(-(ph_prev + ph_min)/2d0)
-                     !         = SQRT(10**(-(ph_prev + ph_min)))
-                     !         = SQRT([H]_old*10**(-ph_min))
-                     !         = SQRT([H]_old * zhmax)
-                     zh                = SQRT(zh_prev * zh_max(ji,jj,jk))
-                     zh_lnfactor       = (zh - zh_prev)/zh_prev ! Required to test convergence below
-                  ENDIF
-               ENDIF
-
-               zeqn_absmin(ji,jj,jk) = MIN( ABS(zeqn), zeqn_absmin(ji,jj,jk))
-
-               ! Stop iterations once |\delta{[H]}/[H]| < rdel
-               ! <=> |(zh - zh_prev)/zh_prev| = |EXP(-zeqn/(zdeqndh*zh_prev)) -1| < rdel
-               ! |EXP(-zeqn/(zdeqndh*zh_prev)) -1| ~ |zeqn/(zdeqndh*zh_prev)|
-
-               ! Alternatively:
-               ! |\Delta pH| = |zeqn/(zdeqndh*zh_prev*LOG(10))|
-               !             ~ 1/LOG(10) * |\Delta [H]|/[H]
-               !             < 1/LOG(10) * rdel
-
-               ! Hence |zeqn/(zdeqndh*zh)| < rdel
-
-               ! rdel <-- pp_rdel_ah_target
-               l_exitnow = (ABS(zh_lnfactor) < pp_rdel_ah_target)
-
-               IF(l_exitnow) THEN 
-                  rmask(ji,jj,jk) = 0.
-               ENDIF
-
-               zhi(ji,jj,jk) =  zh
-
-               IF(jn >= jp_maxniter_atgen) THEN
-                  zhi(ji,jj,jk) = -1._wp
-               ENDIF
-
+               !         = 10**(-(ph_prev + ph_max)/2d0)
+               !         = SQRT(10**(-(ph_prev + phmax)))
+               !         = SQRT([H]_old*10**(-ph_max))
+               !         = SQRT([H]_old * zh_min)
+               zh                = SQRT(zh_prev * zh_min(ji,jj,jk))
+               zh_lnfactor       = (zh - zh_prev)/zh_prev ! Required to test convergence below
             ENDIF
-         END DO
-      END DO
-   END DO
+
+            IF( zh > zh_max(ji,jj,jk) ) THEN
+               ! if [H]_new > [H]_max
+               ! i.e., if ph_new < ph_min, then
+               ! take one bisection step on [ph_min, ph_prev]
+               ! ph_new = (ph_prev + ph_min)/2d0
+               ! In terms of [H]_new:
+               ! [H]_new = 10**(-ph_new)
+               !         = 10**(-(ph_prev + ph_min)/2d0)
+               !         = SQRT(10**(-(ph_prev + ph_min)))
+               !         = SQRT([H]_old*10**(-ph_min))
+               !         = SQRT([H]_old * zhmax)
+               zh                = SQRT(zh_prev * zh_max(ji,jj,jk))
+               zh_lnfactor       = (zh - zh_prev)/zh_prev ! Required to test convergence below
+            ENDIF
+         ENDIF
+
+         zeqn_absmin(ji,jj,jk) = MIN( ABS(zeqn), zeqn_absmin(ji,jj,jk))
+
+         ! Stop iterations once |\delta{[H]}/[H]| < rdel
+         ! <=> |(zh - zh_prev)/zh_prev| = |EXP(-zeqn/(zdeqndh*zh_prev)) -1| < rdel
+         ! |EXP(-zeqn/(zdeqndh*zh_prev)) -1| ~ |zeqn/(zdeqndh*zh_prev)|
+
+         ! Alternatively:
+         ! |\Delta pH| = |zeqn/(zdeqndh*zh_prev*LOG(10))|
+         !             ~ 1/LOG(10) * |\Delta [H]|/[H]
+         !             < 1/LOG(10) * rdel
+
+         ! Hence |zeqn/(zdeqndh*zh)| < rdel
+
+         ! rdel <-- pp_rdel_ah_target
+         l_exitnow = (ABS(zh_lnfactor) < pp_rdel_ah_target)
+
+         IF(l_exitnow) THEN 
+            rmask(ji,jj,jk) = 0.
+         ENDIF
+
+         zhi(ji,jj,jk) =  zh
+
+         IF(jn >= jp_maxniter_atgen) THEN
+            zhi(ji,jj,jk) = -1._wp
+         ENDIF
+
+      ENDIF
+   END_3D
    END DO
    !
 

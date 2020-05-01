@@ -38,7 +38,7 @@ MODULE icethd_sal
 
    !!----------------------------------------------------------------------
    !! NEMO/ICE 4.0 , NEMO Consortium (2018)
-   !! $Id: icethd_sal.F90 10069 2018-08-28 14:12:24Z nicolasmartin $
+   !! $Id: icethd_sal.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -67,8 +67,8 @@ CONTAINS
       !               !---------------------------------------------!
       CASE( 2 )       !  time varying salinity with linear profile  !
          !            !---------------------------------------------!
-         z1_time_gd = 1._wp / rn_time_gd * rdt_ice
-         z1_time_fl = 1._wp / rn_time_fl * rdt_ice
+         z1_time_gd = 1._wp / rn_time_gd * rDt_ice
+         z1_time_fl = 1._wp / rn_time_fl * rDt_ice
          !
          DO ji = 1, npti
             !
@@ -97,7 +97,7 @@ CONTAINS
                s_i_1d(ji) = s_i_1d(ji) + zs_i_fl + zs_i_gd
                
                ! Salt flux
-               sfx_bri_1d(ji) = sfx_bri_1d(ji) - rhoi * a_i_1d(ji) * h_i_1d(ji) * ( zs_i_fl + zs_i_gd ) * r1_rdtice
+               sfx_bri_1d(ji) = sfx_bri_1d(ji) - rhoi * a_i_1d(ji) * h_i_1d(ji) * ( zs_i_fl + zs_i_gd ) * r1_Dt_ice
             ENDIF
          END DO
          !
@@ -131,12 +131,10 @@ CONTAINS
          &                 rn_sal_fl, rn_time_fl, rn_simax , rn_simin 
       !!-------------------------------------------------------------------
       !
-      REWIND( numnam_ice_ref )              ! Namelist namthd_sal in reference namelist : Ice salinity
       READ  ( numnam_ice_ref, namthd_sal, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namthd_sal in reference namelist', lwp )
-      REWIND( numnam_ice_cfg )              ! Namelist namthd_sal in configuration namelist : Ice salinity
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namthd_sal in reference namelist' )
       READ  ( numnam_ice_cfg, namthd_sal, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namthd_sal in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namthd_sal in configuration namelist' )
       IF(lwm) WRITE ( numoni, namthd_sal )
       !
       IF(lwp) THEN                           ! control print

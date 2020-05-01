@@ -25,10 +25,10 @@ MODULE sedstp
    !! * Routine accessibility
    PUBLIC sed_stp  ! called by step.F90
 
-   !! $Id: sedstp.F90 10222 2018-10-25 09:42:23Z aumont $
+   !! $Id: sedstp.F90 12489 2020-02-28 15:55:11Z davestorkey $
 CONTAINS
 
-   SUBROUTINE sed_stp ( kt )
+   SUBROUTINE sed_stp ( kt, Kbb, Kmm, Krhs )
       !!---------------------------------------------------------------------
       !!                  ***  ROUTINE sed_stp  ***
       !!
@@ -43,7 +43,8 @@ CONTAINS
       !!        !  04-10 (N. Emprin, M. Gehlen ) coupled with PISCES
       !!        !  06-04 (C. Ethe)  Re-organization
       !!----------------------------------------------------------------------
-      INTEGER, INTENT(in) ::   kt       ! number of iteration
+      INTEGER, INTENT(in) ::   kt                ! number of iteration
+      INTEGER, INTENT(in) ::   Kbb, Kmm, Krhs    ! time level indices
       INTEGER :: ji,jk,js,jn,jw
       !!----------------------------------------------------------------------
       IF( ln_timing )      CALL timing_start('sed_stp')
@@ -51,12 +52,12 @@ CONTAINS
                                 CALL sed_rst_opn  ( kt )       ! Open tracer restart file 
       IF( lrst_sed )            CALL sed_rst_cal  ( kt, 'WRITE' )   ! calenda
 
-      IF(ln_sediment_offline)   CALL trc_dmp_sed  ( kt )
+      IF(ln_sediment_offline)   CALL trc_dmp_sed  ( kt, Kbb, Kmm, Krhs )
 
-      dtsed  = r2dttrc
+      dtsed  = rDt_trc
 !      dtsed2 = dtsed
       IF (kt /= nitsed000) THEN
-         CALL sed_dta( kt )       ! Load  Data for bot. wat. Chem and fluxes
+         CALL sed_dta( kt, Kbb, Kmm )       ! Load  Data for bot. wat. Chem and fluxes
       ENDIF
 
       IF (sedmask == 1. ) THEN
@@ -79,7 +80,7 @@ CONTAINS
          ! This routine is commented out since it does not work at all
          CALL sed_mbc( kt )         ! cumulation for mass balance calculation
 
-         IF (ln_sed_2way) CALL sed_sfc( kt )         ! Give back new bottom wat chem to tracer model
+         IF (ln_sed_2way) CALL sed_sfc( kt, Kbb )         ! Give back new bottom wat chem to tracer model
       ENDIF
       CALL sed_wri( kt )         ! outputs
       IF( kt == nitsed000 ) THEN

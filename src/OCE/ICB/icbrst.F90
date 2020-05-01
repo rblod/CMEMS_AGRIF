@@ -44,7 +44,7 @@ MODULE icbrst
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: icbrst.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: icbrst.F90 12472 2020-02-26 16:37:57Z mathiot $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -68,12 +68,11 @@ CONTAINS
       TYPE(iceberg)                ::   localberg ! NOT a pointer but an actual local variable
       TYPE(point)                  ::   localpt   ! NOT a pointer but an actual local variable
       !!----------------------------------------------------------------------
-
       ! Find a restart file. Assume iceberg restarts in same directory as ocean restarts
       ! and are called TRIM(cn_ocerst)//'_icebergs'
-      cl_path = TRIM(cn_ocerst_indir)
+      cl_path = TRIM(cn_icbrst_indir)
       IF( cl_path(LEN_TRIM(cl_path):) /= '/' ) cl_path = TRIM(cl_path) // '/'
-      cl_filename = TRIM(cn_ocerst_in)//'_icebergs'
+      cl_filename = TRIM(cn_icbrst_in)
       CALL iom_open( TRIM(cl_path)//cl_filename, ncid )
 
       imax_icb = 0
@@ -130,8 +129,6 @@ CONTAINS
       
       CALL iom_get( ncid, jpdom_unknown, 'kount' , zdata(:) )
       num_bergs(:) = INT(zdata(:))
-      ! Close file
-      CALL iom_close( ncid )
       !
 
       ! Sanity checks
@@ -145,6 +142,8 @@ CONTAINS
       ENDIF
       IF( lwp )   WRITE(numout,'(a,i5,a,i5,a)') 'icebergs, icb_rst_read: there were',ibergs_in_file,   &
          &                                    ' bergs in the restart file and', jn,' bergs have been read'
+      ! Close file
+      CALL iom_close( ncid )
       !
       ! Confirm that all areas have a suitable base for assigning new iceberg
       ! numbers. This will not be the case if restarting from a collated dataset
@@ -191,6 +190,7 @@ CONTAINS
       INTEGER ::   ix_dim, iy_dim, ik_dim, in_dim
       CHARACTER(len=256)     :: cl_path
       CHARACTER(len=256)     :: cl_filename
+      CHARACTER(len=256)     :: cl_kt
       TYPE(iceberg), POINTER :: this
       TYPE(point)  , POINTER :: pt
       !!----------------------------------------------------------------------
@@ -203,13 +203,20 @@ CONTAINS
       IF( kt == nitrst ) THEN
          ! Only operate on the restart timestep itself.
          ! Assume we write iceberg restarts to same directory as ocean restarts.
-         cl_path = TRIM(cn_ocerst_outdir)
+         !
+         ! directory name
+         cl_path = TRIM(cn_icbrst_outdir)
          IF( cl_path(LEN_TRIM(cl_path):) /= '/' ) cl_path = TRIM(cl_path) // '/'
+         !
+         ! file name
+         WRITE(cl_kt, '(i8.8)') kt
+         cl_filename = TRIM(cexper)//"_"//TRIM(ADJUSTL(cl_kt))//"_"//TRIM(cn_icbrst_out)
          IF( lk_mpp ) THEN
-            WRITE(cl_filename,'(A,"_icebergs_",I8.8,"_restart_",I4.4,".nc")') TRIM(cexper), kt, narea-1
+            WRITE(cl_filename,'(A,"_",I4.4,".nc")') TRIM(cl_filename), narea-1
          ELSE
-            WRITE(cl_filename,'(A,"_icebergs_",I8.8,"_restart.nc")') TRIM(cexper), kt
+            WRITE(cl_filename,'(A,".nc")') TRIM(cl_filename)
          ENDIF
+
          IF ( lwp .AND. nn_verbose_level >= 0) WRITE(numout,'(2a)') 'icebergs, write_restart: creating ',  &
            &                                                         TRIM(cl_path)//TRIM(cl_filename)
    

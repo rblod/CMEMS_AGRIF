@@ -1,4 +1,3 @@
-#define TWO_WAY
 #undef DECAL_FEEDBACK
 
 MODULE agrif_top_update
@@ -19,6 +18,7 @@ MODULE agrif_top_update
    USE agrif_oce
    USE par_trc
    USE trc
+   USE vremap
 
    IMPLICIT NONE
    PRIVATE
@@ -27,7 +27,7 @@ MODULE agrif_top_update
 
    !!----------------------------------------------------------------------
    !! NEMO/NST 4.0 , NEMO Consortium (2018)
-   !! $Id: agrif_top_update.F90 10068 2018-08-28 14:09:04Z nicolasmartin $
+   !! $Id: agrif_top_update.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -39,7 +39,6 @@ CONTAINS
       ! 
       IF (Agrif_Root()) RETURN 
       !
-#if defined TWO_WAY   
       Agrif_UseSpecialValueInUpdate = .TRUE.
       Agrif_SpecialValueFineGrid    = 0._wp
       ! 
@@ -53,8 +52,6 @@ CONTAINS
       !
       Agrif_UseSpecialValueInUpdate = .FALSE.
       !
-#endif
-      !
    END SUBROUTINE Agrif_Update_Trc
 
 #ifdef key_vertical
@@ -67,23 +64,22 @@ CONTAINS
       LOGICAL, INTENT(in) :: before
       !!
       INTEGER :: ji,jj,jk,jn
-      REAL(wp), DIMENSION(i1:i2,j1:j2,1:jpk,n1:n2) :: tabres_child
+      REAL(wp) :: ztb, ztnu, ztno
       REAL(wp) :: h_in(k1:k2)
       REAL(wp) :: h_out(1:jpk)
       INTEGER  :: N_in, N_out
       REAL(wp) :: h_diff
-      REAL(wp) :: zrho_xy
-      REAL(wp) :: tabin(k1:k2,n1:n2)
+      REAL(wp) :: tabin(k1:k2,1:jptra)
+      REAL(wp), DIMENSION(i1:i2,j1:j2,1:jpk,1:jptra) :: tabres_child
       !!---------------------------------------------
       !
       IF (before) THEN
          AGRIF_SpecialValue = -999._wp
-         zrho_xy = Agrif_rhox() * Agrif_rhoy() 
          DO jn = n1,n2-1
             DO jk=k1,k2
                DO jj=j1,j2
                   DO ji=i1,i2
-                     tabres(ji,jj,jk,jn) = (trn(ji,jj,jk,jn) * e3t_n(ji,jj,jk) ) &
+                     tabres(ji,jj,jk,jn) = (tr(ji,jj,jk,jn,Kmm_a) * e3t(ji,jj,jk,Kmm_a) ) &
                                            * tmask(ji,jj,jk) + (tmask(ji,jj,jk)-1)*999._wp
                   END DO
                END DO
@@ -92,7 +88,7 @@ CONTAINS
          DO jk=k1,k2
             DO jj=j1,j2
                DO ji=i1,i2
-                  tabres(ji,jj,jk,n2) = tmask(ji,jj,jk) * e3t_n(ji,jj,jk) &
+                  tabres(ji,jj,jk,n2) = tmask(ji,jj,jk) * e3t(ji,jj,jk,Kmm_a) &
                                            + (tmask(ji,jj,jk)-1)*999._wp
                END DO
             END DO
@@ -113,7 +109,7 @@ CONTAINS
                DO jk=1,jpk ! jpk of parent grid
                   IF (tmask(ji,jj,jk) < -900) EXIT ! TODO: Will not work with ISF
                   N_out = N_out + 1
-                  h_out(N_out) = e3t_n(ji,jj,jk) !Parent grid scale factors. Could multiply by e1e2t here instead of division above
+                  h_out(N_out) = e3t(ji,jj,jk,Kmm_a) !Parent grid scale factors. Could multiply by e1e2t here instead of division above
                ENDDO
                IF (N_in > 0) THEN !Remove this?
                   h_diff = sum(h_out(1:N_out))-sum(h_in(1:N_in))
@@ -123,23 +119,23 @@ CONTAINS
                      print *,h_out(1:N_out)
                      STOP
                   ENDIF
-                  DO jn=1,jptra
-                     CALL reconstructandremap(tabin(1:N_in,jn),h_in(1:N_in),tabres_child(ji,jj,1:N_out,jn),h_out(1:N_out),N_in,N_out)
-                  ENDDO
+                  CALL reconstructandremap(tabin(1:N_in,1:jptra),h_in(1:N_in),tabres_child(ji,jj,1:N_out,1:jptra),h_out(1:N_out),N_in,N_out,jptra)
                ENDIF
             ENDDO
          ENDDO
-
-         IF (.NOT.(lk_agrif_fstep.AND.(neuler==0))) THEN
+         !
+         IF (.NOT.(lk_agrif_fstep.AND.(l_1st_euler))) THEN
             ! Add asselin part
             DO jn = 1,jptra
-               DO jk=1,jpk
+               DO jk=1,jpkm1
                   DO jj=j1,j2
                      DO ji=i1,i2
                         IF( tabres_child(ji,jj,jk,jn) .NE. 0. ) THEN
-                           trb(ji,jj,jk,jn) = tsb(ji,jj,jk,jn) & 
-                                 & + atfp * ( tabres_child(ji,jj,jk,jn) &
-                                 &          - trn(ji,jj,jk,jn) ) * tmask(ji,jj,jk)
+                           ztb  = tr(ji,jj,jk,jn,Kbb_a) * e3t(ji,jj,jk,Kbb_a) ! fse3t_b prior update should be used
+                           ztnu = tabres_child(ji,jj,jk,jn) * e3t(ji,jj,jk,Kmm_a)
+                           ztno = tr(ji,jj,jk,jn,Kmm_a) * e3t(ji,jj,jk,Krhs_a)
+                           tr(ji,jj,jk,jn,Kbb_a) = ( ztb + rn_atfp * ( ztnu - ztno) )  & 
+                                     &        * tmask(ji,jj,jk) / e3t(ji,jj,jk,Kbb_a)
                         ENDIF
                      ENDDO
                   ENDDO
@@ -147,16 +143,22 @@ CONTAINS
             ENDDO
          ENDIF
          DO jn = 1,jptra
-            DO jk=1,jpk
+            DO jk=1,jpkm1
                DO jj=j1,j2
                   DO ji=i1,i2
                      IF( tabres_child(ji,jj,jk,jn) .NE. 0. ) THEN 
-                        trn(ji,jj,jk,jn) = tabres_child(ji,jj,jk,jn) * tmask(ji,jj,jk)
+                        tr(ji,jj,jk,jn,Kmm_a) = tabres_child(ji,jj,jk,jn)
                      END IF
                   END DO
                END DO
             END DO
          END DO
+         !
+         IF  ((l_1st_euler).AND.(Agrif_Nb_Step()==0) ) THEN
+            tr(i1:i2,j1:j2,1:jpkm1,1:jptra,Kbb_a)  = tr(i1:i2,j1:j2,1:jpkm1,1:jptra,Kmm_a)
+         ENDIF
+         !
+
       ENDIF
       ! 
    END SUBROUTINE updateTRC
@@ -182,8 +184,8 @@ CONTAINS
                DO jj=j1,j2
                   DO ji=i1,i2
 !> jc tmp
-                     tabres(ji,jj,jk,jn) = trn(ji,jj,jk,jn)  * e3t_n(ji,jj,jk) / e3t_0(ji,jj,jk)
-!                     tabres(ji,jj,jk,jn) = trn(ji,jj,jk,jn)  * e3t_n(ji,jj,jk)
+                     tabres(ji,jj,jk,jn) = tr(ji,jj,jk,jn,Kmm_a)  * e3t(ji,jj,jk,Kmm_a) / e3t_0(ji,jj,jk)
+!                     tabres(ji,jj,jk,jn) = tr(ji,jj,jk,jn,Kmm_a)  * e3t(ji,jj,jk,Kmm_a)
 !< jc tmp
                   END DO
                END DO
@@ -196,18 +198,18 @@ CONTAINS
                                          & * tmask(i1:i2,j1:j2,k1:k2)
          ENDDO
 !< jc tmp
-         IF (.NOT.(lk_agrif_fstep.AND.(neuler==0))) THEN
+         IF (.NOT.(lk_agrif_fstep.AND.(l_1st_euler))) THEN
             ! Add asselin part
             DO jn = n1,n2
                DO jk=k1,k2
                   DO jj=j1,j2
                      DO ji=i1,i2
                         IF( tabres(ji,jj,jk,jn) .NE. 0. ) THEN
-                           ztb  = trb(ji,jj,jk,jn) * e3t_b(ji,jj,jk) ! fse3t_b prior update should be used
+                           ztb  = tr(ji,jj,jk,jn,Kbb_a) * e3t(ji,jj,jk,Kbb_a) ! fse3t_b prior update should be used
                            ztnu = tabres(ji,jj,jk,jn)
-                           ztno = trn(ji,jj,jk,jn) * e3t_a(ji,jj,jk)
-                           trb(ji,jj,jk,jn) = ( ztb + atfp * ( ztnu - ztno) )  & 
-                                     &        * tmask(ji,jj,jk) / e3t_b(ji,jj,jk)
+                           ztno = tr(ji,jj,jk,jn,Kmm_a) * e3t(ji,jj,jk,Krhs_a)
+                           tr(ji,jj,jk,jn,Kbb_a) = ( ztb + rn_atfp * ( ztnu - ztno) )  & 
+                                     &        * tmask(ji,jj,jk) / e3t(ji,jj,jk,Kbb_a)
                         ENDIF
                      ENDDO
                   ENDDO
@@ -219,15 +221,15 @@ CONTAINS
                DO jj=j1,j2
                   DO ji=i1,i2
                      IF( tabres(ji,jj,jk,jn) .NE. 0. ) THEN 
-                        trn(ji,jj,jk,jn) = tabres(ji,jj,jk,jn) / e3t_n(ji,jj,jk)
+                        tr(ji,jj,jk,jn,Kmm_a) = tabres(ji,jj,jk,jn) / e3t(ji,jj,jk,Kmm_a)
                      END IF
                   END DO
                END DO
             END DO
          END DO
          !
-         IF  ((neuler==0).AND.(Agrif_Nb_Step()==0) ) THEN
-            trb(i1:i2,j1:j2,k1:k2,n1:n2)  = trn(i1:i2,j1:j2,k1:k2,n1:n2)
+         IF  ((l_1st_euler).AND.(Agrif_Nb_Step()==0) ) THEN
+            tr(i1:i2,j1:j2,k1:k2,n1:n2,Kbb_a)  = tr(i1:i2,j1:j2,k1:k2,n1:n2,Kmm_a)
          ENDIF
          !
       ENDIF

@@ -20,6 +20,7 @@ MODULE iceitd
    USE phycst         ! physical constants 
    USE ice1D          ! sea-ice: thermodynamic variables
    USE ice            ! sea-ice: variables
+   USE icevar         ! sea-ice: operations
    USE icectl         ! sea-ice: conservation tests
    USE icetab         ! sea-ice: convert 1D<=>2D
    !
@@ -46,9 +47,11 @@ MODULE iceitd
    LOGICAL                    ::   ln_cat_usr   ! ice categories are defined by rn_catbnd
    REAL(wp), DIMENSION(0:100) ::   rn_catbnd    ! ice categories bounds
    !
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/ICE 4.0 , NEMO Consortium (2018)
-   !! $Id: iceitd.F90 10069 2018-08-28 14:12:24Z nicolasmartin $
+   !! $Id: iceitd.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -86,19 +89,20 @@ CONTAINS
       IF( kt == nit000 .AND. lwp )   WRITE(numout,*) '-- ice_itd_rem: remapping ice thickness distribution' 
 
       IF( ln_icediachk )   CALL ice_cons_hsm(0, 'iceitd_rem', rdiag_v, rdiag_s, rdiag_t, rdiag_fv, rdiag_fs, rdiag_ft)
+      IF( ln_icediachk )   CALL ice_cons2D  (0, 'iceitd_rem',  diag_v,  diag_s,  diag_t,  diag_fv,  diag_fs,  diag_ft)
 
       !-----------------------------------------------------------------------------------------------
       !  1) Identify grid cells with ice
       !-----------------------------------------------------------------------------------------------
+      at_i(:,:) = SUM( a_i, dim=3 )
+      !
       npti = 0   ;   nptidx(:) = 0
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-            IF ( at_i(ji,jj) > epsi10 ) THEN
-               npti = npti + 1
-               nptidx( npti ) = (jj - 1) * jpi + ji
-            ENDIF
-         END DO
-      END DO
+      DO_2D_11_11
+         IF ( at_i(ji,jj) > epsi10 ) THEN
+            npti = npti + 1
+            nptidx( npti ) = (jj - 1) * jpi + ji
+         ENDIF
+      END_2D
       
       !-----------------------------------------------------------------------------------------------
       !  2) Compute new category boundaries
@@ -206,14 +210,14 @@ CONTAINS
                ! --- g(h) for category 1 --- !
                CALL itd_glinear( zhb0(1:npti)  , zhb1(1:npti)  , h_ib_1d(1:npti)  , a_i_1d(1:npti)  ,  &   ! in
                   &              g0  (1:npti,1), g1  (1:npti,1), hL     (1:npti,1), hR    (1:npti,1)   )   ! out
-                  !
+               !
                ! Area lost due to melting of thin ice
                DO ji = 1, npti
                   !
                   IF( a_i_1d(ji) > epsi10 ) THEN
                      !
                      zdh0 =  h_i_1d(ji) - h_ib_1d(ji)                
-                     IF( zdh0 < 0.0 ) THEN      !remove area from category 1
+                     IF( zdh0 < 0.0 ) THEN      ! remove area from category 1
                         zdh0 = MIN( -zdh0, hi_max(1) )
                         !Integrate g(1) from 0 to dh0 to estimate area melted
                         zetamax = MIN( zdh0, hR(ji,1) ) - hL(ji,1)
@@ -221,10 +225,9 @@ CONTAINS
                         IF( zetamax > 0.0 ) THEN
                            zx1    = zetamax
                            zx2    = 0.5 * zetamax * zetamax 
-                           zda0   = g1(ji,1) * zx2 + g0(ji,1) * zx1                        ! ice area removed
+                           zda0   = g1(ji,1) * zx2 + g0(ji,1) * zx1                ! ice area removed
                            zdamax = a_i_1d(ji) * (1.0 - h_i_1d(ji) / h_ib_1d(ji) ) ! Constrain new thickness <= h_i                
-                           zda0   = MIN( zda0, zdamax )                                                  ! ice area lost due to melting 
-                           !     of thin ice (zdamax > 0)
+                           zda0   = MIN( zda0, zdamax )                            ! ice area lost due to melting of thin ice (zdamax > 0)
                            ! Remove area, conserving volume
                            h_i_1d(ji) = h_i_1d(ji) * a_i_1d(ji) / ( a_i_1d(ji) - zda0 )
                            a_i_1d(ji) = a_i_1d(ji) - zda0
@@ -248,7 +251,7 @@ CONTAINS
             !
             ! --- g(h) for each thickness category --- !  
             CALL itd_glinear( zhbnew(1:npti,jl-1), zhbnew(1:npti,jl), h_i_1d(1:npti)   , a_i_1d(1:npti)   ,  &   ! in
-               &              g0    (1:npti,jl  ), g1    (1:npti,jl), hL     (1:npti,jl), hR   (1:npti,jl)   )   ! out
+               &              g0    (1:npti,jl  ), g1    (1:npti,jl), hL    (1:npti,jl), hR    (1:npti,jl)   )   ! out
             !
          END DO
          
@@ -312,6 +315,7 @@ CONTAINS
       ENDIF
       !
       IF( ln_icediachk )   CALL ice_cons_hsm(1, 'iceitd_rem', rdiag_v, rdiag_s, rdiag_t, rdiag_fv, rdiag_fs, rdiag_ft)
+      IF( ln_icediachk )   CALL ice_cons2D  (1, 'iceitd_rem',  diag_v,  diag_s,  diag_t,  diag_fv,  diag_fs,  diag_ft)
       !
    END SUBROUTINE ice_itd_rem
 
@@ -343,7 +347,7 @@ CONTAINS
       !
       DO ji = 1, npti
          !
-         IF( paice(ji) > epsi10  .AND. phice(ji) > 0._wp )  THEN
+         IF( paice(ji) > epsi10  .AND. phice(ji) > epsi10 )  THEN
             !
             ! Initialize hL and hR
             phL(ji) = HbL(ji)
@@ -388,11 +392,13 @@ CONTAINS
       REAL(wp), DIMENSION(:,:), INTENT(in) ::   pdaice   ! ice area transferred across boundary
       REAL(wp), DIMENSION(:,:), INTENT(in) ::   pdvice   ! ice volume transferred across boundary
       !
-      INTEGER  ::   ji, jj, jl, jk     ! dummy loop indices
-      INTEGER  ::   ii, ij, jl2, jl1   ! local integers
+      INTEGER  ::   ji, jl, jk         ! dummy loop indices
+      INTEGER  ::   jl2, jl1           ! local integers
       REAL(wp) ::   ztrans             ! ice/snow transferred
-      REAL(wp), DIMENSION(jpij)     ::   zworka, zworkv   ! workspace
-      REAL(wp), DIMENSION(jpij,jpl) ::   zaTsfn           !  -    -
+      REAL(wp), DIMENSION(jpij)            ::   zworka, zworkv   ! workspace
+      REAL(wp), DIMENSION(jpij,jpl)        ::   zaTsfn           !  -    -
+      REAL(wp), DIMENSION(jpij,nlay_i,jpl) ::   ze_i_2d
+      REAL(wp), DIMENSION(jpij,nlay_s,jpl) ::   ze_s_2d
       !!------------------------------------------------------------------
          
       CALL tab_3d_2d( npti, nptidx(1:npti), h_i_2d (1:npti,1:jpl), h_i  )
@@ -404,6 +410,16 @@ CONTAINS
       CALL tab_3d_2d( npti, nptidx(1:npti), a_ip_2d(1:npti,1:jpl), a_ip )
       CALL tab_3d_2d( npti, nptidx(1:npti), v_ip_2d(1:npti,1:jpl), v_ip )
       CALL tab_3d_2d( npti, nptidx(1:npti), t_su_2d(1:npti,1:jpl), t_su )
+      DO jl = 1, jpl
+         DO jk = 1, nlay_s
+            CALL tab_2d_1d( npti, nptidx(1:npti), ze_s_2d(1:npti,jk,jl), e_s(:,:,jk,jl) )
+         END DO
+         DO jk = 1, nlay_i
+            CALL tab_2d_1d( npti, nptidx(1:npti), ze_i_2d(1:npti,jk,jl), e_i(:,:,jk,jl) )
+         END DO
+      END DO
+      ! to correct roundoff errors on a_i
+      CALL tab_2d_1d( npti, nptidx(1:npti), rn_amax_1d(1:npti), rn_amax_2d )
 
       !----------------------------------------------------------------------------------------------
       ! 1) Define a variable equal to a_i*T_su
@@ -434,10 +450,6 @@ CONTAINS
                IF( a_i_2d(ji,jl1) >= epsi10 ) THEN   ;   zworka(ji) = pdaice(ji,jl) / a_i_2d(ji,jl1)
                ELSE                                  ;   zworka(ji) = 0._wp
                ENDIF
-               !
-               ! clem: The transfer between one category to another can lead to very small negative values (-1.e-20)
-               !       because of truncation error ( i.e. 1. - 1. /= 0 )
-               !       I do not think it should be a concern since small areas and volumes are erased (in ice_var_zapsmall.F90)
                !
                a_i_2d(ji,jl1) = a_i_2d(ji,jl1) - pdaice(ji,jl)       ! Ice areas
                a_i_2d(ji,jl2) = a_i_2d(ji,jl2) + pdaice(ji,jl)
@@ -475,10 +487,7 @@ CONTAINS
          END DO
          !
          DO jk = 1, nlay_s         !--- Snow heat content
-            !
             DO ji = 1, npti
-               ii = MOD( nptidx(ji) - 1, jpi ) + 1
-               ij = ( nptidx(ji) - 1 ) / jpi + 1
                !
                jl1 = kdonor(ji,jl)
                !
@@ -486,18 +495,15 @@ CONTAINS
                   IF(jl1 == jl) THEN  ;  jl2 = jl+1
                   ELSE                ;  jl2 = jl
                   ENDIF
-                  !
-                  ztrans            = e_s(ii,ij,jk,jl1) * zworkv(ji)
-                  e_s(ii,ij,jk,jl1) = e_s(ii,ij,jk,jl1) - ztrans
-                  e_s(ii,ij,jk,jl2) = e_s(ii,ij,jk,jl2) + ztrans
+                  ztrans             = ze_s_2d(ji,jk,jl1) * zworkv(ji)
+                  ze_s_2d(ji,jk,jl1) = ze_s_2d(ji,jk,jl1) - ztrans
+                  ze_s_2d(ji,jk,jl2) = ze_s_2d(ji,jk,jl2) + ztrans
                ENDIF
             END DO
          END DO
          !
          DO jk = 1, nlay_i         !--- Ice heat content
             DO ji = 1, npti
-               ii = MOD( nptidx(ji) - 1, jpi ) + 1
-               ij = ( nptidx(ji) - 1 ) / jpi + 1
                !
                jl1 = kdonor(ji,jl)
                !
@@ -505,18 +511,31 @@ CONTAINS
                   IF(jl1 == jl) THEN  ;  jl2 = jl+1
                   ELSE                ;  jl2 = jl
                   ENDIF
-                  !
-                  ztrans            = e_i(ii,ij,jk,jl1) * zworkv(ji)
-                  e_i(ii,ij,jk,jl1) = e_i(ii,ij,jk,jl1) - ztrans
-                  e_i(ii,ij,jk,jl2) = e_i(ii,ij,jk,jl2) + ztrans
+                  ztrans             = ze_i_2d(ji,jk,jl1) * zworkv(ji)
+                  ze_i_2d(ji,jk,jl1) = ze_i_2d(ji,jk,jl1) - ztrans
+                  ze_i_2d(ji,jk,jl2) = ze_i_2d(ji,jk,jl2) + ztrans
                ENDIF
             END DO
          END DO
          !
       END DO                   ! boundaries, 1 to jpl-1
+
+      !-------------------
+      ! 3) roundoff errors
+      !-------------------
+      ! clem: The transfer between one category to another can lead to very small negative values (-1.e-20)
+      !       because of truncation error ( i.e. 1. - 1. /= 0 )
+      CALL ice_var_roundoff( a_i_2d, v_i_2d, v_s_2d, sv_i_2d, oa_i_2d, a_ip_2d, v_ip_2d, ze_s_2d, ze_i_2d )
+
+      ! at_i must be <= rn_amax
+      zworka(1:npti) = SUM( a_i_2d(1:npti,:), dim=2 )
+      DO jl  = 1, jpl
+         WHERE( zworka(1:npti) > rn_amax_1d(1:npti) )   &
+            &   a_i_2d(1:npti,jl) = a_i_2d(1:npti,jl) * rn_amax_1d(1:npti) / zworka(1:npti)
+      END DO
       
       !-------------------------------------------------------------------------------
-      ! 3) Update ice thickness and temperature
+      ! 4) Update ice thickness and temperature
       !-------------------------------------------------------------------------------
       WHERE( a_i_2d(1:npti,:) >= epsi20 )
          h_i_2d (1:npti,:)  =  v_i_2d(1:npti,:) / a_i_2d(1:npti,:) 
@@ -535,6 +554,14 @@ CONTAINS
       CALL tab_2d_3d( npti, nptidx(1:npti), a_ip_2d(1:npti,1:jpl), a_ip )
       CALL tab_2d_3d( npti, nptidx(1:npti), v_ip_2d(1:npti,1:jpl), v_ip )
       CALL tab_2d_3d( npti, nptidx(1:npti), t_su_2d(1:npti,1:jpl), t_su )
+      DO jl = 1, jpl
+         DO jk = 1, nlay_s
+            CALL tab_1d_2d( npti, nptidx(1:npti), ze_s_2d(1:npti,jk,jl), e_s(:,:,jk,jl) )
+         END DO
+         DO jk = 1, nlay_i
+            CALL tab_1d_2d( npti, nptidx(1:npti), ze_i_2d(1:npti,jk,jl), e_i(:,:,jk,jl) )
+         END DO
+      END DO
       !
    END SUBROUTINE itd_shiftice
    
@@ -558,6 +585,9 @@ CONTAINS
       !
       IF( kt == nit000 .AND. lwp )   WRITE(numout,*) '-- ice_itd_reb: rebining ice thickness distribution' 
       !
+      IF( ln_icediachk )   CALL ice_cons_hsm(0, 'iceitd_reb', rdiag_v, rdiag_s, rdiag_t, rdiag_fv, rdiag_fs, rdiag_ft)
+      IF( ln_icediachk )   CALL ice_cons2D  (0, 'iceitd_reb',  diag_v,  diag_s,  diag_t,  diag_fv,  diag_fs,  diag_ft)
+      !
       jdonor(:,:) = 0
       zdaice(:,:) = 0._wp
       zdvice(:,:) = 0._wp
@@ -566,14 +596,12 @@ CONTAINS
       DO jl = 1, jpl-1        ! identify thicknesses that are too big
          !                    !---------------------------------------
          npti = 0   ;   nptidx(:) = 0
-         DO jj = 1, jpj
-            DO ji = 1, jpi
-               IF( a_i(ji,jj,jl) > 0._wp .AND. v_i(ji,jj,jl) > (a_i(ji,jj,jl) * hi_max(jl)) ) THEN
-                  npti = npti + 1
-                  nptidx( npti ) = (jj - 1) * jpi + ji                  
-               ENDIF
-            END DO
-         END DO
+         DO_2D_11_11
+            IF( a_i(ji,jj,jl) > 0._wp .AND. v_i(ji,jj,jl) > (a_i(ji,jj,jl) * hi_max(jl)) ) THEN
+               npti = npti + 1
+               nptidx( npti ) = (jj - 1) * jpi + ji                  
+            ENDIF
+         END_2D
          !
 !!clem   CALL tab_2d_1d( npti, nptidx(1:npti), h_i_1d(1:npti), h_i(:,:,jl) )
          CALL tab_2d_1d( npti, nptidx(1:npti), a_i_1d(1:npti), a_i(:,:,jl) )
@@ -607,14 +635,12 @@ CONTAINS
       DO jl = jpl-1, 1, -1    ! Identify thicknesses that are too small
          !                    !-----------------------------------------
          npti = 0 ; nptidx(:) = 0
-         DO jj = 1, jpj
-            DO ji = 1, jpi
-               IF( a_i(ji,jj,jl+1) > 0._wp .AND. v_i(ji,jj,jl+1) <= (a_i(ji,jj,jl+1) * hi_max(jl)) ) THEN
-                  npti = npti + 1
-                  nptidx( npti ) = (jj - 1) * jpi + ji                  
-               ENDIF
-            END DO
-         END DO
+         DO_2D_11_11
+            IF( a_i(ji,jj,jl+1) > 0._wp .AND. v_i(ji,jj,jl+1) <= (a_i(ji,jj,jl+1) * hi_max(jl)) ) THEN
+               npti = npti + 1
+               nptidx( npti ) = (jj - 1) * jpi + ji                  
+            ENDIF
+         END_2D
          !
          CALL tab_2d_1d( npti, nptidx(1:npti), a_i_1d(1:npti), a_i(:,:,jl+1) ) ! jl+1 is ok
          CALL tab_2d_1d( npti, nptidx(1:npti), v_i_1d(1:npti), v_i(:,:,jl+1) ) ! jl+1 is ok
@@ -634,6 +660,9 @@ CONTAINS
          !
       END DO
       !
+      IF( ln_icediachk )   CALL ice_cons_hsm(1, 'iceitd_reb', rdiag_v, rdiag_s, rdiag_t, rdiag_fv, rdiag_fs, rdiag_ft)
+      IF( ln_icediachk )   CALL ice_cons2D  (1, 'iceitd_reb',  diag_v,  diag_s,  diag_t,  diag_fv,  diag_fs,  diag_ft)
+      !
    END SUBROUTINE ice_itd_reb
 
 
@@ -652,12 +681,10 @@ CONTAINS
       NAMELIST/namitd/ ln_cat_hfn, rn_himean, ln_cat_usr, rn_catbnd, rn_himin
       !!------------------------------------------------------------------
       !
-      REWIND( numnam_ice_ref )      ! Namelist namitd in reference namelist : Parameters for ice
       READ  ( numnam_ice_ref, namitd, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namitd in reference namelist', lwp )
-      REWIND( numnam_ice_cfg )      ! Namelist namitd in configuration namelist : Parameters for ice
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namitd in reference namelist' )
       READ  ( numnam_ice_cfg, namitd, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namitd in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namitd in configuration namelist' )
       IF(lwm) WRITE( numoni, namitd )
       !
       IF(lwp) THEN                  ! control print

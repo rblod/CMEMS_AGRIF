@@ -39,17 +39,17 @@ MODULE traldf_iso
    LOGICAL  ::   l_hst   ! flag to compute heat transport
 
    !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: traldf_iso.F90 10068 2018-08-28 14:09:04Z nicolasmartin $
+   !! $Id: traldf_iso.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-  SUBROUTINE tra_ldf_iso( kt, kit000, cdtype, pahu, pahv, pgu , pgv ,   &
-      &                                                   pgui, pgvi,   &
-      &                                       ptb , ptbb, pta , kjpt, kpass )
+  SUBROUTINE tra_ldf_iso( kt, Kmm, kit000, cdtype, pahu, pahv,                    &
+      &                                            pgu , pgv    ,   pgui, pgvi,   &
+      &                                       pt , pt2 , pt_rhs , kjpt  , kpass )
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE tra_ldf_iso  ***
       !!
@@ -86,28 +86,29 @@ CONTAINS
       !!      take the horizontal divergence of the fluxes:
       !!         difft = 1/(e1e2t*e3t) dk[ zftw ]
       !!      Add this trend to the general trend (ta,sa):
-      !!         pta = pta + difft
+      !!         pt_rhs = pt_rhs + difft
       !!
-      !! ** Action :   Update pta arrays with the before rotated diffusion
+      !! ** Action :   Update pt_rhs arrays with the before rotated diffusion
       !!----------------------------------------------------------------------
       INTEGER                              , INTENT(in   ) ::   kt         ! ocean time-step index
       INTEGER                              , INTENT(in   ) ::   kit000     ! first time step index
       CHARACTER(len=3)                     , INTENT(in   ) ::   cdtype     ! =TRA or TRC (tracer indicator)
       INTEGER                              , INTENT(in   ) ::   kjpt       ! number of tracers
       INTEGER                              , INTENT(in   ) ::   kpass      ! =1/2 first or second passage
+      INTEGER                              , INTENT(in   ) ::   Kmm        ! ocean time level index
       REAL(wp), DIMENSION(jpi,jpj,jpk)     , INTENT(in   ) ::   pahu, pahv ! eddy diffusivity at u- and v-points  [m2/s]
       REAL(wp), DIMENSION(jpi,jpj    ,kjpt), INTENT(in   ) ::   pgu, pgv   ! tracer gradient at pstep levels
       REAL(wp), DIMENSION(jpi,jpj,    kjpt), INTENT(in   ) ::   pgui, pgvi ! tracer gradient at top   levels
-      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt), INTENT(in   ) ::   ptb        ! tracer (kpass=1) or laplacian of tracer (kpass=2)
-      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt), INTENT(in   ) ::   ptbb       ! tracer (only used in kpass=2)
-      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt), INTENT(inout) ::   pta        ! tracer trend
+      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt), INTENT(in   ) ::   pt         ! tracer (kpass=1) or laplacian of tracer (kpass=2)
+      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt), INTENT(in   ) ::   pt2        ! tracer (only used in kpass=2)
+      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt), INTENT(inout) ::   pt_rhs     ! tracer trend
       !
       INTEGER  ::  ji, jj, jk, jn   ! dummy loop indices
       INTEGER  ::  ikt
       INTEGER  ::  ierr             ! local integer
       REAL(wp) ::  zmsku, zahu_w, zabe1, zcof1, zcoef3   ! local scalars
       REAL(wp) ::  zmskv, zahv_w, zabe2, zcof2, zcoef4   !   -      -
-      REAL(wp) ::  zcoef0, ze3w_2, zsign, z2dt, z1_2dt   !   -      -
+      REAL(wp) ::  zcoef0, ze3w_2, zsign                 !   -      -
       REAL(wp), DIMENSION(jpi,jpj)     ::   zdkt, zdk1t, z2d
       REAL(wp), DIMENSION(jpi,jpj,jpk) ::   zdit, zdjt, zftu, zftv, ztfw 
       !!----------------------------------------------------------------------
@@ -123,15 +124,10 @@ CONTAINS
       !   
       l_hst = .FALSE.
       l_ptr = .FALSE.
-      IF( cdtype == 'TRA' .AND. ln_diaptr )                                                 l_ptr = .TRUE. 
+      IF( cdtype == 'TRA' .AND. ( iom_use( 'sophtldf' ) .OR. iom_use( 'sopstldf' ) ) )     l_ptr = .TRUE. 
       IF( cdtype == 'TRA' .AND. ( iom_use("uadv_heattr") .OR. iom_use("vadv_heattr") .OR. &
          &                        iom_use("uadv_salttr") .OR. iom_use("vadv_salttr")  ) )   l_hst = .TRUE.
       !
-      !                                            ! set time step size (Euler/Leapfrog)
-      IF( neuler == 0 .AND. kt == nit000 ) THEN   ;   z2dt =     rdt      ! at nit000   (Euler)
-      ELSE                                        ;   z2dt = 2.* rdt      !             (Leapfrog)
-      ENDIF
-      z1_2dt = 1._wp / z2dt
       !
       IF( kpass == 1 ) THEN   ;   zsign =  1._wp      ! bilaplacian operator require a minus sign (eddy diffusivity >0)
       ELSE                    ;   zsign = -1._wp
@@ -143,58 +139,42 @@ CONTAINS
       !
       IF( kpass == 1 ) THEN                  !==  first pass only  ==!
          !
-         DO jk = 2, jpkm1
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1   ! vector opt.
-                  !
-                  zmsku = wmask(ji,jj,jk) / MAX(   umask(ji  ,jj,jk-1) + umask(ji-1,jj,jk)          &
-                     &                           + umask(ji-1,jj,jk-1) + umask(ji  ,jj,jk) , 1._wp  )
-                  zmskv = wmask(ji,jj,jk) / MAX(   vmask(ji,jj  ,jk-1) + vmask(ji,jj-1,jk)          &
-                     &                           + vmask(ji,jj-1,jk-1) + vmask(ji,jj  ,jk) , 1._wp  )
-                     !
-                  zahu_w = (   pahu(ji  ,jj,jk-1) + pahu(ji-1,jj,jk)    &
-                     &       + pahu(ji-1,jj,jk-1) + pahu(ji  ,jj,jk)  ) * zmsku
-                  zahv_w = (   pahv(ji,jj  ,jk-1) + pahv(ji,jj-1,jk)    &
-                     &       + pahv(ji,jj-1,jk-1) + pahv(ji,jj  ,jk)  ) * zmskv
-                     !
-                  ah_wslp2(ji,jj,jk) = zahu_w * wslpi(ji,jj,jk) * wslpi(ji,jj,jk)   &
-                     &               + zahv_w * wslpj(ji,jj,jk) * wslpj(ji,jj,jk)
-               END DO
-            END DO
-         END DO
+         DO_3D_00_00( 2, jpkm1 )
+            !
+            zmsku = wmask(ji,jj,jk) / MAX(   umask(ji  ,jj,jk-1) + umask(ji-1,jj,jk)          &
+               &                           + umask(ji-1,jj,jk-1) + umask(ji  ,jj,jk) , 1._wp  )
+            zmskv = wmask(ji,jj,jk) / MAX(   vmask(ji,jj  ,jk-1) + vmask(ji,jj-1,jk)          &
+               &                           + vmask(ji,jj-1,jk-1) + vmask(ji,jj  ,jk) , 1._wp  )
+               !
+            zahu_w = (   pahu(ji  ,jj,jk-1) + pahu(ji-1,jj,jk)    &
+               &       + pahu(ji-1,jj,jk-1) + pahu(ji  ,jj,jk)  ) * zmsku
+            zahv_w = (   pahv(ji,jj  ,jk-1) + pahv(ji,jj-1,jk)    &
+               &       + pahv(ji,jj-1,jk-1) + pahv(ji,jj  ,jk)  ) * zmskv
+               !
+            ah_wslp2(ji,jj,jk) = zahu_w * wslpi(ji,jj,jk) * wslpi(ji,jj,jk)   &
+               &               + zahv_w * wslpj(ji,jj,jk) * wslpj(ji,jj,jk)
+         END_3D
          !
          IF( ln_traldf_msc ) THEN                ! stabilizing vertical diffusivity coefficient
-            DO jk = 2, jpkm1
-               DO jj = 2, jpjm1
-                  DO ji = fs_2, fs_jpim1
-                     akz(ji,jj,jk) = 0.25_wp * (                                                                     &
-                        &              ( pahu(ji  ,jj,jk) + pahu(ji  ,jj,jk-1) ) / ( e1u(ji  ,jj) * e1u(ji  ,jj) )   &
-                        &            + ( pahu(ji-1,jj,jk) + pahu(ji-1,jj,jk-1) ) / ( e1u(ji-1,jj) * e1u(ji-1,jj) )   &
-                        &            + ( pahv(ji,jj  ,jk) + pahv(ji,jj  ,jk-1) ) / ( e2v(ji,jj  ) * e2v(ji,jj  ) )   &
-                        &            + ( pahv(ji,jj-1,jk) + pahv(ji,jj-1,jk-1) ) / ( e2v(ji,jj-1) * e2v(ji,jj-1) )   )
-                  END DO
-               END DO
-            END DO
+            DO_3D_00_00( 2, jpkm1 )
+               akz(ji,jj,jk) = 0.25_wp * (                                                                     &
+                  &              ( pahu(ji  ,jj,jk) + pahu(ji  ,jj,jk-1) ) / ( e1u(ji  ,jj) * e1u(ji  ,jj) )   &
+                  &            + ( pahu(ji-1,jj,jk) + pahu(ji-1,jj,jk-1) ) / ( e1u(ji-1,jj) * e1u(ji-1,jj) )   &
+                  &            + ( pahv(ji,jj  ,jk) + pahv(ji,jj  ,jk-1) ) / ( e2v(ji,jj  ) * e2v(ji,jj  ) )   &
+                  &            + ( pahv(ji,jj-1,jk) + pahv(ji,jj-1,jk-1) ) / ( e2v(ji,jj-1) * e2v(ji,jj-1) )   )
+            END_3D
             !
             IF( ln_traldf_blp ) THEN                ! bilaplacian operator
-               DO jk = 2, jpkm1
-                  DO jj = 1, jpjm1
-                     DO ji = 1, fs_jpim1
-                        akz(ji,jj,jk) = 16._wp * ah_wslp2(ji,jj,jk)   &
-                           &          * (  akz(ji,jj,jk) + ah_wslp2(ji,jj,jk) / ( e3w_n(ji,jj,jk) * e3w_n(ji,jj,jk) )  )
-                     END DO
-                  END DO
-               END DO
+               DO_3D_10_10( 2, jpkm1 )
+                  akz(ji,jj,jk) = 16._wp * ah_wslp2(ji,jj,jk)   &
+                     &          * (  akz(ji,jj,jk) + ah_wslp2(ji,jj,jk) / ( e3w(ji,jj,jk,Kmm) * e3w(ji,jj,jk,Kmm) )  )
+               END_3D
             ELSEIF( ln_traldf_lap ) THEN              ! laplacian operator
-               DO jk = 2, jpkm1
-                  DO jj = 1, jpjm1
-                     DO ji = 1, fs_jpim1
-                        ze3w_2 = e3w_n(ji,jj,jk) * e3w_n(ji,jj,jk)
-                        zcoef0 = z2dt * (  akz(ji,jj,jk) + ah_wslp2(ji,jj,jk) / ze3w_2  )
-                        akz(ji,jj,jk) = MAX( zcoef0 - 0.5_wp , 0._wp ) * ze3w_2 * z1_2dt
-                     END DO
-                  END DO
-               END DO
+               DO_3D_10_10( 2, jpkm1 )
+                  ze3w_2 = e3w(ji,jj,jk,Kmm) * e3w(ji,jj,jk,Kmm)
+                  zcoef0 = rDt * (  akz(ji,jj,jk) + ah_wslp2(ji,jj,jk) / ze3w_2  )
+                  akz(ji,jj,jk) = MAX( zcoef0 - 0.5_wp , 0._wp ) * ze3w_2 * r1_Dt
+               END_3D
            ENDIF
            !
          ELSE                                    ! 33 flux set to zero with akz=ah_wslp2 ==>> computed in full implicit
@@ -215,28 +195,20 @@ CONTAINS
          !!end
 
          ! Horizontal tracer gradient 
-         DO jk = 1, jpkm1
-            DO jj = 1, jpjm1
-               DO ji = 1, fs_jpim1   ! vector opt.
-                  zdit(ji,jj,jk) = ( ptb(ji+1,jj  ,jk,jn) - ptb(ji,jj,jk,jn) ) * umask(ji,jj,jk)
-                  zdjt(ji,jj,jk) = ( ptb(ji  ,jj+1,jk,jn) - ptb(ji,jj,jk,jn) ) * vmask(ji,jj,jk)
-               END DO
-            END DO
-         END DO
+         DO_3D_10_10( 1, jpkm1 )
+            zdit(ji,jj,jk) = ( pt(ji+1,jj  ,jk,jn) - pt(ji,jj,jk,jn) ) * umask(ji,jj,jk)
+            zdjt(ji,jj,jk) = ( pt(ji  ,jj+1,jk,jn) - pt(ji,jj,jk,jn) ) * vmask(ji,jj,jk)
+         END_3D
          IF( ln_zps ) THEN      ! botton and surface ocean correction of the horizontal gradient
-            DO jj = 1, jpjm1              ! bottom correction (partial bottom cell)
-               DO ji = 1, fs_jpim1   ! vector opt.
-                  zdit(ji,jj,mbku(ji,jj)) = pgu(ji,jj,jn)          
-                  zdjt(ji,jj,mbkv(ji,jj)) = pgv(ji,jj,jn)
-               END DO
-            END DO
+            DO_2D_10_10
+               zdit(ji,jj,mbku(ji,jj)) = pgu(ji,jj,jn)          
+               zdjt(ji,jj,mbkv(ji,jj)) = pgv(ji,jj,jn)
+            END_2D
             IF( ln_isfcav ) THEN      ! first wet level beneath a cavity
-               DO jj = 1, jpjm1
-                  DO ji = 1, fs_jpim1   ! vector opt.
-                     IF( miku(ji,jj) > 1 )   zdit(ji,jj,miku(ji,jj)) = pgui(ji,jj,jn)          
-                     IF( mikv(ji,jj) > 1 )   zdjt(ji,jj,mikv(ji,jj)) = pgvi(ji,jj,jn)     
-                  END DO
-               END DO
+               DO_2D_10_10
+                  IF( miku(ji,jj) > 1 )   zdit(ji,jj,miku(ji,jj)) = pgui(ji,jj,jn)          
+                  IF( mikv(ji,jj) > 1 )   zdjt(ji,jj,mikv(ji,jj)) = pgvi(ji,jj,jn)     
+               END_2D
             ENDIF
          ENDIF
          !
@@ -247,123 +219,97 @@ CONTAINS
          DO jk = 1, jpkm1                                 ! Horizontal slab
             !
             !                             !== Vertical tracer gradient
-            zdk1t(:,:) = ( ptb(:,:,jk,jn) - ptb(:,:,jk+1,jn) ) * wmask(:,:,jk+1)     ! level jk+1
+            zdk1t(:,:) = ( pt(:,:,jk,jn) - pt(:,:,jk+1,jn) ) * wmask(:,:,jk+1)     ! level jk+1
             !
             IF( jk == 1 ) THEN   ;   zdkt(:,:) = zdk1t(:,:)                          ! surface: zdkt(jk=1)=zdkt(jk=2)
-            ELSE                 ;   zdkt(:,:) = ( ptb(:,:,jk-1,jn) - ptb(:,:,jk,jn) ) * wmask(:,:,jk)
+            ELSE                 ;   zdkt(:,:) = ( pt(:,:,jk-1,jn) - pt(:,:,jk,jn) ) * wmask(:,:,jk)
             ENDIF
-            DO jj = 1 , jpjm1            !==  Horizontal fluxes
-               DO ji = 1, fs_jpim1   ! vector opt.
-                  zabe1 = pahu(ji,jj,jk) * e2_e1u(ji,jj) * e3u_n(ji,jj,jk)
-                  zabe2 = pahv(ji,jj,jk) * e1_e2v(ji,jj) * e3v_n(ji,jj,jk)
-                  !
-                  zmsku = 1. / MAX(  wmask(ji+1,jj,jk  ) + wmask(ji,jj,jk+1)   &
-                     &             + wmask(ji+1,jj,jk+1) + wmask(ji,jj,jk  ), 1. )
-                  !
-                  zmskv = 1. / MAX(  wmask(ji,jj+1,jk  ) + wmask(ji,jj,jk+1)   &
-                     &             + wmask(ji,jj+1,jk+1) + wmask(ji,jj,jk  ), 1. )
-                  !
-                  zcof1 = - pahu(ji,jj,jk) * e2u(ji,jj) * uslp(ji,jj,jk) * zmsku
-                  zcof2 = - pahv(ji,jj,jk) * e1v(ji,jj) * vslp(ji,jj,jk) * zmskv
-                  !
-                  zftu(ji,jj,jk ) = (  zabe1 * zdit(ji,jj,jk)   &
-                     &               + zcof1 * (  zdkt (ji+1,jj) + zdk1t(ji,jj)      &
-                     &                          + zdk1t(ji+1,jj) + zdkt (ji,jj)  )  ) * umask(ji,jj,jk)
-                  zftv(ji,jj,jk) = (  zabe2 * zdjt(ji,jj,jk)   &
-                     &               + zcof2 * (  zdkt (ji,jj+1) + zdk1t(ji,jj)      &
-                     &                          + zdk1t(ji,jj+1) + zdkt (ji,jj)  )  ) * vmask(ji,jj,jk)                  
-               END DO
-            END DO
+            DO_2D_10_10
+               zabe1 = pahu(ji,jj,jk) * e2_e1u(ji,jj) * e3u(ji,jj,jk,Kmm)
+               zabe2 = pahv(ji,jj,jk) * e1_e2v(ji,jj) * e3v(ji,jj,jk,Kmm)
+               !
+               zmsku = 1. / MAX(  wmask(ji+1,jj,jk  ) + wmask(ji,jj,jk+1)   &
+                  &             + wmask(ji+1,jj,jk+1) + wmask(ji,jj,jk  ), 1. )
+               !
+               zmskv = 1. / MAX(  wmask(ji,jj+1,jk  ) + wmask(ji,jj,jk+1)   &
+                  &             + wmask(ji,jj+1,jk+1) + wmask(ji,jj,jk  ), 1. )
+               !
+               zcof1 = - pahu(ji,jj,jk) * e2u(ji,jj) * uslp(ji,jj,jk) * zmsku
+               zcof2 = - pahv(ji,jj,jk) * e1v(ji,jj) * vslp(ji,jj,jk) * zmskv
+               !
+               zftu(ji,jj,jk ) = (  zabe1 * zdit(ji,jj,jk)   &
+                  &               + zcof1 * (  zdkt (ji+1,jj) + zdk1t(ji,jj)      &
+                  &                          + zdk1t(ji+1,jj) + zdkt (ji,jj)  )  ) * umask(ji,jj,jk)
+               zftv(ji,jj,jk) = (  zabe2 * zdjt(ji,jj,jk)   &
+                  &               + zcof2 * (  zdkt (ji,jj+1) + zdk1t(ji,jj)      &
+                  &                          + zdk1t(ji,jj+1) + zdkt (ji,jj)  )  ) * vmask(ji,jj,jk)                  
+            END_2D
             !
-            DO jj = 2 , jpjm1          !== horizontal divergence and add to pta
-               DO ji = fs_2, fs_jpim1   ! vector opt.
-                  pta(ji,jj,jk,jn) = pta(ji,jj,jk,jn) + zsign * (  zftu(ji,jj,jk) - zftu(ji-1,jj,jk)      &
-                     &                                           + zftv(ji,jj,jk) - zftv(ji,jj-1,jk)  )   &
-                     &                                        * r1_e1e2t(ji,jj) / e3t_n(ji,jj,jk)
-               END DO
-            END DO
+            DO_2D_00_00
+               pt_rhs(ji,jj,jk,jn) = pt_rhs(ji,jj,jk,jn) + zsign * (  zftu(ji,jj,jk) - zftu(ji-1,jj,jk)      &
+                  &                                                 + zftv(ji,jj,jk) - zftv(ji,jj-1,jk)  )   &
+                  &                                              * r1_e1e2t(ji,jj) / e3t(ji,jj,jk,Kmm)
+            END_2D
          END DO                                        !   End of slab  
 
          !!----------------------------------------------------------------------
          !!   III - vertical trend (full)
          !!----------------------------------------------------------------------
          !
-         ztfw(1,:,:) = 0._wp     ;     ztfw(jpi,:,:) = 0._wp
-         !
          ! Vertical fluxes
          ! ---------------
          !                          ! Surface and bottom vertical fluxes set to zero
          ztfw(:,:, 1 ) = 0._wp      ;      ztfw(:,:,jpk) = 0._wp
          
-         DO jk = 2, jpkm1           ! interior (2=<jk=<jpk-1)
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1   ! vector opt.
-                  !
-                  zmsku = wmask(ji,jj,jk) / MAX(   umask(ji  ,jj,jk-1) + umask(ji-1,jj,jk)          &
-                     &                           + umask(ji-1,jj,jk-1) + umask(ji  ,jj,jk) , 1._wp  )
-                  zmskv = wmask(ji,jj,jk) / MAX(   vmask(ji,jj  ,jk-1) + vmask(ji,jj-1,jk)          &
-                     &                           + vmask(ji,jj-1,jk-1) + vmask(ji,jj  ,jk) , 1._wp  )
-                     !
-                  zahu_w = (   pahu(ji  ,jj,jk-1) + pahu(ji-1,jj,jk)    &
-                     &       + pahu(ji-1,jj,jk-1) + pahu(ji  ,jj,jk)  ) * zmsku
-                  zahv_w = (   pahv(ji,jj  ,jk-1) + pahv(ji,jj-1,jk)    &
-                     &       + pahv(ji,jj-1,jk-1) + pahv(ji,jj  ,jk)  ) * zmskv
-                     !
-                  zcoef3 = - zahu_w * e2t(ji,jj) * zmsku * wslpi (ji,jj,jk)   !wslpi & j are already w-masked
-                  zcoef4 = - zahv_w * e1t(ji,jj) * zmskv * wslpj (ji,jj,jk)
-                  !
-                  ztfw(ji,jj,jk) = zcoef3 * (   zdit(ji  ,jj  ,jk-1) + zdit(ji-1,jj  ,jk)      &
-                     &                        + zdit(ji-1,jj  ,jk-1) + zdit(ji  ,jj  ,jk)  )   &
-                     &           + zcoef4 * (   zdjt(ji  ,jj  ,jk-1) + zdjt(ji  ,jj-1,jk)      &
-                     &                        + zdjt(ji  ,jj-1,jk-1) + zdjt(ji  ,jj  ,jk)  )
-               END DO
-            END DO
-         END DO
+         DO_3D_00_00( 2, jpkm1 )
+            !
+            zmsku = wmask(ji,jj,jk) / MAX(   umask(ji  ,jj,jk-1) + umask(ji-1,jj,jk)          &
+               &                           + umask(ji-1,jj,jk-1) + umask(ji  ,jj,jk) , 1._wp  )
+            zmskv = wmask(ji,jj,jk) / MAX(   vmask(ji,jj  ,jk-1) + vmask(ji,jj-1,jk)          &
+               &                           + vmask(ji,jj-1,jk-1) + vmask(ji,jj  ,jk) , 1._wp  )
+               !
+            zahu_w = (   pahu(ji  ,jj,jk-1) + pahu(ji-1,jj,jk)    &
+               &       + pahu(ji-1,jj,jk-1) + pahu(ji  ,jj,jk)  ) * zmsku
+            zahv_w = (   pahv(ji,jj  ,jk-1) + pahv(ji,jj-1,jk)    &
+               &       + pahv(ji,jj-1,jk-1) + pahv(ji,jj  ,jk)  ) * zmskv
+               !
+            zcoef3 = - zahu_w * e2t(ji,jj) * zmsku * wslpi (ji,jj,jk)   !wslpi & j are already w-masked
+            zcoef4 = - zahv_w * e1t(ji,jj) * zmskv * wslpj (ji,jj,jk)
+            !
+            ztfw(ji,jj,jk) = zcoef3 * (   zdit(ji  ,jj  ,jk-1) + zdit(ji-1,jj  ,jk)      &
+               &                        + zdit(ji-1,jj  ,jk-1) + zdit(ji  ,jj  ,jk)  )   &
+               &           + zcoef4 * (   zdjt(ji  ,jj  ,jk-1) + zdjt(ji  ,jj-1,jk)      &
+               &                        + zdjt(ji  ,jj-1,jk-1) + zdjt(ji  ,jj  ,jk)  )
+         END_3D
          !                                !==  add the vertical 33 flux  ==!
          IF( ln_traldf_lap ) THEN               ! laplacian case: eddy coef = ah_wslp2 - akz
-            DO jk = 2, jpkm1       
-               DO jj = 1, jpjm1
-                  DO ji = fs_2, fs_jpim1
-                     ztfw(ji,jj,jk) = ztfw(ji,jj,jk) + e1e2t(ji,jj) / e3w_n(ji,jj,jk) * wmask(ji,jj,jk)   &
-                        &                            * ( ah_wslp2(ji,jj,jk) - akz(ji,jj,jk) )             &
-                        &                            * ( ptb(ji,jj,jk-1,jn) - ptb(ji,jj,jk,jn) )
-                  END DO
-               END DO
-            END DO
+            DO_3D_00_00( 2, jpkm1 )
+               ztfw(ji,jj,jk) = ztfw(ji,jj,jk) + e1e2t(ji,jj) / e3w(ji,jj,jk,Kmm) * wmask(ji,jj,jk)   &
+                  &                            * ( ah_wslp2(ji,jj,jk) - akz(ji,jj,jk) )               &
+                  &                            * (  pt(ji,jj,jk-1,jn) -  pt(ji,jj,jk,jn) )
+            END_3D
             !
          ELSE                                   ! bilaplacian 
             SELECT CASE( kpass )
             CASE(  1  )                            ! 1st pass : eddy coef = ah_wslp2
-               DO jk = 2, jpkm1 
-                  DO jj = 1, jpjm1
-                     DO ji = fs_2, fs_jpim1
-                        ztfw(ji,jj,jk) = ztfw(ji,jj,jk)    &
-                           &           + ah_wslp2(ji,jj,jk) * e1e2t(ji,jj)   &
-                           &           * ( ptb(ji,jj,jk-1,jn) - ptb(ji,jj,jk,jn) ) / e3w_n(ji,jj,jk) * wmask(ji,jj,jk)
-                     END DO
-                  END DO
-               END DO 
-            CASE(  2  )                         ! 2nd pass : eddy flux = ah_wslp2 and akz applied on ptb  and ptbb gradients, resp.
-               DO jk = 2, jpkm1 
-                  DO jj = 1, jpjm1
-                     DO ji = fs_2, fs_jpim1
-                        ztfw(ji,jj,jk) = ztfw(ji,jj,jk) + e1e2t(ji,jj) / e3w_n(ji,jj,jk) * wmask(ji,jj,jk)                      &
-                           &                            * (  ah_wslp2(ji,jj,jk) * ( ptb (ji,jj,jk-1,jn) - ptb (ji,jj,jk,jn) )   &
-                           &                               + akz     (ji,jj,jk) * ( ptbb(ji,jj,jk-1,jn) - ptbb(ji,jj,jk,jn) )   )
-                     END DO
-                  END DO
-               END DO
+               DO_3D_00_00( 2, jpkm1 )
+                  ztfw(ji,jj,jk) = ztfw(ji,jj,jk)                       &
+                     &           + ah_wslp2(ji,jj,jk)  * e1e2t(ji,jj)   &
+                     &           * ( pt(ji,jj,jk-1,jn) - pt(ji,jj,jk,jn) ) / e3w(ji,jj,jk,Kmm) * wmask(ji,jj,jk)
+               END_3D
+            CASE(  2  )                         ! 2nd pass : eddy flux = ah_wslp2 and akz applied on pt  and pt2 gradients, resp.
+               DO_3D_00_00( 2, jpkm1 )
+                  ztfw(ji,jj,jk) = ztfw(ji,jj,jk) + e1e2t(ji,jj) / e3w(ji,jj,jk,Kmm) * wmask(ji,jj,jk)                  &
+                     &                            * (  ah_wslp2(ji,jj,jk) * ( pt (ji,jj,jk-1,jn) - pt (ji,jj,jk,jn) )   &
+                     &                            +         akz(ji,jj,jk) * ( pt2(ji,jj,jk-1,jn) - pt2(ji,jj,jk,jn) )   )
+               END_3D
             END SELECT
          ENDIF
          !         
-         DO jk = 1, jpkm1                 !==  Divergence of vertical fluxes added to pta  ==!
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1   ! vector opt.
-                  pta(ji,jj,jk,jn) = pta(ji,jj,jk,jn) + zsign * (  ztfw (ji,jj,jk) - ztfw(ji,jj,jk+1)  )   &
-                     &                                        * r1_e1e2t(ji,jj) / e3t_n(ji,jj,jk)
-               END DO
-            END DO
-         END DO
+         DO_3D_00_00( 1, jpkm1 )
+            pt_rhs(ji,jj,jk,jn) = pt_rhs(ji,jj,jk,jn) + zsign * (  ztfw (ji,jj,jk) - ztfw(ji,jj,jk+1)  )   &
+               &                                              * r1_e1e2t(ji,jj) / e3t(ji,jj,jk,Kmm)
+         END_3D
          !
          IF( ( kpass == 1 .AND. ln_traldf_lap ) .OR.  &     !==  first pass only (  laplacian)  ==!
              ( kpass == 2 .AND. ln_traldf_blp ) ) THEN      !==  2nd   pass      (bilaplacian)  ==!

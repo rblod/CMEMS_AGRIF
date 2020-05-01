@@ -47,7 +47,7 @@
 %OASIS_LIBDIR        -L%OASIS_HOME/lib
 %OASIS_LIB           -lpsmile.MPI1 -lmct -lmpeu -lscrip
 
-%CPP                 cpp
+%CPP                 cpp -Dkey_nosignedzero
 %FC                  ftn
 
 %FCFLAGS             -s real64 -s integer32 -Ovector0 -hfp0 -O0 -hflex_mp=intolerant -e CID
@@ -59,8 +59,8 @@
 %ARFLAGS             -r
 %MK                  gmake
 
-%USER_INC            %NCDF_INC %XIOS_INC
-%USER_LIB            %NCDF_LIB %XIOS_LIB 
+%USER_INC            %NCDF_INC %XIOS_INC %OASIS_INC
+%USER_LIB            %NCDF_LIB %XIOS_LIB %OASIS_LIB %OASIS_LIBDIR
 
 %CC                  cc
 %CFLAGS              -O0

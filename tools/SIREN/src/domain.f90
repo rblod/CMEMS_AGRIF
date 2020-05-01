@@ -2,8 +2,6 @@
 ! NEMO system team, System and Interface for oceanic RElocable Nesting
 !----------------------------------------------------------------------
 !
-! MODULE: dom
-!
 ! DESCRIPTION:
 !> @brief
 !> This module manage domain computation.
@@ -118,7 +116,7 @@
 !>
 !> @author
 !> J.Paul
-! REVISION HISTORY:
+!>
 !> @date November, 2013 - Initial Version
 !> @date September, 2014
 !> - add header
@@ -126,9 +124,10 @@
 !> @date October, 2014
 !> - use mpp file structure instead of file
 !> 
-!> @note Software governed by the CeCILL licence     (./LICENSE)
+!> @note Software governed by the CeCILL licence     (NEMOGCM/NEMO_CeCILL.txt)
 !----------------------------------------------------------------------
 MODULE dom
+
    USE kind                            ! F90 kind parameter
    USE global                          ! global parameter
    USE fct                             ! basic useful function
@@ -136,6 +135,7 @@ MODULE dom
    USE dim                             ! dimension manager
    USE var                             ! variable manager
    USE mpp                             ! mpp file manager
+
    IMPLICIT NONE
    ! NOTE_avoid_public_variables_if_possible
 
@@ -210,6 +210,9 @@ MODULE dom
    END INTERFACE
 
 CONTAINS
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION dom__copy_unit(td_dom) &
+         & RESULT (tf_dom)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine copy an domain structure in another one
@@ -228,29 +231,34 @@ CONTAINS
    !> @param[in] td_dom   domain structure
    !> @return copy of input domain structure
    !-------------------------------------------------------------------
-   FUNCTION dom__copy_unit( td_dom )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TDOM), INTENT(IN)  :: td_dom
+
       ! function
-      TYPE(TDOM) :: dom__copy_unit
+      TYPE(TDOM)              :: tf_dom
 
       ! local variable
       !----------------------------------------------------------------
 
-      dom__copy_unit=td_dom
+      tf_dom=td_dom
       
-      END FUNCTION dom__copy_unit
+   END FUNCTION dom__copy_unit
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE dom_print(td_dom)
    !-------------------------------------------------------------------
    !> @brief This subroutine print some information about domain strucutre.
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] td_dom dom structure
    !-------------------------------------------------------------------
-   SUBROUTINE dom_print(td_dom)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TDOM), INTENT(IN) :: td_dom
 
@@ -283,7 +291,10 @@ CONTAINS
       &  " i-direction extra point for interpolation       ",td_dom%i_iextra(:), &
       &  " j-direction extra point for interpolation       ",td_dom%i_jextra(:)
 
-      END SUBROUTINE dom_print
+   END SUBROUTINE dom_print
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION dom__init_mpp(td_mpp, id_imin, id_imax, id_jmin, id_jmax, cd_card) &
+         & RESULT (tf_dom)
    !-------------------------------------------------------------------
    !> @brief 
    !> This function intialise domain structure, given open file structure,
@@ -291,7 +302,7 @@ CONTAINS
    !> @details
    !> sub domain indices are computed, taking into account coarse grid
    !> periodicity, pivot point, and East-West overlap.
-   !
+   !>
    !> @author J.Paul
    !> @date June, 2013 - Initial Version
    !> @date September, 2014
@@ -309,10 +320,9 @@ CONTAINS
    !> @param[in] cd_card   name of cardinal (for boundary)
    !> @return domain structure
    !-------------------------------------------------------------------
-   TYPE(TDOM) FUNCTION dom__init_mpp( td_mpp, &
-   &                                  id_imin, id_imax, id_jmin, id_jmax, &
-   &                                  cd_card )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TMPP)      , INTENT(IN) :: td_mpp 
 
@@ -322,11 +332,15 @@ CONTAINS
       INTEGER(i4)     , INTENT(IN), OPTIONAL :: id_jmax
 
       CHARACTER(LEN=*), INTENT(IN), OPTIONAL :: cd_card
+
+      ! function
+      TYPE(TDOM)                   :: tf_dom
+
       !local variable
       !----------------------------------------------------------------
 
       ! clean domain structure
-      CALL dom_clean(dom__init_mpp)
+      CALL dom_clean(tf_dom)
 
       IF( .NOT. ASSOCIATED(td_mpp%t_proc) )THEN
 
@@ -341,80 +355,82 @@ CONTAINS
          IF( PRESENT(cd_card) )THEN
             SELECT CASE(TRIM(cd_card))
                CASE('north')
-                  dom__init_mpp%i_bdy=jp_north
+                  tf_dom%i_bdy=jp_north
                CASE('south')
-                  dom__init_mpp%i_bdy=jp_south
+                  tf_dom%i_bdy=jp_south
                CASE('east')
-                  dom__init_mpp%i_bdy=jp_east
+                  tf_dom%i_bdy=jp_east
                CASE('west')
-                  dom__init_mpp%i_bdy=jp_west
+                  tf_dom%i_bdy=jp_west
                CASE DEFAULT
                   ! no boundary
-                  dom__init_mpp%i_bdy=0
+                  tf_dom%i_bdy=0
             END SELECT
          ELSE
             ! no boundary
-            dom__init_mpp%i_bdy=0
+            tf_dom%i_bdy=0
          ENDIF
 
          ! use global dimension define by mpp file
-         dom__init_mpp%t_dim0(:) = dim_copy(td_mpp%t_dim(:))
+         tf_dom%t_dim0(:) = dim_copy(td_mpp%t_dim(:))
 
          IF( td_mpp%i_perio < 0 .OR. td_mpp%i_perio > 6 )THEN
             CALL logger_error("DOM INIT: invalid grid periodicity ("//&
             &  TRIM(fct_str(td_mpp%i_perio))//&
             &  ") you should use grid_get_perio to compute it")
          ELSE
-            dom__init_mpp%i_perio0=td_mpp%i_perio
+            tf_dom%i_perio0=td_mpp%i_perio
          ENDIF
 
          ! global domain pivot point
-         SELECT CASE(dom__init_mpp%i_perio0)
+         SELECT CASE(tf_dom%i_perio0)
             CASE(3,4)
-               dom__init_mpp%i_pivot = 0
+               tf_dom%i_pivot = 0
             CASE(5,6)
-               dom__init_mpp%i_pivot = 1
+               tf_dom%i_pivot = 1
             CASE DEFAULT
-               dom__init_mpp%i_pivot = 0
+               tf_dom%i_pivot = 0
          END SELECT
 
          ! add ghost cell factor of global domain
-         dom__init_mpp%i_ghost0(:,:)=0
-         SELECT CASE(dom__init_mpp%i_perio0)
+         tf_dom%i_ghost0(:,:)=0
+         SELECT CASE(tf_dom%i_perio0)
             CASE(0)
-               dom__init_mpp%i_ghost0(:,:)=1
+               tf_dom%i_ghost0(:,:)=1
             CASE(1)
-               dom__init_mpp%i_ghost0(jp_J,:)=1
+               tf_dom%i_ghost0(jp_J,:)=1
             CASE(2)
-               dom__init_mpp%i_ghost0(jp_I,:)=1
-               dom__init_mpp%i_ghost0(jp_J,2)=1
+               tf_dom%i_ghost0(jp_I,:)=1
+               tf_dom%i_ghost0(jp_J,2)=1
             CASE(3,5)
-               dom__init_mpp%i_ghost0(jp_I,:)=1
-               dom__init_mpp%i_ghost0(jp_J,1)=1
+               tf_dom%i_ghost0(jp_I,:)=1
+               tf_dom%i_ghost0(jp_J,1)=1
             CASE(4,6)
-               dom__init_mpp%i_ghost0(jp_J,1)=1
+               tf_dom%i_ghost0(jp_J,1)=1
          END SELECT
 
          ! look for EW overlap
-         dom__init_mpp%i_ew0=td_mpp%i_ew
+         tf_dom%i_ew0=td_mpp%i_ew
 
          ! initialise domain as global
-         dom__init_mpp%i_imin = 1 
-         dom__init_mpp%i_imax = dom__init_mpp%t_dim0(1)%i_len
+         tf_dom%i_imin = 1 
+         tf_dom%i_imax = tf_dom%t_dim0(1)%i_len
 
-         dom__init_mpp%i_jmin = 1 
-         dom__init_mpp%i_jmax = dom__init_mpp%t_dim0(2)%i_len
+         tf_dom%i_jmin = 1 
+         tf_dom%i_jmax = tf_dom%t_dim0(2)%i_len
 
          ! sub domain dimension
-         dom__init_mpp%t_dim(:) = dim_copy(td_mpp%t_dim(:))
+         tf_dom%t_dim(:) = dim_copy(td_mpp%t_dim(:))
 
          ! define sub domain indices 
-         CALL dom__define( dom__init_mpp, &
-         &                 id_imin, id_imax, id_jmin, id_jmax )
+         CALL dom__define(tf_dom, id_imin, id_imax, id_jmin, id_jmax)
 
       ENDIF
 
    END FUNCTION dom__init_mpp
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION dom__init_file(td_file, id_imin, id_imax, id_jmin, id_jmax, cd_card) &
+         & RESULT (tf_dom)
    !-------------------------------------------------------------------
    !> @brief 
    !> This function intialise domain structure, given open file structure,
@@ -422,7 +438,7 @@ CONTAINS
    !> @details
    !> sub domain indices are computed, taking into account coarse grid
    !> periodicity, pivot point, and East-West overlap.
-   !
+   !>
    !> @author J.Paul
    !> @date June, 2013 - Initial Version
    !> @date September, 2014
@@ -438,10 +454,9 @@ CONTAINS
    !> @param[in] cd_card   name of cardinal (for boundary)
    !> @return domain structure
    !-------------------------------------------------------------------
-   TYPE(TDOM) FUNCTION dom__init_file( td_file, &
-   &                                   id_imin, id_imax, id_jmin, id_jmax, &
-   &                                   cd_card )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TFILE)      , INTENT(IN) :: td_file 
 
@@ -450,12 +465,16 @@ CONTAINS
       INTEGER(i4)      , INTENT(IN), OPTIONAL :: id_jmin
       INTEGER(i4)      , INTENT(IN), OPTIONAL :: id_jmax
 
-      CHARACTER(LEN=*), INTENT(IN), OPTIONAL :: cd_card
+      CHARACTER(LEN=*) , INTENT(IN), OPTIONAL :: cd_card
+
+      ! function
+      TYPE(TDOM)                    :: tf_dom
+
       !local variable
       !----------------------------------------------------------------
 
       ! clean domain structure
-      CALL dom_clean(dom__init_file)
+      CALL dom_clean(tf_dom)
 
       IF( td_file%i_id == 0 )THEN
 
@@ -469,80 +488,82 @@ CONTAINS
          IF( PRESENT(cd_card) )THEN
             SELECT CASE(TRIM(cd_card))
                CASE('north')
-                  dom__init_file%i_bdy=jp_north
+                  tf_dom%i_bdy=jp_north
                CASE('south')
-                  dom__init_file%i_bdy=jp_south
+                  tf_dom%i_bdy=jp_south
                CASE('east')
-                  dom__init_file%i_bdy=jp_east
+                  tf_dom%i_bdy=jp_east
                CASE('west')
-                  dom__init_file%i_bdy=jp_west
+                  tf_dom%i_bdy=jp_west
                CASE DEFAULT
                   ! no boundary
-                  dom__init_file%i_bdy=0
+                  tf_dom%i_bdy=0
             END SELECT
          ELSE
             ! no boundary
-            dom__init_file%i_bdy=0
+            tf_dom%i_bdy=0
          ENDIF
 
          ! use global dimension define by file
-         dom__init_file%t_dim0(:) = dim_copy(td_file%t_dim(:))
+         tf_dom%t_dim0(:) = dim_copy(td_file%t_dim(:))
 
          IF( td_file%i_perio < 0 .OR. td_file%i_perio > 6 )THEN
             CALL logger_error("DOM INIT: invalid grid periodicity ("//&
             &  TRIM(fct_str(td_file%i_perio))//&
             &  ") you should use grid_get_perio to compute it")
          ELSE
-            dom__init_file%i_perio0=td_file%i_perio
+            tf_dom%i_perio0=td_file%i_perio
          ENDIF
 
          ! global domain pivot point
-         SELECT CASE(dom__init_file%i_perio0)
+         SELECT CASE(tf_dom%i_perio0)
             CASE(3,4)
-               dom__init_file%i_pivot = 0
+               tf_dom%i_pivot = 0
             CASE(5,6)
-               dom__init_file%i_pivot = 1
+               tf_dom%i_pivot = 1
             CASE DEFAULT
-               dom__init_file%i_pivot = 0
+               tf_dom%i_pivot = 0
          END SELECT
 
          ! add ghost cell factor of global domain
-         dom__init_file%i_ghost0(:,:)=0
-         SELECT CASE(dom__init_file%i_perio0)
+         tf_dom%i_ghost0(:,:)=0
+         SELECT CASE(tf_dom%i_perio0)
             CASE(0)
-               dom__init_file%i_ghost0(:,:)=1
+               tf_dom%i_ghost0(:,:)=1
             CASE(1)
-               dom__init_file%i_ghost0(jp_J,:)=1
+               tf_dom%i_ghost0(jp_J,:)=1
             CASE(2)
-               dom__init_file%i_ghost0(jp_I,:)=1
-               dom__init_file%i_ghost0(jp_J,2)=1
+               tf_dom%i_ghost0(jp_I,:)=1
+               tf_dom%i_ghost0(jp_J,2)=1
             CASE(3,5)
-               dom__init_file%i_ghost0(jp_I,:)=1
-               dom__init_file%i_ghost0(jp_J,1)=1
+               tf_dom%i_ghost0(jp_I,:)=1
+               tf_dom%i_ghost0(jp_J,1)=1
             CASE(4,6)
-               dom__init_file%i_ghost0(jp_J,1)=1
+               tf_dom%i_ghost0(jp_J,1)=1
          END SELECT
 
          ! look for EW overlap
-         dom__init_file%i_ew0=td_file%i_ew
+         tf_dom%i_ew0=td_file%i_ew
 
          ! initialise domain as global
-         dom__init_file%i_imin = 1 
-         dom__init_file%i_imax = dom__init_file%t_dim0(1)%i_len
+         tf_dom%i_imin = 1 
+         tf_dom%i_imax = tf_dom%t_dim0(1)%i_len
 
-         dom__init_file%i_jmin = 1 
-         dom__init_file%i_jmax = dom__init_file%t_dim0(2)%i_len
+         tf_dom%i_jmin = 1 
+         tf_dom%i_jmax = tf_dom%t_dim0(2)%i_len
 
          ! sub domain dimension
-         dom__init_file%t_dim(:) = dim_copy(td_file%t_dim(:))
+         tf_dom%t_dim(:) = dim_copy(td_file%t_dim(:))
 
          ! define sub domain indices 
-         CALL dom__define( dom__init_file, &
-         &                 id_imin, id_imax, id_jmin, id_jmax )
+         CALL dom__define(tf_dom, id_imin, id_imax, id_jmin, id_jmax)
 
       ENDIF
 
    END FUNCTION dom__init_file
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE dom__define(td_dom, &
+         &                id_imin, id_imax, id_jmin, id_jmax)
    !-------------------------------------------------------------------
    !> @brief 
    !> This subroutine define sub domain indices, and compute the size 
@@ -550,16 +571,16 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial version
-   !
+   !>
    !> @param[inout] td_dom domain structure
    !> @param[in] id_imin   i-direction sub-domain lower left  point indice
    !> @param[in] id_imax   i-direction sub-domain upper right point indice
    !> @param[in] id_jmin   j-direction sub-domain lower left  point indice
    !> @param[in] id_jmax   j-direction sub-domain upper right point indice
    !-------------------------------------------------------------------
-   SUBROUTINE dom__define(td_dom, &
-   &                      id_imin, id_imax, id_jmin, id_jmax )
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TDOM),  INTENT(INOUT) :: td_dom
       INTEGER(i4), INTENT(IN), OPTIONAL :: id_imin
@@ -648,6 +669,8 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE dom__define
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE dom__define_cyclic_north_fold(td_dom)
    !-------------------------------------------------------------------
    !> @brief 
    !> This subroutine define sub domain indices from global domain with
@@ -657,11 +680,12 @@ CONTAINS
    !> @date November, 2013 - Initial version
    !> @date September, 2014
    !> - use zero indice to defined cyclic or global domain
-   !
+   !>
    !> @param[inout] td_dom domain strcuture
    !-------------------------------------------------------------------
-   SUBROUTINE dom__define_cyclic_north_fold( td_dom )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TDOM), INTENT(INOUT) :: td_dom
       !----------------------------------------------------------------
@@ -716,6 +740,8 @@ CONTAINS
       ENDIF
       
    END SUBROUTINE dom__define_cyclic_north_fold
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE dom__define_north_fold(td_dom)
    !-------------------------------------------------------------------
    !> @brief 
    !> This subroutine define sub domain indices from global domain 
@@ -723,11 +749,12 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial verison
-   !
+   !>
    !> @param[inout] td_dom domain strcuture
    !-------------------------------------------------------------------
-   SUBROUTINE dom__define_north_fold( td_dom )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TDOM), INTENT(INOUT) :: td_dom
       !----------------------------------------------------------------
@@ -750,6 +777,8 @@ CONTAINS
       ENDIF      
 
    END SUBROUTINE dom__define_north_fold
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE dom__define_symmetric(td_dom)
    !-------------------------------------------------------------------
    !> @brief 
    !> This subroutine define sub domain indices from global domain 
@@ -757,11 +786,12 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial version
-   !
+   !>
    !> @param[inout] td_dom domain strcuture
    !-------------------------------------------------------------------
-   SUBROUTINE dom__define_symmetric( td_dom )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TDOM), INTENT(INOUT) :: td_dom
       !----------------------------------------------------------------
@@ -769,6 +799,8 @@ CONTAINS
       CALL dom__size_no_pole_no_overlap( td_dom )
 
    END SUBROUTINE dom__define_symmetric
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE dom__define_cyclic(td_dom)
    !-------------------------------------------------------------------
    !> @brief 
    !> This subroutine define sub domain indices from global domain
@@ -776,11 +808,12 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial version
-   !
+   !>
    !> @param[inout] td_dom domain strcuture
    !-------------------------------------------------------------------
-   SUBROUTINE dom__define_cyclic( td_dom )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TDOM), INTENT(INOUT) :: td_dom
       !----------------------------------------------------------------
@@ -801,6 +834,8 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE dom__define_cyclic
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE dom__define_closed(td_dom)
    !-------------------------------------------------------------------
    !> @brief 
    !> This subroutine define sub domain indices from global domain
@@ -808,11 +843,12 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial version
-   !
+   !>
    !> @param[inout] td_dom domain strcuture
    !-------------------------------------------------------------------
-   SUBROUTINE dom__define_closed( td_dom )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TDOM), INTENT(INOUT) :: td_dom
       !----------------------------------------------------------------
@@ -820,17 +856,20 @@ CONTAINS
       CALL dom__size_no_pole_no_overlap( td_dom )
 
    END SUBROUTINE dom__define_closed
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE dom__size_global(td_dom)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute size of global domain 
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial version
-   !
+   !>
    !> @param[inout] td_dom domain strcuture
    !-------------------------------------------------------------------
-   SUBROUTINE dom__size_global( td_dom )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TDOM), INTENT(INOUT) :: td_dom
       !----------------------------------------------------------------
@@ -858,18 +897,21 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE dom__size_global
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE dom__size_semi_global(td_dom)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute size of a semi global domain 
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial version
-   !
+   !>
    !> @param[inout] td_dom domain strcuture
    !> @note never tested
    !-------------------------------------------------------------------
-   SUBROUTINE dom__size_semi_global( td_dom )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TDOM), INTENT(INOUT) :: td_dom
 
@@ -907,6 +949,8 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE dom__size_semi_global
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE dom__size_no_pole(td_dom)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute size of sub domain without north fold
@@ -914,11 +958,12 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial version
-   !
+   !>
    !> @param[inout] td_dom domain strcuture
    !-------------------------------------------------------------------
-   SUBROUTINE dom__size_no_pole( td_dom )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TDOM), INTENT(INOUT) :: td_dom
       !----------------------------------------------------------------
@@ -946,6 +991,8 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE dom__size_no_pole
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE dom__size_pole(td_dom)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute size of sub domain with north fold
@@ -953,12 +1000,13 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date April, 2013 - Initial version
-   !
+   !>
    !> @param[inout] td_dom domain strcuture
    !> @note never tested
    !-------------------------------------------------------------------
-   SUBROUTINE dom__size_pole( td_dom )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TDOM), INTENT(INOUT) :: td_dom
       !----------------------------------------------------------------
@@ -974,6 +1022,8 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE dom__size_pole
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE dom__size_no_pole_overlap(td_dom)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute size of sub domain without north fold
@@ -981,11 +1031,12 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial version
-   !
+   !>
    !> @param[inout] td_dom domain strcuture
    !-------------------------------------------------------------------
-   SUBROUTINE dom__size_no_pole_overlap( td_dom )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TDOM), INTENT(INOUT) :: td_dom
       !----------------------------------------------------------------
@@ -1036,6 +1087,8 @@ CONTAINS
       td_dom%i_ghost(jp_J,:)=1
 
    END SUBROUTINE dom__size_no_pole_overlap
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE dom__size_no_pole_no_overlap(td_dom)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute size of sub domain without north fold
@@ -1043,11 +1096,12 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial version
-   !
+   !>
    !> @param[inout] td_dom domain strcuture
    !-------------------------------------------------------------------
-   SUBROUTINE dom__size_no_pole_no_overlap( td_dom )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TDOM), INTENT(INOUT) :: td_dom
       !----------------------------------------------------------------
@@ -1077,6 +1131,8 @@ CONTAINS
       td_dom%i_perio=0
 
    END SUBROUTINE dom__size_no_pole_no_overlap
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE dom__size_pole_overlap(td_dom)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute size of sub domain with north fold
@@ -1084,12 +1140,13 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial version
-   !
+   !>
    !> @param[inout] td_dom domain strcuture
    !> @note never tested
    !-------------------------------------------------------------------
-   SUBROUTINE dom__size_pole_overlap( td_dom )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TDOM), INTENT(INOUT) :: td_dom
 
@@ -1175,6 +1232,8 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE dom__size_pole_overlap
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE dom__size_pole_no_overlap(td_dom)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute size of sub domain with north fold
@@ -1182,12 +1241,13 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial version
-   !
+   !>
    !> @param[inout] td_dom domain strcuture
    !> @note never tested
    !-------------------------------------------------------------------
-   SUBROUTINE dom__size_pole_no_overlap( td_dom )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TDOM), INTENT(INOUT) :: td_dom
 
@@ -1281,6 +1341,8 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE dom__size_pole_no_overlap
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE dom_add_extra(td_dom, id_iext, id_jext)
    !-------------------------------------------------------------------
    !> @brief 
    !>  This subroutine add extra bands to coarse domain to get enough point for
@@ -1298,13 +1360,14 @@ CONTAINS
    !> - take into account number of ghost cell
    !> @date February, 2016
    !> - number of extra point is the MAX (not the MIN) of zero and asess value. 
-   !
+   !>
    !> @param[inout] td_dom domain strcuture
    !> @param [in] id_iext  i-direction size of extra bands (default=im_minext)
    !> @param [in] id_jext  j-direction size of extra bands (default=im_minext)
    !-------------------------------------------------------------------
-   SUBROUTINE dom_add_extra( td_dom, id_iext, id_jext )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TDOM) ,  INTENT(INOUT) :: td_dom
       INTEGER(i4),  INTENT(IN   ), OPTIONAL :: id_iext
@@ -1432,18 +1495,21 @@ CONTAINS
 
 
    END SUBROUTINE dom_add_extra
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE dom_clean_extra(td_dom)
    !-------------------------------------------------------------------
    !> @brief 
    !>  This subroutine clean coarse grid domain structure. 
    !> it remove extra point added. 
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial version
-   !
+   !>
    !> @param[inout] td_dom domain strcuture
    !-------------------------------------------------------------------
-   SUBROUTINE dom_clean_extra( td_dom )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TDOM) , INTENT(INOUT) :: td_dom
 
@@ -1469,6 +1535,8 @@ CONTAINS
       td_dom%i_jextra(:)=0
 
    END SUBROUTINE dom_clean_extra
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE dom_del_extra(td_var, td_dom, id_rho, ld_coord)
    !-------------------------------------------------------------------
    !> @brief 
    !>  This subroutine delete extra band, from fine grid variable value, 
@@ -1486,14 +1554,15 @@ CONTAINS
    !> - take into account boundary for one point size domain
    !> @date December, 2014
    !> - add special case for coordinates file.
-   !
+   !>
    !> @param[inout] td_var variable strcuture
    !> @param[in] td_dom    domain strcuture
    !> @param[in] id_rho    array of refinement factor
    !> @param[in] ld_coord  work on coordinates file or not
    !-------------------------------------------------------------------
-   SUBROUTINE dom_del_extra( td_var, td_dom, id_rho, ld_coord )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR)               , INTENT(INOUT) :: td_var
       TYPE(TDOM)               , INTENT(IN   ) :: td_dom
@@ -1715,17 +1784,20 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE dom_del_extra
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE dom_clean(td_dom)
    !-------------------------------------------------------------------
    !> @brief 
    !>  This subroutine clean domain structure.
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial version
-   !
+   !>
    !> @param[inout] td_dom domain strcuture
    !-------------------------------------------------------------------
-   SUBROUTINE dom_clean( td_dom )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TDOM),  INTENT(INOUT) :: td_dom
 
@@ -1747,4 +1819,5 @@ CONTAINS
       td_dom=tl_dom
 
    END SUBROUTINE dom_clean
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 END MODULE dom

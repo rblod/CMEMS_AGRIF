@@ -1,5 +1,5 @@
 !
-! $Id: modutil.F90 5656 2015-07-31 08:55:56Z timgraham $
+! $Id: modutil.F90 12420 2020-02-20 12:42:35Z smueller $
 !
 !     Agrif (Adaptive Grid Refinement In Fortran)
 !
@@ -699,7 +699,7 @@ end subroutine Agrif_Integrate_Child_Parallel
 !---------------------------------------------------------------------------------------------------
 subroutine Agrif_Init_Grids ( procname1, procname2 )
 !---------------------------------------------------------------------------------------------------
-    procedure(typedef_proc), optional   :: procname1 !< (Default: Agrif_probdim_modtype_def)
+    procedure(typdef_proc), optional   :: procname1 !< (Default: Agrif_probdim_modtype_def)
     procedure(alloc_proc),   optional   :: procname2 !< (Default: Agrif_Allocationcalls)
 !
     integer :: i, ierr_allocate, nunit
@@ -918,6 +918,7 @@ subroutine Agrif_Deallocation
 !
         if ( allocated(var_c % carray1) ) deallocate(var_c % carray1)
         if ( allocated(var_c % carray2) ) deallocate(var_c % carray2)
+        if ( allocated(var_c % carrayu) ) deallocate(var_c % carrayu)
 !
     enddo
 

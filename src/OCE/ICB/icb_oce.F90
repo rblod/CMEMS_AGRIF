@@ -85,11 +85,12 @@ MODULE icb_oce
    ! Extra arrays with bigger halo, needed when interpolating forcing onto iceberg position
    ! particularly for MPP when iceberg can lie inside T grid but outside U, V, or f grid
    REAL(wp), PUBLIC, DIMENSION(:,:), ALLOCATABLE ::   uo_e, vo_e
-   REAL(wp), PUBLIC, DIMENSION(:,:), ALLOCATABLE ::   ff_e, tt_e, fr_e, hicth
+   REAL(wp), PUBLIC, DIMENSION(:,:), ALLOCATABLE ::   ff_e, tt_e, fr_e
    REAL(wp), PUBLIC, DIMENSION(:,:), ALLOCATABLE ::   ua_e, va_e
    REAL(wp), PUBLIC, DIMENSION(:,:), ALLOCATABLE ::   ssh_e
+   REAL(wp), PUBLIC, DIMENSION(:,:), ALLOCATABLE ::   tmask_e, umask_e, vmask_e
 #if defined key_si3 || defined key_cice
-   REAL(wp), PUBLIC, DIMENSION(:,:), ALLOCATABLE ::   ui_e, vi_e
+   REAL(wp), PUBLIC, DIMENSION(:,:), ALLOCATABLE ::   hi_e, ui_e, vi_e
 #endif
 
    !!gm almost all those PARAM ARE defined in NEMO
@@ -123,6 +124,10 @@ MODULE icb_oce
    LOGICAL , PUBLIC ::   ln_time_average_weight          !: Time average the weight on the ocean    !!gm I don't understand that !
    REAL(wp), PUBLIC ::   rn_speed_limit                  !: CFL speed limit for a berg
    !
+   ! restart
+   CHARACTER(len=256), PUBLIC :: cn_icbrst_indir , cn_icbrst_in  !:  in: restart directory, restart name
+   CHARACTER(len=256), PUBLIC :: cn_icbrst_outdir, cn_icbrst_out !: out: restart directory, restart name
+   !
    !                                     ! Mass thresholds between iceberg classes [kg]
    REAL(wp), DIMENSION(nclasses), PUBLIC ::   rn_initial_mass      ! Fraction of calving to apply to this class [non-dim]
    REAL(wp), DIMENSION(nclasses), PUBLIC ::   rn_distribution      ! Ratio between effective and real iceberg mass (non-dim)
@@ -146,7 +151,7 @@ MODULE icb_oce
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: icb_oce.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: icb_oce.F90 12472 2020-02-26 16:37:57Z mathiot $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -168,18 +173,22 @@ CONTAINS
       icb_alloc = icb_alloc + ill
       !
       ! expanded arrays for bilinear interpolation
-      ALLOCATE( uo_e(0:jpi+1,0:jpj+1) , ua_e(0:jpi+1,0:jpj+1) ,   &
-         &      vo_e(0:jpi+1,0:jpj+1) , va_e(0:jpi+1,0:jpj+1) ,   &
+      ALLOCATE( uo_e(0:jpi+1,0:jpj+1) , ua_e(0:jpi+1,0:jpj+1) ,    &
+         &      vo_e(0:jpi+1,0:jpj+1) , va_e(0:jpi+1,0:jpj+1) ,    &
 #if defined key_si3 || defined key_cice
          &      ui_e(0:jpi+1,0:jpj+1) ,                            &
          &      vi_e(0:jpi+1,0:jpj+1) ,                            &
+         &      hi_e(0:jpi+1,0:jpj+1) ,                            &
 #endif
          &      ff_e(0:jpi+1,0:jpj+1) , fr_e(0:jpi+1,0:jpj+1)  ,   &
          &      tt_e(0:jpi+1,0:jpj+1) , ssh_e(0:jpi+1,0:jpj+1) ,   &
-         &      hicth(0:jpi+1,0:jpj+1),                            &
          &      first_width(nclasses) , first_length(nclasses) ,   &
          &      src_calving (jpi,jpj) ,                            &
          &      src_calving_hflx(jpi,jpj) , STAT=ill)
+      icb_alloc = icb_alloc + ill
+
+      ALLOCATE( tmask_e(0:jpi+1,0:jpj+1), umask_e(0:jpi+1,0:jpj+1), vmask_e(0:jpi+1,0:jpj+1), &
+         &      STAT=ill)
       icb_alloc = icb_alloc + ill
 
       ALLOCATE( nicbfldpts(jpi) , nicbflddest(jpi) , nicbfldproc(jpni) , &

@@ -45,9 +45,11 @@ MODULE obs_write
       CHARACTER(len=ilenunit), POINTER, DIMENSION(:,:) :: cdunit
    END TYPE obswriinfo
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: obs_write.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: obs_write.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 

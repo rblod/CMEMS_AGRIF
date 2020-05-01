@@ -29,12 +29,12 @@ MODULE crsini
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: crsini.F90 10068 2018-08-28 14:09:04Z nicolasmartin $
+   !! $Id: crsini.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
    
-   SUBROUTINE crs_init 
+   SUBROUTINE crs_init( Kmm )
       !!-------------------------------------------------------------------
       !!                     *** SUBROUTINE crs_init
       !!  ** Purpose : Initialization of the grid coarsening module  
@@ -67,6 +67,8 @@ CONTAINS
       !! 
       !!               - Read in pertinent data ?
       !!-------------------------------------------------------------------
+      INTEGER, INTENT(in) :: Kmm   ! time level index
+      !
       INTEGER  :: ji,jj,jk      ! dummy indices
       INTEGER  :: ierr                                ! allocation error status
       INTEGER  ::   ios                 ! Local integer output status for namelist read
@@ -79,12 +81,10 @@ CONTAINS
      ! 1. Read Namelist file
      !---------------------------------------------------------
      !
-      REWIND( numnam_ref )              ! Namelist namrun in reference namelist : Parameters of the run
       READ  ( numnam_ref, namcrs, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namcrs in reference namelist', lwp )
-      REWIND( numnam_cfg )              ! Namelist namrun in configuration namelist : Parameters of the run
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namcrs in reference namelist' )
       READ  ( numnam_cfg, namcrs, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namcrs in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namcrs in configuration namelist' )
       IF(lwm) WRITE ( numond, namcrs )
 
      IF(lwp) THEN
@@ -97,7 +97,7 @@ CONTAINS
         WRITE(numout,*) '      bin centering preference              nn_binref  = ', nn_binref
         WRITE(numout,*) '      create a mesh file (=T)               ln_msh_crs = ', ln_msh_crs
         WRITE(numout,*) '      type of Kz coarsening (0,1,2)         nn_crs_kz  = ', nn_crs_kz
-        WRITE(numout,*) '      wn coarsened or computed using hdivn  ln_crs_wn  = ', ln_crs_wn
+        WRITE(numout,*) '      ww coarsened or computed using hdiv  ln_crs_wn  = ', ln_crs_wn
      ENDIF
               
      rfactx_r = 1. / nn_factx
@@ -173,10 +173,10 @@ CONTAINS
      CALL crs_dom_bat
      
      !
-     ze3t(:,:,:) = e3t_n(:,:,:)
-     ze3u(:,:,:) = e3u_n(:,:,:)
-     ze3v(:,:,:) = e3v_n(:,:,:)
-     ze3w(:,:,:) = e3w_n(:,:,:)
+     ze3t(:,:,:) = e3t(:,:,:,Kmm)
+     ze3u(:,:,:) = e3u(:,:,:,Kmm)
+     ze3v(:,:,:) = e3v(:,:,:,Kmm)
+     ze3w(:,:,:) = e3w(:,:,:,Kmm)
 
      !    3.d.2   Surfaces 
      CALL crs_dom_sfc( tmask, 'W', e1e2w_crs, e1e2w_msk, p_e1=e1t, p_e2=e2t  )

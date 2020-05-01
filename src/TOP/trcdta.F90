@@ -38,9 +38,11 @@ MODULE trcdta
    TYPE(FLD), SAVE, PUBLIC, ALLOCATABLE, DIMENSION(:)  :: sf_trcdta   ! structure of input SST (file informations, fields read)
 !$AGRIF_END_DO_NOT_TREAT
 
+   !! Substitutions
+#include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/TOP 4.0 , NEMO Consortium (2018)
-   !! $Id: trcdta.F90 10222 2018-10-25 09:42:23Z aumont $ 
+   !! $Id: trcdta.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -97,12 +99,10 @@ CONTAINS
          WRITE(numout,*) '   number of passive tracers to be initialize by data :', ntra
       ENDIF
       !
-      REWIND( numnat_ref )              ! Namelist namtrc_dta in reference namelist : Passive tracer input data
       READ  ( numnat_ref, namtrc_dta, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namtrc_dta_ini in reference namelist', lwp )
-      REWIND( numnat_cfg )              ! Namelist namtrc_dta in configuration namelist : Passive tracer input data
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namtrc_dta_ini in reference namelist' )
       READ  ( numnat_cfg, namtrc_dta, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namtrc_dta_ini in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namtrc_dta_ini in configuration namelist' )
       IF(lwm) WRITE ( numont, namtrc_dta )
 
       IF( lwp ) THEN
@@ -153,7 +153,7 @@ CONTAINS
    END SUBROUTINE trc_dta_ini
 
 
-   SUBROUTINE trc_dta( kt, sf_trcdta, ptrcfac, ptrcdta)
+   SUBROUTINE trc_dta( kt, Kmm, sf_trcdta, ptrcfac, ptrcdta)
       !!----------------------------------------------------------------------
       !!                   ***  ROUTINE trc_dta  ***
       !!                    
@@ -166,6 +166,7 @@ CONTAINS
       !! ** Action  :   sf_trcdta   passive tracer data on meld mesh and interpolated at time-step kt
       !!----------------------------------------------------------------------
       INTEGER                          , INTENT(in   )   ::   kt         ! ocean time-step
+      INTEGER                          , INTENT(in   )   ::   Kmm        ! time level index
       TYPE(FLD), DIMENSION(1)          , INTENT(inout)   ::   sf_trcdta  ! array of information on the field to read
       REAL(wp)                         , INTENT(in   )   ::   ptrcfac    ! multiplication factor
       REAL(wp),  DIMENSION(jpi,jpj,jpk), INTENT(inout  ) ::   ptrcdta    ! 3D data array
@@ -177,6 +178,12 @@ CONTAINS
       !!----------------------------------------------------------------------
       !
       IF( ln_timing )   CALL timing_start('trc_dta')
+      !
+      IF( kt == nit000 .AND. lwp) THEN
+         WRITE(numout,*)
+         WRITE(numout,*) 'trc_dta : passive tracers data for IC'
+         WRITE(numout,*) '~~~~~~~ '
+      ENDIF
       !
       IF( nb_trcdta > 0 ) THEN
          !
@@ -190,29 +197,27 @@ CONTAINS
                WRITE(numout,*)
                WRITE(numout,*) 'trc_dta: interpolates passive tracer data onto the s- or mixed s-z-coordinate mesh'
             ENDIF
-            DO jj = 1, jpj                         ! vertical interpolation of T & S
-               DO ji = 1, jpi
-                  DO jk = 1, jpk                        ! determines the intepolated T-S profiles at each (i,j) points
-                     zl = gdept_n(ji,jj,jk)
-                     IF(     zl < gdept_1d(1  ) ) THEN         ! above the first level of data
-                        ztp(jk) = ptrcdta(ji,jj,1)
-                     ELSEIF( zl > gdept_1d(jpk) ) THEN         ! below the last level of data
-                        ztp(jk) = ptrcdta(ji,jj,jpkm1)
-                     ELSE                                      ! inbetween : vertical interpolation between jkk & jkk+1
-                        DO jkk = 1, jpkm1                                  ! when  gdept(jkk) < zl < gdept(jkk+1)
-                           IF( (zl-gdept_1d(jkk)) * (zl-gdept_1d(jkk+1)) <= 0._wp ) THEN
-                              zi = ( zl - gdept_1d(jkk) ) / (gdept_1d(jkk+1)-gdept_1d(jkk))
-                              ztp(jk) = ptrcdta(ji,jj,jkk) + ( ptrcdta(ji,jj,jkk+1) - ptrcdta(ji,jj,jkk) ) * zi
-                           ENDIF
-                        END DO
-                     ENDIF
-                  END DO
-                  DO jk = 1, jpkm1
-                     ptrcdta(ji,jj,jk) = ztp(jk) * tmask(ji,jj,jk)     ! mask required for mixed zps-s-coord
-                  END DO
-                  ptrcdta(ji,jj,jpk) = 0._wp
-                END DO
-            END DO
+            DO_2D_11_11
+               DO jk = 1, jpk                        ! determines the intepolated T-S profiles at each (i,j) points
+                  zl = gdept(ji,jj,jk,Kmm)
+                  IF(     zl < gdept_1d(1  ) ) THEN         ! above the first level of data
+                     ztp(jk) = ptrcdta(ji,jj,1)
+                  ELSEIF( zl > gdept_1d(jpk) ) THEN         ! below the last level of data
+                     ztp(jk) = ptrcdta(ji,jj,jpkm1)
+                  ELSE                                      ! inbetween : vertical interpolation between jkk & jkk+1
+                     DO jkk = 1, jpkm1                                  ! when  gdept(jkk) < zl < gdept(jkk+1)
+                        IF( (zl-gdept_1d(jkk)) * (zl-gdept_1d(jkk+1)) <= 0._wp ) THEN
+                           zi = ( zl - gdept_1d(jkk) ) / (gdept_1d(jkk+1)-gdept_1d(jkk))
+                           ztp(jk) = ptrcdta(ji,jj,jkk) + ( ptrcdta(ji,jj,jkk+1) - ptrcdta(ji,jj,jkk) ) * zi
+                        ENDIF
+                     END DO
+                  ENDIF
+               END DO
+               DO jk = 1, jpkm1
+                  ptrcdta(ji,jj,jk) = ztp(jk) * tmask(ji,jj,jk)     ! mask required for mixed zps-s-coord
+               END DO
+               ptrcdta(ji,jj,jpk) = 0._wp
+            END_2D
             ! 
          ELSE                                !==   z- or zps- coordinate   ==!
             ! zps-coordinate (partial steps) interpolation at the last ocean level

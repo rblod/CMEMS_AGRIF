@@ -23,6 +23,8 @@ MODULE usrdef_hgr
 
    PUBLIC   usr_def_hgr   ! called by domhgr.F90
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OPA 4.0, NEMO Consortium (2016)
    !! $Id$ 
@@ -71,25 +73,23 @@ CONTAINS
       !
       !                          
       ! Position coordinates (in grid points)
-      !                          ==========         
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-            
-            zti = REAL( ji - 1 + nimpp - 1, wp )          ;  ztj = REAL( jj - 1 + njmpp - 1, wp )
-            zui = REAL( ji - 1 + nimpp - 1, wp ) + 0.5_wp ;  zvj = REAL( jj - 1 + njmpp - 1, wp ) + 0.5_wp
+      !                          ==========
+      DO_2D_11_11
+         
+         zti = REAL( ji - 1 + nimpp - 1, wp )          ;  ztj = REAL( jj - 1 + njmpp - 1, wp )
+         zui = REAL( ji - 1 + nimpp - 1, wp ) + 0.5_wp ;  zvj = REAL( jj - 1 + njmpp - 1, wp ) + 0.5_wp
+         
+         plamt(ji,jj) = zti
+         plamu(ji,jj) = zui
+         plamv(ji,jj) = zti
+         plamf(ji,jj) = zui
+         
+         pphit(ji,jj) = ztj
+         pphiv(ji,jj) = zvj
+         pphiu(ji,jj) = ztj
+         pphif(ji,jj) = zvj
 
-            plamt(ji,jj) = zti
-            plamu(ji,jj) = zui
-            plamv(ji,jj) = zti
-            plamf(ji,jj) = zui
-   
-            pphit(ji,jj) = ztj
-            pphiv(ji,jj) = zvj
-            pphiu(ji,jj) = ztj
-            pphif(ji,jj) = zvj
-            
-         END DO
-      END DO
+      END_2D
       !     
       ! Horizontal scale factors (in meters)
       !                              ======

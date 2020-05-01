@@ -81,7 +81,7 @@ MODULE timing
    LOGICAL :: lwriter
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: timing.F90 10510 2019-01-14 16:13:17Z clem $
+   !! $Id: timing.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -346,6 +346,8 @@ CONTAINS
 #endif
 
       ! write output file
+      IF( lwriter ) WRITE(numtime,*) 
+      IF( lwriter ) WRITE(numtime,*) 
       IF( lwriter ) WRITE(numtime,*) 'Total timing (sum) :'
       IF( lwriter ) WRITE(numtime,*) '--------------------'
       IF( lwriter ) WRITE(numtime,"('Elapsed Time (s)  CPU Time (s)')")
@@ -387,7 +389,7 @@ CONTAINS
             IF ( ztot /= 0. ) zperc = timing_glob(4*ji-1) / ztot * 100.
             WRITE(numtime,'(A28,F11.6,A2, F4.1,A3,A25,I8)') 'Waiting  global time : ',timing_glob(4*ji-1)   &
                &                                                         , ' (',      zperc,' %)',   ' on MPI rank : ', ji
-            zsypd = rn_rdt * REAL(nitend-nit000-1, wp) / (timing_glob(4*ji) * 365.)
+            zsypd = rn_Dt * REAL(nitend-nit000-1, wp) / (timing_glob(4*ji) * 365.)
             WRITE(numtime,'(A28,F11.6,A7,F10.3,A2,A15,I8)') 'Total           time : ',timing_glob(4*ji  )   &
                &                                                         , ' (SYPD: ', zsypd, ')',   ' on MPI rank : ', ji
          END DO
@@ -656,8 +658,8 @@ CONTAINS
    
          ! Compute cpu/elapsed ratio
          zall_ratio(:) = all_ctime(:) / all_etime(:)
-         ztot_ratio    = SUM(zall_ratio(:))
-         zavg_ratio    = ztot_ratio/REAL(jpnij,wp)
+         ztot_ratio    = SUM(all_ctime(:))/SUM(all_etime(:))
+         zavg_ratio    = SUM(zall_ratio(:))/REAL(jpnij,wp)
          zmax_ratio    = MAXVAL(zall_ratio(:))
          zmin_ratio    = MINVAL(zall_ratio(:))   
    
@@ -666,8 +668,8 @@ CONTAINS
          cllignes(1)='(1x,"MPI summary report :",/,'
          cllignes(2)='1x,"--------------------",//,'
          cllignes(3)='1x,"Process Rank |"," Elapsed Time (s) |"," CPU Time (s) |"," Ratio CPU/Elapsed",/,'
-         cllignes(4)='    (1x,i4,9x,"|",f12.3,6x,"|",f12.3,2x,"|",4x,f7.3,/),'
-         WRITE(cllignes(4)(1:4),'(I4)') jpnij
+         cllignes(4)='      (4x,i6,4x,"|",f12.3,6x,"|",f12.3,2x,"|",4x,f7.3,/),'
+         WRITE(cllignes(4)(1:6),'(I6)') jpnij
          cllignes(5)='1x,"Total        |",f12.3,6x,"|",F12.3,2x,"|",4x,f7.3,/,'
          cllignes(6)='1x,"Minimum      |",f12.3,6x,"|",F12.3,2x,"|",4x,f7.3,/,'
          cllignes(7)='1x,"Maximum      |",f12.3,6x,"|",F12.3,2x,"|",4x,f7.3,/,'

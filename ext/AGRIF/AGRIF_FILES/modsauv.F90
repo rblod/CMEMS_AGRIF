@@ -1,5 +1,5 @@
 !
-! $Id: modsauv.F90 5656 2015-07-31 08:55:56Z timgraham $
+! $Id: modsauv.F90 12420 2020-02-20 12:42:35Z smueller $
 !
 !     AGRIF (Adaptive Grid Refinement In Fortran)
 !
@@ -78,6 +78,7 @@ subroutine Agrif_deallocate_Arrays_c ( var_c )
 !
     if (allocated(var_c%carray1)) deallocate(var_c%carray1)
     if (allocated(var_C%carray2)) deallocate(var_c%carray2)
+    if (allocated(var_C%carrayu)) deallocate(var_c%carrayu)
 !
 !---------------------------------------------------------------------------------------------------
 end subroutine Agrif_deallocate_Arrays_c

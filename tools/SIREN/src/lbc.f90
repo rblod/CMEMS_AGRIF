@@ -2,8 +2,6 @@
 ! NEMO system team, System and Interface for oceanic RElocable Nesting
 !----------------------------------------------------------------------
 !
-! MODULE: math
-!
 ! DESCRIPTION:
 !> @brief
 !> This module groups lateral boundary conditions subroutine.
@@ -14,7 +12,7 @@
 !>
 !> @author
 !> G. Madec
-! REVISION HISTORY:
+!>
 !>  @date June, 1997 - Original code
 !> @date September, 2002
 !> - F90: Free form and module
@@ -28,10 +26,11 @@
 !> - J.Paul : rewrite with SIREN coding rules
 !> @date Marsh, 2015 
 !> - J.Paul : add hide subroutine
-!
-!> @note Software governed by the CeCILL licence     (./LICENSE)
+!>
+!> @note Software governed by the CeCILL licence     (NEMOGCM/NEMO_CeCILL.txt)
 !----------------------------------------------------------------------
 MODULE lbc
+
    USE kind                            ! F90 kind parameter
    ! NOTE_avoid_public_variables_if_possible
 
@@ -67,6 +66,8 @@ MODULE lbc
    END INTERFACE
     
 CONTAINS
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE lbc__lnk_3d(dd_array, cd_type, id_perio, dd_psgn, dd_fill)
    !------------------------------------------------------------------- 
    !> @brief This subroutine set lateral boundary conditions on a 3D array (non mpp case) 
    !>
@@ -78,15 +79,16 @@ CONTAINS
    !>                             for closed boundaries.
    !> @author J.Paul 
    !> - January, 2015- rewrite with SIREN coding rules 
-   ! 
+   !> 
    !> @param[inout] dd_array  3D array 
    !> @param[in] cd_type point grid
    !> @param[in] id_perio NEMO periodicity of the grid
    !> @param[in] dd_psgn 
    !> @param[in] dd_fill   fillValue
    !-------------------------------------------------------------------
-   SUBROUTINE lbc__lnk_3d( dd_array, cd_type, id_perio, dd_psgn, dd_fill )
+
       IMPLICIT NONE
+
       ! Argument
       REAL(dp), DIMENSION(:,:,:), INTENT(INOUT) :: dd_array
       CHARACTER(LEN=*)          , INTENT(IN   ) :: cd_type
@@ -163,6 +165,8 @@ CONTAINS
       END SELECT
 
    END SUBROUTINE lbc__lnk_3d
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE lbc__lnk_2d(dd_array, cd_type, id_perio, dd_psgn, dd_fill)
    !------------------------------------------------------------------- 
    !> @brief This subroutine set lateral boundary conditions on a 2D array (non mpp case) 
    !>
@@ -174,15 +178,16 @@ CONTAINS
    !>                             for closed boundaries.
    !> @author J.Paul 
    !> - January, 2015- rewrite with SIREN coding rules
-   ! 
+   !> 
    !> @param[inout] dd_array  2D array 
    !> @param[in] cd_type point grid
    !> @param[in] id_perio NEMO periodicity of the grid
    !> @param[in] dd_psgn 
    !> @param[in] dd_fill   fillValue
    !-------------------------------------------------------------------
-   SUBROUTINE lbc__lnk_2d( dd_array, cd_type, id_perio, dd_psgn, dd_fill )
+
       IMPLICIT NONE
+
       ! Argument
       REAL(dp), DIMENSION(:,:), INTENT(INOUT) :: dd_array
       CHARACTER(LEN=*)        , INTENT(IN   ) :: cd_type
@@ -260,6 +265,8 @@ CONTAINS
       END SELECT
 
    END SUBROUTINE lbc__lnk_2d
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE lbc__nfd_3d(dd_array, cd_type, id_perio, dd_psgn)
    !------------------------------------------------------------------- 
    !> @brief This subroutine manage 3D lateral boundary condition : 
    !> North fold treatment without processor exchanges. 
@@ -268,14 +275,15 @@ CONTAINS
    !>
    !> @author J.Paul 
    !> - January, 2015- rewrite with SIREN coding rules
-   ! 
+   !> 
    !> @param[inout] dd_array  3D array 
    !> @param[in] cd_type point grid
    !> @param[in] id_perio NEMO periodicity of the grid
    !> @param[in] dd_psgn 
    !-------------------------------------------------------------------
-   SUBROUTINE lbc__nfd_3d( dd_array, cd_type, id_perio, dd_psgn )
+
       IMPLICIT NONE
+
       ! Argument
       REAL(dp), DIMENSION(:,:,:), INTENT(INOUT) :: dd_array
       CHARACTER(LEN=*)          , INTENT(IN   ) :: cd_type
@@ -397,7 +405,10 @@ CONTAINS
          END SELECT     !  id_perio
          !
       END DO
+
    END SUBROUTINE lbc__nfd_3d
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE lbc__nfd_2d(dd_array, cd_type, id_perio, dd_psgn)
    !------------------------------------------------------------------- 
    !> @brief This subroutine manage 2D lateral boundary condition : 
    !> North fold treatment without processor exchanges. 
@@ -407,14 +418,15 @@ CONTAINS
    !>
    !> @author J.Paul 
    !> - January, 2015- rewrite with SIREN coding rules
-   ! 
+   !> 
    !> @param[inout] dd_array  2D array 
    !> @param[in] cd_type point grid
    !> @param[in] id_perio NEMO periodicity of the grid
    !> @param[in] dd_psgn 
    !-------------------------------------------------------------------
-   SUBROUTINE lbc__nfd_2d( dd_array, cd_type, id_perio, dd_psgn )
+
       IMPLICIT NONE
+
       ! Argument
       REAL(dp), DIMENSION(:,:), INTENT(INOUT) :: dd_array
       CHARACTER(LEN=*)        , INTENT(IN   ) :: cd_type
@@ -576,7 +588,10 @@ CONTAINS
          END SELECT
          !
       END SELECT
+
    END SUBROUTINE lbc__nfd_2d
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE lbc__hide_lnk_2d(dd_array, cd_type, id_perio, dd_psgn, dd_fill)
    !------------------------------------------------------------------- 
    !> @brief This subroutine hide lateral boundary conditions on a 2D array (non mpp case) 
    !>
@@ -588,15 +603,16 @@ CONTAINS
    !>                             for closed boundaries.
    !> @author J.Paul 
    !> - Marsh, 2015- initial version
-   ! 
+   !> 
    !> @param[inout] dd_array  2D array 
    !> @param[in] cd_type point grid
    !> @param[in] id_perio NEMO periodicity of the grid
    !> @param[in] dd_psgn 
    !> @param[in] dd_fill   fillValue
    !-------------------------------------------------------------------
-   SUBROUTINE lbc__hide_lnk_2d( dd_array, cd_type, id_perio, dd_psgn, dd_fill )
+
       IMPLICIT NONE
+
       ! Argument
       REAL(dp), DIMENSION(:,:), INTENT(INOUT) :: dd_array
       CHARACTER(LEN=*)        , INTENT(IN   ) :: cd_type
@@ -675,6 +691,8 @@ CONTAINS
       END SELECT
 
    END SUBROUTINE lbc__hide_lnk_2d
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE lbc__hide_nfd_2d(dd_array, cd_type, id_perio, dd_psgn, dd_fill)
    !------------------------------------------------------------------- 
    !> @brief This subroutine manage 2D lateral boundary condition : 
    !> hide North fold treatment without processor exchanges. 
@@ -684,15 +702,16 @@ CONTAINS
    !>
    !> @author J.Paul 
    !> - Marsh, 2015- initial version
-   ! 
+   !> 
    !> @param[inout] dd_array  2D array 
    !> @param[in] cd_type point grid
    !> @param[in] id_perio NEMO periodicity of the grid
    !> @param[in] dd_psgn 
    !> @param[in] dd_fill 
    !-------------------------------------------------------------------
-   SUBROUTINE lbc__hide_nfd_2d( dd_array, cd_type, id_perio, dd_psgn, dd_fill )
+
       IMPLICIT NONE
+
       ! Argument
       REAL(dp), DIMENSION(:,:), INTENT(INOUT) :: dd_array
       CHARACTER(LEN=*)        , INTENT(IN   ) :: cd_type
@@ -800,5 +819,7 @@ CONTAINS
          END SELECT
          !
       END SELECT
+
    END SUBROUTINE lbc__hide_nfd_2d
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 END MODULE lbc

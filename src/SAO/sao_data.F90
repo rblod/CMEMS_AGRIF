@@ -20,7 +20,7 @@ MODULE sao_data
    
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: sao_data.F90 10069 2018-08-28 14:12:24Z nicolasmartin $
+   !! $Id: sao_data.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -51,12 +51,10 @@ CONTAINS
       nn_sao_freq   = -1         ! input frequency in time steps
 
       ! Standard offline obs_oper settings
-      REWIND( numnam_ref )              ! Namelist namctl in reference namelist : Control prints & Benchmark
       READ  ( numnam_ref, namsao, IOSTAT = ios, ERR = 901 )
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namsao in reference namelist', .TRUE. )
-      REWIND( numnam_cfg )              ! Namelist namctl in confguration namelist : Control prints & Benchmark
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namsao in reference namelist' )
       READ  ( numnam_cfg, namsao, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namsao in configuration namelist', .TRUE. )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namsao in configuration namelist' )
      
       lmask(:) = .FALSE.               ! count input files
       WHERE( sao_files(:) /= '' )   lmask(:) = .TRUE.

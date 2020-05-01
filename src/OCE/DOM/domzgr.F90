@@ -43,10 +43,10 @@ MODULE domzgr
    PUBLIC   dom_zgr        ! called by dom_init.F90
 
   !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: domzgr.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: domzgr.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS       
@@ -70,7 +70,8 @@ CONTAINS
       !!----------------------------------------------------------------------
       INTEGER, DIMENSION(:,:), INTENT(out) ::   k_top, k_bot   ! ocean first and last level indices
       !
-      INTEGER  ::   jk                  ! dummy loop index
+      INTEGER  ::   ji,jj,jk            ! dummy loop index
+      INTEGER  ::   ikt, ikb            ! top/bot index
       INTEGER  ::   ioptio, ibat, ios   ! local integer
       REAL(wp) ::   zrefdep             ! depth of the reference level (~10m)
       !!----------------------------------------------------------------------
@@ -117,7 +118,16 @@ CONTAINS
       !
       ! Any closed seas (defined by closea_mask > 0 in domain_cfg file) to be filled 
       ! in at runtime if ln_closea=.false.
-      IF( .NOT.ln_closea )   CALL clo_bat( k_top, k_bot )
+      IF( ln_closea ) THEN
+         IF ( ln_maskcs ) THEN
+            ! mask all the closed sea
+            CALL clo_msk( k_top, k_bot, mask_opnsea, 'mask_opensea' )
+         ELSE IF ( ln_mask_csundef ) THEN
+            ! defined closed sea are kept
+            ! mask all the undefined closed sea
+            CALL clo_msk( k_top, k_bot, mask_csundef, 'mask_csundef' )
+         END IF
+      END IF
       !
       IF(lwp) THEN                     ! Control print
          WRITE(numout,*)
@@ -137,8 +147,15 @@ CONTAINS
 
       !                                ! top/bottom ocean level indices for t-, u- and v-points (f-point also for top)
       CALL zgr_top_bot( k_top, k_bot )      ! with a minimum value set to 1
-      
-
+      !
+      !                                ! ice shelf draft and bathymetry
+      DO_2D_11_11
+         ikt = mikt(ji,jj)
+         ikb = mbkt(ji,jj)
+         bathy  (ji,jj) = gdepw_0(ji,jj,ikb+1)
+         risfdep(ji,jj) = gdepw_0(ji,jj,ikt  )
+      END_2D
+      !
       !                                ! deepest/shallowest W level Above/Below ~10m
 !!gm BUG in s-coordinate this does not work!
       zrefdep = 10._wp - 0.1_wp * MINVAL( e3w_1d )                   ! ref. depth with tolerance (10% of minimum layer thickness)
@@ -295,16 +312,14 @@ CONTAINS
  
       !                                    ! N.B.  top     k-index of W-level = mikt
       !                                    !       bottom  k-index of W-level = mbkt+1
-      DO jj = 1, jpjm1
-         DO ji = 1, jpim1
-            miku(ji,jj) = MAX(  mikt(ji+1,jj  ) , mikt(ji,jj)  )
-            mikv(ji,jj) = MAX(  mikt(ji  ,jj+1) , mikt(ji,jj)  )
-            mikf(ji,jj) = MAX(  mikt(ji  ,jj+1) , mikt(ji,jj), mikt(ji+1,jj  ), mikt(ji+1,jj+1)  )
-            !
-            mbku(ji,jj) = MIN(  mbkt(ji+1,jj  ) , mbkt(ji,jj)  )
-            mbkv(ji,jj) = MIN(  mbkt(ji  ,jj+1) , mbkt(ji,jj)  )
-         END DO
-      END DO
+      DO_2D_10_10
+         miku(ji,jj) = MAX(  mikt(ji+1,jj  ) , mikt(ji,jj)  )
+         mikv(ji,jj) = MAX(  mikt(ji  ,jj+1) , mikt(ji,jj)  )
+         mikf(ji,jj) = MAX(  mikt(ji  ,jj+1) , mikt(ji,jj), mikt(ji+1,jj  ), mikt(ji+1,jj+1)  )
+         !
+         mbku(ji,jj) = MIN(  mbkt(ji+1,jj  ) , mbkt(ji,jj)  )
+         mbkv(ji,jj) = MIN(  mbkt(ji  ,jj+1) , mbkt(ji,jj)  )
+      END_2D
       ! converte into REAL to use lbc_lnk ; impose a min value of 1 as a zero can be set in lbclnk 
       zk(:,:) = REAL( miku(:,:), wp )   ;   CALL lbc_lnk( 'domzgr', zk, 'U', 1. )   ;   miku(:,:) = MAX( NINT( zk(:,:) ), 1 )
       zk(:,:) = REAL( mikv(:,:), wp )   ;   CALL lbc_lnk( 'domzgr', zk, 'V', 1. )   ;   mikv(:,:) = MAX( NINT( zk(:,:) ), 1 )

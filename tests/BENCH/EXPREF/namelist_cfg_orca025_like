@@ -8,8 +8,8 @@
    cn_exp      =   'BENCH' !  experience name
    nn_it000    =       1   !  first time step
    nn_itend    =    1000   !  last time step 
-   nn_stock    =       0   !  frequency of creation of a restart file (modulo referenced to 1)
-   nn_write    =       0   !  frequency of write in the output file   (modulo referenced to nn_it000)
+   nn_stock    =      -1   !  frequency of creation of a restart file (modulo referenced to 1)
+   nn_write    =      -1   !  frequency of write in the output file   (modulo referenced to nn_it000)
 /
 !-----------------------------------------------------------------------
 &namusr_def    !   User defined :   BENCH configuration: Flat bottom, beta-plane
@@ -29,14 +29,13 @@
 !-----------------------------------------------------------------------
 &namctl        !   Control prints                                       (default: OFF)
 !-----------------------------------------------------------------------
-   ln_ctl      = .false.   !  trends control print (expensive!)
    nn_print    =    0      !  level of print (0 no extra print)
    ln_timing   = .false.   !  timing by routine write out in timing.output file
 /
 !-----------------------------------------------------------------------
 &namdom        !   time and space domain
 !-----------------------------------------------------------------------
-   rn_rdt      =    900.   !  time step for the dynamics (and tracer if nn_acc=0)
+   rn_Dt      =    900.   !  time step for the dynamics (and tracer if nn_acc=0)
    rn_atfp     =   0.05    !  asselin time filter parameter
 /
 
@@ -50,6 +49,9 @@
 &namsbc        !   Surface Boundary Condition (surface module)
 !-----------------------------------------------------------------------
   ln_usr      = .true.    !  user defined formulation                  (T => check usrdef_sbc)
+  nn_ice      = 2         !  =0 no ice boundary condition
+     !                    !  =1 use observed ice-cover                 (  => fill namsbc_iif )
+     !                    !  =2 or 3 for SI3 and CICE, respectively
   ln_traqsr   = .true.    !  Light penetration in the ocean            (T => fill namtra_qsr)
 /
 
@@ -189,7 +191,7 @@
 !-----------------------------------------------------------------------
    ln_dynspg_ts   = .true.   ! split-explicit free surface
       ln_bt_auto    = .false.    ! Number of sub-step defined from:
-         nn_baro      =  30         ! =F : the number of sub-step in rn_rdt seconds
+         nn_e      =  30         ! =F : the number of sub-step in rn_Dt seconds
 /
 !-----------------------------------------------------------------------
 &namdyn_ldf    !   lateral diffusion on momentum                        (default: NO selection)

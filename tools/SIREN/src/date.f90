@@ -2,8 +2,6 @@
 ! NEMO system team, System and Interface for oceanic RElocable Nesting
 !----------------------------------------------------------------------
 !
-! MODULE: date
-!
 ! DESCRIPTION:
 !> @brief This module provide the calculation of Julian dates, and
 !> do many manipulations with dates.
@@ -116,20 +114,22 @@
 !> @endcode
 !>
 !> @author J.Paul
-! REVISION HISTORY:
+!>
 !> @date November, 2013 - Initial Version
 !
 !> @note This module is based on Perderabo's date calculator (ksh)
-!> @note Software governed by the CeCILL licence     (./LICENSE)
+!> @note Software governed by the CeCILL licence     (NEMOGCM/NEMO_CeCILL.txt)
 !>
 !> @todo
 !> - see calendar.f90 and select Gregorian, NoLeap, or D360 calendar
 !----------------------------------------------------------------------
 MODULE date
+
    USE global                          ! global variable
    USE kind                            ! F90 kind parameter
    USE fct                             ! basic useful function
    USE logger                          ! log file manager
+
    IMPLICIT NONE
    ! NOTE_avoid_public_variables_if_possible
 
@@ -142,6 +142,7 @@ MODULE date
    ! function and subroutine
    PUBLIC :: date_today         !< return the date of the day at 12:00:00
    PUBLIC :: date_now           !< return the date and time
+   PUBLIC :: date_time          !< return the date and time in milliseconds
    PUBLIC :: date_init          !< initialized date structure form julian day or year month day
    PUBLIC :: date_print         !< print the date with format YYYY-MM-DD hh:mm:ss
    PUBLIC :: date_leapyear      !< check if year is a leap year
@@ -206,103 +207,156 @@ MODULE date
    END INTERFACE
 
 CONTAINS
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION date_print(td_date, cd_fmt) &
+         & RESULT (cf_date)
    !-------------------------------------------------------------------
    !> @brief This function print the date and time with 
    !> format YYYY/MM/DD hh:mm:ss.
    !> @details
-   !> Optionally, you could specify output format. However it will be only apply
-   !> to year, month, day.
+   !> Optionally, you could specify output format. However it will be 
+   !> only apply to year, month, day.
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] td_date   date strutcutre
    !> @param[in] cd_fmt    ouput format (only for year,month,day)
    !> @return date in format YYYY-MM-DD hh:mm:ss
    !-------------------------------------------------------------------
-   CHARACTER(LEN=lc) FUNCTION date_print(td_date, cd_fmt)
+
       IMPLICIT NONE
+
       ! Argument   
       TYPE(TDATE)     , INTENT(IN) :: td_date
       CHARACTER(LEN=*), INTENT(IN), OPTIONAL :: cd_fmt
+
+      ! function
+      CHARACTER(LEN=lc)            :: cf_date 
       !----------------------------------------------------------------
 
       IF( PRESENT(cd_fmt) )THEN
-         WRITE(date_print,TRIM(cd_fmt)) &
-         &    td_date%i_year,td_date%i_month,td_date%i_day
+         WRITE(cf_date,TRIM(cd_fmt)) &
+            &    td_date%i_year,td_date%i_month,td_date%i_day
       ELSE
-         WRITE(date_print,cm_fmtdate) &
-         &    td_date%i_year,td_date%i_month,td_date%i_day, &
-         &    td_date%i_hour,td_date%i_min,td_date%i_sec
+         WRITE(cf_date,cm_fmtdate) &
+            &    td_date%i_year,td_date%i_month,td_date%i_day, &
+            &    td_date%i_hour,td_date%i_min,td_date%i_sec
       ENDIF
 
    END FUNCTION date_print
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION date_leapyear(td_date) &
+         & RESULT (lf_leap)
    !-------------------------------------------------------------------
    !> @brief This function check if year is a leap year.
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] td_date   date strutcutre
    !> @return true if year is leap year
    !-------------------------------------------------------------------
-   LOGICAL FUNCTION date_leapyear(td_date)
+
       IMPLICIT NONE
+
       ! Argument   
       TYPE(TDATE), INTENT(IN) :: td_date
+
+      ! function
+      LOGICAL                 :: lf_leap
       !----------------------------------------------------------------
 
-      date_leapyear=.false.
+      lf_leap=.false.
       IF( (MOD(td_date%i_year,100_i4)==0) )THEN
          IF( (MOD(td_date%i_year,400_i4)==0) )THEN
-            date_leapyear=.true.
+            lf_leap=.true.
          ENDIF
       ELSE
          IF( (MOD(td_date%i_year,4_i4)==0) )THEN
-            date_leapyear=.true.
+            lf_leap=.true.
          ENDIF
-      ENDIF      
+      ENDIF
 
    END FUNCTION date_leapyear
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION date_now() &
+         & RESULT (tf_date)
    !-------------------------------------------------------------------
    !> @brief This function return the current date and time.
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @return current date and time in a date structure
    !-------------------------------------------------------------------
-   TYPE(TDATE) FUNCTION date_now()
+
       IMPLICIT NONE
+
+      ! function
+      TYPE(TDATE) :: tf_date
+
       ! local variable
       INTEGER(sp), DIMENSION(8) :: il_values
       !----------------------------------------------------------------
 
       CALL DATE_AND_TIME( values= il_values)
 
-      date_now=date_init( il_values(1), il_values(2), il_values(3), &
-      &                   il_values(5), il_values(6), il_values(7) )
+      tf_date=date_init( il_values(1), il_values(2), il_values(3), &
+         &               il_values(5), il_values(6), il_values(7) )
 
    END FUNCTION date_now
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE date_time()
+   !-------------------------------------------------------------------
+   !> @brief This subroutine print the current date and time in milliseconds.
+   !>
+   !> @author J.Paul
+   !> @date August, 2017 - Initial Version
+   !-------------------------------------------------------------------
+
+      IMPLICIT NONE
+
+      ! local variable
+      INTEGER(sp), DIMENSION(8) :: il_values
+      CHARACTER(LEN=lc)         :: cl_fmtdate = &  !< date and time format
+      &  "(i0.4,'-',i0.2,'-',i0.2,1x,i0.2,':',i0.2,':',i0.2'.',i0.3)"      
+      !----------------------------------------------------------------
+
+      CALL DATE_AND_TIME( values= il_values)
+
+      WRITE(*,cl_fmtdate) il_values(1),il_values(2),il_values(3),il_values(5),il_values(6),il_values(7),il_values(8)
+
+   END SUBROUTINE date_time
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION date_today() &
+         & RESULT (tf_date)
    !-------------------------------------------------------------------
    !> @brief This function return the date of the day at 12:00:00.
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @return date of the day at 12:00:00 in a date structure
    !-------------------------------------------------------------------
-   TYPE(TDATE) FUNCTION date_today()
+
       IMPLICIT NONE
+      
+      ! function
+      TYPE(TDATE) :: tf_date
+
       ! local variable
       INTEGER(sp), DIMENSION(8) :: il_values
       !----------------------------------------------------------------
 
       CALL DATE_AND_TIME( values= il_values)
 
-      date_today=date_init( il_values(1), il_values(2), il_values(3), 12_i4 )
+      tf_date=date_init( il_values(1), il_values(2), il_values(3), 12_i4 )
 
    END FUNCTION date_today
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION date__init_fmtdate(cd_datetime, td_dateo) &
+         & RESULT (tf_date)
    !-------------------------------------------------------------------
    !> @brief This function initialized date structure from a character 
    !> date with format YYYY-MM-DD hh:mm:ss.<br/>
@@ -312,16 +366,22 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !> @date April, 2019
+   !> - check time units CF convention, raise error if not
+   !>
    !> @param[in] cd_date   date in format YYYY-MM-DD hh:mm:ss
    !> @param[in] td_dateo  new date origin for pseudo julian day
    !> @return date structure
    !-------------------------------------------------------------------
-   TYPE(TDATE) FUNCTION date__init_fmtdate(cd_datetime, td_dateo)
+
       IMPLICIT NONE
+
       ! Argument   
       CHARACTER(LEN=*), INTENT(IN)  :: cd_datetime
       TYPE(TDATE),      INTENT(IN), OPTIONAL :: td_dateo
+
+      ! function
+      TYPE(TDATE)                   :: tf_date
 
       ! local variable
       CHARACTER(LEN=lc) :: cl_datetime
@@ -333,13 +393,14 @@ CONTAINS
       CHARACTER(LEN=lc) :: cl_hour
       CHARACTER(LEN=lc) :: cl_min
       CHARACTER(LEN=lc) :: cl_sec
+      CHARACTER(LEN=lc) :: cl_msg
 
-      INTEGER(i4) :: il_year
-      INTEGER(i4) :: il_month
-      INTEGER(i4) :: il_day
-      INTEGER(i4) :: il_hour
-      INTEGER(i4) :: il_min
-      INTEGER(i4) :: il_sec
+      INTEGER(i4)       :: il_year
+      INTEGER(i4)       :: il_month
+      INTEGER(i4)       :: il_day
+      INTEGER(i4)       :: il_hour
+      INTEGER(i4)       :: il_min
+      INTEGER(i4)       :: il_sec
       !----------------------------------------------------------------
 
       cl_datetime=TRIM(ADJUSTL(cd_datetime))
@@ -354,16 +415,37 @@ CONTAINS
       cl_day  = fct_split(cl_date,3,'-')
       READ(cl_day, *) il_day
       cl_hour = fct_split(cl_time,1,':')
-      READ(cl_hour, *) il_hour
+      IF( TRIM(cl_hour) /= '' )THEN
+         READ(cl_hour, *) il_hour
+      ELSE
+         WRITE(cl_msg,*) "time units not conform to CF conventions"
+         CALL logger_error(cl_msg)
+         il_hour=0
+      ENDIf
       cl_min  = fct_split(cl_time,2,':')
-      READ(cl_min, *) il_min
+      IF( TRIM(cl_min) /= '' )THEN
+         READ(cl_min, *) il_min
+      ELSE
+         WRITE(cl_msg,*) "time units not conform to CF conventions"
+         CALL logger_error(cl_msg)
+         il_min=0
+      ENDIf
       cl_sec  = fct_split(cl_time,3,':')
-      READ(cl_sec, *) il_sec
+      IF( TRIM(cl_sec) /= '' )THEN
+         READ(cl_sec, *) il_sec
+      ELSE
+         WRITE(cl_msg,*) "time units not conform to CF conventions"
+         CALL logger_error(cl_msg)
+         il_sec=0
+      ENDIf
 
-      date__init_fmtdate = date_init( il_year, il_month, il_day, il_hour, &
-      &                               il_min, il_sec, td_dateo=td_dateo )
+      tf_date = date_init( il_year, il_month, il_day, il_hour, &
+         &                 il_min, il_sec, td_dateo=td_dateo )
 
    END FUNCTION date__init_fmtdate
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION date__init_jd(dd_jd, td_dateo) &
+         & RESULT (tf_date)
    !-------------------------------------------------------------------
    !> @brief This function initialized date structure from julian day.<br/>
    !> @details
@@ -372,48 +454,55 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] dd_jd     julian day
    !> @param[in] td_dateo  new date origin for pseudo julian day
-   !
+   !>
    !> @return date structure of julian day
    !-------------------------------------------------------------------
-   TYPE(TDATE) FUNCTION date__init_jd(dd_jd, td_dateo)
+
       IMPLICIT NONE
+
       !Argument
       REAL(dp),    INTENT(IN)  :: dd_jd
       TYPE(TDATE), INTENT(IN), OPTIONAL :: td_dateo
+
+      ! function
+      TYPE(TDATE)              :: tf_date
       !----------------------------------------------------------------
       IF( PRESENT(td_dateo) )THEN
          CALL date__check(td_dateo)
 
          ! pseudo julian day with origin dateo
-         date__init_jd%d_jc=dd_jd
-         date__init_jd%k_jcsec=date__jd2sec(dd_jd)
+         tf_date%d_jc=dd_jd
+         tf_date%k_jcsec=date__jd2sec(dd_jd)
 
          ! convert to truly julian day
-         CALL date__jc2jd(date__init_jd, td_dateo)
+         CALL date__jc2jd(tf_date, td_dateo)
       ELSE
-         date__init_jd%d_jd=dd_jd
-         date__init_jd%k_jdsec=date__jd2sec(dd_jd)
+         tf_date%d_jd=dd_jd
+         tf_date%k_jdsec=date__jd2sec(dd_jd)
 
          ! compute CNES julian day
-         CALL date__jd2jc(date__init_jd)
+         CALL date__jd2jc(tf_date)
       ENDIF
 
       ! check input data
-      CALL date__check(date__init_jd)
+      CALL date__check(tf_date)
 
       ! compute year month day hour min sec 
-      CALL date__jd2ymd(date__init_jd)
+      CALL date__jd2ymd(tf_date)
 
       ! compute day of the wekk
-      CALL date__jd2dow(date__init_jd)
+      CALL date__jd2dow(tf_date)
 
       !compute last day of the month
-      date__init_jd%i_lday=date__lastday(date__init_jd)
+      tf_date%i_lday=date__lastday(tf_date)
 
    END FUNCTION date__init_jd
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION date__init_nsec(kd_nsec, td_dateo) &
+         & RESULT (tf_date)
    !-------------------------------------------------------------------
    !> @brief This function initialized date structure from number of 
    !> second since julian day origin.<br/>
@@ -422,25 +511,34 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] kd_nsec   number of second since julian day origin
    !> @param[in] td_dateo  new date origin for pseudo julian day
-   !
+   !>
    !> @return date structure of julian day
    !-------------------------------------------------------------------
-   TYPE(TDATE) FUNCTION date__init_nsec(kd_nsec, td_dateo)
+
       IMPLICIT NONE
+
       !Argument
       INTEGER(i8), INTENT(IN)  :: kd_nsec
       TYPE(TDATE), INTENT(IN), OPTIONAL :: td_dateo
+
+      ! function
+      TYPE(TDATE)              :: tf_date
       !----------------------------------------------------------------
       IF( PRESENT(td_dateo) )THEN
-         date__init_nsec=date_init( date__sec2jd(kd_nsec), td_dateo )
+         tf_date=date_init( date__sec2jd(kd_nsec), td_dateo )
       ELSE
-         date__init_nsec=date_init( date__sec2jd(kd_nsec) )
+         tf_date=date_init( date__sec2jd(kd_nsec) )
       ENDIF
 
    END FUNCTION date__init_nsec
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION date__init_ymd(id_year, id_month, id_day, &
+         &                 id_hour, id_min, id_sec,   &
+         &                 td_dateo) &
+         & RESULT (tf_date)
    !-------------------------------------------------------------------
    !> @brief This function initialized date structure form year month day
    !> and optionnaly hour min sec.<br/>
@@ -457,13 +555,12 @@ CONTAINS
    !> @param[in] id_min
    !> @param[in] id_sec
    !> @param[in] td_dateo  new date origin for pseudo julian day
-   !
+   !>
    !> @return date structure of year month day
    !-------------------------------------------------------------------
-   TYPE(TDATE) FUNCTION date__init_ymd(id_year, id_month, id_day,  &
-   &                                   id_hour, id_min, id_sec, &
-   &                                   td_dateo)
+
       IMPLICIT NONE
+
       !Argument
       INTEGER(i4), INTENT(IN) :: id_year
       INTEGER(i4), INTENT(IN) :: id_month
@@ -472,128 +569,158 @@ CONTAINS
       INTEGER(i4), INTENT(IN), OPTIONAL :: id_min
       INTEGER(i4), INTENT(IN), OPTIONAL :: id_sec
       TYPE(TDATE), INTENT(IN), OPTIONAL :: td_dateo
+
+      ! function
+      TYPE(TDATE)              :: tf_date
       !----------------------------------------------------------------
-      date__init_ymd%i_year=id_year
-      date__init_ymd%i_month=id_month
-      date__init_ymd%i_day=id_day
+      tf_date%i_year=id_year
+      tf_date%i_month=id_month
+      tf_date%i_day=id_day
       IF( PRESENT(id_hour) )THEN
-         date__init_ymd%i_hour=id_hour
+         tf_date%i_hour=id_hour
       ENDIF
       IF( PRESENT(id_min) )THEN
-         date__init_ymd%i_min=id_min
+         tf_date%i_min=id_min
       ENDIF   
       IF( PRESENT(id_sec) )THEN   
-         date__init_ymd%i_sec=id_sec
+         tf_date%i_sec=id_sec
       ENDIF   
       ! check input data
-      CALL date__check(date__init_ymd)
+      CALL date__check(tf_date)
 
       ! compute julian day
-      CALL date__ymd2jd(date__init_ymd)
+      CALL date__ymd2jd(tf_date)
 
       IF( PRESENT(td_dateo) )THEN
          CALL date__check(td_dateo)
          ! compute julian day with origin dateo
-         CALL date__jd2jc(date__init_ymd, td_dateo)         
+         CALL date__jd2jc(tf_date, td_dateo)         
       ELSE
          ! compute CNES julian day
-         CALL date__jd2jc(date__init_ymd)
+         CALL date__jd2jc(tf_date)
       ENDIF      
 
       ! compute day of the week
-      CALL date__jd2dow(date__init_ymd)
+      CALL date__jd2dow(tf_date)
 
       !compute last day of the month
-      date__init_ymd%i_lday=date__lastday(date__init_ymd)
+      tf_date%i_lday=date__lastday(tf_date)
 
    END FUNCTION date__init_ymd
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION date__diffdate(td_date1, td_date2) &
+         & RESULT (df_diff)
    !-------------------------------------------------------------------
    !> @brief This function compute number of day between two dates: 
    !> nday= date1 - date2
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] td_date1  first date strutcutre
    !> @param[in] td_date2  second date strutcutre
    !> @return nday
    !-------------------------------------------------------------------
-   REAL(dp) FUNCTION date__diffdate(td_date1, td_date2)
+
       IMPLICIT NONE
        
       !Argument
       TYPE(TDATE), INTENT(IN) :: td_date1
       TYPE(TDATE), INTENT(IN) :: td_date2
+
+      ! function
+      REAL(dp)                :: df_diff
       !----------------------------------------------------------------
 
       ! check year month day hour min sec
       CALL date__check(td_date1)   
       CALL date__check(td_date2)   
 
-      date__diffdate = td_date1%d_jd - td_date2%d_jd
+      df_diff = td_date1%d_jd - td_date2%d_jd
 
    END FUNCTION date__diffdate
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION date__subnday(td_date, dd_nday) &
+         & RESULT (tf_date)
    !-------------------------------------------------------------------
    !> @brief This function substract nday to a date:
    !> date2 = date1 - nday
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] td_date   date strutcutre
    !> @param[in] dd_nday   number of day
    !> @return date strutcutre of date - nday
    !-------------------------------------------------------------------
-   TYPE(TDATE) FUNCTION date__subnday(td_date, dd_nday)
+
       IMPLICIT NONE
-      !Argument
+
+      ! Argument
       TYPE(TDATE), INTENT(IN) :: td_date
       REAL(dp),    INTENT(IN) :: dd_nday
+
+      ! function
+      TYPE(TDATE)             :: tf_date
       !----------------------------------------------------------------
 
       ! check year month day hour min sec
       CALL date__check(td_date)   
 
-      date__subnday=date__init_jd(td_date%d_jd-dd_nday)
+      tf_date=date__init_jd(td_date%d_jd-dd_nday)
 
    END FUNCTION date__subnday
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION date__addnday(td_date, dd_nday) &
+         & RESULT (tf_date)
    !-------------------------------------------------------------------
    !> @brief This function add nday to a date:
    !> date2 = date1 + nday
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] td_date   date strutcutre
    !> @param[in] dd_nday   number of day
    !> @return date strutcutre of date + nday
    !-------------------------------------------------------------------
-   TYPE(TDATE) FUNCTION date__addnday(td_date, dd_nday)
+
       IMPLICIT NONE
-      !Argument
+
+      ! Argument
       TYPE(TDATE), INTENT(IN) :: td_date
       REAL(dp),    INTENT(IN) :: dd_nday
+
+      ! function
+      TYPE(TDATE)             :: tf_date
       !----------------------------------------------------------------
 
       ! check year month day hour min sec
       CALL date__check(td_date)   
 
-      date__addnday=date__init_jd(td_date%d_jd+dd_nday)
+      tf_date=date__init_jd(td_date%d_jd+dd_nday)
 
    END FUNCTION date__addnday
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION date__lastday(td_date) &
+         & RESULT (if_lday)
    !-------------------------------------------------------------------
    !> @brief This subroutine compute last day of the month
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] td_date   date strutcutre
    !> @return last day of the month
    !-------------------------------------------------------------------
-   INTEGER(i4) FUNCTION date__lastday(td_date)
+
       IMPLICIT NONE
+
       ! Argument   
       TYPE(TDATE), INTENT(IN) :: td_date
+
+      ! function
+      INTEGER(i4) :: if_lday
 
       ! local variable
       INTEGER, DIMENSION(12), PARAMETER :: il_lastdaytab = &
@@ -602,27 +729,30 @@ CONTAINS
 
       ! general case
       IF( td_date%i_month /= 2 )THEN
-         date__lastday=il_lastdaytab(td_date%i_month)
+         if_lday=il_lastdaytab(td_date%i_month)
       ELSE
          IF( date_leapyear(td_date) )THEN
-            date__lastday=29
+            if_lday=29
          ELSE
-            date__lastday=il_lastdaytab(td_date%i_month)
+            if_lday=il_lastdaytab(td_date%i_month)
          ENDIF
       ENDIF
 
    END FUNCTION date__lastday
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE date__ymd2jd(td_date)
    !-------------------------------------------------------------------
    !> @brief This subroutine compute julian day from year month day , and fill
    !> input date strutcutre.
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] td_date   date strutcutre
    !-------------------------------------------------------------------
-   SUBROUTINE date__ymd2jd(td_date)
+
       IMPLICIT NONE
+
       ! Argument   
       TYPE(TDATE), INTENT(INOUT) :: td_date
 
@@ -646,17 +776,20 @@ CONTAINS
       td_date%k_jdsec = date__jd2sec( td_date%d_jd ) 
 
    END SUBROUTINE date__ymd2jd
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE date__jd2ymd(td_date)
    !-------------------------------------------------------------------
    !> @brief This subroutine compute year month day from julian day, and fill
    !> input date strutcutre.
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] td_date   date strutcutre
    !-------------------------------------------------------------------
-   SUBROUTINE date__jd2ymd(td_date)
+
       IMPLICIT NONE
+
       ! Argument   
       TYPE(TDATE), INTENT(INOUT) :: td_date
 
@@ -689,18 +822,21 @@ CONTAINS
       CALL date__adjust(td_date)
 
    END SUBROUTINE date__jd2ymd
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE date__jc2jd(td_date, td_dateo)
    !-------------------------------------------------------------------
    !> @brief This subroutine compute julian day from pseudo julian day 
    !> with new date origin, and fill input date strutcutre.
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] td_date   date
    !> @param[in]    td_dateo  new date origin for pseudo julian day
    !-------------------------------------------------------------------
-   SUBROUTINE date__jc2jd(td_date, td_dateo)
+
       IMPLICIT NONE
+
       ! Argument   
       TYPE(TDATE), INTENT(INOUT) :: td_date
       TYPE(TDATE), INTENT(IN) :: td_dateo
@@ -720,6 +856,8 @@ CONTAINS
       td_date%k_jdsec = date__jd2sec(td_date%d_jd)
 
    END SUBROUTINE date__jc2jd
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE date__jd2jc(td_date, td_dateo)
    !-------------------------------------------------------------------
    !> @brief This subroutine compute pseudo julian day with new date origin, and
    !> fill input date structure.<br/>
@@ -727,12 +865,13 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] td_date   date
    !> @param[in] td_dateo     new origin date
    !-------------------------------------------------------------------
-   SUBROUTINE date__jd2jc(td_date, td_dateo)
+
       IMPLICIT NONE
+
       ! Argument   
       TYPE(TDATE), INTENT(INOUT) :: td_date
       TYPE(TDATE), INTENT(IN),   OPTIONAL :: td_dateo
@@ -756,6 +895,8 @@ CONTAINS
       td_date%k_jcsec = date__jd2sec(td_date%d_jc)
 
    END SUBROUTINE date__jd2jc
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE date__jd2dow(td_date)
    !-------------------------------------------------------------------
    !> @brief This subroutine compute the day of week from julian day, and fill
    !> input date structure.<br/>
@@ -764,11 +905,12 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] td_date   date strutcutre
    !-------------------------------------------------------------------
-   SUBROUTINE date__jd2dow(td_date)
+
       IMPLICIT NONE
+
       ! Argument   
       TYPE(TDATE), INTENT(INOUT) :: td_date
       !----------------------------------------------------------------
@@ -776,43 +918,53 @@ CONTAINS
       td_date%i_dow=MOD((INT(AINT(td_date%d_jd))+3),7)
 
    END SUBROUTINE date__jd2dow
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION date__hms2jd(td_date) &
+         & RESULT (df_frac)
    !-------------------------------------------------------------------
    !> @brief This function compute fraction of a day from 
    !> hour, minute, second. 
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] td_date   date strutcutre
    !> @return fraction of the day
    !-------------------------------------------------------------------
-   REAL(dp) FUNCTION date__hms2jd(td_date)
+
       IMPLICIT NONE
+
       ! Argument   
       TYPE(TDATE), INTENT(IN) :: td_date
+
+      ! function
+      REAL(dp)                :: df_frac
       !----------------------------------------------------------------
 
       !  compute real seconds
-      date__hms2jd = REAL( td_date%i_sec, dp )   
+      df_frac = REAL( td_date%i_sec, dp )
       !  compute real minutes
-      date__hms2jd = REAL( td_date%i_min, dp ) + date__hms2jd/60.0
+      df_frac = REAL( td_date%i_min, dp ) + df_frac/60.0
       !  compute real hours
-      date__hms2jd = REAL( td_date%i_hour, dp ) + date__hms2jd/60.0
+      df_frac = REAL( td_date%i_hour, dp ) + df_frac/60.0
       !  julian fraction of a day
-      date__hms2jd = date__hms2jd/24.0
+      df_frac = df_frac/24.0
 
    END FUNCTION date__hms2jd
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE date__jd2hms(td_date)
    !-------------------------------------------------------------------
    !> @brief This subroutine compute hour, minute, second from julian 
    !> fraction, and fill date structure.
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] td_date   date strutcutre
    !-------------------------------------------------------------------
-   SUBROUTINE date__jd2hms(td_date)
+
       IMPLICIT NONE
+
       ! Argument   
       TYPE(TDATE), INTENT(INOUT) :: td_date
 
@@ -831,16 +983,19 @@ CONTAINS
       td_date%i_sec = NINT( dl_fract * 60.0, i4 )
 
    END SUBROUTINE date__jd2hms
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE date__check(td_date)
    !-------------------------------------------------------------------
    !> @brief This subroutine check date express in date structure
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] td_date   date strutcutre
    !-------------------------------------------------------------------
-   SUBROUTINE date__check(td_date)
+      
       IMPLICIT NONE
+
       ! Argument   
       TYPE(TDATE), INTENT(IN) :: td_date
 
@@ -904,17 +1059,20 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE date__check
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE date__adjust(td_date)
    !-------------------------------------------------------------------
    !> @brief This subroutine adjust date (correct hour, minutes, and seconds
    !> value if need be)
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] td_date   date strutcutre
    !-------------------------------------------------------------------
-   SUBROUTINE date__adjust(td_date)
+
       IMPLICIT NONE
+
       ! Argument   
       TYPE(TDATE), INTENT(INOUT) :: td_date
       !----------------------------------------------------------------
@@ -935,41 +1093,56 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE date__adjust
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION date__jd2sec(dd_jul) &
+         & RESULT (if_sec)
    !-------------------------------------------------------------------
    !> @brief This function convert julian day in seconds
    !> since julian day origin.
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] td_date   date strutcutre
    !> @return number of seconds since julian day origin
    !-------------------------------------------------------------------
-   INTEGER(i8) FUNCTION date__jd2sec(dd_jul)
+
       IMPLICIT NONE
+
       ! Argument   
       REAL(dp), INTENT(IN) :: dd_jul
+
+      ! function
+      INTEGER(i8)          :: if_sec
       !----------------------------------------------------------------
 
-      date__jd2sec = NINT( dd_jul * im_secbyday, i8 )
+      if_sec = NINT( dd_jul * im_secbyday, i8 )
 
    END FUNCTION date__jd2sec
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION date__sec2jd(kd_nsec) &
+         & RESULT (df_sec)
    !-------------------------------------------------------------------
    !> @brief This function convert seconds since julian day origin in 
    !> julian day.
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] kd_nsec   number of second since julian day origin
    !> @return julian day
    !-------------------------------------------------------------------
-   REAL(dp) FUNCTION date__sec2jd(kd_nsec)
+
       IMPLICIT NONE
+
       ! Argument   
       INTEGER(i8), INTENT(IN) :: kd_nsec
+
+      ! function
+      REAL(dp)                :: df_sec
       !----------------------------------------------------------------
 
-      date__sec2jd = REAL( REAL( kd_nsec , dp ) / im_secbyday, dp )
+      df_sec = REAL( REAL( kd_nsec , dp ) / im_secbyday, dp )
 
    END FUNCTION date__sec2jd
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 END MODULE date
 

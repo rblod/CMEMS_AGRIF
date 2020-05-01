@@ -8,10 +8,6 @@ MODULE florst
    !!   NEMO      1.0  !  2002-10  (A. Bozec)  F90 : Free form and module
    !!             3.2  !  2010-08  (slaw, cbricaud): netcdf outputs and others 
    !!----------------------------------------------------------------------
-#if   defined key_floats
-   !!----------------------------------------------------------------------
-   !!   'key_floats'                                     float trajectories
-   !!----------------------------------------------------------------------
    USE flo_oce         ! ocean drifting floats
    USE dom_oce         ! ocean space and time domain
    USE lib_mpp         ! distribued memory computing library
@@ -27,7 +23,7 @@ MODULE florst
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: florst.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: florst.F90 11536 2019-09-11 13:54:18Z smasson $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -123,15 +119,6 @@ CONTAINS
       ENDIF
       !
    END SUBROUTINE flo_rst
-
-#  else
-   !!----------------------------------------------------------------------
-   !!   Default option                                         Empty module
-   !!----------------------------------------------------------------------
-CONTAINS
-   SUBROUTINE flo_rst                 ! Empty routine
-   END SUBROUTINE flo_rst
-#endif
 
    !!=======================================================================
 END MODULE florst

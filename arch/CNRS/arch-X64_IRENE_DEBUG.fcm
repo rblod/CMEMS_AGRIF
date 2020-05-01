@@ -1,4 +1,4 @@
-# Curie BULL at TGCC, http://www-hpc.cea.fr/en/complexe/tgcc-curie.htm
+# Irene BULL at TGCC, http://www-hpc.cea.fr/en/complexe/tgcc-Irene.htm
 #
 # NCDF_HOME   root directory containing lib and include subdirectories for netcdf4
 # HDF5_HOME   root directory containing lib and include subdirectories for HDF5
@@ -43,7 +43,7 @@
 
 %CPP	             cpp
 %FC                  mpif90 -c -cpp
-%FCFLAGS             -i4 -r8 -g -O0 -debug all -traceback -fp-model precise -ftrapuv -fpe0
+%FCFLAGS             -i4 -r8 -g -O0 -debug all -traceback -fp-model strict -ftrapuv -fpe0 -check bounds
 %FFLAGS              %FCFLAGS
 %LD                  mpif90
 %LDFLAGS             

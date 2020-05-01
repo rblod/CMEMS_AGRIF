@@ -12,9 +12,9 @@ MODULE sms_pisces
    IMPLICIT NONE
    PUBLIC
 
-   INTEGER ::   numnatp_ref = -1           !! Logical units for namelist pisces
-   INTEGER ::   numnatp_cfg = -1           !! Logical units for namelist pisces
-   INTEGER ::   numonp      = -1           !! Logical unit for namelist pisces output
+   CHARACTER(:), ALLOCATABLE ::   numnatp_ref   !! Character buffer for reference namelist pisces
+   CHARACTER(:), ALLOCATABLE ::   numnatp_cfg   !! Character buffer for configuration namelist pisces
+   INTEGER ::   numonp      = -1                !! Logical unit for namelist pisces output
 
    !                                                       !:  PISCES  : silicon dependant half saturation
 
@@ -66,6 +66,7 @@ MODULE sms_pisces
 
    !!* Mass conservation
    LOGICAL  ::  ln_check_mass      !: Flag to check mass conservation
+   LOGICAL , PUBLIC ::   ln_ironice   !: boolean for Fe input from sea ice
 
    !!*  Biological fluxes for light : variables shared by pisces & lobster
    INTEGER , ALLOCATABLE, SAVE, DIMENSION(:,:)   ::  neln  !: number of T-levels + 1 in the euphotic layer
@@ -119,9 +120,11 @@ MODULE sms_pisces
    REAL(wp), ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::   tgfunc    !: Temp. dependancy of various biological rates
    REAL(wp), ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::   tgfunc2   !: Temp. dependancy of mesozooplankton rates
 
+   LOGICAL, SAVE :: lk_sed
+
    !!----------------------------------------------------------------------
    !! NEMO/TOP 4.0 , NEMO Consortium (2018)
-   !! $Id: sms_pisces.F90 10425 2018-12-19 21:54:16Z smasson $ 
+   !! $Id: sms_pisces.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS

@@ -30,9 +30,11 @@ MODULE obs_oper
 
    INTEGER, PARAMETER, PUBLIC ::   imaxavtypes = 20   !: Max number of daily avgd obs types
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: obs_oper.F90 10068 2018-08-28 14:09:04Z nicolasmartin $
+   !! $Id: obs_oper.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -186,44 +188,32 @@ CONTAINS
 
          ! Initialize daily mean for first timestep of the day
          IF ( idayend == 1 .OR. kt == 0 ) THEN
-            DO jk = 1, jpk
-               DO jj = 1, jpj
-                  DO ji = 1, jpi
-                     prodatqc%vdmean(ji,jj,jk,1) = 0.0
-                     prodatqc%vdmean(ji,jj,jk,2) = 0.0
-                  END DO
-               END DO
-            END DO
+            DO_3D_11_11( 1, jpk )
+               prodatqc%vdmean(ji,jj,jk,1) = 0.0
+               prodatqc%vdmean(ji,jj,jk,2) = 0.0
+            END_3D
          ENDIF
 
-         DO jk = 1, jpk
-            DO jj = 1, jpj
-               DO ji = 1, jpi
-                  ! Increment field 1 for computing daily mean
-                  prodatqc%vdmean(ji,jj,jk,1) = prodatqc%vdmean(ji,jj,jk,1) &
-                     &                        + pvar1(ji,jj,jk)
-                  ! Increment field 2 for computing daily mean
-                  prodatqc%vdmean(ji,jj,jk,2) = prodatqc%vdmean(ji,jj,jk,2) &
-                     &                        + pvar2(ji,jj,jk)
-               END DO
-            END DO
-         END DO
+         DO_3D_11_11( 1, jpk )
+            ! Increment field 1 for computing daily mean
+            prodatqc%vdmean(ji,jj,jk,1) = prodatqc%vdmean(ji,jj,jk,1) &
+               &                        + pvar1(ji,jj,jk)
+            ! Increment field 2 for computing daily mean
+            prodatqc%vdmean(ji,jj,jk,2) = prodatqc%vdmean(ji,jj,jk,2) &
+               &                        + pvar2(ji,jj,jk)
+         END_3D
 
          ! Compute the daily mean at the end of day
          zdaystp = 1.0 / REAL( kdaystp )
          IF ( idayend == 0 ) THEN
             IF (lwp) WRITE(numout,*) 'Calculating prodatqc%vdmean on time-step: ',kt
             CALL FLUSH(numout)
-            DO jk = 1, jpk
-               DO jj = 1, jpj
-                  DO ji = 1, jpi
-                     prodatqc%vdmean(ji,jj,jk,1) = prodatqc%vdmean(ji,jj,jk,1) &
-                        &                        * zdaystp
-                     prodatqc%vdmean(ji,jj,jk,2) = prodatqc%vdmean(ji,jj,jk,2) &
-                        &                        * zdaystp
-                  END DO
-               END DO
-            END DO
+            DO_3D_11_11( 1, jpk )
+               prodatqc%vdmean(ji,jj,jk,1) = prodatqc%vdmean(ji,jj,jk,1) &
+                  &                        * zdaystp
+               prodatqc%vdmean(ji,jj,jk,2) = prodatqc%vdmean(ji,jj,jk,2) &
+                  &                        * zdaystp
+            END_3D
          ENDIF
 
       ENDIF
@@ -341,7 +331,7 @@ CONTAINS
 
             CALL obs_int_h2d_init( 1, 1, k2dint, zlam, zphi,     &
                &                   zglam2(:,:,iobs), zgphi2(:,:,iobs), &
-               &                   zmask2(:,:,1,iobs), zweig2, zmsk_2 )
+               &                   zmask2(:,:,1,iobs), zweig2, zmsk_2)
  
          ENDIF
 
@@ -759,46 +749,40 @@ CONTAINS
 
          ! Initialize night-time mean for first timestep of the day
          IF ( idayend == 1 .OR. kt == 0 ) THEN
-            DO jj = 1, jpj
-               DO ji = 1, jpi
-                  surfdataqc%vdmean(ji,jj) = 0.0
-                  zmeanday(ji,jj) = 0.0
-                  icount_night(ji,jj) = 0
-               END DO
-            END DO
+            DO_2D_11_11
+               surfdataqc%vdmean(ji,jj) = 0.0
+               zmeanday(ji,jj) = 0.0
+               icount_night(ji,jj) = 0
+            END_2D
          ENDIF
 
          zintmp(:,:) = 0.0
          zouttmp(:,:) = sbc_dcy( zintmp(:,:), .TRUE. )
          imask_night(:,:) = INT( zouttmp(:,:) )
 
-         DO jj = 1, jpj
-            DO ji = 1, jpi
-               ! Increment the temperature field for computing night mean and counter
-               surfdataqc%vdmean(ji,jj) = surfdataqc%vdmean(ji,jj)  &
-                      &                    + psurf(ji,jj) * REAL( imask_night(ji,jj) )
-               zmeanday(ji,jj)          = zmeanday(ji,jj) + psurf(ji,jj)
-               icount_night(ji,jj)      = icount_night(ji,jj) + imask_night(ji,jj)
-            END DO
-         END DO
+         DO_2D_11_11
+            ! Increment the temperature field for computing night mean and counter
+            surfdataqc%vdmean(ji,jj) = surfdataqc%vdmean(ji,jj)  &
+                   &                    + psurf(ji,jj) * REAL( imask_night(ji,jj) )
+            zmeanday(ji,jj)          = zmeanday(ji,jj) + psurf(ji,jj)
+            icount_night(ji,jj)      = icount_night(ji,jj) + imask_night(ji,jj)
+         END_2D
 
          ! Compute the night-time mean at the end of the day
          zdaystp = 1.0 / REAL( kdaystp )
          IF ( idayend == 0 ) THEN
             IF (lwp) WRITE(numout,*) 'Calculating surfdataqc%vdmean on time-step: ',kt
-            DO jj = 1, jpj
-               DO ji = 1, jpi
-                  ! Test if "no night" point
-                  IF ( icount_night(ji,jj) > 0 ) THEN
-                     surfdataqc%vdmean(ji,jj) = surfdataqc%vdmean(ji,jj) &
-                       &                        / REAL( icount_night(ji,jj) )
-                  ELSE
-                     !At locations where there is no night (e.g. poles),
-                     ! calculate daily mean instead of night-time mean.
-                     surfdataqc%vdmean(ji,jj) = zmeanday(ji,jj) * zdaystp
-                  ENDIF
-               END DO
-            END DO
+            DO_2D_11_11
+               ! Test if "no night" point
+               IF ( icount_night(ji,jj) > 0 ) THEN
+                  surfdataqc%vdmean(ji,jj) = surfdataqc%vdmean(ji,jj) &
+                    &                        / REAL( icount_night(ji,jj) )
+               ELSE
+                  !At locations where there is no night (e.g. poles),
+                  ! calculate daily mean instead of night-time mean.
+                  surfdataqc%vdmean(ji,jj) = zmeanday(ji,jj) * zdaystp
+               ENDIF
+            END_2D
          ENDIF
 
       ENDIF
@@ -923,7 +907,7 @@ CONTAINS
                &                   zglam(:,:,iobs), zgphi(:,:,iobs), &
                &                   zglamf(:,:,iobs), zgphif(:,:,iobs), &
                &                   zmask(:,:,iobs), plamscl, pphiscl, &
-               &                   lindegrees, zweig, zobsmask )
+               &                   lindegrees, zweig )
 
             ! Average the model SST to the observation footprint
             CALL obs_avg_h2d( 1, 1, imaxifp, imaxjfp, &

@@ -2,8 +2,6 @@
 ! NEMO system team, System and Interface for oceanic RElocable Nesting
 !----------------------------------------------------------------------
 !
-! MODULE: dim
-!
 ! DESCRIPTION:
 !> @brief 
 !> This module manage dimension and how to change order of those dimension.
@@ -151,27 +149,37 @@
 !>       - cl_sname: dimension short name [optional]
 !>
 !> @author J.Paul
-! REVISION HISTORY:
+!>
 !> @date November, 2013 - Initial Version
-!> @date Spetember, 2015
+!> @date September, 2015
 !> - manage useless (dummy) dimension
 !> @date October, 2016
 !> - dimension allowed read in configuration file
+!> @date May, 2019
+!> - read number of element for each dimension allowed in configuration file 
+!> - read number of element for each dummy array in configuration file
 !>
-!> @note Software governed by the CeCILL licence     (./LICENSE)
+!> @note Software governed by the CeCILL licence     (NEMOGCM/NEMO_CeCILL.txt)
 !----------------------------------------------------------------------
 MODULE dim
+
    USE global                          ! global variable
    USE kind                            ! F90 kind parameter
    USE logger                          ! log file manager
    USE fct                             ! basic useful function
+
    IMPLICIT NONE
    ! NOTE_avoid_public_variables_if_possible
 
    ! type and variable
    PUBLIC :: TDIM              !< dimension structure
 
+   PRIVATE :: im_ndumdim       !< number of elt in dummy dimension array
    PRIVATE :: cm_dumdim        !< dummy dimension array
+   PRIVATE :: im_dimX          !< number of elt in x dimension array
+   PRIVATE :: im_dimY          !< number of elt in y dimension array
+   PRIVATE :: im_dimZ          !< number of elt in z dimension array
+   PRIVATE :: im_dimT          !< number of elt in t dimension array
    PRIVATE :: cm_dimX          !< x dimension array
    PRIVATE :: cm_dimY          !< y dimension array
    PRIVATE :: cm_dimZ          !< z dimension array
@@ -222,11 +230,16 @@ MODULE dim
       INTEGER(i4)       :: i_xyzt2 = 0       !< indices to reshape array from ('x','y','z','t')
    END TYPE
 
-   CHARACTER(LEN=lc), DIMENSION(ip_maxdumcfg), SAVE :: cm_dumdim !< dummy dimension
-   CHARACTER(LEN=lc), DIMENSION(ip_maxdimcfg), SAVE :: cm_dimX   !< x dimension
-   CHARACTER(LEN=lc), DIMENSION(ip_maxdimcfg), SAVE :: cm_dimY   !< y dimension
-   CHARACTER(LEN=lc), DIMENSION(ip_maxdimcfg), SAVE :: cm_dimZ   !< z dimension
-   CHARACTER(LEN=lc), DIMENSION(ip_maxdimcfg), SAVE :: cm_dimT   !< t dimension
+   INTEGER(i4)                               , SAVE :: im_ndumdim !< number of elt in dummy dimension array
+   CHARACTER(LEN=lc), DIMENSION(ip_maxdumcfg), SAVE :: cm_dumdim  !< dummy dimension
+   INTEGER(i4)                               , SAVE :: im_dimX    !< number of elt in x dimension array
+   INTEGER(i4)                               , SAVE :: im_dimY    !< number of elt in y dimension array
+   INTEGER(i4)                               , SAVE :: im_dimZ    !< number of elt in z dimension array
+   INTEGER(i4)                               , SAVE :: im_dimT    !< number of elt in t dimension array
+   CHARACTER(LEN=lc), DIMENSION(ip_maxdimcfg), SAVE :: cm_dimX    !< x dimension
+   CHARACTER(LEN=lc), DIMENSION(ip_maxdimcfg), SAVE :: cm_dimY    !< y dimension
+   CHARACTER(LEN=lc), DIMENSION(ip_maxdimcfg), SAVE :: cm_dimZ    !< z dimension
+   CHARACTER(LEN=lc), DIMENSION(ip_maxdimcfg), SAVE :: cm_dimT    !< t dimension
 
    INTERFACE dim_print
       MODULE PROCEDURE dim__print_unit ! print information on one dimension
@@ -264,6 +277,9 @@ MODULE dim
    END INTERFACE dim_reorder_xyzt2
 
 CONTAINS
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION dim__copy_arr(td_dim) &
+         & RESULT (tf_dim)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine copy a array of dimension structure in another one
@@ -282,12 +298,14 @@ CONTAINS
    !> @param[in] td_dim   array of dimension structure
    !> @return copy of input array of dimension structure
    !-------------------------------------------------------------------
-   FUNCTION dim__copy_arr( td_dim )
+
       IMPLICIT NONE
+
       ! Argument
-      TYPE(TDIM), DIMENSION(:), INTENT(IN) :: td_dim
+      TYPE(TDIM), DIMENSION(:), INTENT(IN)   :: td_dim
+
       ! function
-      TYPE(TDIM), DIMENSION(SIZE(td_dim(:))) :: dim__copy_arr
+      TYPE(TDIM), DIMENSION(SIZE(td_dim(:))) :: tf_dim
 
       ! local variable
       ! loop indices
@@ -295,10 +313,13 @@ CONTAINS
       !----------------------------------------------------------------
 
       DO ji=1,SIZE(td_dim(:))
-         dim__copy_arr(ji)=dim_copy(td_dim(ji))
+         tf_dim(ji)=dim_copy(td_dim(ji))
       ENDDO
 
    END FUNCTION dim__copy_arr
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION dim__copy_unit(td_dim) &
+         & RESULT (tf_dim)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine copy an dimension structure in another one
@@ -317,19 +338,24 @@ CONTAINS
    !> @param[in] td_dim   dimension structure
    !> @return copy of input dimension structure
    !-------------------------------------------------------------------
-   FUNCTION dim__copy_unit( td_dim )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TDIM), INTENT(IN)  :: td_dim
+
       ! function
-      TYPE(TDIM) :: dim__copy_unit
+      TYPE(TDIM)              :: tf_dim
 
       ! local variable
       !----------------------------------------------------------------
 
-      dim__copy_unit=td_dim
+      tf_dim=td_dim
 
    END FUNCTION dim__copy_unit
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION dim_get_index(td_dim, cd_name, cd_sname) &
+         & RESULT (if_idx)
    !-------------------------------------------------------------------
    !> @brief This function returns dimension index,
    !> given dimension name or short name.
@@ -348,12 +374,16 @@ CONTAINS
    !> @param[in] cd_sname  dimension short name
    !> @return dimension index
    !-------------------------------------------------------------------
-   INTEGER(i4) FUNCTION dim_get_index( td_dim, cd_name, cd_sname )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TDIM)      , DIMENSION(:), INTENT(IN) :: td_dim
       CHARACTER(LEN=*),               INTENT(IN) :: cd_name
       CHARACTER(LEN=*),               INTENT(IN), OPTIONAL :: cd_sname
+
+      ! function
+      INTEGER(i4)                                :: if_idx
 
       ! local variable
       CHARACTER(LEN=lc) :: cl_name
@@ -365,37 +395,34 @@ CONTAINS
 
       ! loop indices
       INTEGER(i4) :: ji
-      INTEGER(i4) :: jj
       !----------------------------------------------------------------
       ! init
-      dim_get_index=0
+      if_idx=0
 
       il_ndim=SIZE(td_dim(:))
 
       ! look for dimension name
       cl_name=fct_lower(cd_name)
       ! check if dimension is in array of dimension structure
-      jj=0
       DO ji=1,il_ndim
          cl_dim_name=fct_lower(td_dim(ji)%c_name)
          IF( TRIM(cl_dim_name) == TRIM(cl_name) )THEN
-             dim_get_index=ji
-             EXIT
+            if_idx=ji
+            EXIT
          ENDIF
       ENDDO
 
       ! look for dimension short name
-      IF(  dim_get_index == 0 )THEN
+      IF(  if_idx == 0 )THEN
 
          cl_sname=fct_lower(cd_name)
          ! check if dimension is in array of dimension structure
-         jj=0
          DO ji=1,il_ndim
             cl_dim_sname=fct_lower(td_dim(ji)%c_sname)
             IF( (TRIM(cl_dim_sname) == TRIM(cl_sname) ) )THEN
                CALL logger_debug("DIM GET INDEX: variable short name "//&
-               &  TRIM(ADJUSTL(cd_name))//" already in file")
-               dim_get_index=ji
+                  &              TRIM(ADJUSTL(cd_name))//" already in file")
+               if_idx=ji
                EXIT
             ENDIF
          ENDDO
@@ -404,17 +431,16 @@ CONTAINS
 
       ! look for dimension short name
       IF( PRESENT(cd_sname) )THEN
-         IF(  dim_get_index == 0 )THEN
+         IF( if_idx == 0 )THEN
 
             cl_sname=fct_lower(cd_sname)
             ! check if dimension is in array of dimension structure
-            jj=0
             DO ji=1,il_ndim
                cl_dim_sname=fct_lower(td_dim(ji)%c_sname)
                IF( (TRIM(cl_dim_sname) == TRIM(cl_sname) ) )THEN
                   CALL logger_debug("DIM GET INDEX: variable short name "//&
-                  &  TRIM(ADJUSTL(cd_sname))//" already in file")
-                  dim_get_index=ji
+                     &              TRIM(ADJUSTL(cd_sname))//" already in file")
+                  if_idx=ji
                   EXIT
                ENDIF
             ENDDO
@@ -423,6 +449,9 @@ CONTAINS
       ENDIF
 
    END FUNCTION dim_get_index
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION dim_get_id(td_dim, cd_name, cd_sname) &
+         & RESULT (if_id)
    !-------------------------------------------------------------------
    !> @brief This function returns dimension id, in a array of dimension structure,
    !> given dimension name, or short name. 
@@ -436,12 +465,16 @@ CONTAINS
    !> @param[in] cd_sname  dimension short name
    !> @return dimension id
    !-------------------------------------------------------------------
-   INTEGER(i4) FUNCTION dim_get_id( td_dim, cd_name, cd_sname )
+   
       IMPLICIT NONE
+
       ! Argument
       TYPE(TDIM),       DIMENSION(:), INTENT(IN) :: td_dim
       CHARACTER(LEN=*),               INTENT(IN) :: cd_name
       CHARACTER(LEN=*),               INTENT(IN), OPTIONAL :: cd_sname
+
+      ! function
+      INTEGER(i4)                                :: if_id
 
       ! local variable
       CHARACTER(LEN=lc) :: cl_name
@@ -456,7 +489,7 @@ CONTAINS
       INTEGER(i4) :: jj
       !----------------------------------------------------------------
       ! init
-      dim_get_id=0
+      if_id=0
 
       il_ndim=SIZE(td_dim(:))
 
@@ -469,14 +502,14 @@ CONTAINS
          IF( TRIM(cl_dim_name) == TRIM(cl_name) .AND. &
          &   td_dim(ji)%l_use )THEN
             IF( td_dim(ji)%i_id /= 0 )THEN
-               dim_get_id=td_dim(ji)%i_id
+               if_id=td_dim(ji)%i_id
                EXIT
             ENDIF
          ENDIF
       ENDDO
 
       ! look for dimension short name
-      IF(  dim_get_id == 0 )THEN
+      IF(  if_id == 0 )THEN
 
          cl_sname=fct_lower(cd_name)
          ! check if dimension is in array of dimension structure and used
@@ -486,7 +519,7 @@ CONTAINS
             IF( (TRIM(cl_dim_sname) == TRIM(cl_sname) ).AND.&
             &   td_dim(ji)%l_use )THEN
                IF( td_dim(ji)%i_id /= 0 )THEN
-                  dim_get_id=td_dim(ji)%i_id
+                  if_id=td_dim(ji)%i_id
                   EXIT
                ENDIF
             ENDIF
@@ -496,7 +529,7 @@ CONTAINS
 
       ! look for dimension short name
       IF( PRESENT(cd_sname) )THEN
-         IF(  dim_get_id == 0 )THEN
+         IF(  if_id == 0 )THEN
 
             cl_sname=fct_lower(cd_sname)
             ! check if dimension is in array of dimension structure and used
@@ -504,9 +537,9 @@ CONTAINS
             DO ji=1,il_ndim
                cl_dim_sname=fct_lower(td_dim(ji)%c_sname)
                IF( (TRIM(cl_dim_sname) == TRIM(cl_sname) ).AND.&
-               &   td_dim(ji)%l_use )THEN
+                  & td_dim(ji)%l_use )THEN
                   IF( td_dim(ji)%i_id /= 0 )THEN
-                     dim_get_id=td_dim(ji)%i_id
+                     if_id=td_dim(ji)%i_id
                      EXIT
                   ENDIF
                ENDIF
@@ -516,6 +549,9 @@ CONTAINS
       ENDIF
 
    END FUNCTION dim_get_id
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION dim_init(cd_name, id_len, ld_uld, cd_sname, ld_use) &
+         & RESULT (tf_dim)
    !-------------------------------------------------------------------
    !> @brief This function initialize a dimension structure with given
    !> name.<br/>
@@ -532,7 +568,9 @@ CONTAINS
    !> @date July, 2015
    !> - Bug fix: inform order to disorder table instead of disorder to order
    !> table
-   !
+   !> @date May, 2019
+   !> - use number of element for each dimention allowed, instead of while loop
+   !>
    !> @param[in] cd_name   dimension name
    !> @param[in] id_len    dimension length
    !> @param[in] ld_uld    dimension unlimited
@@ -540,7 +578,7 @@ CONTAINS
    !> @param[in] ld_use    dimension use or not
    !> @return dimension structure
    !-------------------------------------------------------------------
-   TYPE(TDIM) FUNCTION dim_init( cd_name, id_len, ld_uld, cd_sname, ld_use )
+
       IMPLICIT NONE
 
       ! Argument 
@@ -550,31 +588,34 @@ CONTAINS
       CHARACTER(LEN=*), INTENT(IN), OPTIONAL :: cd_sname
       LOGICAL,          INTENT(IN), OPTIONAL :: ld_use
 
+      ! function
+      TYPE(TDIM)                    :: tf_dim
+
       ! local variable
       CHARACTER(LEN=lc) :: cl_name
       CHARACTER(LEN=lc) :: cl_sname
       !----------------------------------------------------------------
 
       ! clean dimension
-      CALL dim_clean(dim_init)
+      CALL dim_clean(tf_dim)
 
       cl_name=fct_upper(cd_name)
 
       CALL logger_debug( &
       &  " DIM INIT: dimension name: "//TRIM(cl_name) )
-      dim_init%c_name=TRIM(ADJUSTL(cd_name))
+      tf_dim%c_name=TRIM(ADJUSTL(cd_name))
 
       IF( PRESENT(id_len) )THEN
          CALL logger_debug( &
          &  " DIM INIT: dimension length: "//fct_str(id_len) )
-         dim_init%i_len=id_len
+         tf_dim%i_len=id_len
       ENDIF
 
       ! define dimension is supposed to be used
       IF( PRESENT(ld_use) )THEN
-         dim_init%l_use=ld_use
+         tf_dim%l_use=ld_use
       ELSE
-         dim_init%l_use=.TRUE.
+         tf_dim%l_use=.TRUE.
       ENDIF
 
       IF( PRESENT(cd_sname) )THEN
@@ -587,25 +628,25 @@ CONTAINS
          &   TRIM(cl_sname) == 't' )THEN
             CALL logger_debug( &
             &  " DIM INIT: dimension short name: "//TRIM(cd_sname) )
-            dim_init%c_sname=TRIM(cd_sname)
+            tf_dim%c_sname=TRIM(cd_sname)
          ELSE
             CALL logger_warn("DIM INIT: invalid short name."//&
             " choose between ('x','y','z','t')")
          ENDIF
       ENDIF
 
-      IF( TRIM(fct_lower(dim_init%c_sname)) == 'u' )THEN
+      IF( TRIM(fct_lower(tf_dim%c_sname)) == 'u' )THEN
 
          cl_name=fct_lower(cd_name)
 
-         IF(     dim__is_allowed(TRIM(cl_name), cm_dimX(:)) )THEN
-            dim_init%c_sname='x'
-         ELSEIF( dim__is_allowed(TRIM(cl_name), cm_dimY(:)) )THEN
-            dim_init%c_sname='y'
-         ELSEIF( dim__is_allowed(TRIM(cl_name), cm_dimZ(:)) )THEN
-            dim_init%c_sname='z'
-         ELSEIF( dim__is_allowed(TRIM(cl_name), cm_dimT(:)) )THEN
-            dim_init%c_sname='t'
+         IF(     dim__is_allowed(TRIM(cl_name), cm_dimX(:), im_dimX) )THEN
+            tf_dim%c_sname='x'
+         ELSEIF( dim__is_allowed(TRIM(cl_name), cm_dimY(:), im_dimY) )THEN
+            tf_dim%c_sname='y'
+         ELSEIF( dim__is_allowed(TRIM(cl_name), cm_dimZ(:), im_dimZ) )THEN
+            tf_dim%c_sname='z'
+         ELSEIF( dim__is_allowed(TRIM(cl_name), cm_dimT(:), im_dimT) )THEN
+            tf_dim%c_sname='t'
          ELSE
             CALL logger_warn("DIM INIT: "//TRIM(cd_name)//&
             " not allowed.")
@@ -616,17 +657,19 @@ CONTAINS
       IF( PRESENT(ld_uld) )THEN
          CALL logger_debug( &
          &  " DIM INIT: unlimited dimension: "//fct_str(ld_uld) )
-         dim_init%l_uld=ld_uld
+         tf_dim%l_uld=ld_uld
       ELSE
-         IF( TRIM(fct_lower(dim_init%c_sname)) =='t'  )THEN
-            dim_init%l_uld=.TRUE.
+         IF( TRIM(fct_lower(tf_dim%c_sname)) =='t'  )THEN
+            tf_dim%l_uld=.TRUE.
          ENDIF
       ENDIF
       
       ! get dimension order indices
-      dim_init%i_xyzt2=SCAN(TRIM(cp_dimorder),TRIM(dim_init%c_sname))
+      tf_dim%i_xyzt2=SCAN(TRIM(cp_dimorder),TRIM(tf_dim%c_sname))
 
    END FUNCTION dim_init
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE dim__print_arr(td_dim)
    !-------------------------------------------------------------------
    !> @brief This subroutine print informations of an array of dimension. 
    !>
@@ -635,7 +678,7 @@ CONTAINS
    !
    !> @param[in] td_dim array of dimension structure
    !-------------------------------------------------------------------
-   SUBROUTINE dim__print_arr(td_dim)
+
       IMPLICIT NONE
 
       ! Argument      
@@ -650,6 +693,8 @@ CONTAINS
       ENDDO
 
    END SUBROUTINE dim__print_arr
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE dim__print_unit(td_dim)
    !-------------------------------------------------------------------
    !> @brief This subrtoutine print dimension information. 
    !>
@@ -658,14 +703,14 @@ CONTAINS
    !
    !> @param[in] td_dim dimension structure
    !-------------------------------------------------------------------
-   SUBROUTINE dim__print_unit(td_dim)
+
       IMPLICIT NONE
 
       ! Argument      
       TYPE(TDIM), INTENT(IN) :: td_dim
       !----------------------------------------------------------------
 
-      WRITE(*,'((3x,a,a),(/6x,a,a),(a,i1),(a,i4),2(a,a),2(a,i1))')   &
+      WRITE(*,'((3x,a,a),(/6x,a,a),(a,i1),(a,i5),2(a,a),2(a,i1))')   &
       &        " dimension : ",TRIM(td_dim%c_name),               &
       &        " short name : ",TRIM(td_dim%c_sname),        &
       &        " id : ",td_dim%i_id,                         &
@@ -676,6 +721,9 @@ CONTAINS
       &        " 2xyzt : ",td_dim%i_2xyzt
 
    END SUBROUTINE dim__print_unit
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION dim_fill_unused(td_dim) &
+         & RESULT (tf_dim)
    !-------------------------------------------------------------------
    !> @brief This function fill unused dimension of an array of dimension
    !> and return a 4 elts array of dimension structure. 
@@ -694,54 +742,49 @@ CONTAINS
    !> @param[in] td_dim array of dimension structure
    !> @return  4elts array of dimension structure
    !-------------------------------------------------------------------
-   FUNCTION dim_fill_unused(td_dim)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TDIM), DIMENSION(:), INTENT(IN), OPTIONAL :: td_dim
 
       ! function
-      TYPE(TDIM), DIMENSION(ip_maxdim) :: dim_fill_unused
+      TYPE(TDIM), DIMENSION(ip_maxdim)               :: tf_dim
 
       ! local variable
       CHARACTER(LEN=lc)                       :: cl_dimin
       INTEGER(i4)      , DIMENSION(1)         :: il_ind  ! index
       
-      TYPE(TDIM),        DIMENSION(ip_maxdim) :: tl_dim
-
       ! loop indices
       INTEGER(i4) :: ji
       !----------------------------------------------------------------
 
       IF( PRESENT(td_dim) )THEN
-         tl_dim(1:SIZE(td_dim(:)))=td_dim(:)
+         tf_dim(1:SIZE(td_dim(:)))=td_dim(:)
       ENDIF
       ! concatenate short nem dimension in a character string
-      cl_dimin=fct_lower(fct_concat(tl_dim(:)%c_sname))
+      cl_dimin=fct_lower(fct_concat(tf_dim(:)%c_sname))
       DO ji = 1, ip_maxdim
 
          ! search missing dimension
          IF( INDEX(cl_dimin,TRIM(fct_lower(cp_dimorder(ji:ji)))) == 0 )THEN
             ! search first empty dimension (see dim_init)
-            il_ind(:)=MINLOC( tl_dim(:)%i_xyzt2, tl_dim(:)%i_xyzt2 == 0 )
+            il_ind(:)=MINLOC( tf_dim(:)%i_xyzt2, tf_dim(:)%i_xyzt2 == 0 )
 
             ! put missing dimension instead of empty one
-            tl_dim(il_ind(1))%c_sname=fct_lower(cp_dimorder(ji:ji))
+            tf_dim(il_ind(1))%c_sname=fct_lower(cp_dimorder(ji:ji))
             ! update output structure
-            tl_dim(il_ind(1))%c_name=fct_lower(cp_dimorder(ji:ji))
-            tl_dim(il_ind(1))%i_xyzt2=ji
-            tl_dim(il_ind(1))%i_len=1
-            tl_dim(il_ind(1))%l_use=.FALSE.
+            tf_dim(il_ind(1))%c_name=fct_lower(cp_dimorder(ji:ji))
+            tf_dim(il_ind(1))%i_xyzt2=ji
+            tf_dim(il_ind(1))%i_len=1
+            tf_dim(il_ind(1))%l_use=.FALSE.
          ENDIF
 
       ENDDO
          
-      ! save result
-      dim_fill_unused(:)=tl_dim(:)
-
-      ! clean
-      CALL dim_clean(tl_dim(:))
-
    END FUNCTION dim_fill_unused
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE dim_reorder(td_dim, cd_dimorder)
    !-------------------------------------------------------------------
    !> @brief 
    !> This subroutine switch element of an array (4 elts) of dimension 
@@ -763,8 +806,9 @@ CONTAINS
    !> @param[inout] td_dim    array of dimension structure
    !> @param[in] cd_dimorder  dimension order to be output 
    !-------------------------------------------------------------------
-   SUBROUTINE dim_reorder(td_dim, cd_dimorder)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TDIM)              , DIMENSION(:), INTENT(INOUT) :: td_dim
       CHARACTER(LEN=ip_maxdim)              , INTENT(IN   ), OPTIONAL :: cd_dimorder
@@ -845,6 +889,8 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE dim_reorder
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE dim_disorder(td_dim)
    !-------------------------------------------------------------------
    !> @brief This subroutine switch dimension array from ordered dimension ('x','y','z','t')
    !> to disordered dimension. <br/>
@@ -858,8 +904,9 @@ CONTAINS
    !
    !> @param[inout] td_dim array of dimension structure
    !-------------------------------------------------------------------
-   SUBROUTINE dim_disorder(td_dim)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TDIM), DIMENSION(:), INTENT(INOUT) :: td_dim
 
@@ -905,6 +952,9 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE dim_disorder
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION dim__reshape_2xyzt_dp(td_dim, dd_value) &
+         & RESULT (df_value)
    !-------------------------------------------------------------------
    !> @brief This function reshape real(8) 4D array   
    !> to an ordered array, as defined by dim_reorder.<br/>
@@ -917,12 +967,14 @@ CONTAINS
    !
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !> @date January, 2019
+   !> - do not reshape array already order
+   !>
    !> @param[in] td_dim    array of dimension structure
    !> @param[in] dd_value  array of value to reshape
    !> @return array of value reshaped 
    !-------------------------------------------------------------------
-   FUNCTION dim__reshape_2xyzt_dp(td_dim, dd_value)
+
       IMPLICIT NONE
 
       ! Argument      
@@ -931,9 +983,9 @@ CONTAINS
       
       ! function
       REAL(dp), DIMENSION(td_dim(1)%i_len, &
-      &                   td_dim(2)%i_len, &
-      &                   td_dim(3)%i_len, &
-      &                   td_dim(4)%i_len) :: dim__reshape_2xyzt_dp
+         &                td_dim(2)%i_len, &
+         &                td_dim(3)%i_len, &
+         &                td_dim(4)%i_len)       :: df_value
 
       ! local variable
       INTEGER(i4)      , DIMENSION(ip_maxdim) :: il_shape
@@ -941,6 +993,9 @@ CONTAINS
       
       ! loop indices
       INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
+      INTEGER(i4) :: jk
+      INTEGER(i4) :: jl
       !----------------------------------------------------------------
 
       IF( SIZE(td_dim(:)) /= ip_maxdim )THEN
@@ -965,9 +1020,9 @@ CONTAINS
 
             DO ji=1,ip_maxdim
                CALL logger_debug(" DIM RESHAPE 2 XYZT: dim "//&
-               &     TRIM(td_dim(td_dim(ji)%i_xyzt2)%c_name)//" "//&
-               &     TRIM(fct_str(td_dim(td_dim(ji)%i_xyzt2)%i_len))//" vs "//&
-               &     TRIM(fct_str(il_shape(ji))) )
+                  &     TRIM(td_dim(td_dim(ji)%i_xyzt2)%c_name)//" "//&
+                  &     TRIM(fct_str(td_dim(td_dim(ji)%i_xyzt2)%i_len))//" vs "//&
+                  &     TRIM(fct_str(il_shape(ji))) )
             ENDDO
             CALL logger_fatal(" DIM RESHAPE 2 XYZT: wrong input dimensions " )
 
@@ -992,21 +1047,41 @@ CONTAINS
             CALL logger_debug(" DIM RESHAPE 2 XYZT: ouput dimensions should be "//&
             &  TRIM(cl_dim) )
 
-               ! reorder dimension to x,y,z,t
-               dim__reshape_2xyzt_dp(:,:,:,:)=RESHAPE(SOURCE=dd_value(:,:,:,:),&
-               &                 SHAPE = (/ td_dim(1)%i_len,   &
-               &                            td_dim(2)%i_len,   &
-               &                            td_dim(3)%i_len,   &
-               &                            td_dim(4)%i_len /),&
-               &                 ORDER = (/ td_dim(1)%i_2xyzt,          &
-               &                            td_dim(2)%i_2xyzt,          &
-               &                            td_dim(3)%i_2xyzt,          &
-               &                            td_dim(4)%i_2xyzt        /))      
+            IF( td_dim(1)%i_xyzt2 == 1 .AND. &
+              & td_dim(2)%i_xyzt2 == 2 .AND. &   
+              & td_dim(3)%i_xyzt2 == 3 .AND. &   
+              & td_dim(4)%i_xyzt2 == 4 )THEN     
+   
+               DO jl=1,td_dim(4)%i_len
+                  DO jk=1,td_dim(3)%i_len
+                     DO jj=1,td_dim(2)%i_len
+                        DO ji=1,td_dim(1)%i_len
+                           df_value(ji,jj,jk,jl)=dd_value(ji,jj,jk,jl)
+                        ENDDO
+                     ENDDO   
+                  ENDDO
+               ENDDO
 
+            ELSE
+
+               ! reorder dimension to x,y,z,t
+               df_value(:,:,:,:)=RESHAPE(SOURCE=dd_value(:,:,:,:),&
+                  &                 SHAPE = (/ td_dim(1)%i_len,   &
+                  &                            td_dim(2)%i_len,   &
+                  &                            td_dim(3)%i_len,   &
+                  &                            td_dim(4)%i_len /),&
+                  &                 ORDER = (/ td_dim(1)%i_2xyzt, &
+                  &                            td_dim(2)%i_2xyzt, &
+                  &                            td_dim(3)%i_2xyzt, &
+                  &                            td_dim(4)%i_2xyzt /))      
+            ENDIF
          ENDIF
       ENDIF
 
    END FUNCTION dim__reshape_2xyzt_dp
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION dim__reshape_xyzt2_dp(td_dim, dd_value) &
+         & RESULT (df_value)
    !-------------------------------------------------------------------
    !> @brief This function reshape ordered real(8) 4D array with dimension 
    !> (/'x','y','z','t'/) to an "disordered" array.<br/>
@@ -1024,7 +1099,7 @@ CONTAINS
    !> @param[in] dd_value  array of value to reshape
    !> @return array of value reshaped 
    !-------------------------------------------------------------------
-   FUNCTION dim__reshape_xyzt2_dp(td_dim, dd_value)
+
       IMPLICIT NONE
       
       ! Argument      
@@ -1033,9 +1108,9 @@ CONTAINS
       
       ! function
       REAL(dp), DIMENSION(td_dim(td_dim(1)%i_xyzt2)%i_len, &
-      &                   td_dim(td_dim(2)%i_xyzt2)%i_len, &
-      &                   td_dim(td_dim(3)%i_xyzt2)%i_len, &
-      &                   td_dim(td_dim(4)%i_xyzt2)%i_len) :: dim__reshape_xyzt2_dp
+         &                td_dim(td_dim(2)%i_xyzt2)%i_len, &
+         &                td_dim(td_dim(3)%i_xyzt2)%i_len, &
+         &                td_dim(td_dim(4)%i_xyzt2)%i_len) :: df_value
 
       ! local variable
       INTEGER(i4),      DIMENSION(ip_maxdim) :: il_shape
@@ -1094,20 +1169,23 @@ CONTAINS
             &  TRIM(cl_dim) )
 
             ! reshape array
-            dim__reshape_xyzt2_dp(:,:,:,:)=RESHAPE(SOURCE=dd_value,  &
-            &           SHAPE = (/ td_dim(td_dim(1)%i_xyzt2)%i_len,   &
-            &                      td_dim(td_dim(2)%i_xyzt2)%i_len,   &
-            &                      td_dim(td_dim(3)%i_xyzt2)%i_len,   &
-            &                      td_dim(td_dim(4)%i_xyzt2)%i_len /),&
-            &           ORDER = (/        td_dim(1)%i_xyzt2,          &
-            &                             td_dim(2)%i_xyzt2,          &
-            &                             td_dim(3)%i_xyzt2,          &
-            &                             td_dim(4)%i_xyzt2        /))
+            df_value(:,:,:,:)=RESHAPE(SOURCE=dd_value,  &
+               &           SHAPE = (/ td_dim(td_dim(1)%i_xyzt2)%i_len,   &
+               &                      td_dim(td_dim(2)%i_xyzt2)%i_len,   &
+               &                      td_dim(td_dim(3)%i_xyzt2)%i_len,   &
+               &                      td_dim(td_dim(4)%i_xyzt2)%i_len /),&
+               &           ORDER = (/        td_dim(1)%i_xyzt2,          &
+               &                             td_dim(2)%i_xyzt2,          &
+               &                             td_dim(3)%i_xyzt2,          &
+               &                             td_dim(4)%i_xyzt2        /))
 
          ENDIF      
       ENDIF      
 
    END FUNCTION dim__reshape_xyzt2_dp
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION dim__reorder_2xyzt_i4(td_dim, id_arr) &
+         & RESULT (if_value)
    !-------------------------------------------------------------------
    !> @brief  This function reordered integer(4) 1D array to be suitable 
    !> with dimension ordered as defined in dim_reorder.
@@ -1120,7 +1198,7 @@ CONTAINS
    !> @param[in] id_arr array of value to reshape
    !> @return array of value reshaped 
    !-------------------------------------------------------------------
-   FUNCTION dim__reorder_2xyzt_i4(td_dim, id_arr)
+
       IMPLICIT NONE
 
       ! Argument      
@@ -1128,7 +1206,7 @@ CONTAINS
       INTEGER(i4), DIMENSION(:), INTENT(IN) :: id_arr
       
       ! function
-      INTEGER(i4), DIMENSION(ip_maxdim) :: dim__reorder_2xyzt_i4
+      INTEGER(i4), DIMENSION(ip_maxdim)     :: if_value
 
       ! loop indices
       INTEGER(i4) :: ji
@@ -1148,11 +1226,14 @@ CONTAINS
          ENDIF        
 
          DO ji=1,ip_maxdim
-            dim__reorder_2xyzt_i4(ji)=id_arr(td_dim(ji)%i_2xyzt)
+            if_value(ji)=id_arr(td_dim(ji)%i_2xyzt)
          ENDDO
       ENDIF
 
    END FUNCTION dim__reorder_2xyzt_i4
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION dim__reorder_xyzt2_i4(td_dim, id_arr) &
+         & RESULT (if_value)
    !-------------------------------------------------------------------
    !> @brief This function disordered integer(4) 1D array to be suitable with
    !> initial dimension order (ex: dimension read in file).
@@ -1165,16 +1246,16 @@ CONTAINS
    !> @param[in] id_arr array of value to reshape
    !> @return array of value reshaped 
    !-------------------------------------------------------------------
-   FUNCTION dim__reorder_xyzt2_i4(td_dim, id_arr)
+
       IMPLICIT NONE
 
       ! Argument      
       TYPE(TDIM) , DIMENSION(:), INTENT(IN) :: td_dim
       INTEGER(i4), DIMENSION(:), INTENT(IN) :: id_arr
-      
+ 
       ! function
-      INTEGER(i4), DIMENSION(ip_maxdim) :: dim__reorder_xyzt2_i4
-      
+      INTEGER(i4), DIMENSION(ip_maxdim)     :: if_value
+ 
       ! loop indices
       INTEGER(i4) :: ji
       !----------------------------------------------------------------
@@ -1193,11 +1274,14 @@ CONTAINS
          ENDIF        
 
          DO ji=1,ip_maxdim
-            dim__reorder_xyzt2_i4(ji)=id_arr(td_dim(ji)%i_xyzt2)
+            if_value(ji)=id_arr(td_dim(ji)%i_xyzt2)
          ENDDO
       ENDIF
 
    END FUNCTION dim__reorder_xyzt2_i4
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION dim__reorder_2xyzt_l(td_dim, ld_arr) &
+         & RESULT (lf_arr)
    !-------------------------------------------------------------------
    !> @brief  This function reordered logical 1D array to be suitable 
    !> with dimension ordered as defined in dim_reorder.
@@ -1210,14 +1294,15 @@ CONTAINS
    !> @param[in] ld_arr array of value to reordered
    !> @return array of value reordered 
    !-------------------------------------------------------------------
-   FUNCTION dim__reorder_2xyzt_l(td_dim, ld_arr)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TDIM) , DIMENSION(:), INTENT(IN) :: td_dim
       LOGICAL    , DIMENSION(:), INTENT(IN) :: ld_arr
       
       ! function
-      LOGICAL, DIMENSION(ip_maxdim) :: dim__reorder_2xyzt_l
+      LOGICAL, DIMENSION(ip_maxdim)         :: lf_arr
 
       ! loop indices
       INTEGER(i4) :: ji
@@ -1237,11 +1322,14 @@ CONTAINS
          ENDIF        
 
          DO ji=1,ip_maxdim
-            dim__reorder_2xyzt_l(ji)=ld_arr(td_dim(ji)%i_2xyzt)
+            lf_arr(ji)=ld_arr(td_dim(ji)%i_2xyzt)
          ENDDO
       ENDIF
 
    END FUNCTION dim__reorder_2xyzt_l
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION dim__reorder_xyzt2_l(td_dim, ld_arr) &
+         & RESULT (lf_arr)
    !-------------------------------------------------------------------
    !> @brief This function disordered logical 1D array to be suitable with
    !> initial dimension order (ex: dimension read in file).
@@ -1254,16 +1342,16 @@ CONTAINS
    !> @param[in] ld_arr array of value to reordered
    !> @return array of value reordered 
    !-------------------------------------------------------------------
-   FUNCTION dim__reorder_xyzt2_l(td_dim, ld_arr)
+
       IMPLICIT NONE
 
       ! Argument      
       TYPE(TDIM) , DIMENSION(:), INTENT(IN) :: td_dim
       LOGICAL    , DIMENSION(:), INTENT(IN) :: ld_arr
-      
+ 
       ! function
-      LOGICAL, DIMENSION(ip_maxdim) :: dim__reorder_xyzt2_l
-      
+      LOGICAL, DIMENSION(ip_maxdim)         :: lf_arr
+ 
       ! loop indices
       INTEGER(i4) :: ji
       !----------------------------------------------------------------
@@ -1282,11 +1370,14 @@ CONTAINS
          ENDIF        
 
          DO ji=1,ip_maxdim
-            dim__reorder_xyzt2_l(ji)=ld_arr(td_dim(ji)%i_xyzt2)
+            lf_arr(ji)=ld_arr(td_dim(ji)%i_xyzt2)
          ENDDO
       ENDIF
 
    END FUNCTION dim__reorder_xyzt2_l
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION dim__reorder_2xyzt_c(td_dim, cd_arr) &
+         & RESULT (cf_arr)
    !-------------------------------------------------------------------
    !> @brief  This function reordered string 1D array to be suitable 
    !> with dimension ordered as defined in dim_reorder.
@@ -1299,14 +1390,15 @@ CONTAINS
    !> @param[in] cd_arr array of value to reordered
    !> @return array of value reordered 
    !-------------------------------------------------------------------
-   FUNCTION dim__reorder_2xyzt_c(td_dim, cd_arr)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TDIM),       DIMENSION(:), INTENT(IN) :: td_dim
       CHARACTER(LEN=*), DIMENSION(:), INTENT(IN) :: cd_arr
-      
+ 
       ! function
-      CHARACTER(LEN=lc), DIMENSION(ip_maxdim) :: dim__reorder_2xyzt_c
+      CHARACTER(LEN=lc), DIMENSION(ip_maxdim)    :: cf_arr
 
       ! loop indices
       INTEGER(i4) :: ji
@@ -1326,11 +1418,14 @@ CONTAINS
          ENDIF        
 
          DO ji=1,ip_maxdim
-            dim__reorder_2xyzt_c(ji)=TRIM(cd_arr(td_dim(ji)%i_2xyzt))
+            cf_arr(ji)=TRIM(cd_arr(td_dim(ji)%i_2xyzt))
          ENDDO
       ENDIF
 
    END FUNCTION dim__reorder_2xyzt_c
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION dim__reorder_xyzt2_c(td_dim, cd_arr) &
+         & RESULT (cf_arr)
    !-------------------------------------------------------------------
    !> @brief This function disordered string 1D array to be suitable with
    !> initial dimension order (ex: dimension read in file).
@@ -1343,15 +1438,15 @@ CONTAINS
    !> @param[in] cd_arr array of value to reordered
    !> @return array of value reordered 
    !-------------------------------------------------------------------
-   FUNCTION dim__reorder_xyzt2_c(td_dim, cd_arr)
+
       IMPLICIT NONE
 
       ! Argument      
       TYPE(TDIM),       DIMENSION(:), INTENT(IN) :: td_dim
       CHARACTER(LEN=*), DIMENSION(:), INTENT(IN) :: cd_arr
-      
+ 
       ! function
-      CHARACTER(LEN=lc), DIMENSION(ip_maxdim) :: dim__reorder_xyzt2_c
+      CHARACTER(LEN=lc), DIMENSION(ip_maxdim) :: cf_arr
       
       ! loop indices
       INTEGER(i4) :: ji
@@ -1370,11 +1465,13 @@ CONTAINS
          ENDIF        
 
          DO ji=1,ip_maxdim
-            dim__reorder_xyzt2_c(ji)=TRIM(cd_arr(td_dim(ji)%i_xyzt2))
+            cf_arr(ji)=TRIM(cd_arr(td_dim(ji)%i_xyzt2))
          ENDDO
       ENDIF
 
    END FUNCTION dim__reorder_xyzt2_c
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE dim__clean_unit(td_dim)
    !-------------------------------------------------------------------
    !> @brief This subroutine clean dimension structure.
    !
@@ -1383,8 +1480,9 @@ CONTAINS
    !
    !> @param[in] td_dim dimension strucutre
    !-------------------------------------------------------------------
-   SUBROUTINE dim__clean_unit( td_dim )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TDIM), INTENT(INOUT) :: td_dim
 
@@ -1399,6 +1497,8 @@ CONTAINS
       td_dim=tl_dim
 
    END SUBROUTINE dim__clean_unit
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE dim__clean_arr(td_dim)
    !-------------------------------------------------------------------
    !> @brief This subroutine clean array of dimension structure
    !
@@ -1407,7 +1507,7 @@ CONTAINS
    !
    !> @param[in] td_dim array of dimension strucutre
    !-------------------------------------------------------------------
-   SUBROUTINE dim__clean_arr( td_dim )
+
       IMPLICIT NONE
       ! Argument
       TYPE(TDIM), DIMENSION(:), INTENT(INOUT) :: td_dim
@@ -1421,15 +1521,19 @@ CONTAINS
       ENDDO
 
    END SUBROUTINE dim__clean_arr
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE dim_get_dummy(cd_dummy)
    !-------------------------------------------------------------------
    !> @brief This subroutine fill dummy dimension array
    !
    !> @author J.Paul
    !> @date September, 2015 - Initial Version
-   !
+   !> @date May, 2019
+   !> - read number of dummy element
+   !>
    !> @param[in] cd_dummy dummy configuration file
    !-------------------------------------------------------------------
-   SUBROUTINE dim_get_dummy( cd_dummy )
+
       IMPLICIT NONE
       ! Argument
       CHARACTER(LEN=*), INTENT(IN) :: cd_dummy
@@ -1442,12 +1546,18 @@ CONTAINS
 
       ! loop indices
       ! namelist
+      INTEGER(i4)                                :: in_ndumvar
+      INTEGER(i4)                                :: in_ndumdim
+      INTEGER(i4)                                :: in_ndumatt
       CHARACTER(LEN=lc), DIMENSION(ip_maxdumcfg) :: cn_dumvar
       CHARACTER(LEN=lc), DIMENSION(ip_maxdumcfg) :: cn_dumdim
       CHARACTER(LEN=lc), DIMENSION(ip_maxdumcfg) :: cn_dumatt
 
       !----------------------------------------------------------------
       NAMELIST /namdum/ &   !< dummy namelist
+      &  in_ndumvar,&       !< number of variable  name
+      &  in_ndumdim,&       !< number of dimension name
+      &  in_ndumatt,&       !< number of attribute name
       &  cn_dumvar, &       !< variable  name
       &  cn_dumdim, &       !< dimension name
       &  cn_dumatt          !< attribute name
@@ -1474,55 +1584,70 @@ CONTAINS
          ENDIF
 
          READ( il_fileid, NML = namdum )
-         cm_dumdim(:)=cn_dumdim(:)
+         im_ndumdim  = in_ndumdim
+         cm_dumdim(:)= cn_dumdim(:)
 
          CLOSE( il_fileid )
 
+         IF( im_ndumdim > ip_maxdumcfg )THEN
+            CALL logger_fatal("DIM GET dUMMY : too much dummy dimension &
+            &     ( >"//fct_str(ip_maxdumcfg)//" ). &
+            &     set ip_maxdumcfg to higher value.")
+         ENDIF
       ENDIF
 
    END SUBROUTINE dim_get_dummy
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION dim_is_dummy(td_dim) &
+         & RESULT (lf_dummy)
    !-------------------------------------------------------------------
    !> @brief This function check if dimension is defined as dummy dimension
    !> in configuraton file
    !>
    !> @author J.Paul
    !> @date September, 2015 - Initial Version
-   !
+   !> @date, May, 2019
+   !> - use number of dummy elt in do-loop
+   !>
    !> @param[in] td_dim dimension structure
    !> @return true if dimension is dummy dimension 
    !-------------------------------------------------------------------
-   FUNCTION dim_is_dummy(td_dim)
+
       IMPLICIT NONE
 
       ! Argument      
       TYPE(TDIM), INTENT(IN) :: td_dim
       
       ! function
-      LOGICAL :: dim_is_dummy
+      LOGICAL                :: lf_dummy
       
       ! loop indices
       INTEGER(i4) :: ji
       !----------------------------------------------------------------
 
-      dim_is_dummy=.FALSE.
-      DO ji=1,ip_maxdumcfg
+      lf_dummy=.FALSE.
+      DO ji=1,im_ndumdim
          IF( fct_lower(td_dim%c_name) == fct_lower(cm_dumdim(ji)) )THEN
-            dim_is_dummy=.TRUE.
+            lf_dummy=.TRUE.
             EXIT
          ENDIF
       ENDDO
 
    END FUNCTION dim_is_dummy
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE dim_def_extra(cd_file)
    !-------------------------------------------------------------------
    !> @brief This subroutine read dimension configuration file, 
    !> and fill array of dimension allowed.
    !>
    !> @author J.Paul
    !> @date Ocotber, 2016 - Initial Version
+   !> @date May, 2019
+   !> - read number of element for each dimention 
    !
    !> @param[in] cd_file input file (dimension configuration file)
    !-------------------------------------------------------------------
-   SUBROUTINE dim_def_extra( cd_file )
+
       IMPLICIT NONE
 
       ! Argument      
@@ -1536,6 +1661,10 @@ CONTAINS
       
       ! loop indices
       ! namelist
+      INTEGER(i4)                                :: in_dimX = 0
+      INTEGER(i4)                                :: in_dimY = 0
+      INTEGER(i4)                                :: in_dimZ = 0
+      INTEGER(i4)                                :: in_dimT = 0
       CHARACTER(LEN=lc), DIMENSION(ip_maxdimcfg) :: cn_dimX = '' 
       CHARACTER(LEN=lc), DIMENSION(ip_maxdimcfg) :: cn_dimY = ''
       CHARACTER(LEN=lc), DIMENSION(ip_maxdimcfg) :: cn_dimZ = ''
@@ -1543,6 +1672,10 @@ CONTAINS
 
       !----------------------------------------------------------------
       NAMELIST /namdim/ &   !< dimension namelist
+      &  in_dimX, &       !< number of x dimension name allowed
+      &  in_dimY, &       !< number of y dimension name allowed
+      &  in_dimZ, &       !< number of z dimension name allowed
+      &  in_dimT, &       !< number of t dimension name allowed
       &  cn_dimX, &       !< x dimension name allowed
       &  cn_dimY, &       !< y dimension name allowed
       &  cn_dimZ, &       !< z dimension name allowed
@@ -1574,6 +1707,10 @@ CONTAINS
          ENDIF
    
          READ( il_fileid, NML = namdim )
+         im_dimX   =in_dimX
+         im_dimY   =in_dimY
+         im_dimZ   =in_dimZ
+         im_dimT   =in_dimT
          cm_dimX(:)=cn_dimX(:)
          cm_dimY(:)=cn_dimY(:)
          cm_dimZ(:)=cn_dimZ(:)
@@ -1589,42 +1726,47 @@ CONTAINS
       ENDIF         
 
    END SUBROUTINE dim_def_extra
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION dim__is_allowed(cd_name, cd_dim, id_ndim) &
+         & RESULT (lf_allowed)
    !-------------------------------------------------------------------
    !> @brief This function check if dimension is allowed, i.e defined 
    !> in dimension configuraton file
    !>
    !> @author J.Paul
-   !> @date OCTOber, 2016 - Initial Version
+   !> @date October, 2016 - Initial Version
+   !> @date May, 2019
+   !> - use number of element for each dimention allowed, instead of while loop 
    !
    !> @param[in] cd_name dimension name
    !> @param[in] cd_dim  array dimension name allowed
+   !> @param[in] id_ndim number of elt in array dimension name allowed
    !> @return true if dimension is allowed 
    !-------------------------------------------------------------------
-   FUNCTION dim__is_allowed(cd_name, cd_dim)
+
       IMPLICIT NONE
 
       ! Argument
       CHARACTER(LEN=*),               INTENT(IN) :: cd_name
       CHARACTER(LEN=*), DIMENSION(:), INTENT(IN) :: cd_dim
+      INTEGER(i4)     ,               INTENT(IN) :: id_ndim
       
       ! function
-      LOGICAL :: dim__is_allowed
+      LOGICAL                                    :: lf_allowed
       
       ! loop indices
       INTEGER(i4) :: ji
       !----------------------------------------------------------------
 
-      dim__is_allowed=.FALSE.
-      ji=1
-      DO WHILE( TRIM(cd_dim(ji)) /= '' )
+      lf_allowed=.FALSE.
+      DO ji=1,id_ndim
          IF( TRIM(fct_lower(cd_name)) == TRIM(fct_lower(cd_dim(ji))) )THEN
-            dim__is_allowed=.TRUE.
+            lf_allowed=.TRUE.
             EXIT
          ENDIF
-         ji=ji+1
       ENDDO
 
    END FUNCTION dim__is_allowed
-
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 END MODULE dim
 

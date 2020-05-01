@@ -11,6 +11,7 @@ MODULE dom_oce
    !!                             to the optimization of BDY communications
    !!            3.7  ! 2015-11  (G. Madec) introduce surface and scale factor ratio
    !!             -   ! 2015-11  (G. Madec, A. Coward)  time varying zgr by default
+   !!            4.1  ! 2019-08  (A. Coward, D. Storkey) rename prognostic variables in preparation for new time scheme.
    !!----------------------------------------------------------------------
 
    !!----------------------------------------------------------------------
@@ -31,11 +32,9 @@ MODULE dom_oce
    !                                   !!* Namelist namdom : time & space domain *
    LOGICAL , PUBLIC ::   ln_linssh      !: =T  linear free surface ==>> model level are fixed in time
    LOGICAL , PUBLIC ::   ln_meshmask    !: =T  create a mesh-mask file (mesh_mask.nc)
-   REAL(wp), PUBLIC ::   rn_isfhmin     !: threshold to discriminate grounded ice to floating ice
-   REAL(wp), PUBLIC ::   rn_rdt         !: time step for the dynamics and tracer
+   REAL(wp), PUBLIC ::   rn_Dt          !: time step for the dynamics and tracer
    REAL(wp), PUBLIC ::   rn_atfp        !: asselin time filter parameter
-   INTEGER , PUBLIC ::   nn_euler       !: =0 start with forward time step or not (=1)
-   LOGICAL , PUBLIC ::   ln_iscpl       !: coupling with ice sheet
+   LOGICAL , PUBLIC ::   ln_1st_euler   !: =T start with forward time step or not (=F)
    LOGICAL , PUBLIC ::   ln_crs         !: Apply grid coarsening to dynamical model output or online passive tracers
 
    !! Free surface parameters
@@ -49,18 +48,17 @@ MODULE dom_oce
    LOGICAL,  PUBLIC :: ln_bt_av         !: Time averaging of barotropic variables
    LOGICAL,  PUBLIC :: ln_bt_auto       !: Set number of barotropic iterations automatically
    INTEGER,  PUBLIC :: nn_bt_flt        !: Filter choice
-   INTEGER,  PUBLIC :: nn_baro          !: Number of barotropic iterations during one baroclinic step (rdt)
+   INTEGER,  PUBLIC :: nn_e          !: Number of barotropic iterations during one baroclinic step (rn_Dt)
    REAL(wp), PUBLIC :: rn_bt_cmax       !: Maximum allowed courant number (used if ln_bt_auto=T)
    REAL(wp), PUBLIC :: rn_bt_alpha      !: Time stepping diffusion parameter
 
 
-   !                                   !! old non-DOCTOR names still used in the model
-   REAL(wp), PUBLIC ::   atfp           !: asselin time filter parameter
-   REAL(wp), PUBLIC ::   rdt            !: time step for the dynamics and tracer
-
    !                                   !!! associated variables
-   INTEGER , PUBLIC ::   neuler         !: restart euler forward option (0=Euler)
-   REAL(wp), PUBLIC ::   r2dt           !: = 2*rdt except at nit000 (=rdt) if neuler=0
+   LOGICAL , PUBLIC ::   l_1st_euler    !: Euler 1st time-step flag (=T if ln_restart=F or ln_1st_euler=T)
+   REAL(wp), PUBLIC ::   rDt, r1_Dt     !: Current model timestep and reciprocal
+                                        !: rDt = 2 * rn_Dt if leapfrog and l_1st_euler = F
+                                        !:     =     rn_Dt if leapfrog and l_1st_euler = T
+                                        !:     =     rn_Dt if RK3
 
    !!----------------------------------------------------------------------
    !! space domain parameters
@@ -120,7 +118,7 @@ MODULE dom_oce
    REAL(wp), PUBLIC, ALLOCATABLE, SAVE        , DIMENSION(:,:) ::   e1e2v , r1_e1e2v , e1_e2v       !: associated metrics at v-point
    REAL(wp), PUBLIC, ALLOCATABLE, SAVE        , DIMENSION(:,:) ::   e1e2f , r1_e1e2f                !: associated metrics at f-point
    !
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE        , DIMENSION(:,:) ::   ff_f  , ff_t                    !: Coriolis factor at f- & t-points  [1/s]
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) ::   ff_f  , ff_t                    !: Coriolis factor at f- & t-points  [1/s]
    !!----------------------------------------------------------------------
    !! vertical coordinate and scale factors
    !! ---------------------------------------------------------------------
@@ -128,26 +126,33 @@ MODULE dom_oce
    LOGICAL, PUBLIC ::   ln_zps       !: z-coordinate - partial step
    LOGICAL, PUBLIC ::   ln_sco       !: s-coordinate or hybrid z-s coordinate
    LOGICAL, PUBLIC ::   ln_isfcav    !: presence of ISF 
-   !                                                        !  ref.   ! before  !   now   ! after  !
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::     e3t_0 ,   e3t_b ,   e3t_n ,  e3t_a   !: t- vert. scale factor [m]
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::     e3u_0 ,   e3u_b ,   e3u_n ,  e3u_a   !: u- vert. scale factor [m]
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::     e3v_0 ,   e3v_b ,   e3v_n ,  e3v_a   !: v- vert. scale factor [m]
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::     e3f_0           ,   e3f_n            !: f- vert. scale factor [m]
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::     e3w_0 ,   e3w_b ,   e3w_n            !: w- vert. scale factor [m]
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::    e3uw_0 ,  e3uw_b ,  e3uw_n            !: uw-vert. scale factor [m]
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::    e3vw_0 ,  e3vw_b ,  e3vw_n            !: vw-vert. scale factor [m]
+   !                                                        !  reference scale factors
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::     e3t_0   !: t- vert. scale factor [m]
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::     e3u_0   !: u- vert. scale factor [m]
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::     e3v_0   !: v- vert. scale factor [m]
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::     e3f_0   !: f- vert. scale factor [m]
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::     e3w_0   !: w- vert. scale factor [m]
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::    e3uw_0   !: uw-vert. scale factor [m]
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::    e3vw_0   !: vw-vert. scale factor [m]
+   !                                                        !  time-dependent scale factors
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:,:) ::   e3t, e3u, e3v, e3w, e3uw, e3vw  !: vert. scale factor [m]
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:)   ::   e3f                             !: F-point vert. scale factor [m]
 
-   !                                                        !  ref.   ! before  !   now   !
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::   gdept_0 , gdept_b , gdept_n   !: t- depth              [m]
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::   gdepw_0 , gdepw_b , gdepw_n   !: w- depth              [m]
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::   gde3w_0           , gde3w_n   !: w- depth (sum of e3w) [m]
+   !                                                        !  reference depths of cells
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::   gdept_0  !: t- depth              [m]
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::   gdepw_0  !: w- depth              [m]
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::   gde3w_0  !: w- depth (sum of e3w) [m]
+   !                                                        !  time-dependent depths of cells
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:,:) ::  gdept, gdepw  
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:)   ::  gde3w  
    
-   !                                                      !  ref. ! before  !   now   !  after  !
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) ::   ht_0            ,    ht_n             !: t-depth              [m]
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) ::   hu_0  ,    hu_b ,    hu_n ,    hu_a   !: u-depth              [m]
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) ::   hv_0  ,    hv_b ,    hv_n ,    hv_a   !: v-depth              [m]
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) ::           r1_hu_b , r1_hu_n , r1_hu_a   !: inverse of u-depth [1/m]
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) ::           r1_hv_b , r1_hv_n , r1_hv_a   !: inverse of v-depth [1/m]
+   !                                                      !  reference heights of water column
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) ::   ht_0  !: t-depth              [m]
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) ::   hu_0  !: u-depth              [m]
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) ::   hv_0  !: v-depth              [m]
+                                                          ! time-dependent heights of water column
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:)   ::   ht                     !: height of water column at T-points [m]
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::   hu, hv, r1_hu, r1_hv   !: height of water column [m] and reciprocal [1/m]
 
    INTEGER, PUBLIC ::   nla10              !: deepest    W level Above  ~10m (nlb10 - 1)
    INTEGER, PUBLIC ::   nlb10              !: shallowest W level Bellow ~10m (nla10 + 1) 
@@ -157,6 +162,7 @@ MODULE dom_oce
    REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:)   ::   gdept_1d, gdepw_1d !: reference depth of t- and w-points (m)
    REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:)   ::   e3t_1d  , e3w_1d   !: reference vertical scale factors at T- and W-pts (m)
 
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) ::   risfdep, bathy
 
    !!----------------------------------------------------------------------
    !! masks, top and bottom ocean point position
@@ -169,9 +175,7 @@ MODULE dom_oce
    REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) ::   tmask_i            !: interior domain T-point mask
    REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) ::   tmask_h            !: internal domain T-point mask (Figure 8.5 NEMO book)
 
-   INTEGER , PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) ::   misfdep                 !: top first ocean level             (ISF)
-   INTEGER , PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) ::   mikt, miku, mikv, mikf  !: top first wet T-, U-, V-, F-level (ISF)
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) ::   risfdep                 !: Iceshelf draft                    (ISF)
+   INTEGER , PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) ::   mikt, miku, mikv, mikf  !: top first wet T-, U-, V-, F-level           (ISF)
 
    REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) ::   ssmask, ssumask, ssvmask             !: surface mask at T-,U-, V- and F-pts
    REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:), TARGET :: tmask, umask, vmask, fmask   !: land/ocean mask at T-, U-, V- and F-pts
@@ -189,19 +193,20 @@ MODULE dom_oce
    INTEGER , PUBLIC ::   nminute       !: current minute
    INTEGER , PUBLIC ::   ndastp        !: time step date in yyyymmdd format
    INTEGER , PUBLIC ::   nday_year     !: current day counted from jan 1st of the current year
-   INTEGER , PUBLIC ::   nsec_year     !: current time step counted in second since 00h jan 1st of the current year
-   INTEGER , PUBLIC ::   nsec_month    !: current time step counted in second since 00h 1st day of the current month
-   INTEGER , PUBLIC ::   nsec_week     !: current time step counted in second since 00h of last monday
-   INTEGER , PUBLIC ::   nsec_day      !: current time step counted in second since 00h of the current day
+   INTEGER , PUBLIC ::   nsec_year     !: seconds between 00h jan 1st of the current  year and half of the current time step
+   INTEGER , PUBLIC ::   nsec_month    !: seconds between 00h 1st day of the current month and half of the current time step
+   INTEGER , PUBLIC ::   nsec_monday   !: seconds between 00h         of the last Monday   and half of the current time step
+   INTEGER , PUBLIC ::   nsec_day      !: seconds between 00h         of the current   day and half of the current time step
    REAL(wp), PUBLIC ::   fjulday       !: current julian day 
    REAL(wp), PUBLIC ::   fjulstartyear !: first day of the current year in julian days
    REAL(wp), PUBLIC ::   adatrj        !: number of elapsed days since the begining of the whole simulation
    !                                   !: (cumulative duration of previous runs that may have used different time-step size)
-   INTEGER , PUBLIC, DIMENSION(0: 2) ::   nyear_len     !: length in days of the previous/current/next year
-   INTEGER , PUBLIC, DIMENSION(0:13) ::   nmonth_len    !: length in days of the months of the current year
-   INTEGER , PUBLIC, DIMENSION(0:13) ::   nmonth_half   !: second since Jan 1st 0h of the current year and the half of the months
-   INTEGER , PUBLIC, DIMENSION(0:13) ::   nmonth_end    !: second since Jan 1st 0h of the current year and the end of the months
-   INTEGER , PUBLIC                  ::   nsec1jan000   !: second since Jan 1st 0h of nit000 year and Jan 1st 0h the current year
+   INTEGER , PUBLIC, DIMENSION(  0: 2) ::   nyear_len     !: length in days of the previous/current/next year
+   INTEGER , PUBLIC, DIMENSION(-11:25) ::   nmonth_len    !: length in days of the months of the current year
+   INTEGER , PUBLIC, DIMENSION(-11:25) ::   nmonth_beg    !: second since Jan 1st 0h of the current year and the half of the months
+   INTEGER , PUBLIC                  ::   nsec1jan000     !: second since Jan 1st 0h of nit000 year and Jan 1st 0h the current year
+   INTEGER , PUBLIC                  ::   nsec000_1jan000   !: second since Jan 1st 0h of nit000 year and nit000
+   INTEGER , PUBLIC                  ::   nsecend_1jan000   !: second since Jan 1st 0h of nit000 year and nitend
 
    !!----------------------------------------------------------------------
    !! agrif domain
@@ -214,7 +219,7 @@ MODULE dom_oce
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: dom_oce.F90 10068 2018-08-28 14:09:04Z nicolasmartin $ 
+   !! $Id: dom_oce.F90 12489 2020-02-28 15:55:11Z davestorkey $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -255,33 +260,27 @@ CONTAINS
          &      e1e2f(jpi,jpj) , r1_e1e2f(jpi,jpj)                                     ,     &
          &      ff_f (jpi,jpj) ,    ff_t (jpi,jpj)                                     , STAT=ierr(3) )
          !
-      ALLOCATE( gdept_0(jpi,jpj,jpk) , gdepw_0(jpi,jpj,jpk) , gde3w_0(jpi,jpj,jpk) ,      &
-         &      gdept_b(jpi,jpj,jpk) , gdepw_b(jpi,jpj,jpk) ,                             &
-         &      gdept_n(jpi,jpj,jpk) , gdepw_n(jpi,jpj,jpk) , gde3w_n(jpi,jpj,jpk) , STAT=ierr(4) )
+      ALLOCATE( gdept_0(jpi,jpj,jpk)     , gdepw_0(jpi,jpj,jpk)     , gde3w_0(jpi,jpj,jpk) ,      &
+         &      gdept  (jpi,jpj,jpk,jpt) , gdepw  (jpi,jpj,jpk,jpt) , gde3w  (jpi,jpj,jpk) , STAT=ierr(4) )
          !
-      ALLOCATE( e3t_0(jpi,jpj,jpk) , e3u_0(jpi,jpj,jpk) , e3v_0(jpi,jpj,jpk) , e3f_0(jpi,jpj,jpk) , e3w_0(jpi,jpj,jpk) ,   &
-         &      e3t_b(jpi,jpj,jpk) , e3u_b(jpi,jpj,jpk) , e3v_b(jpi,jpj,jpk) ,                      e3w_b(jpi,jpj,jpk) ,   & 
-         &      e3t_n(jpi,jpj,jpk) , e3u_n(jpi,jpj,jpk) , e3v_n(jpi,jpj,jpk) , e3f_n(jpi,jpj,jpk) , e3w_n(jpi,jpj,jpk) ,   & 
-         &      e3t_a(jpi,jpj,jpk) , e3u_a(jpi,jpj,jpk) , e3v_a(jpi,jpj,jpk) ,                                             &
-         !                                                          !
-         &      e3uw_0(jpi,jpj,jpk) , e3vw_0(jpi,jpj,jpk) ,         &
-         &      e3uw_b(jpi,jpj,jpk) , e3vw_b(jpi,jpj,jpk) ,         &               
-         &      e3uw_n(jpi,jpj,jpk) , e3vw_n(jpi,jpj,jpk) ,     STAT=ierr(5) )                       
+      ALLOCATE( e3t_0(jpi,jpj,jpk)     , e3u_0(jpi,jpj,jpk)     , e3v_0(jpi,jpj,jpk)     , e3f_0(jpi,jpj,jpk) , e3w_0(jpi,jpj,jpk)     ,   &
+         &      e3t  (jpi,jpj,jpk,jpt) , e3u  (jpi,jpj,jpk,jpt) , e3v  (jpi,jpj,jpk,jpt) , e3f  (jpi,jpj,jpk) , e3w  (jpi,jpj,jpk,jpt) ,   & 
+         &      e3uw_0(jpi,jpj,jpk)     , e3vw_0(jpi,jpj,jpk)     ,         &
+         &      e3uw  (jpi,jpj,jpk,jpt) , e3vw  (jpi,jpj,jpk,jpt) ,    STAT=ierr(5) )                       
          !
-      ALLOCATE( ht_0(jpi,jpj) , hu_0(jpi,jpj) , hv_0(jpi,jpj) ,                                           &
-         &                      hu_b(jpi,jpj) , hv_b(jpi,jpj) , r1_hu_b(jpi,jpj) , r1_hv_b(jpi,jpj) ,     &
-         &      ht_n(jpi,jpj) , hu_n(jpi,jpj) , hv_n(jpi,jpj) , r1_hu_n(jpi,jpj) , r1_hv_n(jpi,jpj) ,     &
-         &                      hu_a(jpi,jpj) , hv_a(jpi,jpj) , r1_hu_a(jpi,jpj) , r1_hv_a(jpi,jpj) , STAT=ierr(6)  )
+      ALLOCATE( ht_0(jpi,jpj) , hu_0(jpi,jpj)    , hv_0(jpi,jpj)     ,                                             &
+         &      ht  (jpi,jpj) , hu(  jpi,jpj,jpt), hv(  jpi,jpj,jpt) , r1_hu(jpi,jpj,jpt) , r1_hv(jpi,jpj,jpt) ,   &
+         &                      STAT=ierr(6)  )
          !
+      ALLOCATE( risfdep(jpi,jpj) , bathy(jpi,jpj) , STAT=ierr(7)  ) 
          !
-      ALLOCATE( gdept_1d(jpk) , gdepw_1d(jpk) , e3t_1d(jpk) , e3w_1d(jpk) , STAT=ierr(7) )
+      ALLOCATE( gdept_1d(jpk) , gdepw_1d(jpk) , e3t_1d(jpk) , e3w_1d(jpk) , STAT=ierr(8) )
          !
       ALLOCATE( tmask_i(jpi,jpj) , tmask_h(jpi,jpj) ,                        & 
          &      ssmask (jpi,jpj) , ssumask(jpi,jpj) , ssvmask(jpi,jpj) ,     &
          &      mbkt   (jpi,jpj) , mbku   (jpi,jpj) , mbkv   (jpi,jpj) , STAT=ierr(9) )
          !
-      ALLOCATE( misfdep(jpi,jpj) , mikt(jpi,jpj) , miku(jpi,jpj) ,     &
-         &      risfdep(jpi,jpj) , mikv(jpi,jpj) , mikf(jpi,jpj) , STAT=ierr(10) )
+      ALLOCATE( mikt(jpi,jpj), miku(jpi,jpj), mikv(jpi,jpj), mikf(jpi,jpj), STAT=ierr(10) )
          !
       ALLOCATE( tmask(jpi,jpj,jpk) , umask(jpi,jpj,jpk) ,     & 
          &      vmask(jpi,jpj,jpk) , fmask(jpi,jpj,jpk) , STAT=ierr(11) )

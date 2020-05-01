@@ -2,8 +2,6 @@
 ! NEMO system team, System and Interface for oceanic RElocable Nesting
 !----------------------------------------------------------------------
 !
-! MODULE: interp
-!
 ! DESCRIPTION:
 !> @brief 
 !> This module manage nearest interpolation on regular grid.
@@ -22,10 +20,10 @@
 !>
 !> @author
 !> J.Paul
-! REVISION HISTORY:
+!>
 !> @date September, 2014 - Initial version
 !>
-!> @note Software governed by the CeCILL licence     (./LICENSE)
+!> @note Software governed by the CeCILL licence     (NEMOGCM/NEMO_CeCILL.txt)
 !----------------------------------------------------------------------
 MODULE interp_nearest
 
@@ -48,7 +46,9 @@ MODULE interp_nearest
    PRIVATE :: interp_nearest__2D_fill  !< fill value using binearest interpolation
    PRIVATE :: interp_nearest__1D_fill  !< fill value using   nearest interpolation
 
-CONTAINS   
+CONTAINS
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE interp_nearest_fill(dd_value, id_detect, id_rho)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute horizontal nearest interpolation on 4D array of value. 
@@ -60,8 +60,9 @@ CONTAINS
    !> @param[inout] id_detect 2D array of point to be interpolated 
    !> @param[in]    id_rho    array of refinment factor
    !-------------------------------------------------------------------
-   SUBROUTINE interp_nearest_fill(dd_value, id_detect, id_rho )
+
       IMPLICIT NONE
+
       ! Argument
       REAL(dp)        , DIMENSION(:,:,:,:), INTENT(INOUT) :: dd_value 
       INTEGER(I4)     , DIMENSION(:,:,:)  , INTENT(INOUT) :: id_detect
@@ -117,6 +118,8 @@ CONTAINS
       DEALLOCATE(il_detect)
 
    END SUBROUTINE interp_nearest_fill
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE interp_nearest__2D(dd_value, id_detect, id_rhoi, id_rhoj)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute nearest interpolation on 2D array of value. 
@@ -130,10 +133,9 @@ CONTAINS
    !> @param[in] id_rhoj      refinment factor in j-direction
    !> @param[in] id_rhok      refinment factor in k-direction
    !-------------------------------------------------------------------
-   SUBROUTINE interp_nearest__2D( dd_value, id_detect, &
-      &                           id_rhoi, id_rhoj )
 
       IMPLICIT NONE
+
       ! Argument
       REAL(dp)        , DIMENSION(:,:), INTENT(INOUT) :: dd_value 
       INTEGER(I4)     , DIMENSION(:,:), INTENT(INOUT) :: id_detect
@@ -172,6 +174,8 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE interp_nearest__2D
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE interp_nearest__1D(dd_value, id_detect, id_rhoi)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute nearest interpolation on 1D array of value. 
@@ -183,10 +187,9 @@ CONTAINS
    !> @param[inout] id_detect 1D array of point to be interpolated 
    !> @param[in]    id_rhoi   refinment factor
    !-------------------------------------------------------------------
-   SUBROUTINE interp_nearest__1D( dd_value,  id_detect, &
-      &                           id_rhoi )
 
       IMPLICIT NONE
+
       ! Argument
       REAL(dp)        , DIMENSION(:), INTENT(INOUT) :: dd_value 
       INTEGER(I4)     , DIMENSION(:), INTENT(INOUT) :: id_detect
@@ -197,7 +200,6 @@ CONTAINS
 
       ! loop indices
       INTEGER(i4) :: ji
-
       !----------------------------------------------------------------
 
       IF( ANY(id_detect(:)==1) )THEN
@@ -217,6 +219,8 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE interp_nearest__1D
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE interp_nearest__2D_fill(dd_value, id_detect)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute nearest interpolation of a 2D array of value. 
@@ -227,8 +231,9 @@ CONTAINS
    !> @param[inout] dd_value  2D array of mixed grid value
    !> @param[inout] id_detect 2D array of point to be interpolated
    !-------------------------------------------------------------------
-   SUBROUTINE interp_nearest__2D_fill( dd_value, id_detect )
+
       IMPLICIT NONE
+
       ! Argument
       REAL(dp)   , DIMENSION(:,:)  , INTENT(INOUT) :: dd_value 
       INTEGER(i4), DIMENSION(:,:)  , INTENT(INOUT) :: id_detect
@@ -301,6 +306,8 @@ CONTAINS
       ENDDO
 
    END SUBROUTINE interp_nearest__2D_fill
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE interp_nearest__1D_fill(dd_value, id_detect)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute nearest interpolation of a 1D array of value. 
@@ -311,8 +318,9 @@ CONTAINS
    !> @param[inout] dd_value  1D array of mixed grid value
    !> @param[inout] id_detect 1D array of point to be interpolated
    !-------------------------------------------------------------------
-   SUBROUTINE interp_nearest__1D_fill( dd_value, id_detect )
+
       IMPLICIT NONE
+
       ! Argument
       REAL(dp)   , DIMENSION(:), INTENT(INOUT) :: dd_value 
       INTEGER(i4), DIMENSION(:), INTENT(INOUT) :: id_detect
@@ -357,4 +365,5 @@ CONTAINS
       ENDDO
 
    END SUBROUTINE interp_nearest__1D_fill
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 END MODULE interp_nearest

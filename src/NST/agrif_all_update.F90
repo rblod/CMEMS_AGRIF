@@ -1,6 +1,4 @@
-#define TWO_WAY
-
- MODULE agrif_all_update
+MODULE agrif_all_update
    !!======================================================================
    !!                   ***  MODULE  agrif_all_update  ***
    !! AGRIF: Main update driver for ocean, ice and passive tracers
@@ -28,7 +26,7 @@
 
    !!----------------------------------------------------------------------
    !! NEMO/NST 4.0 , NEMO Consortium (2018)
-   !! $Id: agrif_all_update.F90 10069 2018-08-28 14:12:24Z nicolasmartin $
+   !! $Id: agrif_all_update.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -40,8 +38,7 @@ CONTAINS
       !! ** Purpose :: Update nested grids for all components (Ocean, Sea Ice, TOP)
       !!               Order of update matters here !
       !!----------------------------------------------------------------------
-# if defined TWO_WAY
-      IF (Agrif_Root()) RETURN
+      IF (( .NOT.ln_agrif_2way ).OR.(Agrif_Root())) RETURN
       !
       IF (lwp.AND.lk_agrif_debug) Write(*,*) ' --> START AGRIF UPDATE from grid Number',Agrif_Fixed()
       !
@@ -66,7 +63,6 @@ CONTAINS
       IF (lwp.AND.lk_agrif_debug) Write(*,*) ' <-- END AGRIF UPDATE from grid Number',Agrif_Fixed()
       !
       Agrif_UseSpecialValueInUpdate = .FALSE.
-#endif
     END SUBROUTINE agrif_Update_All
 
 #else

@@ -88,6 +88,7 @@ CONTAINS
             zsolcpsi = zsolcpsi + solcp(ji,jk,jsopal) * dz(jk)
             zsolcpcl = zsolcpcl + solcp(ji,jk,jsclay) * dz(jk)
          END DO
+         zsolcpsi = MAX( zsolcpsi, rtrn )
          zsieq(ji) = sieqs(ji) * MAX(0.25, 1.0 - (0.045 * zsolcpcl / zsolcpsi )**0.58 )
          zsieq(ji) = MAX( rtrn, sieqs(ji) )
       END DO

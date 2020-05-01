@@ -25,9 +25,11 @@ MODULE usrdef_hgr
 
    PUBLIC   usr_def_hgr   ! called in domhgr.F90
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: usrdef_hgr.F90 10069 2018-08-28 14:12:24Z nicolasmartin $ 
+   !! $Id: usrdef_hgr.F90 12489 2020-02-28 15:55:11Z davestorkey $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -104,39 +106,37 @@ CONTAINS
       !   
       IF( ln_bench ) THEN     ! benchmark: forced the resolution to be 106 km 
          ze1 = 106000._wp     ! but keep (lat,lon) at the right nn_GYRE resolution
-         CALL ctl_warn( ' GYRE used as Benchmark: e1=e2=106km, no need to adjust rdt, ahm,aht ' )
+         CALL ctl_warn( ' GYRE used as Benchmark: e1=e2=106km, no need to adjust rn_Dt, ahm,aht ' )
       ENDIF
       IF( nprint==1 .AND. lwp )   THEN
          WRITE(numout,*) 'ze1', ze1, 'cosalpha', zcos_alpha, 'sinalpha', zsin_alpha
          WRITE(numout,*) 'ze1deg', ze1deg, 'zlam0', zlam0, 'zphi0', zphi0
       ENDIF
       !   
-      DO jj = 1, jpj 
-         DO ji = 1, jpi 
-            zim1 = REAL( ji + nimpp - 1 ) - 1.   ;   zim05 = REAL( ji + nimpp - 1 ) - 1.5 
-            zjm1 = REAL( jj + njmpp - 1 ) - 1.   ;   zjm05 = REAL( jj + njmpp - 1 ) - 1.5 
-            !   
-            !glamt(i,j) longitude at T-point
-            !gphit(i,j) latitude at T-point  
-            plamt(ji,jj) = zlam0 + zim05 * ze1deg * zcos_alpha + zjm05 * ze1deg * zsin_alpha
-            pphit(ji,jj) = zphi0 - zim05 * ze1deg * zsin_alpha + zjm05 * ze1deg * zcos_alpha
-            !   
-            !glamu(i,j) longitude at U-point
-            !gphiu(i,j) latitude at U-point
-            plamu(ji,jj) = zlam0 + zim1  * ze1deg * zcos_alpha + zjm05 * ze1deg * zsin_alpha
-            pphiu(ji,jj) = zphi0 - zim1  * ze1deg * zsin_alpha + zjm05 * ze1deg * zcos_alpha
-            !   
-            !glamv(i,j) longitude at V-point
-            !gphiv(i,j) latitude at V-point
-            plamv(ji,jj) = zlam0 + zim05 * ze1deg * zcos_alpha + zjm1  * ze1deg * zsin_alpha
-            pphiv(ji,jj) = zphi0 - zim05 * ze1deg * zsin_alpha + zjm1  * ze1deg * zcos_alpha
-            !
-            !glamf(i,j) longitude at F-point
-            !gphif(i,j) latitude at F-point 
-            plamf(ji,jj) = zlam0 + zim1  * ze1deg * zcos_alpha + zjm1  * ze1deg * zsin_alpha
-            pphif(ji,jj) = zphi0 - zim1  * ze1deg * zsin_alpha + zjm1  * ze1deg * zcos_alpha
-         END DO
-      END DO
+      DO_2D_11_11
+         zim1 = REAL( ji + nimpp - 1 ) - 1.   ;   zim05 = REAL( ji + nimpp - 1 ) - 1.5 
+         zjm1 = REAL( jj + njmpp - 1 ) - 1.   ;   zjm05 = REAL( jj + njmpp - 1 ) - 1.5 
+         !   
+         !glamt(i,j) longitude at T-point
+         !gphit(i,j) latitude at T-point  
+         plamt(ji,jj) = zlam0 + zim05 * ze1deg * zcos_alpha + zjm05 * ze1deg * zsin_alpha
+         pphit(ji,jj) = zphi0 - zim05 * ze1deg * zsin_alpha + zjm05 * ze1deg * zcos_alpha
+         !   
+         !glamu(i,j) longitude at U-point
+         !gphiu(i,j) latitude at U-point
+         plamu(ji,jj) = zlam0 + zim1  * ze1deg * zcos_alpha + zjm05 * ze1deg * zsin_alpha
+         pphiu(ji,jj) = zphi0 - zim1  * ze1deg * zsin_alpha + zjm05 * ze1deg * zcos_alpha
+         !   
+         !glamv(i,j) longitude at V-point
+         !gphiv(i,j) latitude at V-point
+         plamv(ji,jj) = zlam0 + zim05 * ze1deg * zcos_alpha + zjm1  * ze1deg * zsin_alpha
+         pphiv(ji,jj) = zphi0 - zim05 * ze1deg * zsin_alpha + zjm1  * ze1deg * zcos_alpha
+         !
+         !glamf(i,j) longitude at F-point
+         !gphif(i,j) latitude at F-point 
+         plamf(ji,jj) = zlam0 + zim1  * ze1deg * zcos_alpha + zjm1  * ze1deg * zsin_alpha
+         pphif(ji,jj) = zphi0 - zim1  * ze1deg * zsin_alpha + zjm1  * ze1deg * zcos_alpha
+      END_2D
       !
       !                       !== Horizontal scale factors ==! (in meters)
       !                     

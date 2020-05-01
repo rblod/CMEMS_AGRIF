@@ -29,9 +29,11 @@ MODULE ldfc1d_c2d
    REAL(wp) ::   r1_4  = 0.25_wp          ! =1/4
    REAL(wp) ::   r1_12 = 1._wp / 12._wp   ! =1/12
  
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: ldfc1d_c2d.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: ldfc1d_c2d.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -77,28 +79,20 @@ CONTAINS
          DO jk = jpkm1, 1, -1                ! pah1 at T-point
             pah1(:,:,jk) = pahs1(:,:) * (  zratio + zc * ( 1._wp + TANH( - ( gdept_0(:,:,jk) - zh ) * zw) )  )
          END DO
-         DO jk = jpkm1, 1, -1                ! pah2 at F-point (zdep2 is an approximation in zps-coord.)
-            DO jj = 1, jpjm1
-               DO ji = 1, jpim1
-                  zdep2 = (  gdept_0(ji,jj+1,jk) + gdept_0(ji+1,jj+1,jk)   &
-                     &     + gdept_0(ji,jj  ,jk) + gdept_0(ji+1,jj  ,jk)  ) * r1_4
-                  pah2(ji,jj,jk) = pahs2(ji,jj) * (  zratio + zc * ( 1._wp + TANH( - ( zdep2 - zh ) * zw) )  )
-               END DO
-            END DO
-         END DO
+         DO_3DS_10_10( jpkm1, 1, -1 )
+            zdep2 = (  gdept_0(ji,jj+1,jk) + gdept_0(ji+1,jj+1,jk)   &
+               &     + gdept_0(ji,jj  ,jk) + gdept_0(ji+1,jj  ,jk)  ) * r1_4
+            pah2(ji,jj,jk) = pahs2(ji,jj) * (  zratio + zc * ( 1._wp + TANH( - ( zdep2 - zh ) * zw) )  )
+         END_3D
          CALL lbc_lnk( 'ldfc1d_c2d', pah2, 'F', 1. )   ! Lateral boundary conditions
          !
       CASE( 'TRA' )                     ! U- and V-points (zdep1 & 2 are an approximation in zps-coord.)
-         DO jk = jpkm1, 1, -1
-            DO jj = 1, jpjm1
-               DO ji = 1, jpim1
-                  zdep1 = (  gdept_0(ji,jj,jk) + gdept_0(ji+1,jj,jk)  ) * 0.5_wp
-                  zdep2 = (  gdept_0(ji,jj,jk) + gdept_0(ji,jj+1,jk)  ) * 0.5_wp
-                  pah1(ji,jj,jk) = pahs1(ji,jj) * (  zratio + zc * ( 1._wp + TANH( - ( zdep1 - zh ) * zw) )  )
-                  pah2(ji,jj,jk) = pahs2(ji,jj) * (  zratio + zc * ( 1._wp + TANH( - ( zdep2 - zh ) * zw) )  )
-               END DO
-            END DO
-         END DO
+         DO_3DS_10_10( jpkm1, 1, -1 )
+            zdep1 = (  gdept_0(ji,jj,jk) + gdept_0(ji+1,jj,jk)  ) * 0.5_wp
+            zdep2 = (  gdept_0(ji,jj,jk) + gdept_0(ji,jj+1,jk)  ) * 0.5_wp
+            pah1(ji,jj,jk) = pahs1(ji,jj) * (  zratio + zc * ( 1._wp + TANH( - ( zdep1 - zh ) * zw) )  )
+            pah2(ji,jj,jk) = pahs2(ji,jj) * (  zratio + zc * ( 1._wp + TANH( - ( zdep2 - zh ) * zw) )  )
+         END_3D
          ! Lateral boundary conditions
          CALL lbc_lnk_multi( 'ldfc1d_c2d', pah1, 'U', 1. , pah2, 'V', 1. )   
          !
@@ -140,19 +134,15 @@ CONTAINS
       SELECT CASE( cd_type )        !==  surface values  ==!  (chosen grid point function of DYN or TRA)
       !
       CASE( 'DYN' )                       ! T- and F-points
-         DO jj = 1, jpj
-            DO ji = 1, jpi 
-               pah1(ji,jj,1) = pUfac * MAX( e1t(ji,jj) , e2t(ji,jj) )**knn
-               pah2(ji,jj,1) = pUfac * MAX( e1f(ji,jj) , e2f(ji,jj) )**knn
-            END DO
-         END DO
+         DO_2D_11_11
+            pah1(ji,jj,1) = pUfac * MAX( e1t(ji,jj) , e2t(ji,jj) )**knn
+            pah2(ji,jj,1) = pUfac * MAX( e1f(ji,jj) , e2f(ji,jj) )**knn
+         END_2D
       CASE( 'TRA' )                       ! U- and V-points
-         DO jj = 1, jpj 
-            DO ji = 1, jpi 
-               pah1(ji,jj,1) = pUfac * MAX( e1u(ji,jj), e2u(ji,jj) )**knn
-               pah2(ji,jj,1) = pUfac * MAX( e1v(ji,jj), e2v(ji,jj) )**knn
-            END DO
-         END DO
+         DO_2D_11_11
+            pah1(ji,jj,1) = pUfac * MAX( e1u(ji,jj), e2u(ji,jj) )**knn
+            pah2(ji,jj,1) = pUfac * MAX( e1v(ji,jj), e2v(ji,jj) )**knn
+         END_2D
       CASE DEFAULT                        ! error
          CALL ctl_stop( 'ldf_c2d: ', cd_type, ' Unknown, i.e. /= DYN or TRA' )
       END SELECT

@@ -25,7 +25,6 @@ MODULE trc_oce
 
    LOGICAL , PUBLIC ::   l_co2cpl  = .false.   !: atmospheric pco2 recieved from oasis
    LOGICAL , PUBLIC ::   l_offline = .false.   !: offline passive tracers flag
-   INTEGER , PUBLIC ::   nn_dttrc              !: frequency of step on passive tracers
    REAL(wp), PUBLIC ::   r_si2                 !: largest depth of extinction (blue & 0.01 mg.m-3)  (RGB)
    !
    REAL(wp), PUBLIC, SAVE, ALLOCATABLE, DIMENSION(:,:,:) ::   etot3     !: light absortion coefficient
@@ -44,7 +43,7 @@ MODULE trc_oce
 #endif
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: trc_oce.F90 10068 2018-08-28 14:09:04Z nicolasmartin $ 
+   !! $Id: trc_oce.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS

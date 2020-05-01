@@ -35,21 +35,23 @@ MODULE trazdf
    PUBLIC   tra_zdf_imp   ! called by trczdf.F90
 
    !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: trazdf.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: trazdf.F90 12740 2020-04-12 09:03:06Z smasson $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE tra_zdf( kt )
+   SUBROUTINE tra_zdf( kt, Kbb, Kmm, Krhs, pts, Kaa )
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE tra_zdf  ***
       !!
       !! ** Purpose :   compute the vertical ocean tracer physics.
       !!---------------------------------------------------------------------
-      INTEGER, INTENT(in) ::   kt   ! ocean time-step index
+      INTEGER                                  , INTENT(in)    :: kt                  ! ocean time-step index
+      INTEGER                                  , INTENT(in)    :: Kbb, Kmm, Krhs, Kaa ! time level indices
+      REAL(wp), DIMENSION(jpi,jpj,jpk,jpts,jpt), INTENT(inout) :: pts                 ! active tracers and RHS of tracer equation
       !
       INTEGER  ::   jk   ! Dummy loop indices
       REAL(wp), DIMENSION(:,:,:), ALLOCATABLE ::   ztrdt, ztrds   ! 3D workspace
@@ -63,50 +65,46 @@ CONTAINS
          IF(lwp)WRITE(numout,*) '~~~~~~~ '
       ENDIF
       !
-      IF( neuler == 0 .AND. kt == nit000 ) THEN   ;   r2dt =      rdt   ! at nit000, =   rdt (restarting with Euler time stepping)
-      ELSEIF( kt <= nit000 + 1           ) THEN   ;   r2dt = 2. * rdt   ! otherwise, = 2 rdt (leapfrog)
-      ENDIF
-      !
       IF( l_trdtra )   THEN                  !* Save ta and sa trends
          ALLOCATE( ztrdt(jpi,jpj,jpk) , ztrds(jpi,jpj,jpk) )
-         ztrdt(:,:,:) = tsa(:,:,:,jp_tem)
-         ztrds(:,:,:) = tsa(:,:,:,jp_sal)
+         ztrdt(:,:,:) = pts(:,:,:,jp_tem,Kaa)
+         ztrds(:,:,:) = pts(:,:,:,jp_sal,Kaa)
       ENDIF
       !
       !                                      !* compute lateral mixing trend and add it to the general trend
-      CALL tra_zdf_imp( kt, nit000, 'TRA', r2dt, tsb, tsa, jpts ) 
+      CALL tra_zdf_imp( kt, nit000, 'TRA', rDt, Kbb, Kmm, Krhs, pts, Kaa, jpts ) 
 
 !!gm WHY here !   and I don't like that !
       ! DRAKKAR SSS control {
       ! JMM avoid negative salinities near river outlet ! Ugly fix
       ! JMM : restore negative salinities to small salinities:
-!!$      WHERE( tsa(:,:,:,jp_sal) < 0._wp )   tsa(:,:,:,jp_sal) = 0.1_wp
+!!$      WHERE( pts(:,:,:,jp_sal,Kaa) < 0._wp )   pts(:,:,:,jp_sal,Kaa) = 0.1_wp
 !!gm
 
       IF( l_trdtra )   THEN                      ! save the vertical diffusive trends for further diagnostics
          DO jk = 1, jpkm1
-            ztrdt(:,:,jk) = ( ( tsa(:,:,jk,jp_tem)*e3t_a(:,:,jk) - tsb(:,:,jk,jp_tem)*e3t_b(:,:,jk) ) &
-               &          / (e3t_n(:,:,jk)*r2dt) ) - ztrdt(:,:,jk)
-            ztrds(:,:,jk) = ( ( tsa(:,:,jk,jp_sal)*e3t_a(:,:,jk) - tsb(:,:,jk,jp_sal)*e3t_b(:,:,jk) ) &
-              &           / (e3t_n(:,:,jk)*r2dt) ) - ztrds(:,:,jk)
+            ztrdt(:,:,jk) = ( ( pts(:,:,jk,jp_tem,Kaa)*e3t(:,:,jk,Kaa) - pts(:,:,jk,jp_tem,Kbb)*e3t(:,:,jk,Kbb) ) &
+               &          / (e3t(:,:,jk,Kmm)*rDt) ) - ztrdt(:,:,jk)
+            ztrds(:,:,jk) = ( ( pts(:,:,jk,jp_sal,Kaa)*e3t(:,:,jk,Kaa) - pts(:,:,jk,jp_sal,Kbb)*e3t(:,:,jk,Kbb) ) &
+              &           / (e3t(:,:,jk,Kmm)*rDt) ) - ztrds(:,:,jk)
          END DO
 !!gm this should be moved in trdtra.F90 and done on all trends
          CALL lbc_lnk_multi( 'trazdf', ztrdt, 'T', 1. , ztrds, 'T', 1. )
 !!gm
-         CALL trd_tra( kt, 'TRA', jp_tem, jptra_zdf, ztrdt )
-         CALL trd_tra( kt, 'TRA', jp_sal, jptra_zdf, ztrds )
+         CALL trd_tra( kt, Kmm, Krhs, 'TRA', jp_tem, jptra_zdf, ztrdt )
+         CALL trd_tra( kt, Kmm, Krhs, 'TRA', jp_sal, jptra_zdf, ztrds )
          DEALLOCATE( ztrdt , ztrds )
       ENDIF
       !                                          ! print mean trends (used for debugging)
-      IF(ln_ctl)   CALL prt_ctl( tab3d_1=tsa(:,:,:,jp_tem), clinfo1=' zdf  - Ta: ', mask1=tmask,               &
-         &                       tab3d_2=tsa(:,:,:,jp_sal), clinfo2=       ' Sa: ', mask2=tmask, clinfo3='tra' )
+      IF(sn_cfctl%l_prtctl)   CALL prt_ctl( tab3d_1=pts(:,:,:,jp_tem,Kaa), clinfo1=' zdf  - Ta: ', mask1=tmask,               &
+         &                                  tab3d_2=pts(:,:,:,jp_sal,Kaa), clinfo2=       ' Sa: ', mask2=tmask, clinfo3='tra' )
       !
       IF( ln_timing )   CALL timing_stop('tra_zdf')
       !
    END SUBROUTINE tra_zdf
 
  
-   SUBROUTINE tra_zdf_imp( kt, kit000, cdtype, p2dt, ptb, pta, kjpt ) 
+   SUBROUTINE tra_zdf_imp( kt, kit000, cdtype, p2dt, Kbb, Kmm, Krhs, pt, Kaa, kjpt ) 
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE tra_zdf_imp  ***
       !!
@@ -124,18 +122,18 @@ CONTAINS
       !!      both tracers (bottom, applied through the masked field avt).
       !!      If iso-neutral mixing, add to avt the contribution due to lateral mixing.
       !!
-      !! ** Action  : - pta  becomes the after tracer
+      !! ** Action  : - pt(:,:,:,:,Kaa)  becomes the after tracer
       !!---------------------------------------------------------------------
-      INTEGER                              , INTENT(in   ) ::   kt       ! ocean time-step index
-      INTEGER                              , INTENT(in   ) ::   kit000   ! first time step index
-      CHARACTER(len=3)                     , INTENT(in   ) ::   cdtype   ! =TRA or TRC (tracer indicator)
-      INTEGER                              , INTENT(in   ) ::   kjpt     ! number of tracers
-      REAL(wp)                             , INTENT(in   ) ::   p2dt     ! tracer time-step
-      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt), INTENT(in   ) ::   ptb      ! before and now tracer fields
-      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt), INTENT(inout) ::   pta      ! in: tracer trend ; out: after tracer field
+      INTEGER                                  , INTENT(in   ) ::   kt       ! ocean time-step index
+      INTEGER                                  , INTENT(in   ) ::   Kbb, Kmm, Krhs, Kaa  ! ocean time level indices
+      INTEGER                                  , INTENT(in   ) ::   kit000   ! first time step index
+      CHARACTER(len=3)                         , INTENT(in   ) ::   cdtype   ! =TRA or TRC (tracer indicator)
+      INTEGER                                  , INTENT(in   ) ::   kjpt     ! number of tracers
+      REAL(wp)                                 , INTENT(in   ) ::   p2dt     ! tracer time-step
+      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt,jpt), INTENT(inout) ::   pt       ! tracers and RHS of tracer equation
       !
       INTEGER  ::  ji, jj, jk, jn   ! dummy loop indices
-      REAL(wp) ::  zrhs             ! local scalars
+      REAL(wp) ::  zrhs, zzwi, zzws ! local scalars
       REAL(wp), DIMENSION(jpi,jpj,jpk) ::  zwi, zwt, zwd, zws
       !!---------------------------------------------------------------------
       !
@@ -157,35 +155,33 @@ CONTAINS
             !
             IF( l_ldfslp ) THEN            ! isoneutral diffusion: add the contribution 
                IF( ln_traldf_msc  ) THEN     ! MSC iso-neutral operator 
-                  DO jk = 2, jpkm1
-                     DO jj = 2, jpjm1
-                        DO ji = fs_2, fs_jpim1   ! vector opt.
-                           zwt(ji,jj,jk) = zwt(ji,jj,jk) + akz(ji,jj,jk)  
-                        END DO
-                     END DO
-                  END DO
+                  DO_3D_00_00( 2, jpkm1 )
+                     zwt(ji,jj,jk) = zwt(ji,jj,jk) + akz(ji,jj,jk)  
+                  END_3D
                ELSE                          ! standard or triad iso-neutral operator
-                  DO jk = 2, jpkm1
-                     DO jj = 2, jpjm1
-                        DO ji = fs_2, fs_jpim1   ! vector opt.
-                           zwt(ji,jj,jk) = zwt(ji,jj,jk) + ah_wslp2(ji,jj,jk)
-                        END DO
-                     END DO
-                  END DO
+                  DO_3D_00_00( 2, jpkm1 )
+                     zwt(ji,jj,jk) = zwt(ji,jj,jk) + ah_wslp2(ji,jj,jk)
+                  END_3D
                ENDIF
             ENDIF
             !
             ! Diagonal, lower (i), upper (s)  (including the bottom boundary condition since avt is masked)
-            DO jk = 1, jpkm1
-               DO jj = 2, jpjm1
-                  DO ji = fs_2, fs_jpim1   ! vector opt.
-!!gm BUG  I think, use e3w_a instead of e3w_n, not sure of that
-                     zwi(ji,jj,jk) = - p2dt * zwt(ji,jj,jk  ) / e3w_n(ji,jj,jk  )
-                     zws(ji,jj,jk) = - p2dt * zwt(ji,jj,jk+1) / e3w_n(ji,jj,jk+1)
-                     zwd(ji,jj,jk) = e3t_a(ji,jj,jk) - zwi(ji,jj,jk) - zws(ji,jj,jk)
-                 END DO
-               END DO
-            END DO
+            IF( ln_zad_Aimp ) THEN         ! Adaptive implicit vertical advection
+               DO_3D_00_00( 1, jpkm1 )
+                  zzwi = - p2dt * zwt(ji,jj,jk  ) / e3w(ji,jj,jk  ,Kmm)
+                  zzws = - p2dt * zwt(ji,jj,jk+1) / e3w(ji,jj,jk+1,Kmm)
+                  zwd(ji,jj,jk) = e3t(ji,jj,jk,Kaa) - zzwi - zzws   &
+                     &                 + p2dt * ( MAX( wi(ji,jj,jk  ) , 0._wp ) - MIN( wi(ji,jj,jk+1) , 0._wp ) )
+                  zwi(ji,jj,jk) = zzwi + p2dt *   MIN( wi(ji,jj,jk  ) , 0._wp )
+                  zws(ji,jj,jk) = zzws - p2dt *   MAX( wi(ji,jj,jk+1) , 0._wp )
+               END_3D
+            ELSE
+               DO_3D_00_00( 1, jpkm1 )
+                  zwi(ji,jj,jk) = - p2dt * zwt(ji,jj,jk  ) / e3w(ji,jj,jk,Kmm)
+                  zws(ji,jj,jk) = - p2dt * zwt(ji,jj,jk+1) / e3w(ji,jj,jk+1,Kmm)
+                  zwd(ji,jj,jk) = e3t(ji,jj,jk,Kaa) - zwi(ji,jj,jk) - zws(ji,jj,jk)
+               END_3D
+            ENDIF
             !
             !! Matrix inversion from the first level
             !!----------------------------------------------------------------------
@@ -203,51 +199,33 @@ CONTAINS
             !   and "superior" (above diagonal) components of the tridiagonal system.
             !   The solution will be in the 4d array pta.
             !   The 3d array zwt is used as a work space array.
-            !   En route to the solution pta is used a to evaluate the rhs and then 
+            !   En route to the solution pt(:,:,:,:,Kaa) is used a to evaluate the rhs and then 
             !   used as a work space array: its value is modified.
             !
-            DO jj = 2, jpjm1        !* 1st recurrence:   Tk = Dk - Ik Sk-1 / Tk-1   (increasing k)
-               DO ji = fs_2, fs_jpim1            ! done one for all passive tracers (so included in the IF instruction)
-                  zwt(ji,jj,1) = zwd(ji,jj,1)
-               END DO
-            END DO
-            DO jk = 2, jpkm1
-               DO jj = 2, jpjm1
-                  DO ji = fs_2, fs_jpim1
-                     zwt(ji,jj,jk) = zwd(ji,jj,jk) - zwi(ji,jj,jk) * zws(ji,jj,jk-1) / zwt(ji,jj,jk-1)
-                  END DO
-               END DO
-            END DO
+            DO_2D_00_00
+               zwt(ji,jj,1) = zwd(ji,jj,1)
+            END_2D
+            DO_3D_00_00( 2, jpkm1 )
+               zwt(ji,jj,jk) = zwd(ji,jj,jk) - zwi(ji,jj,jk) * zws(ji,jj,jk-1) / zwt(ji,jj,jk-1)
+            END_3D
             !
          ENDIF 
          !         
-         DO jj = 2, jpjm1           !* 2nd recurrence:    Zk = Yk - Ik / Tk-1  Zk-1
-            DO ji = fs_2, fs_jpim1
-               pta(ji,jj,1,jn) = e3t_b(ji,jj,1) * ptb(ji,jj,1,jn) + p2dt * e3t_n(ji,jj,1) * pta(ji,jj,1,jn)
-            END DO
-         END DO
-         DO jk = 2, jpkm1
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1
-                  zrhs = e3t_b(ji,jj,jk) * ptb(ji,jj,jk,jn) + p2dt * e3t_n(ji,jj,jk) * pta(ji,jj,jk,jn)   ! zrhs=right hand side
-                  pta(ji,jj,jk,jn) = zrhs - zwi(ji,jj,jk) / zwt(ji,jj,jk-1) * pta(ji,jj,jk-1,jn)
-               END DO
-            END DO
-         END DO
+         DO_2D_00_00
+            pt(ji,jj,1,jn,Kaa) = e3t(ji,jj,1,Kbb) * pt(ji,jj,1,jn,Kbb) + p2dt * e3t(ji,jj,1,Kmm) * pt(ji,jj,1,jn,Krhs)
+         END_2D
+         DO_3D_00_00( 2, jpkm1 )
+            zrhs = e3t(ji,jj,jk,Kbb) * pt(ji,jj,jk,jn,Kbb) + p2dt * e3t(ji,jj,jk,Kmm) * pt(ji,jj,jk,jn,Krhs)   ! zrhs=right hand side
+            pt(ji,jj,jk,jn,Kaa) = zrhs - zwi(ji,jj,jk) / zwt(ji,jj,jk-1) * pt(ji,jj,jk-1,jn,Kaa)
+         END_3D
          !
-         DO jj = 2, jpjm1           !* 3d recurrence:    Xk = (Zk - Sk Xk+1 ) / Tk   (result is the after tracer)
-            DO ji = fs_2, fs_jpim1
-               pta(ji,jj,jpkm1,jn) = pta(ji,jj,jpkm1,jn) / zwt(ji,jj,jpkm1) * tmask(ji,jj,jpkm1)
-            END DO
-         END DO
-         DO jk = jpk-2, 1, -1
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1
-                  pta(ji,jj,jk,jn) = ( pta(ji,jj,jk,jn) - zws(ji,jj,jk) * pta(ji,jj,jk+1,jn) )   &
-                     &             / zwt(ji,jj,jk) * tmask(ji,jj,jk)
-               END DO
-            END DO
-         END DO
+         DO_2D_00_00
+            pt(ji,jj,jpkm1,jn,Kaa) = pt(ji,jj,jpkm1,jn,Kaa) / zwt(ji,jj,jpkm1) * tmask(ji,jj,jpkm1)
+         END_2D
+         DO_3DS_00_00( jpk-2, 1, -1 )
+            pt(ji,jj,jk,jn,Kaa) = ( pt(ji,jj,jk,jn,Kaa) - zws(ji,jj,jk) * pt(ji,jj,jk+1,jn,Kaa) )   &
+               &             / zwt(ji,jj,jk) * tmask(ji,jj,jk)
+         END_3D
          !                                            ! ================= !
       END DO                                          !  end tracer loop  !
       !                                               ! ================= !

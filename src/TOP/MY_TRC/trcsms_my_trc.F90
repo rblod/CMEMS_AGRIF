@@ -14,7 +14,6 @@ MODULE trcsms_my_trc
    USE trc             ! TOP variables
    USE trd_oce
    USE trdtrc
-   USE trcbc, only : trc_bc
 
    IMPLICIT NONE
    PRIVATE
@@ -26,12 +25,12 @@ MODULE trcsms_my_trc
 
    !!----------------------------------------------------------------------
    !! NEMO/TOP 4.0 , NEMO Consortium (2018)
-   !! $Id: trcsms_my_trc.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: trcsms_my_trc.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE trc_sms_my_trc( kt )
+   SUBROUTINE trc_sms_my_trc( kt, Kbb, Kmm, Krhs )
       !!----------------------------------------------------------------------
       !!                     ***  trc_sms_my_trc  ***
       !!
@@ -41,6 +40,7 @@ CONTAINS
       !!----------------------------------------------------------------------
       !
       INTEGER, INTENT(in) ::   kt   ! ocean time-step index
+      INTEGER, INTENT(in) ::   Kbb, Kmm, Krhs  ! time level indices
       INTEGER ::   jn   ! dummy loop index
       REAL(wp), ALLOCATABLE, DIMENSION(:,:,:) :: ztrmyt
       !!----------------------------------------------------------------------
@@ -53,15 +53,13 @@ CONTAINS
 
       IF( l_trdtrc )  ALLOCATE( ztrmyt(jpi,jpj,jpk) )
 
-      CALL trc_bc ( kt )       ! tracers: surface and lateral Boundary Conditions
-
       ! add here the call to BGC model
 
       ! Save the trends in the mixed layer
       IF( l_trdtrc ) THEN
           DO jn = jp_myt0, jp_myt1
-            ztrmyt(:,:,:) = tra(:,:,:,jn)
-            CALL trd_trc( ztrmyt, jn, jptra_sms, kt )   ! save trends
+            ztrmyt(:,:,:) = tr(:,:,:,jn,Krhs)
+            CALL trd_trc( ztrmyt, jn, jptra_sms, kt, Kmm )   ! save trends
           END DO
           DEALLOCATE( ztrmyt )
       END IF

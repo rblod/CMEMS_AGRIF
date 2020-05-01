@@ -1027,6 +1027,7 @@ attribute :
 clause :
         expr   { strcpy(CharacterSize,$1);  strcpy($$,$1);  }
       | '*'    { strcpy(CharacterSize,"*"); strcpy($$,"*"); }
+      | ':'    { strcpy(CharacterSize,":"); strcpy($$,":"); }
       ;
 opt_clause :
       | ',' TOK_NAME clause

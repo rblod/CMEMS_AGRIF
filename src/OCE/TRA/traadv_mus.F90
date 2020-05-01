@@ -45,16 +45,16 @@ MODULE traadv_mus
    LOGICAL  ::   l_hst   ! flag to compute heat/salt transport
 
    !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: traadv_mus.F90 10425 2018-12-19 21:54:16Z smasson $ 
+   !! $Id: traadv_mus.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE tra_adv_mus( kt, kit000, cdtype, p2dt, pun, pvn, pwn,             &
-      &                                              ptb, pta, kjpt, ld_msc_ups )
+   SUBROUTINE tra_adv_mus( kt, kit000, cdtype, p2dt, pU, pV, pW,             &
+      &                    Kbb, Kmm, pt, kjpt, Krhs, ld_msc_ups )
       !!----------------------------------------------------------------------
       !!                    ***  ROUTINE tra_adv_mus  ***
       !!
@@ -65,22 +65,22 @@ CONTAINS
       !! ** Method  : MUSCL scheme plus centered scheme at ocean boundaries
       !!              ld_msc_ups=T : 
       !!
-      !! ** Action : - update pta  with the now advective tracer trends
+      !! ** Action : - update pt(:,:,:,:,Krhs)  with the now advective tracer trends
       !!             - send trends to trdtra module for further diagnostcs (l_trdtra=T)
-      !!             - htr_adv, str_adv : poleward advective heat and salt transport (ln_diaptr=T)
+      !!             - poleward advective heat and salt transport (ln_diaptr=T)
       !!
       !! References : Estubier, A., and M. Levy, Notes Techn. Pole de Modelisation
       !!              IPSL, Sept. 2000 (http://www.lodyc.jussieu.fr/opa)
       !!----------------------------------------------------------------------
-      INTEGER                              , INTENT(in   ) ::   kt              ! ocean time-step index
-      INTEGER                              , INTENT(in   ) ::   kit000          ! first time step index
-      CHARACTER(len=3)                     , INTENT(in   ) ::   cdtype          ! =TRA or TRC (tracer indicator)
-      INTEGER                              , INTENT(in   ) ::   kjpt            ! number of tracers
-      LOGICAL                              , INTENT(in   ) ::   ld_msc_ups      ! use upstream scheme within muscl
-      REAL(wp)                             , INTENT(in   ) ::   p2dt            ! tracer time-step
-      REAL(wp), DIMENSION(jpi,jpj,jpk     ), INTENT(in   ) ::   pun, pvn, pwn   ! 3 ocean velocity components
-      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt), INTENT(in   ) ::   ptb             ! before tracer field
-      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt), INTENT(inout) ::   pta             ! tracer trend 
+      INTEGER                                  , INTENT(in   ) ::   kt              ! ocean time-step index
+      INTEGER                                  , INTENT(in   ) ::   Kbb, Kmm, Krhs  ! ocean time level indices
+      INTEGER                                  , INTENT(in   ) ::   kit000          ! first time step index
+      CHARACTER(len=3)                         , INTENT(in   ) ::   cdtype          ! =TRA or TRC (tracer indicator)
+      INTEGER                                  , INTENT(in   ) ::   kjpt            ! number of tracers
+      LOGICAL                                  , INTENT(in   ) ::   ld_msc_ups      ! use upstream scheme within muscl
+      REAL(wp)                                 , INTENT(in   ) ::   p2dt            ! tracer time-step
+      REAL(wp), DIMENSION(jpi,jpj,jpk         ), INTENT(in   ) ::   pU, pV, pW      ! 3 ocean volume flux components
+      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt,jpt), INTENT(inout) ::   pt              ! tracers and RHS of tracer equation
       !
       INTEGER  ::   ji, jj, jk, jn   ! dummy loop indices
       INTEGER  ::   ierr             ! local integer
@@ -119,7 +119,7 @@ CONTAINS
       l_hst = .FALSE.
       l_ptr = .FALSE.
       IF( ( cdtype == 'TRA' .AND. l_trdtra ) .OR. ( cdtype == 'TRC' .AND. l_trdtrc ) )      l_trd = .TRUE.
-      IF(   cdtype == 'TRA' .AND. ln_diaptr )                                               l_ptr = .TRUE. 
+      IF(   cdtype == 'TRA' .AND. ( iom_use( 'sophtadv' ) .OR. iom_use( 'sophtadv' ) )  )   l_ptr = .TRUE. 
       IF(   cdtype == 'TRA' .AND. ( iom_use("uadv_heattr") .OR. iom_use("vadv_heattr") .OR. &
          &                          iom_use("uadv_salttr") .OR. iom_use("vadv_salttr")  ) ) l_hst = .TRUE.
       !
@@ -130,78 +130,58 @@ CONTAINS
          !                                !-- first guess of the slopes
          zwx(:,:,jpk) = 0._wp                   ! bottom values
          zwy(:,:,jpk) = 0._wp  
-         DO jk = 1, jpkm1                       ! interior values
-            DO jj = 1, jpjm1      
-               DO ji = 1, fs_jpim1   ! vector opt.
-                  zwx(ji,jj,jk) = umask(ji,jj,jk) * ( ptb(ji+1,jj,jk,jn) - ptb(ji,jj,jk,jn) )
-                  zwy(ji,jj,jk) = vmask(ji,jj,jk) * ( ptb(ji,jj+1,jk,jn) - ptb(ji,jj,jk,jn) )
-               END DO
-           END DO
-         END DO
+         DO_3D_10_10( 1, jpkm1 )
+            zwx(ji,jj,jk) = umask(ji,jj,jk) * ( pt(ji+1,jj,jk,jn,Kbb) - pt(ji,jj,jk,jn,Kbb) )
+            zwy(ji,jj,jk) = vmask(ji,jj,jk) * ( pt(ji,jj+1,jk,jn,Kbb) - pt(ji,jj,jk,jn,Kbb) )
+         END_3D
          ! lateral boundary conditions   (changed sign)
          CALL lbc_lnk_multi( 'traadv_mus', zwx, 'U', -1. , zwy, 'V', -1. )
          !                                !-- Slopes of tracer
          zslpx(:,:,jpk) = 0._wp                 ! bottom values
          zslpy(:,:,jpk) = 0._wp
-         DO jk = 1, jpkm1                       ! interior values
-            DO jj = 2, jpj
-               DO ji = fs_2, jpi   ! vector opt.
-                  zslpx(ji,jj,jk) =                    ( zwx(ji,jj,jk) + zwx(ji-1,jj  ,jk) )   &
-                     &            * ( 0.25 + SIGN( 0.25, zwx(ji,jj,jk) * zwx(ji-1,jj  ,jk) ) )
-                  zslpy(ji,jj,jk) =                    ( zwy(ji,jj,jk) + zwy(ji  ,jj-1,jk) )   &
-                     &            * ( 0.25 + SIGN( 0.25, zwy(ji,jj,jk) * zwy(ji  ,jj-1,jk) ) )
-               END DO
-            END DO
-         END DO
+         DO_3D_01_01( 1, jpkm1 )
+            zslpx(ji,jj,jk) =                    ( zwx(ji,jj,jk) + zwx(ji-1,jj  ,jk) )   &
+               &            * ( 0.25 + SIGN( 0.25, zwx(ji,jj,jk) * zwx(ji-1,jj  ,jk) ) )
+            zslpy(ji,jj,jk) =                    ( zwy(ji,jj,jk) + zwy(ji  ,jj-1,jk) )   &
+               &            * ( 0.25 + SIGN( 0.25, zwy(ji,jj,jk) * zwy(ji  ,jj-1,jk) ) )
+         END_3D
          !
-         DO jk = 1, jpkm1                 !-- Slopes limitation
-            DO jj = 2, jpj
-               DO ji = fs_2, jpi   ! vector opt.
-                  zslpx(ji,jj,jk) = SIGN( 1., zslpx(ji,jj,jk) ) * MIN(    ABS( zslpx(ji  ,jj,jk) ),   &
-                     &                                                 2.*ABS( zwx  (ji-1,jj,jk) ),   &
-                     &                                                 2.*ABS( zwx  (ji  ,jj,jk) ) )
-                  zslpy(ji,jj,jk) = SIGN( 1., zslpy(ji,jj,jk) ) * MIN(    ABS( zslpy(ji,jj  ,jk) ),   &
-                     &                                                 2.*ABS( zwy  (ji,jj-1,jk) ),   &
-                     &                                                 2.*ABS( zwy  (ji,jj  ,jk) ) )
-               END DO
-           END DO
-         END DO
+         DO_3D_01_01( 1, jpkm1 )
+            zslpx(ji,jj,jk) = SIGN( 1., zslpx(ji,jj,jk) ) * MIN(    ABS( zslpx(ji  ,jj,jk) ),   &
+               &                                                 2.*ABS( zwx  (ji-1,jj,jk) ),   &
+               &                                                 2.*ABS( zwx  (ji  ,jj,jk) ) )
+            zslpy(ji,jj,jk) = SIGN( 1., zslpy(ji,jj,jk) ) * MIN(    ABS( zslpy(ji,jj  ,jk) ),   &
+               &                                                 2.*ABS( zwy  (ji,jj-1,jk) ),   &
+               &                                                 2.*ABS( zwy  (ji,jj  ,jk) ) )
+         END_3D
          !
-         DO jk = 1, jpkm1                 !-- MUSCL horizontal advective fluxes
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1   ! vector opt.
-                  ! MUSCL fluxes
-                  z0u = SIGN( 0.5, pun(ji,jj,jk) )
-                  zalpha = 0.5 - z0u
-                  zu  = z0u - 0.5 * pun(ji,jj,jk) * p2dt * r1_e1e2u(ji,jj) / e3u_n(ji,jj,jk)
-                  zzwx = ptb(ji+1,jj,jk,jn) + xind(ji,jj,jk) * zu * zslpx(ji+1,jj,jk)
-                  zzwy = ptb(ji  ,jj,jk,jn) + xind(ji,jj,jk) * zu * zslpx(ji  ,jj,jk)
-                  zwx(ji,jj,jk) = pun(ji,jj,jk) * ( zalpha * zzwx + (1.-zalpha) * zzwy )
-                  !
-                  z0v = SIGN( 0.5, pvn(ji,jj,jk) )
-                  zalpha = 0.5 - z0v
-                  zv  = z0v - 0.5 * pvn(ji,jj,jk) * p2dt * r1_e1e2v(ji,jj) / e3v_n(ji,jj,jk)
-                  zzwx = ptb(ji,jj+1,jk,jn) + xind(ji,jj,jk) * zv * zslpy(ji,jj+1,jk)
-                  zzwy = ptb(ji,jj  ,jk,jn) + xind(ji,jj,jk) * zv * zslpy(ji,jj  ,jk)
-                  zwy(ji,jj,jk) = pvn(ji,jj,jk) * ( zalpha * zzwx + (1.-zalpha) * zzwy )
-               END DO
-            END DO
-         END DO
+         DO_3D_00_00( 1, jpkm1 )
+            ! MUSCL fluxes
+            z0u = SIGN( 0.5, pU(ji,jj,jk) )
+            zalpha = 0.5 - z0u
+            zu  = z0u - 0.5 * pU(ji,jj,jk) * p2dt * r1_e1e2u(ji,jj) / e3u(ji,jj,jk,Kmm)
+            zzwx = pt(ji+1,jj,jk,jn,Kbb) + xind(ji,jj,jk) * zu * zslpx(ji+1,jj,jk)
+            zzwy = pt(ji  ,jj,jk,jn,Kbb) + xind(ji,jj,jk) * zu * zslpx(ji  ,jj,jk)
+            zwx(ji,jj,jk) = pU(ji,jj,jk) * ( zalpha * zzwx + (1.-zalpha) * zzwy )
+            !
+            z0v = SIGN( 0.5, pV(ji,jj,jk) )
+            zalpha = 0.5 - z0v
+            zv  = z0v - 0.5 * pV(ji,jj,jk) * p2dt * r1_e1e2v(ji,jj) / e3v(ji,jj,jk,Kmm)
+            zzwx = pt(ji,jj+1,jk,jn,Kbb) + xind(ji,jj,jk) * zv * zslpy(ji,jj+1,jk)
+            zzwy = pt(ji,jj  ,jk,jn,Kbb) + xind(ji,jj,jk) * zv * zslpy(ji,jj  ,jk)
+            zwy(ji,jj,jk) = pV(ji,jj,jk) * ( zalpha * zzwx + (1.-zalpha) * zzwy )
+         END_3D
          CALL lbc_lnk_multi( 'traadv_mus', zwx, 'U', -1. , zwy, 'V', -1. )   ! lateral boundary conditions   (changed sign)
          !
-         DO jk = 1, jpkm1                 !-- Tracer advective trend
-            DO jj = 2, jpjm1      
-               DO ji = fs_2, fs_jpim1   ! vector opt.
-                  pta(ji,jj,jk,jn) = pta(ji,jj,jk,jn) - ( zwx(ji,jj,jk) - zwx(ji-1,jj  ,jk  )       &
-                  &                                     + zwy(ji,jj,jk) - zwy(ji  ,jj-1,jk  ) )     &
-                  &                                   * r1_e1e2t(ji,jj) / e3t_n(ji,jj,jk)
-               END DO
-           END DO
-         END DO        
+         DO_3D_00_00( 1, jpkm1 )
+            pt(ji,jj,jk,jn,Krhs) = pt(ji,jj,jk,jn,Krhs) - ( zwx(ji,jj,jk) - zwx(ji-1,jj  ,jk  )       &
+            &                                     + zwy(ji,jj,jk) - zwy(ji  ,jj-1,jk  ) )     &
+            &                                   * r1_e1e2t(ji,jj) / e3t(ji,jj,jk,Kmm)
+         END_3D
          !                                ! trend diagnostics
          IF( l_trd )  THEN
-            CALL trd_tra( kt, cdtype, jn, jptra_xad, zwx, pun, ptb(:,:,:,jn) )
-            CALL trd_tra( kt, cdtype, jn, jptra_yad, zwy, pvn, ptb(:,:,:,jn) )
+            CALL trd_tra( kt, Kmm, Krhs, cdtype, jn, jptra_xad, zwx, pU, pt(:,:,:,jn,Kbb) )
+            CALL trd_tra( kt, Kmm, Krhs, cdtype, jn, jptra_yad, zwy, pV, pt(:,:,:,jn,Kbb) )
          END IF
          !                                 ! "Poleward" heat and salt transports 
          IF( l_ptr )  CALL dia_ptr_hst( jn, 'adv', zwy(:,:,:) )
@@ -214,60 +194,42 @@ CONTAINS
          zwx(:,:, 1 ) = 0._wp                   ! surface & bottom boundary conditions
          zwx(:,:,jpk) = 0._wp
          DO jk = 2, jpkm1                       ! interior values
-            zwx(:,:,jk) = tmask(:,:,jk) * ( ptb(:,:,jk-1,jn) - ptb(:,:,jk,jn) )
+            zwx(:,:,jk) = tmask(:,:,jk) * ( pt(:,:,jk-1,jn,Kbb) - pt(:,:,jk,jn,Kbb) )
          END DO
          !                                !-- Slopes of tracer
          zslpx(:,:,1) = 0._wp                   ! surface values
-         DO jk = 2, jpkm1                       ! interior value
-            DO jj = 1, jpj
-               DO ji = 1, jpi
-                  zslpx(ji,jj,jk) =                     ( zwx(ji,jj,jk) + zwx(ji,jj,jk+1) )  &
-                     &            * (  0.25 + SIGN( 0.25, zwx(ji,jj,jk) * zwx(ji,jj,jk+1) )  )
-               END DO
-            END DO
-         END DO
-         DO jk = 2, jpkm1                 !-- Slopes limitation
-            DO jj = 1, jpj                      ! interior values
-               DO ji = 1, jpi
-                  zslpx(ji,jj,jk) = SIGN( 1., zslpx(ji,jj,jk) ) * MIN(    ABS( zslpx(ji,jj,jk  ) ),   &
-                     &                                                 2.*ABS( zwx  (ji,jj,jk+1) ),   &
-                     &                                                 2.*ABS( zwx  (ji,jj,jk  ) )  )
-               END DO
-            END DO
-         END DO
-         DO jk = 1, jpk-2                 !-- vertical advective flux
-            DO jj = 2, jpjm1      
-               DO ji = fs_2, fs_jpim1   ! vector opt.
-                  z0w = SIGN( 0.5, pwn(ji,jj,jk+1) )
-                  zalpha = 0.5 + z0w
-                  zw  = z0w - 0.5 * pwn(ji,jj,jk+1) * p2dt * r1_e1e2t(ji,jj) / e3w_n(ji,jj,jk+1)
-                  zzwx = ptb(ji,jj,jk+1,jn) + xind(ji,jj,jk) * zw * zslpx(ji,jj,jk+1)
-                  zzwy = ptb(ji,jj,jk  ,jn) + xind(ji,jj,jk) * zw * zslpx(ji,jj,jk  )
-                  zwx(ji,jj,jk+1) = pwn(ji,jj,jk+1) * ( zalpha * zzwx + (1.-zalpha) * zzwy ) * wmask(ji,jj,jk)
-               END DO 
-            END DO
-         END DO
+         DO_3D_11_11( 2, jpkm1 )
+            zslpx(ji,jj,jk) =                     ( zwx(ji,jj,jk) + zwx(ji,jj,jk+1) )  &
+               &            * (  0.25 + SIGN( 0.25, zwx(ji,jj,jk) * zwx(ji,jj,jk+1) )  )
+         END_3D
+         DO_3D_11_11( 2, jpkm1 )
+            zslpx(ji,jj,jk) = SIGN( 1., zslpx(ji,jj,jk) ) * MIN(    ABS( zslpx(ji,jj,jk  ) ),   &
+               &                                                 2.*ABS( zwx  (ji,jj,jk+1) ),   &
+               &                                                 2.*ABS( zwx  (ji,jj,jk  ) )  )
+         END_3D
+         DO_3D_00_00( 1, jpk-2 )
+            z0w = SIGN( 0.5, pW(ji,jj,jk+1) )
+            zalpha = 0.5 + z0w
+            zw  = z0w - 0.5 * pW(ji,jj,jk+1) * p2dt * r1_e1e2t(ji,jj) / e3w(ji,jj,jk+1,Kmm)
+            zzwx = pt(ji,jj,jk+1,jn,Kbb) + xind(ji,jj,jk) * zw * zslpx(ji,jj,jk+1)
+            zzwy = pt(ji,jj,jk  ,jn,Kbb) + xind(ji,jj,jk) * zw * zslpx(ji,jj,jk  )
+            zwx(ji,jj,jk+1) = pW(ji,jj,jk+1) * ( zalpha * zzwx + (1.-zalpha) * zzwy ) * wmask(ji,jj,jk)
+         END_3D
          IF( ln_linssh ) THEN                   ! top values, linear free surface only
             IF( ln_isfcav ) THEN                      ! ice-shelf cavities (top of the ocean)
-               DO jj = 1, jpj
-                  DO ji = 1, jpi
-                     zwx(ji,jj, mikt(ji,jj) ) = pwn(ji,jj,mikt(ji,jj)) * ptb(ji,jj,mikt(ji,jj),jn)
-                  END DO
-               END DO   
+               DO_2D_11_11
+                  zwx(ji,jj, mikt(ji,jj) ) = pW(ji,jj,mikt(ji,jj)) * pt(ji,jj,mikt(ji,jj),jn,Kbb)
+               END_2D
             ELSE                                      ! no cavities: only at the ocean surface
-               zwx(:,:,1) = pwn(:,:,1) * ptb(:,:,1,jn)
+               zwx(:,:,1) = pW(:,:,1) * pt(:,:,1,jn,Kbb)
             ENDIF
          ENDIF
          !
-         DO jk = 1, jpkm1                 !-- vertical advective trend
-            DO jj = 2, jpjm1      
-               DO ji = fs_2, fs_jpim1   ! vector opt.
-                  pta(ji,jj,jk,jn) =  pta(ji,jj,jk,jn) - ( zwx(ji,jj,jk) - zwx(ji,jj,jk+1) ) * r1_e1e2t(ji,jj) / e3t_n(ji,jj,jk)
-               END DO
-            END DO
-         END DO
+         DO_3D_00_00( 1, jpkm1 )
+            pt(ji,jj,jk,jn,Krhs) =  pt(ji,jj,jk,jn,Krhs) - ( zwx(ji,jj,jk) - zwx(ji,jj,jk+1) ) * r1_e1e2t(ji,jj) / e3t(ji,jj,jk,Kmm)
+         END_3D
          !                                ! send trends for diagnostic
-         IF( l_trd )  CALL trd_tra( kt, cdtype, jn, jptra_zad, zwx, pwn, ptb(:,:,:,jn) )
+         IF( l_trd )  CALL trd_tra( kt, Kmm, Krhs, cdtype, jn, jptra_zad, zwx, pW, pt(:,:,:,jn,Kbb) )
          !
       END DO                     ! end of tracer loop
       !

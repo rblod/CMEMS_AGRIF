@@ -21,8 +21,10 @@ MODULE iceistate
    USE sbc_ice , ONLY : tn_ice, snwice_mass, snwice_mass_b
    USE eosbn2         ! equation of state
    USE domvvl         ! Variable volume
-   USE ice            ! sea-ice variables
-   USE icevar         ! ice_var_salprof
+   USE ice            ! sea-ice: variables
+   USE ice1D          ! sea-ice: thermodynamics variables
+   USE icetab         ! sea-ice: 1D <==> 2D transformation
+   USE icevar         ! sea-ice: operations
    !
    USE in_out_manager ! I/O manager
    USE iom            ! I/O manager library
@@ -35,39 +37,39 @@ MODULE iceistate
 
    PUBLIC   ice_istate        ! called by icestp.F90
    PUBLIC   ice_istate_init   ! called by icestp.F90
-
-   INTEGER , PARAMETER ::   jpfldi = 6           ! maximum number of files to read
-   INTEGER , PARAMETER ::   jp_hti = 1           ! index of ice thickness (m)    at T-point
-   INTEGER , PARAMETER ::   jp_hts = 2           ! index of snow thicknes (m)    at T-point
-   INTEGER , PARAMETER ::   jp_ati = 3           ! index of ice fraction (%) at T-point
-   INTEGER , PARAMETER ::   jp_tsu = 4           ! index of ice surface temp (K)    at T-point
-   INTEGER , PARAMETER ::   jp_tmi = 5           ! index of ice temp at T-point
-   INTEGER , PARAMETER ::   jp_smi = 6           ! index of ice sali at T-point
-   TYPE(FLD), ALLOCATABLE, DIMENSION(:) ::   si  ! structure of input fields (file informations, fields read)
    !
    !                             !! ** namelist (namini) **
-   LOGICAL  ::   ln_iceini        ! initialization or not
-   LOGICAL  ::   ln_iceini_file   ! Ice initialization state from 2D netcdf file
-   REAL(wp) ::   rn_thres_sst     ! threshold water temperature for initial sea ice
-   REAL(wp) ::   rn_hts_ini_n     ! initial snow thickness in the north
-   REAL(wp) ::   rn_hts_ini_s     ! initial snow thickness in the south
-   REAL(wp) ::   rn_hti_ini_n     ! initial ice thickness in the north
-   REAL(wp) ::   rn_hti_ini_s     ! initial ice thickness in the south
-   REAL(wp) ::   rn_ati_ini_n     ! initial leads area in the north
-   REAL(wp) ::   rn_ati_ini_s     ! initial leads area in the south
-   REAL(wp) ::   rn_smi_ini_n     ! initial salinity 
-   REAL(wp) ::   rn_smi_ini_s     ! initial salinity
-   REAL(wp) ::   rn_tmi_ini_n     ! initial temperature
-   REAL(wp) ::   rn_tmi_ini_s     ! initial temperature
-   
+   LOGICAL, PUBLIC  ::   ln_iceini        !: Ice initialization or not
+   LOGICAL, PUBLIC  ::   ln_iceini_file   !: Ice initialization from 2D netcdf file
+   REAL(wp) ::   rn_thres_sst
+   REAL(wp) ::   rn_hti_ini_n, rn_hts_ini_n, rn_ati_ini_n, rn_smi_ini_n, rn_tmi_ini_n, rn_tsu_ini_n, rn_tms_ini_n
+   REAL(wp) ::   rn_hti_ini_s, rn_hts_ini_s, rn_ati_ini_s, rn_smi_ini_s, rn_tmi_ini_s, rn_tsu_ini_s, rn_tms_ini_s
+   REAL(wp) ::   rn_apd_ini_n, rn_hpd_ini_n
+   REAL(wp) ::   rn_apd_ini_s, rn_hpd_ini_s
+   !
+   !                              ! if ln_iceini_file = T
+   INTEGER , PARAMETER ::   jpfldi = 9           ! maximum number of files to read
+   INTEGER , PARAMETER ::   jp_hti = 1           ! index of ice thickness    (m)
+   INTEGER , PARAMETER ::   jp_hts = 2           ! index of snw thickness    (m)
+   INTEGER , PARAMETER ::   jp_ati = 3           ! index of ice fraction     (-)
+   INTEGER , PARAMETER ::   jp_smi = 4           ! index of ice salinity     (g/kg)
+   INTEGER , PARAMETER ::   jp_tmi = 5           ! index of ice temperature  (K)
+   INTEGER , PARAMETER ::   jp_tsu = 6           ! index of ice surface temp (K)
+   INTEGER , PARAMETER ::   jp_tms = 7           ! index of snw temperature  (K)
+   INTEGER , PARAMETER ::   jp_apd = 8           ! index of pnd fraction     (-)
+   INTEGER , PARAMETER ::   jp_hpd = 9           ! index of pnd depth        (m)
+   TYPE(FLD), ALLOCATABLE, DIMENSION(:) ::   si  ! structure of input fields (file informations, fields read)
+   !   
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/ICE 4.0 , NEMO Consortium (2018)
-   !! $Id: iceistate.F90 10534 2019-01-16 16:49:45Z clem $
+   !! $Id: iceistate.F90 12736 2020-04-10 14:23:32Z jchanut $
    !! Software governed by the CeCILL licence (modipsl/doc/NEMO_CeCILL.txt)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE ice_istate
+   SUBROUTINE ice_istate( kt, Kbb, Kmm, Kaa )
       !!-------------------------------------------------------------------
       !!                    ***  ROUTINE ice_istate  ***
       !!
@@ -86,63 +88,151 @@ CONTAINS
       !!                6) store before fields
       !!
       !! ** Notes   : o_i, t_su, t_s, t_i, sz_i must be filled everywhere, even
-      !!              where there is no ice (clem: I do not know why, is it mandatory?) 
+      !!              where there is no ice
       !!--------------------------------------------------------------------
+      INTEGER, INTENT(in) :: kt            ! time step 
+      INTEGER, INTENT(in) :: Kbb, Kmm, Kaa ! ocean time level indices
+      !
       INTEGER  ::   ji, jj, jk, jl         ! dummy loop indices
-      INTEGER  ::   i_hemis, i_fill, jl0   ! local integers
-      REAL(wp) ::   ztmelts, zdh
-      REAL(wp) ::   zarg, zV, zconv, zdv, zfac
+      REAL(wp) ::   ztmelts
       INTEGER , DIMENSION(4)           ::   itest
       REAL(wp), DIMENSION(jpi,jpj)     ::   z2d
       REAL(wp), DIMENSION(jpi,jpj)     ::   zswitch    ! ice indicator
-      REAL(wp), DIMENSION(jpi,jpj)     ::   zht_i_ini, zat_i_ini, zvt_i_ini            !data from namelist or nc file
-      REAL(wp), DIMENSION(jpi,jpj)     ::   zts_u_ini, zht_s_ini, zsm_i_ini, ztm_i_ini !data from namelist or nc file
-      REAL(wp), DIMENSION(jpi,jpj,jpl) ::   zh_i_ini , za_i_ini                        !data by cattegories to fill
+      REAL(wp), DIMENSION(jpi,jpj)     ::   zht_i_ini, zat_i_ini, ztm_s_ini            !data from namelist or nc file
+      REAL(wp), DIMENSION(jpi,jpj)     ::   zt_su_ini, zht_s_ini, zsm_i_ini, ztm_i_ini !data from namelist or nc file
+      REAL(wp), DIMENSION(jpi,jpj)     ::   zapnd_ini, zhpnd_ini                       !data from namelist or nc file
+      REAL(wp), DIMENSION(jpi,jpj,jpl) ::   zti_3d , zts_3d                            !temporary arrays
+      !!
+      REAL(wp), DIMENSION(:,:), ALLOCATABLE ::   zhi_2d, zhs_2d, zai_2d, zti_2d, zts_2d, ztsu_2d, zsi_2d, zaip_2d, zhip_2d
       !--------------------------------------------------------------------
 
       IF(lwp) WRITE(numout,*)
       IF(lwp) WRITE(numout,*) 'ice_istate: sea-ice initialization '
       IF(lwp) WRITE(numout,*) '~~~~~~~~~~'
 
-      !--------------------------------------------------------------------
-      ! 1) Set surface and bottom temperatures to initial values
-      !--------------------------------------------------------------------
+      !---------------------------
+      ! 1) 1st init. of the fields
+      !---------------------------
       !
-      ! init surface temperature
+      ! basal temperature (considered at freezing point)   [Kelvin]
+      CALL eos_fzp( sss_m(:,:), t_bo(:,:) )
+      t_bo(:,:) = ( t_bo(:,:) + rt0 ) * tmask(:,:,1) 
+      !
+      ! surface temperature and conductivity
       DO jl = 1, jpl
          t_su   (:,:,jl) = rt0 * tmask(:,:,1)  ! temp at the surface
          cnd_ice(:,:,jl) = 0._wp               ! initialisation of the effective conductivity at the top of ice/snow (ln_cndflx=T)
       END DO
       !
-      ! init basal temperature (considered at freezing point)   [Kelvin]
-      CALL eos_fzp( sss_m(:,:), t_bo(:,:) )
-      t_bo(:,:) = ( t_bo(:,:) + rt0 ) * tmask(:,:,1) 
+      ! ice and snw temperatures
+      DO jl = 1, jpl
+         DO jk = 1, nlay_i
+            t_i(:,:,jk,jl) = rt0 * tmask(:,:,1)
+         END DO
+         DO jk = 1, nlay_s
+            t_s(:,:,jk,jl) = rt0 * tmask(:,:,1)
+         END DO
+      END DO
+      !
+      ! specific temperatures for coupled runs
+      tn_ice (:,:,:) = t_i (:,:,1,:)
+      t1_ice (:,:,:) = t_i (:,:,1,:)
 
+      ! heat contents
+      e_i (:,:,:,:) = 0._wp
+      e_s (:,:,:,:) = 0._wp
+      
+      ! general fields
+      a_i (:,:,:) = 0._wp
+      v_i (:,:,:) = 0._wp
+      v_s (:,:,:) = 0._wp
+      sv_i(:,:,:) = 0._wp
+      oa_i(:,:,:) = 0._wp
+      !
+      h_i (:,:,:) = 0._wp
+      h_s (:,:,:) = 0._wp
+      s_i (:,:,:) = 0._wp
+      o_i (:,:,:) = 0._wp
+      !
+      ! melt ponds
+      a_ip     (:,:,:) = 0._wp
+      v_ip     (:,:,:) = 0._wp
+      a_ip_frac(:,:,:) = 0._wp
+      h_ip     (:,:,:) = 0._wp
+      !
+      ! ice velocities
+      u_ice (:,:) = 0._wp
+      v_ice (:,:) = 0._wp
+      !
+      !------------------------------------------------------------------------
+      ! 2) overwrite some of the fields with namelist parameters or netcdf file
+      !------------------------------------------------------------------------
       IF( ln_iceini ) THEN
-         !-----------------------------------------------------------
-         ! 2) Compute or read sea ice variables ===> single category
-         !-----------------------------------------------------------
-         !
          !                             !---------------!
          IF( ln_iceini_file )THEN      ! Read a file   !
             !                          !---------------!
-            !
-            zht_i_ini(:,:)  = si(jp_hti)%fnow(:,:,1)
-            zht_s_ini(:,:)  = si(jp_hts)%fnow(:,:,1)
-            zat_i_ini(:,:)  = si(jp_ati)%fnow(:,:,1)
-            zts_u_ini(:,:)  = si(jp_tsu)%fnow(:,:,1)
-            ztm_i_ini(:,:)  = si(jp_tmi)%fnow(:,:,1)
-            zsm_i_ini(:,:)  = si(jp_smi)%fnow(:,:,1)
-            !
-            WHERE( zat_i_ini(:,:) > 0._wp ) ; zswitch(:,:) = tmask(:,:,1) 
-            ELSEWHERE                       ; zswitch(:,:) = 0._wp
+            WHERE( ff_t(:,:) >= 0._wp )   ;   zswitch(:,:) = 1._wp
+            ELSEWHERE                     ;   zswitch(:,:) = 0._wp
             END WHERE
-            zvt_i_ini(:,:) = zht_i_ini(:,:) * zat_i_ini(:,:)
             !
+            CALL fld_read( kt, 1, si ) ! input fields provided at the current time-step
+            !
+            ! -- mandatory fields -- !
+            zht_i_ini(:,:) = si(jp_hti)%fnow(:,:,1) * tmask(:,:,1)
+            zht_s_ini(:,:) = si(jp_hts)%fnow(:,:,1) * tmask(:,:,1)
+            zat_i_ini(:,:) = si(jp_ati)%fnow(:,:,1) * tmask(:,:,1)
+
+            ! -- optional fields -- !
+            !    if fields do not exist then set them to the values present in the namelist (except for snow and surface temperature)
+            !
+            ! ice salinity
+            IF( TRIM(si(jp_smi)%clrootname) == 'NOT USED' ) &
+               &     si(jp_smi)%fnow(:,:,1) = ( rn_smi_ini_n * zswitch + rn_smi_ini_s * (1._wp - zswitch) ) * tmask(:,:,1)
+            !
+            ! temperatures
+            IF    ( TRIM(si(jp_tmi)%clrootname) == 'NOT USED' .AND. TRIM(si(jp_tsu)%clrootname) == 'NOT USED' .AND. &
+               &    TRIM(si(jp_tms)%clrootname) == 'NOT USED' ) THEN
+               si(jp_tmi)%fnow(:,:,1) = ( rn_tmi_ini_n * zswitch + rn_tmi_ini_s * (1._wp - zswitch) ) * tmask(:,:,1)
+               si(jp_tsu)%fnow(:,:,1) = ( rn_tsu_ini_n * zswitch + rn_tsu_ini_s * (1._wp - zswitch) ) * tmask(:,:,1)
+               si(jp_tms)%fnow(:,:,1) = ( rn_tms_ini_n * zswitch + rn_tms_ini_s * (1._wp - zswitch) ) * tmask(:,:,1)
+            ELSEIF( TRIM(si(jp_tmi)%clrootname) == 'NOT USED' .AND. TRIM(si(jp_tms)%clrootname) /= 'NOT USED' ) THEN ! if T_s is read and not T_i, set T_i = (T_s + T_freeze)/2
+               si(jp_tmi)%fnow(:,:,1) = 0.5_wp * ( si(jp_tms)%fnow(:,:,1) + 271.15 )
+            ELSEIF( TRIM(si(jp_tmi)%clrootname) == 'NOT USED' .AND. TRIM(si(jp_tsu)%clrootname) /= 'NOT USED' ) THEN ! if T_su is read and not T_i, set T_i = (T_su + T_freeze)/2
+               si(jp_tmi)%fnow(:,:,1) = 0.5_wp * ( si(jp_tsu)%fnow(:,:,1) + 271.15 )
+            ELSEIF( TRIM(si(jp_tsu)%clrootname) == 'NOT USED' .AND. TRIM(si(jp_tms)%clrootname) /= 'NOT USED' ) THEN ! if T_s is read and not T_su, set T_su = T_s
+               si(jp_tsu)%fnow(:,:,1) = si(jp_tms)%fnow(:,:,1)
+            ELSEIF( TRIM(si(jp_tsu)%clrootname) == 'NOT USED' .AND. TRIM(si(jp_tmi)%clrootname) /= 'NOT USED' ) THEN ! if T_i is read and not T_su, set T_su = T_i
+               si(jp_tsu)%fnow(:,:,1) = si(jp_tmi)%fnow(:,:,1)
+            ELSEIF( TRIM(si(jp_tms)%clrootname) == 'NOT USED' .AND. TRIM(si(jp_tsu)%clrootname) /= 'NOT USED' ) THEN ! if T_su is read and not T_s, set T_s = T_su
+               si(jp_tms)%fnow(:,:,1) = si(jp_tsu)%fnow(:,:,1)
+            ELSEIF( TRIM(si(jp_tms)%clrootname) == 'NOT USED' .AND. TRIM(si(jp_tmi)%clrootname) /= 'NOT USED' ) THEN ! if T_i is read and not T_s, set T_s = T_i
+               si(jp_tms)%fnow(:,:,1) = si(jp_tmi)%fnow(:,:,1)
+            ENDIF
+            !
+            ! pond concentration
+            IF( TRIM(si(jp_apd)%clrootname) == 'NOT USED' ) &
+               &     si(jp_apd)%fnow(:,:,1) = ( rn_apd_ini_n * zswitch + rn_apd_ini_s * (1._wp - zswitch) ) * tmask(:,:,1) & ! rn_apd = pond fraction => rn_apnd * a_i = pond conc.
+               &                              * si(jp_ati)%fnow(:,:,1) 
+            !
+            ! pond depth
+            IF( TRIM(si(jp_hpd)%clrootname) == 'NOT USED' ) &
+               &     si(jp_hpd)%fnow(:,:,1) = ( rn_hpd_ini_n * zswitch + rn_hpd_ini_s * (1._wp - zswitch) ) * tmask(:,:,1)
+            !
+            zsm_i_ini(:,:) = si(jp_smi)%fnow(:,:,1) * tmask(:,:,1)
+            ztm_i_ini(:,:) = si(jp_tmi)%fnow(:,:,1) * tmask(:,:,1)
+            zt_su_ini(:,:) = si(jp_tsu)%fnow(:,:,1) * tmask(:,:,1)
+            ztm_s_ini(:,:) = si(jp_tms)%fnow(:,:,1) * tmask(:,:,1)
+            zapnd_ini(:,:) = si(jp_apd)%fnow(:,:,1) * tmask(:,:,1)
+            zhpnd_ini(:,:) = si(jp_hpd)%fnow(:,:,1) * tmask(:,:,1)
+            !
+            ! change the switch for the following
+            WHERE( zat_i_ini(:,:) > 0._wp )   ;   zswitch(:,:) = tmask(:,:,1) 
+            ELSEWHERE                         ;   zswitch(:,:) = 0._wp
+            END WHERE
             !                          !---------------!
          ELSE                          ! Read namelist !
             !                          !---------------!
-            ! no ice if sst <= t-freez + ttest
+            ! no ice if (sst - Tfreez) >= thresold
             WHERE( ( sst_m(:,:) - (t_bo(:,:) - rt0) ) * tmask(:,:,1) >= rn_thres_sst )   ;   zswitch(:,:) = 0._wp 
             ELSEWHERE                                                                    ;   zswitch(:,:) = tmask(:,:,1)
             END WHERE
@@ -152,324 +242,183 @@ CONTAINS
                zht_i_ini(:,:) = rn_hti_ini_n * zswitch(:,:)
                zht_s_ini(:,:) = rn_hts_ini_n * zswitch(:,:)
                zat_i_ini(:,:) = rn_ati_ini_n * zswitch(:,:)
-               zts_u_ini(:,:) = rn_tmi_ini_n * zswitch(:,:)
                zsm_i_ini(:,:) = rn_smi_ini_n * zswitch(:,:)
                ztm_i_ini(:,:) = rn_tmi_ini_n * zswitch(:,:)
+               zt_su_ini(:,:) = rn_tsu_ini_n * zswitch(:,:)
+               ztm_s_ini(:,:) = rn_tms_ini_n * zswitch(:,:)
+               zapnd_ini(:,:) = rn_apd_ini_n * zswitch(:,:) * zat_i_ini(:,:) ! rn_apd = pond fraction => rn_apd * a_i = pond conc. 
+               zhpnd_ini(:,:) = rn_hpd_ini_n * zswitch(:,:)
             ELSEWHERE
                zht_i_ini(:,:) = rn_hti_ini_s * zswitch(:,:)
                zht_s_ini(:,:) = rn_hts_ini_s * zswitch(:,:)
                zat_i_ini(:,:) = rn_ati_ini_s * zswitch(:,:)
-               zts_u_ini(:,:) = rn_tmi_ini_s * zswitch(:,:)
                zsm_i_ini(:,:) = rn_smi_ini_s * zswitch(:,:)
                ztm_i_ini(:,:) = rn_tmi_ini_s * zswitch(:,:)
+               zt_su_ini(:,:) = rn_tsu_ini_s * zswitch(:,:)
+               ztm_s_ini(:,:) = rn_tms_ini_s * zswitch(:,:)
+               zapnd_ini(:,:) = rn_apd_ini_s * zswitch(:,:) * zat_i_ini(:,:) ! rn_apd = pond fraction => rn_apd * a_i = pond conc.
+               zhpnd_ini(:,:) = rn_hpd_ini_s * zswitch(:,:)
             END WHERE
-            zvt_i_ini(:,:) = zht_i_ini(:,:) * zat_i_ini(:,:)
             !
+         ENDIF
+
+         ! make sure ponds = 0 if no ponds scheme
+         IF ( .NOT.ln_pnd ) THEN
+            zapnd_ini(:,:) = 0._wp
+            zhpnd_ini(:,:) = 0._wp
          ENDIF
          
-         !------------------------------------------------------------------
-         ! 3) Distribute ice concentration and thickness into the categories
-         !------------------------------------------------------------------
-         ! a gaussian distribution for ice concentration is used
-         ! then we check whether the distribution fullfills
-         ! volume and area conservation, positivity and ice categories bounds
+         !-------------!
+         ! fill fields !
+         !-------------!
+         ! select ice covered grid points
+         npti = 0 ; nptidx(:) = 0
+         DO_2D_11_11
+            IF ( zht_i_ini(ji,jj) > 0._wp ) THEN
+               npti         = npti  + 1
+               nptidx(npti) = (jj - 1) * jpi + ji
+            ENDIF
+         END_2D
 
-         IF( jpl == 1 ) THEN
-            !
-            zh_i_ini(:,:,1) = zht_i_ini(:,:)
-            za_i_ini(:,:,1) = zat_i_ini(:,:)            
-            !
-         ELSE
-            zh_i_ini(:,:,:) = 0._wp 
-            za_i_ini(:,:,:) = 0._wp
-            !
-            DO jj = 1, jpj
-               DO ji = 1, jpi
-                  !
-                  IF( zat_i_ini(ji,jj) > 0._wp .AND. zht_i_ini(ji,jj) > 0._wp )THEN
+         ! move to 1D arrays: (jpi,jpj) -> (jpi*jpj)
+         CALL tab_2d_1d( npti, nptidx(1:npti), h_i_1d (1:npti)  , zht_i_ini )
+         CALL tab_2d_1d( npti, nptidx(1:npti), h_s_1d (1:npti)  , zht_s_ini )
+         CALL tab_2d_1d( npti, nptidx(1:npti), at_i_1d(1:npti)  , zat_i_ini )
+         CALL tab_2d_1d( npti, nptidx(1:npti), t_i_1d (1:npti,1), ztm_i_ini )
+         CALL tab_2d_1d( npti, nptidx(1:npti), t_s_1d (1:npti,1), ztm_s_ini )
+         CALL tab_2d_1d( npti, nptidx(1:npti), t_su_1d(1:npti)  , zt_su_ini )
+         CALL tab_2d_1d( npti, nptidx(1:npti), s_i_1d (1:npti)  , zsm_i_ini )
+         CALL tab_2d_1d( npti, nptidx(1:npti), a_ip_1d(1:npti)  , zapnd_ini )
+         CALL tab_2d_1d( npti, nptidx(1:npti), h_ip_1d(1:npti)  , zhpnd_ini )
 
-                     ! find which category (jl0) the input ice thickness falls into
-                     jl0 = jpl
-                     DO jl = 1, jpl
-                        IF ( ( zht_i_ini(ji,jj) >  hi_max(jl-1) ) .AND. ( zht_i_ini(ji,jj) <= hi_max(jl) ) ) THEN
-                           jl0 = jl
-                           CYCLE
-                        ENDIF
-                     END DO
-                     !
-                     itest(:) = 0
-                     i_fill   = jpl + 1                                            !------------------------------------
-                     DO WHILE ( ( SUM( itest(:) ) /= 4 ) .AND. ( i_fill >= 2 ) )   ! iterative loop on i_fill categories
-                        !                                                          !------------------------------------
-                        i_fill = i_fill - 1
-                        !
-                        zh_i_ini(ji,jj,:) = 0._wp 
-                        za_i_ini(ji,jj,:) = 0._wp
-                        itest(:) = 0
-                        !
-                        IF ( i_fill == 1 ) THEN      !-- case very thin ice: fill only category 1
-                           zh_i_ini(ji,jj,1) = zht_i_ini(ji,jj)
-                           za_i_ini(ji,jj,1) = zat_i_ini(ji,jj)
-                        ELSE                         !-- case ice is thicker: fill categories >1
-                           ! thickness
-                           DO jl = 1, i_fill-1
-                              zh_i_ini(ji,jj,jl) = hi_mean(jl)
-                           END DO
-                           !
-                           ! concentration
-                           za_i_ini(ji,jj,jl0) = zat_i_ini(ji,jj) / SQRT(REAL(jpl))
-                           DO jl = 1, i_fill - 1
-                              IF( jl /= jl0 )THEN
-                                 zarg               = ( zh_i_ini(ji,jj,jl) - zht_i_ini(ji,jj) ) / ( 0.5_wp * zht_i_ini(ji,jj) )
-                                 za_i_ini(ji,jj,jl) = za_i_ini(ji,jj,jl0) * EXP(-zarg**2)
-                              ENDIF
-                           END DO
-
-                           ! last category
-                           za_i_ini(ji,jj,i_fill) = zat_i_ini(ji,jj) - SUM( za_i_ini(ji,jj,1:i_fill-1) )
-                           zV = SUM( za_i_ini(ji,jj,1:i_fill-1) * zh_i_ini(ji,jj,1:i_fill-1) )
-                           zh_i_ini(ji,jj,i_fill) = ( zvt_i_ini(ji,jj) - zV ) / MAX( za_i_ini(ji,jj,i_fill), epsi10 ) 
-
-                           ! correction if concentration of upper cat is greater than lower cat
-                           !   (it should be a gaussian around jl0 but sometimes it is not)
-                           IF ( jl0 /= jpl ) THEN
-                              DO jl = jpl, jl0+1, -1
-                                 IF ( za_i_ini(ji,jj,jl) > za_i_ini(ji,jj,jl-1) ) THEN
-                                    zdv = zh_i_ini(ji,jj,jl) * za_i_ini(ji,jj,jl)
-                                    zh_i_ini(ji,jj,jl    ) = 0._wp
-                                    za_i_ini(ji,jj,jl    ) = 0._wp
-                                    za_i_ini(ji,jj,1:jl-1) = za_i_ini(ji,jj,1:jl-1)  &
-                                       &                     + zdv / MAX( REAL(jl-1) * zht_i_ini(ji,jj), epsi10 )
-                                 END IF
-                              ENDDO
-                           ENDIF
-                           !
-                        ENDIF
-                        !
-                        ! Compatibility tests
-                        zconv = ABS( zat_i_ini(ji,jj) - SUM( za_i_ini(ji,jj,1:jpl) ) )           ! Test 1: area conservation
-                        IF ( zconv < epsi06 ) itest(1) = 1
-                        !
-                        zconv = ABS(       zat_i_ini(ji,jj)       * zht_i_ini(ji,jj)   &         ! Test 2: volume conservation
-                           &        - SUM( za_i_ini (ji,jj,1:jpl) * zh_i_ini (ji,jj,1:jpl) ) )
-                        IF ( zconv < epsi06 ) itest(2) = 1
-                        !
-                        IF ( zh_i_ini(ji,jj,i_fill) >= hi_max(i_fill-1) ) itest(3) = 1           ! Test 3: thickness of the last category is in-bounds ?
-                        !
-                        itest(4) = 1
-                        DO jl = 1, i_fill
-                           IF ( za_i_ini(ji,jj,jl) < 0._wp ) itest(4) = 0                        ! Test 4: positivity of ice concentrations
-                        END DO
-                        !                                                          !----------------------------
-                     END DO                                                        ! end iteration on categories
-                     !                                                             !----------------------------
-                     IF( lwp .AND. SUM(itest) /= 4 ) THEN 
-                        WRITE(numout,*)
-                        WRITE(numout,*) ' !!!! ALERT itest is not equal to 4      !!! '
-                        WRITE(numout,*) ' !!!! Something is wrong in the SI3 initialization procedure '
-                        WRITE(numout,*)
-                        WRITE(numout,*) ' *** itest_i (i=1,4) = ', itest(:)
-                        WRITE(numout,*) ' zat_i_ini : ', zat_i_ini(ji,jj)
-                        WRITE(numout,*) ' zht_i_ini : ', zht_i_ini(ji,jj)
-                     ENDIF
-                     !
-                  ENDIF
-                  !
-               END DO
-            END DO
-         ENDIF
+         ! allocate temporary arrays
+         ALLOCATE( zhi_2d(npti,jpl), zhs_2d(npti,jpl), zai_2d (npti,jpl), &
+            &      zti_2d(npti,jpl), zts_2d(npti,jpl), ztsu_2d(npti,jpl), zsi_2d(npti,jpl), zaip_2d(npti,jpl), zhip_2d(npti,jpl) )
          
-         !---------------------------------------------------------------------
-         ! 4) Fill in sea ice arrays
-         !---------------------------------------------------------------------
-         !
-         ! Ice concentration, thickness and volume, ice salinity, ice age, surface temperature
-         DO jl = 1, jpl ! loop over categories
-            DO jj = 1, jpj
-               DO ji = 1, jpi
-                  a_i(ji,jj,jl)  = zswitch(ji,jj) * za_i_ini(ji,jj,jl)                       ! concentration
-                  h_i(ji,jj,jl)  = zswitch(ji,jj) * zh_i_ini(ji,jj,jl)                       ! ice thickness
-                  s_i(ji,jj,jl)  = zswitch(ji,jj) * zsm_i_ini(ji,jj)                         ! salinity
-                  o_i(ji,jj,jl)  = 0._wp                                                     ! age (0 day)
-                  t_su(ji,jj,jl) = zswitch(ji,jj) * zts_u_ini(ji,jj) + ( 1._wp - zswitch(ji,jj) ) * rt0 ! surf temp
-                  !
-                  IF( zht_i_ini(ji,jj) > 0._wp )THEN
-                    h_s(ji,jj,jl)= h_i(ji,jj,jl) * ( zht_s_ini(ji,jj) / zht_i_ini(ji,jj) )  ! snow depth
-                  ELSE
-                    h_s(ji,jj,jl)= 0._wp
-                  ENDIF
-                  !
-                  ! This case below should not be used if (h_s/h_i) is ok in namelist
-                  ! In case snow load is in excess that would lead to transformation from snow to ice
-                  ! Then, transfer the snow excess into the ice (different from icethd_dh)
-                  zdh = MAX( 0._wp, ( rhos * h_s(ji,jj,jl) + ( rhoi - rau0 ) * h_i(ji,jj,jl) ) * r1_rau0 ) 
-                  ! recompute h_i, h_s avoiding out of bounds values
-                  h_i(ji,jj,jl) = MIN( hi_max(jl), h_i(ji,jj,jl) + zdh )
-                  h_s(ji,jj,jl) = MAX( 0._wp, h_s(ji,jj,jl) - zdh * rhoi * r1_rhos )
-                  !
-                  ! ice volume, salt content, age content
-                  v_i (ji,jj,jl) = h_i(ji,jj,jl) * a_i(ji,jj,jl)              ! ice volume
-                  v_s (ji,jj,jl) = h_s(ji,jj,jl) * a_i(ji,jj,jl)              ! snow volume
-                  sv_i(ji,jj,jl) = MIN( s_i(ji,jj,jl) , sss_m(ji,jj) ) * v_i(ji,jj,jl) ! salt content
-                  oa_i(ji,jj,jl) = o_i(ji,jj,jl) * a_i(ji,jj,jl)               ! age content
-               END DO
-            END DO
-         END DO
-         !
-         IF( nn_icesal /= 2 )  THEN         ! for constant salinity in time
-            CALL ice_var_salprof
-            sv_i = s_i * v_i
-         ENDIF
-         !  
-         ! Snow temperature and heat content
-         DO jk = 1, nlay_s
-            DO jl = 1, jpl ! loop over categories
-               DO jj = 1, jpj
-                  DO ji = 1, jpi
-                     t_s(ji,jj,jk,jl) = zswitch(ji,jj) * ztm_i_ini(ji,jj) + ( 1._wp - zswitch(ji,jj) ) * rt0
-                     ! Snow energy of melting
-                     e_s(ji,jj,jk,jl) = zswitch(ji,jj) * rhos * ( rcpi * ( rt0 - t_s(ji,jj,jk,jl) ) + rLfus )
-                     !
-                     ! Mutliply by volume, and divide by number of layers to get heat content in J/m2
-                     e_s(ji,jj,jk,jl) = e_s(ji,jj,jk,jl) * v_s(ji,jj,jl) * r1_nlay_s
-                  END DO
-               END DO
-            END DO
-         END DO
-         !
-         ! Ice salinity, temperature and heat content
-         DO jk = 1, nlay_i
-            DO jl = 1, jpl ! loop over categories
-               DO jj = 1, jpj
-                  DO ji = 1, jpi
-                     t_i (ji,jj,jk,jl) = zswitch(ji,jj) * ztm_i_ini(ji,jj) + ( 1._wp - zswitch(ji,jj) ) * rt0 
-                     sz_i(ji,jj,jk,jl) = zswitch(ji,jj) * zsm_i_ini(ji,jj) + ( 1._wp - zswitch(ji,jj) ) * rn_simin
-                     ztmelts          = - rTmlt * sz_i(ji,jj,jk,jl) + rt0 !Melting temperature in K
-                     !
-                     ! heat content per unit volume
-                     e_i(ji,jj,jk,jl) = zswitch(ji,jj) * rhoi * (   rcpi    * ( ztmelts - t_i(ji,jj,jk,jl) )           &
-                        &             + rLfus * ( 1._wp - (ztmelts-rt0) / MIN( (t_i(ji,jj,jk,jl)-rt0) , -epsi20 )  )   &
-                        &             - rcp  * ( ztmelts - rt0 ) )
-                     !
-                     ! Mutliply by ice volume, and divide by number of layers to get heat content in J/m2
-                     e_i(ji,jj,jk,jl) = e_i(ji,jj,jk,jl) * v_i(ji,jj,jl) * r1_nlay_i
-                  END DO
-               END DO
-            END DO
-         END DO
-         !
-         tn_ice (:,:,:) = t_su (:,:,:)
-         t1_ice (:,:,:) = t_i (:,:,1,:)   ! initialisation of 1st layer temp for coupled simu
+         ! distribute 1-cat into jpl-cat: (jpi*jpj) -> (jpi*jpj,jpl)
+         CALL ice_var_itd( h_i_1d(1:npti)  , h_s_1d(1:npti)  , at_i_1d(1:npti),                                                   &
+            &              zhi_2d          , zhs_2d          , zai_2d         ,                                                   &
+            &              t_i_1d(1:npti,1), t_s_1d(1:npti,1), t_su_1d(1:npti), s_i_1d(1:npti), a_ip_1d(1:npti), h_ip_1d(1:npti), &
+            &              zti_2d          , zts_2d          , ztsu_2d        , zsi_2d        , zaip_2d        , zhip_2d )
 
-         ! Melt pond volume and fraction
-         IF ( ln_pnd_CST .OR. ln_pnd_H12 ) THEN   ;   zfac = 1._wp
-         ELSE                                     ;   zfac = 0._wp
-         ENDIF 
+         ! move to 3D arrays: (jpi*jpj,jpl) -> (jpi,jpj,jpl)
          DO jl = 1, jpl
-            a_ip_frac(:,:,jl) = rn_apnd * zswitch(:,:) * zfac
-            h_ip     (:,:,jl) = rn_hpnd * zswitch(:,:) * zfac
+            zti_3d(:,:,jl) = rt0 * tmask(:,:,1)
+            zts_3d(:,:,jl) = rt0 * tmask(:,:,1)
          END DO
-         a_ip(:,:,:) = a_ip_frac(:,:,:) * a_i (:,:,:) 
-         v_ip(:,:,:) = h_ip     (:,:,:) * a_ip(:,:,:)
-         !
-      ELSE ! if ln_iceini=false
-         a_i  (:,:,:) = 0._wp
-         v_i  (:,:,:) = 0._wp
-         v_s  (:,:,:) = 0._wp
-         sv_i (:,:,:) = 0._wp
-         oa_i (:,:,:) = 0._wp
-         h_i  (:,:,:) = 0._wp
-         h_s  (:,:,:) = 0._wp
-         s_i  (:,:,:) = 0._wp
-         o_i  (:,:,:) = 0._wp
-         !
-         e_i(:,:,:,:) = 0._wp
-         e_s(:,:,:,:) = 0._wp
+         CALL tab_2d_3d( npti, nptidx(1:npti), zhi_2d   , h_i    )
+         CALL tab_2d_3d( npti, nptidx(1:npti), zhs_2d   , h_s    )
+         CALL tab_2d_3d( npti, nptidx(1:npti), zai_2d   , a_i    )
+         CALL tab_2d_3d( npti, nptidx(1:npti), zti_2d   , zti_3d )
+         CALL tab_2d_3d( npti, nptidx(1:npti), zts_2d   , zts_3d )
+         CALL tab_2d_3d( npti, nptidx(1:npti), ztsu_2d  , t_su   )
+         CALL tab_2d_3d( npti, nptidx(1:npti), zsi_2d   , s_i    )
+         CALL tab_2d_3d( npti, nptidx(1:npti), zaip_2d  , a_ip   )
+         CALL tab_2d_3d( npti, nptidx(1:npti), zhip_2d  , h_ip   )
+
+         ! deallocate temporary arrays
+         DEALLOCATE( zhi_2d, zhs_2d, zai_2d , &
+            &        zti_2d, zts_2d, ztsu_2d, zsi_2d, zaip_2d, zhip_2d )
+
+         ! calculate extensive and intensive variables
+         CALL ice_var_salprof ! for sz_i
+         DO jl = 1, jpl
+            DO_2D_11_11
+               v_i (ji,jj,jl) = h_i(ji,jj,jl) * a_i(ji,jj,jl)
+               v_s (ji,jj,jl) = h_s(ji,jj,jl) * a_i(ji,jj,jl)
+               sv_i(ji,jj,jl) = MIN( MAX( rn_simin , s_i(ji,jj,jl) ) , rn_simax ) * v_i(ji,jj,jl)
+            END_2D
+         END DO
          !
          DO jl = 1, jpl
-            DO jk = 1, nlay_i
-               t_i(:,:,jk,jl) = rt0 * tmask(:,:,1)
-            END DO
-            DO jk = 1, nlay_s
-               t_s(:,:,jk,jl) = rt0 * tmask(:,:,1)
-            END DO
+            DO_3D_11_11( 1, nlay_s )
+               t_s(ji,jj,jk,jl) = zts_3d(ji,jj,jl)
+               e_s(ji,jj,jk,jl) = zswitch(ji,jj) * v_s(ji,jj,jl) * r1_nlay_s * &
+                  &               rhos * ( rcpi * ( rt0 - t_s(ji,jj,jk,jl) ) + rLfus )
+            END_3D
+         END DO
+         !
+         DO jl = 1, jpl
+            DO_3D_11_11( 1, nlay_i )
+               t_i (ji,jj,jk,jl) = zti_3d(ji,jj,jl) 
+               ztmelts          = - rTmlt * sz_i(ji,jj,jk,jl) + rt0 ! melting temperature in K
+               e_i(ji,jj,jk,jl) = zswitch(ji,jj) * v_i(ji,jj,jl) * r1_nlay_i * &
+                  &               rhoi * (  rcpi  * ( ztmelts - t_i(ji,jj,jk,jl) ) + &
+                  &                         rLfus * ( 1._wp - (ztmelts-rt0) / MIN( (t_i(ji,jj,jk,jl)-rt0), -epsi20 ) ) &
+                  &                       - rcp   * ( ztmelts - rt0 ) )
+            END_3D
          END DO
 
-         tn_ice (:,:,:) = t_i (:,:,1,:)
-         t1_ice (:,:,:) = t_i (:,:,1,:)   ! initialisation of 1st layer temp for coupled simu
-         
-         a_ip(:,:,:)      = 0._wp
-         v_ip(:,:,:)      = 0._wp
-         a_ip_frac(:,:,:) = 0._wp
-         h_ip     (:,:,:) = 0._wp
+         ! Melt ponds
+         WHERE( a_i > epsi10 )
+            a_ip_frac(:,:,:) = a_ip(:,:,:) / a_i(:,:,:)
+         ELSEWHERE
+            a_ip_frac(:,:,:) = 0._wp
+         END WHERE
+         v_ip(:,:,:) = h_ip(:,:,:) * a_ip(:,:,:)
+          
+         ! specific temperatures for coupled runs
+         tn_ice(:,:,:) = t_su(:,:,:)
+         t1_ice(:,:,:) = t_i (:,:,1,:)
          !
       ENDIF ! ln_iceini
       !
-      at_i (:,:) = 0.0_wp
-      DO jl = 1, jpl
-         at_i (:,:) = at_i (:,:) + a_i (:,:,jl)
-      END DO
-      !
-      ! --- set ice velocities --- !
-      u_ice (:,:) = 0._wp
-      v_ice (:,:) = 0._wp
-      ! fields needed for ice_dyn_adv_umx
-      l_split_advumx(1) = .FALSE.
+      at_i(:,:) = SUM( a_i, dim=3 )
       !
       !----------------------------------------------
-      ! 5) Snow-ice mass (case ice is fully embedded)
+      ! 3) Snow-ice mass (case ice is fully embedded)
       !----------------------------------------------
       snwice_mass  (:,:) = tmask(:,:,1) * SUM( rhos * v_s(:,:,:) + rhoi * v_i(:,:,:), dim=3  )   ! snow+ice mass
       snwice_mass_b(:,:) = snwice_mass(:,:)
       !
       IF( ln_ice_embd ) THEN            ! embedded sea-ice: deplete the initial ssh below sea-ice area
          !
-         sshn(:,:) = sshn(:,:) - snwice_mass(:,:) * r1_rau0
-         sshb(:,:) = sshb(:,:) - snwice_mass(:,:) * r1_rau0
+         ssh(:,:,Kmm) = ssh(:,:,Kmm) - snwice_mass(:,:) * r1_rho0
+         ssh(:,:,Kbb) = ssh(:,:,Kbb) - snwice_mass(:,:) * r1_rho0
          !
          IF( .NOT.ln_linssh ) THEN
             !
-            WHERE( ht_0(:,:) > 0 )   ;   z2d(:,:) = 1._wp + sshn(:,:)*tmask(:,:,1) / ht_0(:,:)
+            WHERE( ht_0(:,:) > 0 )   ;   z2d(:,:) = 1._wp + ssh(:,:,Kmm)*tmask(:,:,1) / ht_0(:,:)
             ELSEWHERE                ;   z2d(:,:) = 1._wp   ;   END WHERE
             !
             DO jk = 1,jpkm1                     ! adjust initial vertical scale factors                
-               e3t_n(:,:,jk) = e3t_0(:,:,jk) * z2d(:,:)
-               e3t_b(:,:,jk) = e3t_n(:,:,jk)
-               e3t_a(:,:,jk) = e3t_n(:,:,jk)
+               e3t(:,:,jk,Kmm) = e3t_0(:,:,jk) * z2d(:,:)
+               e3t(:,:,jk,Kbb) = e3t(:,:,jk,Kmm)
+               e3t(:,:,jk,Kaa) = e3t(:,:,jk,Kmm)
             END DO
             !
             ! Reconstruction of all vertical scale factors at now and before time-steps
             ! =========================================================================
             ! Horizontal scale factor interpolations
             ! --------------------------------------
-            CALL dom_vvl_interpol( e3t_b(:,:,:), e3u_b(:,:,:), 'U' )
-            CALL dom_vvl_interpol( e3t_b(:,:,:), e3v_b(:,:,:), 'V' )
-            CALL dom_vvl_interpol( e3t_n(:,:,:), e3u_n(:,:,:), 'U' )
-            CALL dom_vvl_interpol( e3t_n(:,:,:), e3v_n(:,:,:), 'V' )
-            CALL dom_vvl_interpol( e3u_n(:,:,:), e3f_n(:,:,:), 'F' )
+            CALL dom_vvl_interpol( e3t(:,:,:,Kbb), e3u(:,:,:,Kbb), 'U' )
+            CALL dom_vvl_interpol( e3t(:,:,:,Kbb), e3v(:,:,:,Kbb), 'V' )
+            CALL dom_vvl_interpol( e3t(:,:,:,Kmm), e3u(:,:,:,Kmm), 'U' )
+            CALL dom_vvl_interpol( e3t(:,:,:,Kmm), e3v(:,:,:,Kmm), 'V' )
+            CALL dom_vvl_interpol( e3u(:,:,:,Kmm), e3f(:,:,:), 'F' )
             ! Vertical scale factor interpolations
             ! ------------------------------------
-            CALL dom_vvl_interpol( e3t_n(:,:,:), e3w_n (:,:,:), 'W'  )
-            CALL dom_vvl_interpol( e3u_n(:,:,:), e3uw_n(:,:,:), 'UW' )
-            CALL dom_vvl_interpol( e3v_n(:,:,:), e3vw_n(:,:,:), 'VW' )
-            CALL dom_vvl_interpol( e3u_b(:,:,:), e3uw_b(:,:,:), 'UW' )
-            CALL dom_vvl_interpol( e3v_b(:,:,:), e3vw_b(:,:,:), 'VW' )
+            CALL dom_vvl_interpol( e3t(:,:,:,Kmm), e3w (:,:,:,Kmm), 'W'  )
+            CALL dom_vvl_interpol( e3u(:,:,:,Kmm), e3uw(:,:,:,Kmm), 'UW' )
+            CALL dom_vvl_interpol( e3v(:,:,:,Kmm), e3vw(:,:,:,Kmm), 'VW' )
+            CALL dom_vvl_interpol( e3u(:,:,:,Kbb), e3uw(:,:,:,Kbb), 'UW' )
+            CALL dom_vvl_interpol( e3v(:,:,:,Kbb), e3vw(:,:,:,Kbb), 'VW' )
             ! t- and w- points depth
             ! ----------------------
             !!gm not sure of that....
-            gdept_n(:,:,1) = 0.5_wp * e3w_n(:,:,1)
-            gdepw_n(:,:,1) = 0.0_wp
-            gde3w_n(:,:,1) = gdept_n(:,:,1) - sshn(:,:)
+            gdept(:,:,1,Kmm) = 0.5_wp * e3w(:,:,1,Kmm)
+            gdepw(:,:,1,Kmm) = 0.0_wp
+            gde3w(:,:,1) = gdept(:,:,1,Kmm) - ssh(:,:,Kmm)
             DO jk = 2, jpk
-               gdept_n(:,:,jk) = gdept_n(:,:,jk-1) + e3w_n(:,:,jk  )
-               gdepw_n(:,:,jk) = gdepw_n(:,:,jk-1) + e3t_n(:,:,jk-1)
-               gde3w_n(:,:,jk) = gdept_n(:,:,jk  ) - sshn (:,:)
+               gdept(:,:,jk,Kmm) = gdept(:,:,jk-1,Kmm) + e3w(:,:,jk  ,Kmm)
+               gdepw(:,:,jk,Kmm) = gdepw(:,:,jk-1,Kmm) + e3t(:,:,jk-1,Kmm)
+               gde3w(:,:,jk) = gdept(:,:,jk  ,Kmm) - ssh (:,:,Kmm)
             END DO
          ENDIF
       ENDIF
       
       !------------------------------------
-      ! 6) store fields at before time-step
+      ! 4) store fields at before time-step
       !------------------------------------
       ! it is only necessary for the 1st interpolation by Agrif
       a_i_b  (:,:,:)   = a_i  (:,:,:)
@@ -486,7 +435,7 @@ CONTAINS
 
 !!clem: output of initial state should be written here but it is impossible because
 !!      the ocean and ice are in the same file
-!!      CALL dia_wri_state( 'output.init' )
+!!      CALL dia_wri_state( Kmm, 'output.init' )
       !
    END SUBROUTINE ice_istate
 
@@ -503,50 +452,51 @@ CONTAINS
       !! ** input   :  Namelist namini
       !!
       !!-----------------------------------------------------------------------------
-      INTEGER ::   ji, jj
-      INTEGER ::   ios, ierr, inum_ice   ! Local integer output status for namelist read
+      INTEGER ::   ios   ! Local integer output status for namelist read
       INTEGER ::   ifpr, ierror
       !
       CHARACTER(len=256) ::  cn_dir          ! Root directory for location of ice files
-      TYPE(FLD_N)                    ::   sn_hti, sn_hts, sn_ati, sn_tsu, sn_tmi, sn_smi
+      TYPE(FLD_N)                    ::   sn_hti, sn_hts, sn_ati, sn_smi, sn_tmi, sn_tsu, sn_tms, sn_apd, sn_hpd
       TYPE(FLD_N), DIMENSION(jpfldi) ::   slf_i                 ! array of namelist informations on the fields to read
       !
-      NAMELIST/namini/ ln_iceini, ln_iceini_file, rn_thres_sst, rn_hts_ini_n, rn_hts_ini_s,  &
-         &             rn_hti_ini_n, rn_hti_ini_s, rn_ati_ini_n, rn_ati_ini_s, rn_smi_ini_n, &
-         &             rn_smi_ini_s, rn_tmi_ini_n, rn_tmi_ini_s,                             &
-         &             sn_hti, sn_hts, sn_ati, sn_tsu, sn_tmi, sn_smi, cn_dir
+      NAMELIST/namini/ ln_iceini, ln_iceini_file, rn_thres_sst, &
+         &             rn_hti_ini_n, rn_hti_ini_s, rn_hts_ini_n, rn_hts_ini_s, &
+         &             rn_ati_ini_n, rn_ati_ini_s, rn_smi_ini_n, rn_smi_ini_s, &
+         &             rn_tmi_ini_n, rn_tmi_ini_s, rn_tsu_ini_n, rn_tsu_ini_s, rn_tms_ini_n, rn_tms_ini_s, &
+         &             rn_apd_ini_n, rn_apd_ini_s, rn_hpd_ini_n, rn_hpd_ini_s, &
+         &             sn_hti, sn_hts, sn_ati, sn_tsu, sn_tmi, sn_smi, sn_tms, sn_apd, sn_hpd, cn_dir
       !!-----------------------------------------------------------------------------
       !
-      REWIND( numnam_ice_ref )              ! Namelist namini in reference namelist : Ice initial state
       READ  ( numnam_ice_ref, namini, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namini in reference namelist', lwp )
-      REWIND( numnam_ice_cfg )              ! Namelist namini in configuration namelist : Ice initial state
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namini in reference namelist' )
       READ  ( numnam_ice_cfg, namini, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namini in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namini in configuration namelist' )
       IF(lwm) WRITE ( numoni, namini )
       !
       slf_i(jp_hti) = sn_hti  ;  slf_i(jp_hts) = sn_hts
-      slf_i(jp_ati) = sn_ati  ;  slf_i(jp_tsu) = sn_tsu
-      slf_i(jp_tmi) = sn_tmi  ;  slf_i(jp_smi) = sn_smi
+      slf_i(jp_ati) = sn_ati  ;  slf_i(jp_smi) = sn_smi
+      slf_i(jp_tmi) = sn_tmi  ;  slf_i(jp_tsu) = sn_tsu   ;   slf_i(jp_tms) = sn_tms
+      slf_i(jp_apd) = sn_apd  ;  slf_i(jp_hpd) = sn_hpd
       !
       IF(lwp) THEN                          ! control print
          WRITE(numout,*)
          WRITE(numout,*) 'ice_istate_init: ice parameters inititialisation '
          WRITE(numout,*) '~~~~~~~~~~~~~~~'
          WRITE(numout,*) '   Namelist namini:'
-         WRITE(numout,*) '      initialization with ice (T) or not (F)                 ln_iceini       = ', ln_iceini
-         WRITE(numout,*) '      ice initialization from a netcdf file                  ln_iceini_file  = ', ln_iceini_file
-         WRITE(numout,*) '      max delta ocean temp. above Tfreeze with initial ice   rn_thres_sst    = ', rn_thres_sst
-         WRITE(numout,*) '      initial snow thickness in the north                    rn_hts_ini_n    = ', rn_hts_ini_n
-         WRITE(numout,*) '      initial snow thickness in the south                    rn_hts_ini_s    = ', rn_hts_ini_s 
-         WRITE(numout,*) '      initial ice thickness  in the north                    rn_hti_ini_n    = ', rn_hti_ini_n
-         WRITE(numout,*) '      initial ice thickness  in the south                    rn_hti_ini_s    = ', rn_hti_ini_s
-         WRITE(numout,*) '      initial ice concentr.  in the north                    rn_ati_ini_n    = ', rn_ati_ini_n
-         WRITE(numout,*) '      initial ice concentr.  in the north                    rn_ati_ini_s    = ', rn_ati_ini_s
-         WRITE(numout,*) '      initial  ice salinity  in the north                    rn_smi_ini_n    = ', rn_smi_ini_n
-         WRITE(numout,*) '      initial  ice salinity  in the south                    rn_smi_ini_s    = ', rn_smi_ini_s
-         WRITE(numout,*) '      initial  ice/snw temp  in the north                    rn_tmi_ini_n    = ', rn_tmi_ini_n
-         WRITE(numout,*) '      initial  ice/snw temp  in the south                    rn_tmi_ini_s    = ', rn_tmi_ini_s
+         WRITE(numout,*) '      ice initialization (T) or not (F)                ln_iceini      = ', ln_iceini
+         WRITE(numout,*) '      ice initialization from a netcdf file            ln_iceini_file = ', ln_iceini_file
+         WRITE(numout,*) '      max ocean temp. above Tfreeze with initial ice   rn_thres_sst   = ', rn_thres_sst
+         IF( ln_iceini .AND. .NOT.ln_iceini_file ) THEN
+            WRITE(numout,*) '      initial snw thickness in the north-south         rn_hts_ini     = ', rn_hts_ini_n,rn_hts_ini_s 
+            WRITE(numout,*) '      initial ice thickness in the north-south         rn_hti_ini     = ', rn_hti_ini_n,rn_hti_ini_s
+            WRITE(numout,*) '      initial ice concentr  in the north-south         rn_ati_ini     = ', rn_ati_ini_n,rn_ati_ini_s
+            WRITE(numout,*) '      initial ice salinity  in the north-south         rn_smi_ini     = ', rn_smi_ini_n,rn_smi_ini_s
+            WRITE(numout,*) '      initial surf temperat in the north-south         rn_tsu_ini     = ', rn_tsu_ini_n,rn_tsu_ini_s
+            WRITE(numout,*) '      initial ice temperat  in the north-south         rn_tmi_ini     = ', rn_tmi_ini_n,rn_tmi_ini_s
+            WRITE(numout,*) '      initial snw temperat  in the north-south         rn_tms_ini     = ', rn_tms_ini_n,rn_tms_ini_s
+            WRITE(numout,*) '      initial pnd fraction  in the north-south         rn_apd_ini     = ', rn_apd_ini_n,rn_apd_ini_s
+            WRITE(numout,*) '      initial pnd depth     in the north-south         rn_hpd_ini     = ', rn_hpd_ini_n,rn_hpd_ini_s
+         ENDIF
       ENDIF
       !
       IF( ln_iceini_file ) THEN                      ! Ice initialization using input file
@@ -554,19 +504,23 @@ CONTAINS
          ! set si structure
          ALLOCATE( si(jpfldi), STAT=ierror )
          IF( ierror > 0 ) THEN
-            CALL ctl_stop( 'Ice_ini in iceistate: unable to allocate si structure' )   ;   RETURN
+            CALL ctl_stop( 'ice_istate_ini in iceistate: unable to allocate si structure' )   ;   RETURN
          ENDIF
          !
          DO ifpr = 1, jpfldi
             ALLOCATE( si(ifpr)%fnow(jpi,jpj,1) )
-            ALLOCATE( si(ifpr)%fdta(jpi,jpj,1,2) )
+            IF( slf_i(ifpr)%ln_tint )  ALLOCATE( si(ifpr)%fdta(jpi,jpj,1,2) )
          END DO
          !
          ! fill si with slf_i and control print
-         CALL fld_fill( si, slf_i, cn_dir, 'ice_istate', 'ice istate ini', 'numnam_ice' )
+         CALL fld_fill( si, slf_i, cn_dir, 'ice_istate_ini', 'initialization of sea ice fields', 'numnam_ice' )
          !
-         CALL fld_read( nit000, 1, si )                ! input fields provided at the current time-step
-         !
+      ENDIF
+      !
+      IF( .NOT.ln_pnd ) THEN
+         rn_apd_ini_n = 0. ; rn_apd_ini_s = 0.
+         rn_hpd_ini_n = 0. ; rn_hpd_ini_s = 0.
+         CALL ctl_warn( 'rn_apd_ini & rn_hpd_ini = 0 when no ponds' )
       ENDIF
       !
    END SUBROUTINE ice_istate_init

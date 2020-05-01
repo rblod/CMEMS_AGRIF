@@ -6,9 +6,7 @@ MODULE floats
    !! History :  OPA  !          (CLIPPER)   original Code
    !!   NEMO     1.0  ! 2002-06  (A. Bozec)  F90, Free form and module
    !!----------------------------------------------------------------------
-#if   defined   key_floats
-   !!----------------------------------------------------------------------
-   !!   'key_floats'                                     float trajectories
+   !!
    !!----------------------------------------------------------------------
    !!   flo_stp   : float trajectories computation
    !!   flo_init  : initialization of float trajectories computation
@@ -29,16 +27,16 @@ MODULE floats
    PRIVATE  
 
    PUBLIC   flo_stp    ! routine called by step.F90
-   PUBLIC   flo_init   ! routine called by opa.F90
+   PUBLIC   flo_init   ! routine called by nemogcm.F90
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: floats.F90 10068 2018-08-28 14:09:04Z nicolasmartin $ 
+   !! $Id: floats.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE flo_stp( kt )
+   SUBROUTINE flo_stp( kt, Kbb, Kmm )
       !!----------------------------------------------------------------------
       !!                   ***  ROUTINE flo_stp  ***
       !!                    
@@ -49,106 +47,95 @@ CONTAINS
       !!        algorithm by default and with a 4th order Runge-Kutta scheme
       !!        if ln_flork4 =T
       !!----------------------------------------------------------------------
-      INTEGER, INTENT( in  ) ::   kt   ! ocean time step
+      INTEGER, INTENT( in  ) ::   kt        ! ocean time step
+      INTEGER, INTENT( in  ) ::   Kbb, Kmm  ! ocean time level indices 
       !!----------------------------------------------------------------------
       !
       IF( ln_timing )   CALL timing_start('flo_stp')
       !
-      IF( ln_flork4 ) THEN   ;   CALL flo_4rk( kt )        ! Trajectories using a 4th order Runge Kutta scheme
-      ELSE                   ;   CALL flo_blk( kt )        ! Trajectories using Blanke' algorithme
+      IF( ln_flork4 ) THEN   ;   CALL flo_4rk( kt, Kbb, Kmm )  ! Trajectories using a 4th order Runge Kutta scheme
+      ELSE                   ;   CALL flo_blk( kt, Kbb, Kmm )  ! Trajectories using Blanke' algorithme
       ENDIF
       !
       IF( lk_mpp )   CALL mppsync   ! synchronization of all the processor
       !
-      CALL flo_wri( kt )      ! trajectories ouput 
+      CALL flo_wri( kt, Kmm ) ! trajectories ouput 
       !
       CALL flo_rst( kt )      ! trajectories restart
       !
-      wb(:,:,:) = wn(:,:,:)         ! Save the old vertical velocity field
+      wb(:,:,:) = ww(:,:,:)         ! Save the old vertical velocity field
       !
       IF( ln_timing )   CALL timing_stop('flo_stp')
       !
    END SUBROUTINE flo_stp
 
 
-   SUBROUTINE flo_init
+   SUBROUTINE flo_init( Kmm )
       !!----------------------------------------------------------------
       !!                 ***  ROUTINE flo_init  ***
       !!                   
       !! ** Purpose :   Read the namelist of floats
       !!----------------------------------------------------------------------
+      INTEGER, INTENT(in) :: Kmm       ! ocean time level index
+      !
       INTEGER ::   jfl
       INTEGER ::   ios                 ! Local integer output status for namelist read
       !
-      NAMELIST/namflo/ jpnfl, jpnnewflo, ln_rstflo, nn_writefl, nn_stockfl, ln_argo, ln_flork4, ln_ariane, ln_flo_ascii
+      NAMELIST/namflo/ ln_floats, jpnfl, jpnnewflo, ln_rstflo, nn_writefl, nn_stockfl, ln_argo, ln_flork4, ln_ariane, ln_flo_ascii
       !!---------------------------------------------------------------------
       !
       IF(lwp) WRITE(numout,*)
       IF(lwp) WRITE(numout,*) 'flo_stp : call floats routine '
       IF(lwp) WRITE(numout,*) '~~~~~~~'
 
-      REWIND( numnam_ref )              ! Namelist namflo in reference namelist : Floats
       READ  ( numnam_ref, namflo, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namflo in reference namelist', lwp )
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namflo in reference namelist' )
 
-      REWIND( numnam_cfg )              ! Namelist namflo in configuration namelist : Floats
       READ  ( numnam_cfg, namflo, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namflo in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namflo in configuration namelist' )
       IF(lwm) WRITE ( numond, namflo )
       !
       IF(lwp) THEN                  ! control print
          WRITE(numout,*)
          WRITE(numout,*) '         Namelist floats :'
-         WRITE(numout,*) '            number of floats                      jpnfl        = ', jpnfl
-         WRITE(numout,*) '            number of new floats                  jpnflnewflo  = ', jpnnewflo
-         WRITE(numout,*) '            restart                               ln_rstflo    = ', ln_rstflo
-         WRITE(numout,*) '            frequency of float output file        nn_writefl   = ', nn_writefl
-         WRITE(numout,*) '            frequency of float restart file       nn_stockfl   = ', nn_stockfl
-         WRITE(numout,*) '            Argo type floats                      ln_argo      = ', ln_argo
-         WRITE(numout,*) '            Computation of T trajectories         ln_flork4    = ', ln_flork4
-         WRITE(numout,*) '            Use of ariane convention              ln_ariane    = ', ln_ariane
-         WRITE(numout,*) '            ascii output (T) or netcdf output (F) ln_flo_ascii = ', ln_flo_ascii
+         WRITE(numout,*) '            Activate floats or not                   ln_floats    = ', ln_floats
+         WRITE(numout,*) '               number of floats                      jpnfl        = ', jpnfl
+         WRITE(numout,*) '               number of new floats                  jpnflnewflo  = ', jpnnewflo
+         WRITE(numout,*) '               restart                               ln_rstflo    = ', ln_rstflo
+         WRITE(numout,*) '               frequency of float output file        nn_writefl   = ', nn_writefl
+         WRITE(numout,*) '               frequency of float restart file       nn_stockfl   = ', nn_stockfl
+         WRITE(numout,*) '               Argo type floats                      ln_argo      = ', ln_argo
+         WRITE(numout,*) '               Computation of T trajectories         ln_flork4    = ', ln_flork4
+         WRITE(numout,*) '               Use of ariane convention              ln_ariane    = ', ln_ariane
+         WRITE(numout,*) '               ascii output (T) or netcdf output (F) ln_flo_ascii = ', ln_flo_ascii
 
       ENDIF
       !
-      !                             ! allocate floats arrays
-      IF( flo_oce_alloc() /= 0 )   CALL ctl_stop( 'STOP', 'flo_init : unable to allocate arrays' )
-      !
-      !                             ! allocate flodom arrays
-      IF( flo_dom_alloc() /= 0 )   CALL ctl_stop( 'STOP', 'flo_dom : unable to allocate arrays' )
-      !
-      !                             ! allocate flowri arrays
-      IF( flo_wri_alloc() /= 0 )   CALL ctl_stop( 'STOP', 'flo_wri : unable to allocate arrays' )
-      !
-      !                             ! allocate florst arrays
-      IF( flo_rst_alloc() /= 0 )   CALL ctl_stop( 'STOP', 'flo_rst : unable to allocate arrays' )
-      !
-      jpnrstflo = jpnfl-jpnnewflo   ! memory allocation 
-      !
-      DO jfl = 1, jpnfl             ! vertical axe for netcdf IOM ouput
-         nfloat(jfl) = jfl 
-      END DO
-      !
-      CALL flo_dom                  ! compute/read initial position of floats
-      !
-      wb(:,:,:) = wn(:,:,:)         ! set wb for computation of floats trajectories at the first time step
-      !
+      IF( ln_floats ) THEN
+         !                             ! allocate floats arrays
+         IF( flo_oce_alloc() /= 0 )   CALL ctl_stop( 'STOP', 'flo_init : unable to allocate arrays' )
+         !
+         !                             ! allocate flodom arrays
+         IF( flo_dom_alloc() /= 0 )   CALL ctl_stop( 'STOP', 'flo_dom : unable to allocate arrays' )
+         !
+         !                             ! allocate flowri arrays
+         IF( flo_wri_alloc() /= 0 )   CALL ctl_stop( 'STOP', 'flo_wri : unable to allocate arrays' )
+         !
+         !                             ! allocate florst arrays
+         IF( flo_rst_alloc() /= 0 )   CALL ctl_stop( 'STOP', 'flo_rst : unable to allocate arrays' )
+         !
+         jpnrstflo = jpnfl-jpnnewflo   ! memory allocation 
+         !
+         DO jfl = 1, jpnfl             ! vertical axe for netcdf IOM ouput
+            nfloat(jfl) = jfl 
+         END DO
+         !
+         CALL flo_dom( Kmm )           ! compute/read initial position of floats
+         !
+         wb(:,:,:) = ww(:,:,:)         ! set wb for computation of floats trajectories at the first time step
+         !
+      ENDIF
    END SUBROUTINE flo_init
-
-#  else
-   !!----------------------------------------------------------------------
-   !!   Default option :                                       Empty module
-   !!----------------------------------------------------------------------
-CONTAINS
-   SUBROUTINE flo_stp( kt )          ! Empty routine
-      IMPLICIT NONE
-      INTEGER, INTENT( in ) :: kt
-      WRITE(*,*) 'flo_stp: You should not have seen this print! error?', kt
-   END SUBROUTINE flo_stp
-   SUBROUTINE flo_init          ! Empty routine
-      IMPLICIT NONE
-   END SUBROUTINE flo_init
-#endif
 
    !!======================================================================
  END MODULE floats

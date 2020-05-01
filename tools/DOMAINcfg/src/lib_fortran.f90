@@ -6,6 +6,7 @@ MODULE lib_fortran
    !! History :  3.2  !  2010-05  (M. Dunphy, R. Benshila)  Original code
    !!            3.4  !  2013-06  (C. Rousset)  add glob_min, glob_max 
    !!                                           + 3d dim. of input is fexible (jpk, jpl...) 
+   !!            4.0  !  2016-06  (T. Lovato)  double precision global sum by default 
    !!----------------------------------------------------------------------
 
    !!----------------------------------------------------------------------
@@ -19,351 +20,281 @@ MODULE lib_fortran
    USE dom_oce         ! ocean domain
    USE in_out_manager  ! I/O manager
    USE lib_mpp         ! distributed memory computing
+   USE lbclnk          ! ocean lateral boundary conditions
 
    IMPLICIT NONE
    PRIVATE
 
    PUBLIC   glob_sum      ! used in many places (masked with tmask_i)
-   PUBLIC   glob_sum_full ! used in many places (masked with tmask_h, ie omly over the halos)
+   PUBLIC   glob_sum_full ! used in many places (masked with tmask_h, ie only over the halos)
+   PUBLIC   local_sum     ! used in trcrad, local operation before glob_sum_delay
+   PUBLIC   sum3x3        ! used in trcrad, do a sum over 3x3 boxes
    PUBLIC   DDPDD         ! also used in closea module
    PUBLIC   glob_min, glob_max
-
+#if defined key_nosignedzero
    PUBLIC SIGN
-
+#endif
 
    INTERFACE glob_sum
-      MODULE PROCEDURE glob_sum_1d, glob_sum_2d, glob_sum_3d, &
-         &             glob_sum_2d_a, glob_sum_3d_a
+      MODULE PROCEDURE glob_sum_1d, glob_sum_2d, glob_sum_3d
    END INTERFACE
    INTERFACE glob_sum_full
       MODULE PROCEDURE glob_sum_full_2d, glob_sum_full_3d
    END INTERFACE
+   INTERFACE local_sum
+      MODULE PROCEDURE local_sum_2d, local_sum_3d
+   END INTERFACE
+   INTERFACE sum3x3
+      MODULE PROCEDURE sum3x3_2d, sum3x3_3d
+   END INTERFACE
    INTERFACE glob_min
-      MODULE PROCEDURE glob_min_2d, glob_min_3d,glob_min_2d_a, glob_min_3d_a 
+      MODULE PROCEDURE glob_min_2d, glob_min_3d
    END INTERFACE
    INTERFACE glob_max
-      MODULE PROCEDURE glob_max_2d, glob_max_3d,glob_max_2d_a, glob_max_3d_a 
+      MODULE PROCEDURE glob_max_2d, glob_max_3d
    END INTERFACE
 
-
+#if defined key_nosignedzero
    INTERFACE SIGN
       MODULE PROCEDURE SIGN_SCALAR, SIGN_ARRAY_1D, SIGN_ARRAY_2D, SIGN_ARRAY_3D,   &
          &             SIGN_ARRAY_1D_A, SIGN_ARRAY_2D_A, SIGN_ARRAY_3D_A,          &
          &             SIGN_ARRAY_1D_B, SIGN_ARRAY_2D_B, SIGN_ARRAY_3D_B
    END INTERFACE
-
+#endif
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: lib_fortran.F90 6140 2015-12-21 11:35:23Z timgraham $
-   !! Software governed by the CeCILL licence     (./LICENSE)
+   !! $Id: lib_fortran.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
+#  define GLOBSUM_CODE
 
-   ! --- SUM ---
+#     define DIM_1d
+#     define FUNCTION_GLOBSUM           glob_sum_1d
+#     include "lib_fortran_generic.h90"
+#     undef FUNCTION_GLOBSUM
+#     undef DIM_1d
 
-   FUNCTION glob_sum_1d( ptab, kdim )
-      !!-----------------------------------------------------------------------
-      !!                  ***  FUNCTION  glob_sum_1D  ***
-      !!
-      !! ** Purpose : perform a masked sum on the inner global domain of a 1D array
-      !!-----------------------------------------------------------------------
-      INTEGER :: kdim
-      REAL(wp), INTENT(in), DIMENSION(kdim) ::   ptab        ! input 1D array
-      REAL(wp)                              ::   glob_sum_1d ! global sum
-      !!-----------------------------------------------------------------------
-      !
-      glob_sum_1d = SUM( ptab(:) )
-      IF( lk_mpp )   CALL mpp_sum( glob_sum_1d )
-      !
-   END FUNCTION glob_sum_1d
+#     define DIM_2d
+#     define OPERATION_GLOBSUM
+#     define FUNCTION_GLOBSUM           glob_sum_2d
+#     include "lib_fortran_generic.h90"
+#     undef FUNCTION_GLOBSUM
+#     undef OPERATION_GLOBSUM
+#     define OPERATION_FULL_GLOBSUM
+#     define FUNCTION_GLOBSUM           glob_sum_full_2d
+#     include "lib_fortran_generic.h90"
+#     undef FUNCTION_GLOBSUM
+#     undef OPERATION_FULL_GLOBSUM
+#     undef DIM_2d
 
-   FUNCTION glob_sum_2d( ptab )
-      !!-----------------------------------------------------------------------
-      !!                  ***  FUNCTION  glob_sum_2D  ***
-      !!
-      !! ** Purpose : perform a masked sum on the inner global domain of a 2D array
-      !!-----------------------------------------------------------------------
-      REAL(wp), INTENT(in), DIMENSION(:,:) ::   ptab          ! input 2D array
-      REAL(wp)                             ::   glob_sum_2d   ! global masked sum
-      !!-----------------------------------------------------------------------
-      !
-      glob_sum_2d = SUM( ptab(:,:)*tmask_i(:,:) )
-      IF( lk_mpp )   CALL mpp_sum( glob_sum_2d )
-      !
-   END FUNCTION glob_sum_2d
+#     define DIM_3d
+#     define OPERATION_GLOBSUM
+#     define FUNCTION_GLOBSUM           glob_sum_3d
+#     include "lib_fortran_generic.h90"
+#     undef FUNCTION_GLOBSUM
+#     undef OPERATION_GLOBSUM
+#     define OPERATION_FULL_GLOBSUM
+#     define FUNCTION_GLOBSUM           glob_sum_full_3d
+#     include "lib_fortran_generic.h90"
+#     undef FUNCTION_GLOBSUM
+#     undef OPERATION_FULL_GLOBSUM
+#     undef DIM_3d
+
+#  undef GLOBSUM_CODE
 
 
-   FUNCTION glob_sum_3d( ptab )
-      !!-----------------------------------------------------------------------
-      !!                  ***  FUNCTION  glob_sum_3D  ***
-      !!
-      !! ** Purpose : perform a masked sum on the inner global domain of a 3D array
-      !!-----------------------------------------------------------------------
-      REAL(wp), INTENT(in), DIMENSION(:,:,:) ::   ptab          ! input 3D array
-      REAL(wp)                               ::   glob_sum_3d   ! global masked sum
-      !!
-      INTEGER :: jk
-      INTEGER :: ijpk ! local variable: size of the 3d dimension of ptab
+#  define GLOBMINMAX_CODE
+
+#     define DIM_2d
+#     define OPERATION_GLOBMIN
+#     define FUNCTION_GLOBMINMAX           glob_min_2d
+#     include "lib_fortran_generic.h90"
+#     undef FUNCTION_GLOBMINMAX
+#     undef OPERATION_GLOBMIN
+#     define OPERATION_GLOBMAX
+#     define FUNCTION_GLOBMINMAX           glob_max_2d
+#     include "lib_fortran_generic.h90"
+#     undef FUNCTION_GLOBMINMAX
+#     undef OPERATION_GLOBMAX
+#     undef DIM_2d
+
+#     define DIM_3d
+#     define OPERATION_GLOBMIN
+#     define FUNCTION_GLOBMINMAX           glob_min_3d
+#     include "lib_fortran_generic.h90"
+#     undef FUNCTION_GLOBMINMAX
+#     undef OPERATION_GLOBMIN
+#     define OPERATION_GLOBMAX
+#     define FUNCTION_GLOBMINMAX           glob_max_3d
+#     include "lib_fortran_generic.h90"
+#     undef FUNCTION_GLOBMINMAX
+#     undef OPERATION_GLOBMAX
+#     undef DIM_3d
+#  undef GLOBMINMAX_CODE
+
+!                          ! FUNCTION local_sum !
+
+   FUNCTION local_sum_2d( ptab )
+      !!----------------------------------------------------------------------
+      REAL(wp),  INTENT(in   ) ::   ptab(:,:) ! array on which operation is applied
+      COMPLEX(wp)              ::  local_sum_2d
+      !
       !!-----------------------------------------------------------------------
       !
-      ijpk = SIZE(ptab,3)
+      COMPLEX(wp)::   ctmp
+      REAL(wp)   ::   ztmp
+      INTEGER    ::   ji, jj    ! dummy loop indices
+      INTEGER    ::   ipi, ipj  ! dimensions
+      !!-----------------------------------------------------------------------
       !
-      glob_sum_3d = 0.e0
-      DO jk = 1, ijpk
-         glob_sum_3d = glob_sum_3d + SUM( ptab(:,:,jk)*tmask_i(:,:) )
+      ipi = SIZE(ptab,1)   ! 1st dimension
+      ipj = SIZE(ptab,2)   ! 2nd dimension
+      !
+      ctmp = CMPLX( 0.e0, 0.e0, wp )   ! warning ctmp is cumulated
+
+      DO jj = 1, ipj
+         DO ji = 1, ipi
+            ztmp =  ptab(ji,jj) * tmask_i(ji,jj)
+            CALL DDPDD( CMPLX( ztmp, 0.e0, wp ), ctmp )
+         END DO
       END DO
-      IF( lk_mpp )   CALL mpp_sum( glob_sum_3d )
       !
-   END FUNCTION glob_sum_3d
+      local_sum_2d = ctmp
+       
+   END FUNCTION local_sum_2d
 
-
-   FUNCTION glob_sum_2d_a( ptab1, ptab2 )
-      !!-----------------------------------------------------------------------
-      !!                  ***  FUNCTION  glob_sum_2D _a ***
-      !!
-      !! ** Purpose : perform a masked sum on the inner global domain of two 2D array
-      !!-----------------------------------------------------------------------
-      REAL(wp), INTENT(in), DIMENSION(:,:) ::   ptab1, ptab2    ! input 2D array
-      REAL(wp)            , DIMENSION(2)   ::   glob_sum_2d_a   ! global masked sum
-      !!-----------------------------------------------------------------------
-      !
-      glob_sum_2d_a(1) = SUM( ptab1(:,:)*tmask_i(:,:) )
-      glob_sum_2d_a(2) = SUM( ptab2(:,:)*tmask_i(:,:) )
-      IF( lk_mpp )   CALL mpp_sum( glob_sum_2d_a, 2 )
-      !
-   END FUNCTION glob_sum_2d_a
-
-
-   FUNCTION glob_sum_3d_a( ptab1, ptab2 )
-      !!-----------------------------------------------------------------------
-      !!                  ***  FUNCTION  glob_sum_3D_a ***
-      !!
-      !! ** Purpose : perform a masked sum on the inner global domain of two 3D array
-      !!-----------------------------------------------------------------------
-      REAL(wp), INTENT(in), DIMENSION(:,:,:) ::   ptab1, ptab2    ! input 3D array
-      REAL(wp)            , DIMENSION(2)     ::   glob_sum_3d_a   ! global masked sum
-      !!
-      INTEGER :: jk
-      INTEGER :: ijpk ! local variable: size of the 3d dimension of ptab
-      !!-----------------------------------------------------------------------
-      !
-      ijpk = SIZE(ptab1,3)
-      !
-      glob_sum_3d_a(:) = 0.e0
-      DO jk = 1, ijpk
-         glob_sum_3d_a(1) = glob_sum_3d_a(1) + SUM( ptab1(:,:,jk)*tmask_i(:,:) )
-         glob_sum_3d_a(2) = glob_sum_3d_a(2) + SUM( ptab2(:,:,jk)*tmask_i(:,:) )
-      END DO
-      IF( lk_mpp )   CALL mpp_sum( glob_sum_3d_a, 2 )
-      !
-   END FUNCTION glob_sum_3d_a
-
-   FUNCTION glob_sum_full_2d( ptab )
+   FUNCTION local_sum_3d( ptab )
       !!----------------------------------------------------------------------
-      !!                  ***  FUNCTION  glob_sum_full_2d ***
-      !!
-      !! ** Purpose : perform a sum in calling DDPDD routine (nomask)
-      !!----------------------------------------------------------------------
-      REAL(wp), INTENT(in), DIMENSION(:,:) ::   ptab
-      REAL(wp)                             ::   glob_sum_full_2d   ! global sum
-      !!
+      REAL(wp),  INTENT(in   ) ::   ptab(:,:,:) ! array on which operation is applied
+      COMPLEX(wp)              ::  local_sum_3d
+      !
       !!-----------------------------------------------------------------------
       !
-      glob_sum_full_2d = SUM( ptab(:,:) * tmask_h(:,:) )
-      IF( lk_mpp )   CALL mpp_sum( glob_sum_full_2d )
-      !
-   END FUNCTION glob_sum_full_2d
-
-   FUNCTION glob_sum_full_3d( ptab )
-      !!----------------------------------------------------------------------
-      !!                  ***  FUNCTION  glob_sum_full_3d ***
-      !!
-      !! ** Purpose : perform a sum on a 3D array in calling DDPDD routine (nomask)
-      !!----------------------------------------------------------------------
-      REAL(wp), INTENT(in), DIMENSION(:,:,:) ::   ptab
-      REAL(wp)                               ::   glob_sum_full_3d   ! global sum
-      !!
+      COMPLEX(wp)::   ctmp
+      REAL(wp)   ::   ztmp
       INTEGER    ::   ji, jj, jk   ! dummy loop indices
-      INTEGER    ::   ijpk ! local variables: size of ptab
+      INTEGER    ::   ipi, ipj, ipk    ! dimensions
       !!-----------------------------------------------------------------------
       !
-      ijpk = SIZE(ptab,3)
+      ipi = SIZE(ptab,1)   ! 1st dimension
+      ipj = SIZE(ptab,2)   ! 2nd dimension
+      ipk = SIZE(ptab,3)   ! 3rd dimension
       !
-      glob_sum_full_3d = 0.e0
-      DO jk = 1, ijpk
-         glob_sum_full_3d = glob_sum_full_3d + SUM( ptab(:,:,jk) * tmask_h(:,:) )
+      ctmp = CMPLX( 0.e0, 0.e0, wp )   ! warning ctmp is cumulated
+
+      DO jk = 1, ipk
+        DO jj = 1, ipj
+          DO ji = 1, ipi
+             ztmp =  ptab(ji,jj,jk) * tmask_i(ji,jj)
+             CALL DDPDD( CMPLX( ztmp, 0.e0, wp ), ctmp )
+          END DO
+        END DO
       END DO
-      IF( lk_mpp )   CALL mpp_sum( glob_sum_full_3d )
       !
-   END FUNCTION glob_sum_full_3d
+      local_sum_3d = ctmp
+       
+   END FUNCTION local_sum_3d
 
+!                          ! FUNCTION sum3x3 !
 
-
-   ! --- MIN ---
-   FUNCTION glob_min_2d( ptab ) 
+   SUBROUTINE sum3x3_2d( p2d )
       !!-----------------------------------------------------------------------
-      !!                  ***  FUNCTION  glob_min_2D  ***
+      !!                  ***  routine sum3x3_2d  ***
       !!
-      !! ** Purpose : perform a masked min on the inner global domain of a 2D array
-      !!-----------------------------------------------------------------------
-      REAL(wp), INTENT(in), DIMENSION(:,:) ::   ptab          ! input 2D array
-      REAL(wp)                             ::   glob_min_2d   ! global masked min
-      !!-----------------------------------------------------------------------
+      !! ** Purpose : sum over 3x3 boxes
+      !!----------------------------------------------------------------------
+      REAL(wp), DIMENSION (:,:), INTENT(inout) ::   p2d
       !
-      glob_min_2d = MINVAL( ptab(:,:)*tmask_i(:,:) )
-      IF( lk_mpp )   CALL mpp_min( glob_min_2d )
+      INTEGER ::   ji, ji2, jj, jj2     ! dummy loop indices
+      !!----------------------------------------------------------------------
       !
-   END FUNCTION glob_min_2d
- 
-   FUNCTION glob_min_3d( ptab ) 
-      !!-----------------------------------------------------------------------
-      !!                  ***  FUNCTION  glob_min_3D  ***
-      !!
-      !! ** Purpose : perform a masked min on the inner global domain of a 3D array
-      !!-----------------------------------------------------------------------
-      REAL(wp), INTENT(in), DIMENSION(:,:,:) ::   ptab          ! input 3D array
-      REAL(wp)                               ::   glob_min_3d   ! global masked min
-      !!
-      INTEGER :: jk
-      INTEGER :: ijpk ! local variable: size of the 3d dimension of ptab
-      !!-----------------------------------------------------------------------
+      IF( SIZE(p2d,1) /= jpi ) CALL ctl_stop( 'STOP', 'wrong call of sum3x3_2d, the first dimension is not equal to jpi' ) 
+      IF( SIZE(p2d,2) /= jpj ) CALL ctl_stop( 'STOP', 'wrong call of sum3x3_2d, the second dimension is not equal to jpj' ) 
       !
-      ijpk = SIZE(ptab,3)
-      !
-      glob_min_3d = MINVAL( ptab(:,:,1)*tmask_i(:,:) )
-      DO jk = 2, ijpk
-         glob_min_3d = MIN( glob_min_3d, MINVAL( ptab(:,:,jk)*tmask_i(:,:) ) )
+      DO jj = 1, jpj
+         DO ji = 1, jpi 
+            IF( MOD(mig(ji), 3) == 1 .AND. MOD(mjg(jj), 3) == 1 ) THEN   ! bottom left corber of a 3x3 box
+               ji2 = MIN(mig(ji)+2, jpiglo) - nimpp + 1                  ! right position of the box
+               jj2 = MIN(mjg(jj)+2, jpjglo) - njmpp + 1                  ! upper position of the box
+               IF( ji2 <= jpi .AND. jj2 <= jpj ) THEN                    ! the box is fully included in the local mpi domain
+                  p2d(ji:ji2,jj:jj2) = SUM(p2d(ji:ji2,jj:jj2))
+               ENDIF
+            ENDIF
+         END DO
       END DO
-      IF( lk_mpp )   CALL mpp_min( glob_min_3d )
-      !
-   END FUNCTION glob_min_3d
+      CALL lbc_lnk( 'lib_fortran', p2d, 'T', 1. )
+      IF( nbondi /= -1 ) THEN
+         IF( MOD(mig(    1), 3) == 1 )   p2d(    1,:) = p2d(    2,:)
+         IF( MOD(mig(    1), 3) == 2 )   p2d(    2,:) = p2d(    1,:)
+      ENDIF
+      IF( nbondi /=  1 ) THEN
+         IF( MOD(mig(jpi-2), 3) == 1 )   p2d(  jpi,:) = p2d(jpi-1,:)
+         IF( MOD(mig(jpi-2), 3) == 0 )   p2d(jpi-1,:) = p2d(  jpi,:)
+      ENDIF
+      IF( nbondj /= -1 ) THEN
+         IF( MOD(mjg(    1), 3) == 1 )   p2d(:,    1) = p2d(:,    2)
+         IF( MOD(mjg(    1), 3) == 2 )   p2d(:,    2) = p2d(:,    1)
+      ENDIF
+      IF( nbondj /=  1 ) THEN
+         IF( MOD(mjg(jpj-2), 3) == 1 )   p2d(:,  jpj) = p2d(:,jpj-1)
+         IF( MOD(mjg(jpj-2), 3) == 0 )   p2d(:,jpj-1) = p2d(:,  jpj)
+      ENDIF
+      CALL lbc_lnk( 'lib_fortran', p2d, 'T', 1. )
 
+   END SUBROUTINE sum3x3_2d
 
-   FUNCTION glob_min_2d_a( ptab1, ptab2 ) 
+   SUBROUTINE sum3x3_3d( p3d )
       !!-----------------------------------------------------------------------
-      !!                  ***  FUNCTION  glob_min_2D _a ***
+      !!                  ***  routine sum3x3_3d  ***
       !!
-      !! ** Purpose : perform a masked min on the inner global domain of two 2D array
-      !!-----------------------------------------------------------------------
-      REAL(wp), INTENT(in), DIMENSION(:,:) ::   ptab1, ptab2    ! input 2D array
-      REAL(wp)            , DIMENSION(2)   ::   glob_min_2d_a   ! global masked min
-      !!-----------------------------------------------------------------------
-      !             
-      glob_min_2d_a(1) = MINVAL( ptab1(:,:)*tmask_i(:,:) )
-      glob_min_2d_a(2) = MINVAL( ptab2(:,:)*tmask_i(:,:) )
-      IF( lk_mpp )   CALL mpp_min( glob_min_2d_a, 2 )
+      !! ** Purpose : sum over 3x3 boxes
+      !!----------------------------------------------------------------------
+      REAL(wp), DIMENSION (:,:,:), INTENT(inout) ::   p3d
       !
-   END FUNCTION glob_min_2d_a
- 
- 
-   FUNCTION glob_min_3d_a( ptab1, ptab2 ) 
-      !!-----------------------------------------------------------------------
-      !!                  ***  FUNCTION  glob_min_3D_a ***
-      !!
-      !! ** Purpose : perform a masked min on the inner global domain of two 3D array
-      !!-----------------------------------------------------------------------
-      REAL(wp), INTENT(in), DIMENSION(:,:,:) ::   ptab1, ptab2    ! input 3D array
-      REAL(wp)            , DIMENSION(2)     ::   glob_min_3d_a   ! global masked min
-      !!
-      INTEGER :: jk
-      INTEGER :: ijpk ! local variable: size of the 3d dimension of ptab
-      !!-----------------------------------------------------------------------
+      INTEGER ::   ji, ji2, jj, jj2, jn     ! dummy loop indices
+      INTEGER ::   ipn                      ! Third dimension size
+      !!----------------------------------------------------------------------
       !
-      ijpk = SIZE(ptab1,3)
+      IF( SIZE(p3d,1) /= jpi ) CALL ctl_stop( 'STOP', 'wrong call of sum3x3_3d, the first dimension is not equal to jpi' ) 
+      IF( SIZE(p3d,2) /= jpj ) CALL ctl_stop( 'STOP', 'wrong call of sum3x3_3d, the second dimension is not equal to jpj' ) 
+      ipn = SIZE(p3d,3)
       !
-      glob_min_3d_a(1) = MINVAL( ptab1(:,:,1)*tmask_i(:,:) )
-      glob_min_3d_a(2) = MINVAL( ptab2(:,:,1)*tmask_i(:,:) )
-      DO jk = 2, ijpk
-         glob_min_3d_a(1) = MIN( glob_min_3d_a(1), MINVAL( ptab1(:,:,jk)*tmask_i(:,:) ) )
-         glob_min_3d_a(2) = MIN( glob_min_3d_a(2), MINVAL( ptab2(:,:,jk)*tmask_i(:,:) ) )
+      DO jn = 1, ipn
+         DO jj = 1, jpj
+            DO ji = 1, jpi 
+               IF( MOD(mig(ji), 3) == 1 .AND. MOD(mjg(jj), 3) == 1 ) THEN   ! bottom left corber of a 3x3 box
+                  ji2 = MIN(mig(ji)+2, jpiglo) - nimpp + 1                  ! right position of the box
+                  jj2 = MIN(mjg(jj)+2, jpjglo) - njmpp + 1                  ! upper position of the box
+                  IF( ji2 <= jpi .AND. jj2 <= jpj ) THEN                    ! the box is fully included in the local mpi domain
+                     p3d(ji:ji2,jj:jj2,jn) = SUM(p3d(ji:ji2,jj:jj2,jn))
+                  ENDIF
+               ENDIF
+            END DO
+         END DO
       END DO
-      IF( lk_mpp )   CALL mpp_min( glob_min_3d_a, 2 )
-      !
-   END FUNCTION glob_min_3d_a
+      CALL lbc_lnk( 'lib_fortran', p3d, 'T', 1. )
+      IF( nbondi /= -1 ) THEN
+         IF( MOD(mig(    1), 3) == 1 )   p3d(    1,:,:) = p3d(    2,:,:)
+         IF( MOD(mig(    1), 3) == 2 )   p3d(    2,:,:) = p3d(    1,:,:)
+      ENDIF
+      IF( nbondi /=  1 ) THEN
+         IF( MOD(mig(jpi-2), 3) == 1 )   p3d(  jpi,:,:) = p3d(jpi-1,:,:)
+         IF( MOD(mig(jpi-2), 3) == 0 )   p3d(jpi-1,:,:) = p3d(  jpi,:,:)
+      ENDIF
+      IF( nbondj /= -1 ) THEN
+         IF( MOD(mjg(    1), 3) == 1 )   p3d(:,    1,:) = p3d(:,    2,:)
+         IF( MOD(mjg(    1), 3) == 2 )   p3d(:,    2,:) = p3d(:,    1,:)
+      ENDIF
+      IF( nbondj /=  1 ) THEN
+         IF( MOD(mjg(jpj-2), 3) == 1 )   p3d(:,  jpj,:) = p3d(:,jpj-1,:)
+         IF( MOD(mjg(jpj-2), 3) == 0 )   p3d(:,jpj-1,:) = p3d(:,  jpj,:)
+      ENDIF
+      CALL lbc_lnk( 'lib_fortran', p3d, 'T', 1. )
 
-   ! --- MAX ---
-   FUNCTION glob_max_2d( ptab ) 
-      !!-----------------------------------------------------------------------
-      !!                  ***  FUNCTION  glob_max_2D  ***
-      !!
-      !! ** Purpose : perform a masked max on the inner global domain of a 2D array
-      !!-----------------------------------------------------------------------
-      REAL(wp), INTENT(in), DIMENSION(:,:) ::   ptab          ! input 2D array
-      REAL(wp)                             ::   glob_max_2d   ! global masked max
-      !!-----------------------------------------------------------------------
-      !
-      glob_max_2d = MAXVAL( ptab(:,:)*tmask_i(:,:) )
-      IF( lk_mpp )   CALL mpp_max( glob_max_2d )
-      !
-   END FUNCTION glob_max_2d
- 
-   FUNCTION glob_max_3d( ptab ) 
-      !!-----------------------------------------------------------------------
-      !!                  ***  FUNCTION  glob_max_3D  ***
-      !!
-      !! ** Purpose : perform a masked max on the inner global domain of a 3D array
-      !!-----------------------------------------------------------------------
-      REAL(wp), INTENT(in), DIMENSION(:,:,:) ::   ptab          ! input 3D array
-      REAL(wp)                               ::   glob_max_3d   ! global masked max
-      !!
-      INTEGER :: jk
-      INTEGER :: ijpk ! local variable: size of the 3d dimension of ptab
-      !!-----------------------------------------------------------------------
-      !
-      ijpk = SIZE(ptab,3)
-      !
-      glob_max_3d = MAXVAL( ptab(:,:,1)*tmask_i(:,:) )
-      DO jk = 2, ijpk
-         glob_max_3d = MAX( glob_max_3d, MAXVAL( ptab(:,:,jk)*tmask_i(:,:) ) )
-      END DO
-      IF( lk_mpp )   CALL mpp_max( glob_max_3d )
-      !
-   END FUNCTION glob_max_3d
-
-
-   FUNCTION glob_max_2d_a( ptab1, ptab2 ) 
-      !!-----------------------------------------------------------------------
-      !!                  ***  FUNCTION  glob_max_2D _a ***
-      !!
-      !! ** Purpose : perform a masked max on the inner global domain of two 2D array
-      !!-----------------------------------------------------------------------
-      REAL(wp), INTENT(in), DIMENSION(:,:) ::   ptab1, ptab2    ! input 2D array
-      REAL(wp)            , DIMENSION(2)   ::   glob_max_2d_a   ! global masked max
-      !!-----------------------------------------------------------------------
-      !             
-      glob_max_2d_a(1) = MAXVAL( ptab1(:,:)*tmask_i(:,:) )
-      glob_max_2d_a(2) = MAXVAL( ptab2(:,:)*tmask_i(:,:) )
-      IF( lk_mpp )   CALL mpp_max( glob_max_2d_a, 2 )
-      !
-   END FUNCTION glob_max_2d_a
- 
- 
-   FUNCTION glob_max_3d_a( ptab1, ptab2 ) 
-      !!-----------------------------------------------------------------------
-      !!                  ***  FUNCTION  glob_max_3D_a ***
-      !!
-      !! ** Purpose : perform a masked max on the inner global domain of two 3D array
-      !!-----------------------------------------------------------------------
-      REAL(wp), INTENT(in), DIMENSION(:,:,:) ::   ptab1, ptab2    ! input 3D array
-      REAL(wp)            , DIMENSION(2)     ::   glob_max_3d_a   ! global masked max
-      !!
-      INTEGER :: jk
-      INTEGER :: ijpk ! local variable: size of the 3d dimension of ptab
-      !!-----------------------------------------------------------------------
-      !
-      ijpk = SIZE(ptab1,3)
-      !
-      glob_max_3d_a(1) = MAXVAL( ptab1(:,:,1)*tmask_i(:,:) )
-      glob_max_3d_a(2) = MAXVAL( ptab2(:,:,1)*tmask_i(:,:) )
-      DO jk = 2, ijpk
-         glob_max_3d_a(1) = MAX( glob_max_3d_a(1), MAXVAL( ptab1(:,:,jk)*tmask_i(:,:) ) )
-         glob_max_3d_a(2) = MAX( glob_max_3d_a(2), MAXVAL( ptab2(:,:,jk)*tmask_i(:,:) ) )
-      END DO
-      IF( lk_mpp )   CALL mpp_max( glob_max_3d_a, 2 )
-      !
-   END FUNCTION glob_max_3d_a
+   END SUBROUTINE sum3x3_3d
 
 
    SUBROUTINE DDPDD( ydda, yddb )
@@ -400,6 +331,7 @@ CONTAINS
       !
    END SUBROUTINE DDPDD
 
+#if defined key_nosignedzero
    !!----------------------------------------------------------------------
    !!   'key_nosignedzero'                                         F90 SIGN
    !!----------------------------------------------------------------------
@@ -551,6 +483,7 @@ CONTAINS
       ELSE                    ;   SIGN_ARRAY_3D_B =-ABS(pa)
       ENDIF
    END FUNCTION SIGN_ARRAY_3D_B
+#endif
 
    !!======================================================================
 END MODULE lib_fortran

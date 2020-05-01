@@ -44,13 +44,13 @@ MODULE par_oce
    INTEGER       ::   jpizoom          !: left bottom (i,j) indices of the zoom
    INTEGER       ::   jpjzoom          !: in data domain indices
 
-   ! Domain characteristics
-   INTEGER       ::   jperio           !: lateral cond. type (between 0 and 6)
-   !                                       !  = 0 closed                 ;   = 1 cyclic East-West
-   !                                       !  = 2 equatorial symmetric   ;   = 3 North fold T-point pivot
-   !                                       !  = 4 cyclic East-West AND North fold T-point pivot
-   !                                       !  = 5 North fold F-point pivot
-   !                                       !  = 6 cyclic East-West AND North fold F-point pivot
+!   ! Domain characteristics
+!   INTEGER       ::   jperio           !: lateral cond. type (between 0 and 6)
+!   !                                       !  = 0 closed                 ;   = 1 cyclic East-West
+!   !                                       !  = 2 equatorial symmetric   ;   = 3 North fold T-point pivot
+!   !                                       !  = 4 cyclic East-West AND North fold T-point pivot
+!   !                                       !  = 5 North fold F-point pivot
+!   !                                       !  = 6 cyclic East-West AND North fold F-point pivot
 
    ! Input file read offset
    LOGICAL       ::   ln_use_jattr     !: Use file global attribute: open_ocean_jstart to determine start j-row 

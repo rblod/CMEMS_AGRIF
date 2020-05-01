@@ -16,6 +16,7 @@ MODULE diacfl
    USE lib_mpp         ! distribued memory computing
    USE lbclnk          ! ocean lateral boundary condition (or mpp link)
    USE in_out_manager  ! I/O manager
+   USE iom             ! 
    USE timing          ! Performance output
 
    IMPLICIT NONE
@@ -27,24 +28,19 @@ MODULE diacfl
    INTEGER, DIMENSION(3) ::   nCu_loc, nCv_loc, nCw_loc   ! U, V, and W run max locations in the global domain
    REAL(wp)              ::   rCu_max, rCv_max, rCw_max   ! associated run max Courant number 
 
-!!gm CAUTION: need to declare these arrays here, otherwise the calculation fails in multi-proc !
-!!gm          I don't understand why.
-   REAL(wp), ALLOCATABLE, DIMENSION(:,:,:) ::   zCu_cfl, zCv_cfl, zCw_cfl         ! workspace
-!!gm end
-
    PUBLIC   dia_cfl       ! routine called by step.F90
    PUBLIC   dia_cfl_init  ! routine called by nemogcm
 
    !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: diacfl.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: diacfl.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE dia_cfl ( kt )
+   SUBROUTINE dia_cfl ( kt, Kmm )
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE dia_cfl  ***
       !!
@@ -52,31 +48,27 @@ CONTAINS
       !!               and output to ascii file 'cfl_diagnostics.ascii'
       !!----------------------------------------------------------------------
       INTEGER, INTENT(in) ::   kt   ! ocean time-step index
+      INTEGER, INTENT(in) ::   Kmm  ! ocean time level index
       !
-      INTEGER                ::   ji, jj, jk                            ! dummy loop indices
-      REAL(wp)               ::   z2dt, zCu_max, zCv_max, zCw_max       ! local scalars
-      INTEGER , DIMENSION(3) ::   iloc_u , iloc_v , iloc_w , iloc       ! workspace
-!!gm this does not work      REAL(wp), DIMENSION(jpi,jpj,jpk) ::   zCu_cfl, zCv_cfl, zCw_cfl         ! workspace
+      INTEGER                          ::   ji, jj, jk                       ! dummy loop indices
+      REAL(wp)                         ::   zCu_max, zCv_max, zCw_max        ! local scalars
+      INTEGER , DIMENSION(3)           ::   iloc_u , iloc_v , iloc_w , iloc  ! workspace
+      REAL(wp), DIMENSION(jpi,jpj,jpk) ::   zCu_cfl, zCv_cfl, zCw_cfl        ! workspace
       !!----------------------------------------------------------------------
       !
       IF( ln_timing )   CALL timing_start('dia_cfl')
       !
-      !                       ! setup timestep multiplier to account for initial Eulerian timestep
-      IF( neuler == 0 .AND. kt == nit000 ) THEN   ;    z2dt = rdt
-      ELSE                                        ;    z2dt = rdt * 2._wp
-      ENDIF
+      DO_3D_11_11( 1, jpk )
+         zCu_cfl(ji,jj,jk) = ABS( uu(ji,jj,jk,Kmm) ) * rDt / e1u  (ji,jj)      ! for i-direction
+         zCv_cfl(ji,jj,jk) = ABS( vv(ji,jj,jk,Kmm) ) * rDt / e2v  (ji,jj)      ! for j-direction
+         zCw_cfl(ji,jj,jk) = ABS( ww(ji,jj,jk) ) * rDt / e3w(ji,jj,jk,Kmm)   ! for k-direction
+      END_3D
       !
-      !                
-      DO jk = 1, jpk       ! calculate Courant numbers
-         DO jj = 1, jpj
-            DO ji = 1, fs_jpim1   ! vector opt.
-               zCu_cfl(ji,jj,jk) = ABS( un(ji,jj,jk) ) * z2dt / e1u  (ji,jj)      ! for i-direction
-               zCv_cfl(ji,jj,jk) = ABS( vn(ji,jj,jk) ) * z2dt / e2v  (ji,jj)      ! for j-direction
-               zCw_cfl(ji,jj,jk) = ABS( wn(ji,jj,jk) ) * z2dt / e3w_n(ji,jj,jk)   ! for k-direction
-            END DO
-         END DO         
-      END DO
-      !
+      ! write outputs
+      IF( iom_use('cfl_cu') )   CALL iom_put( 'cfl_cu', MAXVAL( zCu_cfl, dim=3 ) )
+      IF( iom_use('cfl_cv') )   CALL iom_put( 'cfl_cv', MAXVAL( zCv_cfl, dim=3 ) )
+      IF( iom_use('cfl_cw') )   CALL iom_put( 'cfl_cw', MAXVAL( zCw_cfl, dim=3 ) )
+
       !                    ! calculate maximum values and locations
       IF( lk_mpp ) THEN
          CALL mpp_maxloc( 'diacfl', zCu_cfl, umask, zCu_max, iloc_u )
@@ -104,7 +96,7 @@ CONTAINS
       !
       !                    ! write out to file
       IF( lwp ) THEN
-         WRITE(numcfl,FMT='(2x,i4,5x,a6,4x,f7.4,1x,i4,1x,i4,1x,i4)') kt, 'Max Cu', zCu_max, iloc_u(1), iloc_u(2), iloc_u(3)
+         WRITE(numcfl,FMT='(2x,i6,3x,a6,4x,f7.4,1x,i4,1x,i4,1x,i4)') kt, 'Max Cu', zCu_max, iloc_u(1), iloc_u(2), iloc_u(3)
          WRITE(numcfl,FMT='(11x,     a6,4x,f7.4,1x,i4,1x,i4,1x,i4)')     'Max Cv', zCv_max, iloc_v(1), iloc_v(2), iloc_v(3)
          WRITE(numcfl,FMT='(11x,     a6,4x,f7.4,1x,i4,1x,i4,1x,i4)')     'Max Cw', zCw_max, iloc_w(1), iloc_w(2), iloc_w(3)
       ENDIF
@@ -119,22 +111,22 @@ CONTAINS
          ! to ascii file
          WRITE(numcfl,*) '******************************************'
          WRITE(numcfl,FMT='(3x,a12,6x,f7.4,1x,i4,1x,i4,1x,i4)') 'Run Max Cu', rCu_max, nCu_loc(1), nCu_loc(2), nCu_loc(3)
-         WRITE(numcfl,FMT='(3x,a8,11x,f15.1)') ' => dt/C', z2dt/rCu_max
+         WRITE(numcfl,FMT='(3x,a8,11x,f15.1)') ' => dt/C', rDt/rCu_max
          WRITE(numcfl,*) '******************************************'
          WRITE(numcfl,FMT='(3x,a12,6x,f7.4,1x,i4,1x,i4,1x,i4)') 'Run Max Cv', rCv_max, nCv_loc(1), nCv_loc(2), nCv_loc(3)
-         WRITE(numcfl,FMT='(3x,a8,11x,f15.1)') ' => dt/C', z2dt/rCv_max
+         WRITE(numcfl,FMT='(3x,a8,11x,f15.1)') ' => dt/C', rDt/rCv_max
          WRITE(numcfl,*) '******************************************'
          WRITE(numcfl,FMT='(3x,a12,6x,f7.4,1x,i4,1x,i4,1x,i4)') 'Run Max Cw', rCw_max, nCw_loc(1), nCw_loc(2), nCw_loc(3)
-         WRITE(numcfl,FMT='(3x,a8,11x,f15.1)') ' => dt/C', z2dt/rCw_max
+         WRITE(numcfl,FMT='(3x,a8,11x,f15.1)') ' => dt/C', rDt/rCw_max
          CLOSE( numcfl ) 
          !
          ! to ocean output
          WRITE(numout,*)
          WRITE(numout,*) 'dia_cfl : Maximum Courant number information for the run '
          WRITE(numout,*) '~~~~~~~'
-         WRITE(numout,*) '   Max Cu = ', rCu_max, ' at (i,j,k) = (',nCu_loc(1),nCu_loc(2),nCu_loc(3),') => dt/C = ', z2dt/rCu_max
-         WRITE(numout,*) '   Max Cv = ', rCv_max, ' at (i,j,k) = (',nCv_loc(1),nCv_loc(2),nCv_loc(3),') => dt/C = ', z2dt/rCv_max
-         WRITE(numout,*) '   Max Cw = ', rCw_max, ' at (i,j,k) = (',nCw_loc(1),nCw_loc(2),nCw_loc(3),') => dt/C = ', z2dt/rCw_max
+         WRITE(numout,*) '   Max Cu = ', rCu_max, ' at (i,j,k) = (',nCu_loc(1),nCu_loc(2),nCu_loc(3),') => dt/C = ', rDt/rCu_max
+         WRITE(numout,*) '   Max Cv = ', rCv_max, ' at (i,j,k) = (',nCv_loc(1),nCv_loc(2),nCv_loc(3),') => dt/C = ', rDt/rCv_max
+         WRITE(numout,*) '   Max Cw = ', rCw_max, ' at (i,j,k) = (',nCw_loc(1),nCw_loc(2),nCw_loc(3),') => dt/C = ', rDt/rCw_max
       ENDIF
       !
       IF( ln_timing )   CALL timing_stop('dia_cfl')
@@ -165,10 +157,6 @@ CONTAINS
       rCv_max = 0._wp
       rCw_max = 0._wp
       !
-!!gm required to work
-      ALLOCATE ( zCu_cfl(jpi,jpj,jpk), zCv_cfl(jpi,jpj,jpk), zCw_cfl(jpi,jpj,jpk) )
-!!gm end
-      !      
    END SUBROUTINE dia_cfl_init
 
    !!======================================================================

@@ -27,6 +27,8 @@ MODULE usrdef_istate
 
    PUBLIC   usr_def_istate   ! called by istate.F90
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OPA 4.0 , NEMO Consortium (2016)
    !! $Id$ 
@@ -61,31 +63,28 @@ CONTAINS
       IF(lwp) WRITE(numout,*) '~~~~~~~~~~~~~~   '
       !
       ! define unique value on each point. z2d ranging from 0.05 to -0.05
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-            z2d(ji,jj) = 0.1 * ( 0.5 - REAL( nimpp + ji - 1 + ( njmpp + jj - 2 ) * jpiglo, wp ) / REAL( jpiglo * jpjglo, wp ) )
-         ENDDO
-      ENDDO
+      DO_2D_11_11
+         z2d(ji,jj) = 0.1 * ( 0.5 - REAL( mig(ji) + (mjg(jj)-1) * jpiglo, wp ) / REAL( jpiglo * jpjglo, wp ) )
+      END_2D
       !
       ! sea level:
       pssh(:,:) = z2d(:,:)                                                ! +/- 0.05 m
       !
       DO jk = 1, jpk
          zfact = REAL(jk-1,wp) / REAL(jpk-1,wp)   ! 0 to 1 to add a basic stratification
-         ! temperature choosen to lead to 20% ice
-         pts(:,:,jk,jp_tem) = 2._wp - 0.1_wp * zfact + z2d(:,:) * 100._wp ! 2 to 1.9 +/- 5 degG
-         WHERE ( pts(:,:,jk,jp_tem) < -1.5_wp ) pts(:,:,jk,jp_tem) = -1.5_wp + z2d(:,:) * 0.2_wp  
+         ! temperature choosen to lead to ~50% ice at the beginning if rn_thres_sst = 0.5
+         pts(:,:,jk,jp_tem) = 20._wp*z2d(:,:) - 1._wp - 0.5_wp * zfact    ! -1 to -1.5 +/-1.0 degG
          ! salinity:  
          pts(:,:,jk,jp_sal) = 30._wp + 1._wp * zfact + z2d(:,:)           ! 30 to 31 +/- 0.05 psu
          ! velocities:
-         pu(:,:,jk) = z2d(:,:) * 0.1_wp                                   ! +/- 0.005  m/s
-         pv(:,:,jk) = z2d(:,:) * 0.01_wp                                  ! +/- 0.0005 m/s
+         pu(:,:,jk) = z2d(:,:) *  0.1_wp * umask(:,:,jk)                  ! +/- 0.005  m/s
+         pv(:,:,jk) = z2d(:,:) * 0.01_wp * vmask(:,:,jk)                  ! +/- 0.0005 m/s
       ENDDO
       !
       CALL lbc_lnk('usrdef_istate', pssh, 'T',  1. )            ! apply boundary conditions
-      CALL lbc_lnk( 'usrdef_istate', pts, 'T',  1. )            ! apply boundary conditions
-      CALL lbc_lnk(  'usrdef_istate', pu, 'U', -1. )            ! apply boundary conditions
-      CALL lbc_lnk(  'usrdef_istate', pv, 'V', -1. )            ! apply boundary conditions
+      CALL lbc_lnk('usrdef_istate',  pts, 'T',  1. )            ! apply boundary conditions
+      CALL lbc_lnk('usrdef_istate',   pu, 'U', -1. )            ! apply boundary conditions
+      CALL lbc_lnk('usrdef_istate',   pv, 'V', -1. )            ! apply boundary conditions
       
    END SUBROUTINE usr_def_istate
 

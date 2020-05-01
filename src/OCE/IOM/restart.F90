@@ -26,7 +26,7 @@ MODULE restart
    !
    USE in_out_manager  ! I/O manager
    USE iom             ! I/O module
-   USE diurnal_bulk
+   USE diu_bulk
    USE lib_mpp         ! distribued memory computing library
 
    IMPLICIT NONE
@@ -37,11 +37,9 @@ MODULE restart
    PUBLIC   rst_read        ! routine called by istate module
    PUBLIC   rst_read_open   ! routine called in rst_read and (possibly) in dom_vvl_init
 
-   !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: restart.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: restart.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -69,22 +67,24 @@ CONTAINS
          lrst_oce = .FALSE.   
          IF( ln_rst_list ) THEN
             nrst_lst = 1
-            nitrst = nstocklist( nrst_lst )
+            nitrst = nn_stocklist( nrst_lst )
          ELSE
             nitrst = nitend
          ENDIF
       ENDIF
+      
+      IF( .NOT. ln_rst_list .AND. nn_stock == -1 )   RETURN   ! we will never do any restart
 
       ! frequency-based restart dumping (nn_stock)
-      IF( .NOT. ln_rst_list .AND. MOD( kt - 1, nstock ) == 0 ) THEN   
+      IF( .NOT. ln_rst_list .AND. MOD( kt - 1, nn_stock ) == 0 ) THEN   
          ! we use kt - 1 and not kt - nit000 to keep the same periodicity from the beginning of the experiment
-         nitrst = kt + nstock - 1                  ! define the next value of nitrst for restart writing
+         nitrst = kt + nn_stock - 1                  ! define the next value of nitrst for restart writing
          IF( nitrst > nitend )   nitrst = nitend   ! make sure we write a restart at the end of the run
       ENDIF
       ! to get better performances with NetCDF format:
       ! we open and define the ocean restart file one time step before writing the data (-> at nitrst - 1)
       ! except if we write ocean restart files every time step or if an ocean restart file was writen at nitend - 1
-      IF( kt == nitrst - 1 .OR. nstock == 1 .OR. ( kt == nitend .AND. .NOT. lrst_oce ) ) THEN
+      IF( kt == nitrst - 1 .OR. nn_stock == 1 .OR. ( kt == nitend .AND. .NOT. lrst_oce ) ) THEN
          IF( nitrst <= nitend .AND. nitrst > 0 ) THEN 
             ! beware of the format used to write kt (default is i8.8, that should be large enough...)
             IF( nitrst > 999999999 ) THEN   ;   WRITE(clkt, *       ) nitrst
@@ -130,7 +130,7 @@ CONTAINS
    END SUBROUTINE rst_opn
 
 
-   SUBROUTINE rst_write( kt )
+   SUBROUTINE rst_write( kt, Kbb, Kmm )
       !!---------------------------------------------------------------------
       !!                   ***  ROUTINE rstwrite  ***
       !!                     
@@ -139,36 +139,26 @@ CONTAINS
       !! ** Method  :   Write in numrow when kt == nitrst in NetCDF
       !!              file, save fields which are necessary for restart
       !!----------------------------------------------------------------------
-      INTEGER, INTENT(in) ::   kt   ! ocean time-step
+      INTEGER, INTENT(in) ::   kt         ! ocean time-step
+      INTEGER, INTENT(in) ::   Kbb, Kmm   ! ocean time level indices
       !!----------------------------------------------------------------------
                      IF(lwxios) CALL iom_swap(      cwxios_context          )
-                     CALL iom_rstput( kt, nitrst, numrow, 'rdt'    , rdt       , ldxios = lwxios)   ! dynamics time step
+                     CALL iom_rstput( kt, nitrst, numrow, 'rdt'    , rn_Dt       , ldxios = lwxios)   ! dynamics time step
                      CALL iom_delay_rst( 'WRITE', 'OCE', numrow )   ! save only ocean delayed global communication variables
 
       IF ( .NOT. ln_diurnal_only ) THEN
-                     CALL iom_rstput( kt, nitrst, numrow, 'ub'     , ub, ldxios = lwxios        )     ! before fields
-                     CALL iom_rstput( kt, nitrst, numrow, 'vb'     , vb, ldxios = lwxios        )
-                     CALL iom_rstput( kt, nitrst, numrow, 'tb'     , tsb(:,:,:,jp_tem), ldxios = lwxios )
-                     CALL iom_rstput( kt, nitrst, numrow, 'sb'     , tsb(:,:,:,jp_sal), ldxios = lwxios )
-                     CALL iom_rstput( kt, nitrst, numrow, 'sshb'   , sshb, ldxios = lwxios      )
+                     CALL iom_rstput( kt, nitrst, numrow, 'ub'     , uu(:,:,:       ,Kbb), ldxios = lwxios        )     ! before fields
+                     CALL iom_rstput( kt, nitrst, numrow, 'vb'     , vv(:,:,:       ,Kbb), ldxios = lwxios        )
+                     CALL iom_rstput( kt, nitrst, numrow, 'tb'     , ts(:,:,:,jp_tem,Kbb), ldxios = lwxios )
+                     CALL iom_rstput( kt, nitrst, numrow, 'sb'     , ts(:,:,:,jp_sal,Kbb), ldxios = lwxios )
+                     CALL iom_rstput( kt, nitrst, numrow, 'sshb'   ,ssh(:,:         ,Kbb), ldxios = lwxios      )
                      !
-                     CALL iom_rstput( kt, nitrst, numrow, 'un'     , un, ldxios = lwxios        )     ! now fields
-                     CALL iom_rstput( kt, nitrst, numrow, 'vn'     , vn, ldxios = lwxios        )
-                     CALL iom_rstput( kt, nitrst, numrow, 'tn'     , tsn(:,:,:,jp_tem), ldxios = lwxios )
-                     CALL iom_rstput( kt, nitrst, numrow, 'sn'     , tsn(:,:,:,jp_sal), ldxios = lwxios )
-                     CALL iom_rstput( kt, nitrst, numrow, 'sshn'   , sshn, ldxios = lwxios      )
+                     CALL iom_rstput( kt, nitrst, numrow, 'un'     , uu(:,:,:       ,Kmm), ldxios = lwxios        )     ! now fields
+                     CALL iom_rstput( kt, nitrst, numrow, 'vn'     , vv(:,:,:       ,Kmm), ldxios = lwxios        )
+                     CALL iom_rstput( kt, nitrst, numrow, 'tn'     , ts(:,:,:,jp_tem,Kmm), ldxios = lwxios )
+                     CALL iom_rstput( kt, nitrst, numrow, 'sn'     , ts(:,:,:,jp_sal,Kmm), ldxios = lwxios )
+                     CALL iom_rstput( kt, nitrst, numrow, 'sshn'   ,ssh(:,:         ,Kmm), ldxios = lwxios      )
                      CALL iom_rstput( kt, nitrst, numrow, 'rhop'   , rhop, ldxios = lwxios      )
-                  ! extra variable needed for the ice sheet coupling
-                  IF ( ln_iscpl ) THEN 
-                     CALL iom_rstput( kt, nitrst, numrow, 'tmask'  , tmask, ldxios = lwxios ) ! need to extrapolate T/S
-                     CALL iom_rstput( kt, nitrst, numrow, 'umask'  , umask, ldxios = lwxios ) ! need to correct barotropic velocity
-                     CALL iom_rstput( kt, nitrst, numrow, 'vmask'  , vmask, ldxios = lwxios ) ! need to correct barotropic velocity
-                     CALL iom_rstput( kt, nitrst, numrow, 'smask'  , ssmask, ldxios = lwxios) ! need to correct barotropic velocity
-                     CALL iom_rstput( kt, nitrst, numrow, 'e3t_n', e3t_n(:,:,:), ldxios = lwxios )   ! need to compute temperature correction
-                     CALL iom_rstput( kt, nitrst, numrow, 'e3u_n', e3u_n(:,:,:), ldxios = lwxios )   ! need to compute bt conservation
-                     CALL iom_rstput( kt, nitrst, numrow, 'e3v_n', e3v_n(:,:,:), ldxios = lwxios )   ! need to compute bt conservation
-                     CALL iom_rstput( kt, nitrst, numrow, 'gdepw_n', gdepw_n(:,:,:), ldxios = lwxios ) ! need to compute extrapolation if vvl
-                  END IF
       ENDIF
       
       IF (ln_diurnal) CALL iom_rstput( kt, nitrst, numrow, 'Dsst', x_dsst, ldxios = lwxios )  
@@ -183,8 +173,8 @@ CONTAINS
 !!gm  not sure what to do here   ===>>>  ask to Sebastian
          lrst_oce = .FALSE.
             IF( ln_rst_list ) THEN
-               nrst_lst = MIN(nrst_lst + 1, SIZE(nstocklist,1))
-               nitrst = nstocklist( nrst_lst )
+               nrst_lst = MIN(nrst_lst + 1, SIZE(nn_stocklist,1))
+               nitrst = nn_stocklist( nrst_lst )
             ENDIF
       ENDIF
       !
@@ -237,7 +227,7 @@ CONTAINS
    END SUBROUTINE rst_read_open
 
 
-   SUBROUTINE rst_read
+   SUBROUTINE rst_read( Kbb, Kmm )
       !!---------------------------------------------------------------------- 
       !!                   ***  ROUTINE rst_read  ***
       !! 
@@ -245,6 +235,7 @@ CONTAINS
       !! 
       !! ** Method  :   Read in restart.nc file fields which are necessary for restart
       !!----------------------------------------------------------------------
+      INTEGER, INTENT(in) ::   Kbb, Kmm   ! ocean time level indices
       REAL(wp) ::   zrdt
       INTEGER  ::   jk
       REAL(wp), DIMENSION(jpi, jpj, jpk) :: w3d
@@ -255,7 +246,13 @@ CONTAINS
       ! Check dynamics and tracer time-step consistency and force Euler restart if changed
       IF( iom_varid( numror, 'rdt', ldstop = .FALSE. ) > 0 )   THEN
          CALL iom_get( numror, 'rdt', zrdt, ldxios = lrxios )
-         IF( zrdt /= rdt )   neuler = 0
+         IF( zrdt /= rn_Dt ) THEN
+            IF(lwp) WRITE( numout,*)
+            IF(lwp) WRITE( numout,*) 'rst_read:  rdt not equal to the read one'
+            IF(lwp) WRITE( numout,*)
+            IF(lwp) WRITE( numout,*) '      ==>>>   forced euler first time-step'
+            l_1st_euler =  .TRUE.
+         ENDIF
       ENDIF
 
       CALL iom_delay_rst( 'READ', 'OCE', numror )   ! read only ocean delayed global communication variables
@@ -264,43 +261,43 @@ CONTAINS
       IF( ln_diurnal ) CALL iom_get( numror, jpdom_autoglo, 'Dsst' , x_dsst, ldxios = lrxios ) 
       IF ( ln_diurnal_only ) THEN 
          IF(lwp) WRITE( numout, * ) &
-         &   "rst_read:- ln_diurnal_only set, setting rhop=rau0" 
-         rhop = rau0
+         &   "rst_read:- ln_diurnal_only set, setting rhop=rho0" 
+         rhop = rho0
          CALL iom_get( numror, jpdom_autoglo, 'tn'     , w3d, ldxios = lrxios ) 
-         tsn(:,:,1,jp_tem) = w3d(:,:,1)
+         ts(:,:,1,jp_tem,Kmm) = w3d(:,:,1)
          RETURN 
       ENDIF  
       
       IF( iom_varid( numror, 'ub', ldstop = .FALSE. ) > 0 ) THEN
-         CALL iom_get( numror, jpdom_autoglo, 'ub'     , ub, ldxios = lrxios                )   ! before fields
-         CALL iom_get( numror, jpdom_autoglo, 'vb'     , vb, ldxios = lrxios                )
-         CALL iom_get( numror, jpdom_autoglo, 'tb'     , tsb(:,:,:,jp_tem), ldxios = lrxios )
-         CALL iom_get( numror, jpdom_autoglo, 'sb'     , tsb(:,:,:,jp_sal), ldxios = lrxios )
-         CALL iom_get( numror, jpdom_autoglo, 'sshb'   , sshb, ldxios = lrxios              )
+         CALL iom_get( numror, jpdom_autoglo, 'ub'     , uu(:,:,:       ,Kbb), ldxios = lrxios )   ! before fields
+         CALL iom_get( numror, jpdom_autoglo, 'vb'     , vv(:,:,:       ,Kbb), ldxios = lrxios )
+         CALL iom_get( numror, jpdom_autoglo, 'tb'     , ts(:,:,:,jp_tem,Kbb), ldxios = lrxios )
+         CALL iom_get( numror, jpdom_autoglo, 'sb'     , ts(:,:,:,jp_sal,Kbb), ldxios = lrxios )
+         CALL iom_get( numror, jpdom_autoglo, 'sshb'   ,ssh(:,:         ,Kbb), ldxios = lrxios )
       ELSE
-         neuler = 0
+         l_1st_euler =  .TRUE.      ! before field not found, forced euler 1st time-step
       ENDIF
       !
-      CALL iom_get( numror, jpdom_autoglo, 'un'     , un, ldxios = lrxios )   ! now    fields
-      CALL iom_get( numror, jpdom_autoglo, 'vn'     , vn, ldxios = lrxios )
-      CALL iom_get( numror, jpdom_autoglo, 'tn'     , tsn(:,:,:,jp_tem), ldxios = lrxios )
-      CALL iom_get( numror, jpdom_autoglo, 'sn'     , tsn(:,:,:,jp_sal), ldxios = lrxios )
-      CALL iom_get( numror, jpdom_autoglo, 'sshn'   , sshn, ldxios = lrxios )
+      CALL iom_get( numror, jpdom_autoglo, 'un'     , uu(:,:,:       ,Kmm), ldxios = lrxios )       ! now    fields
+      CALL iom_get( numror, jpdom_autoglo, 'vn'     , vv(:,:,:       ,Kmm), ldxios = lrxios )
+      CALL iom_get( numror, jpdom_autoglo, 'tn'     , ts(:,:,:,jp_tem,Kmm), ldxios = lrxios )
+      CALL iom_get( numror, jpdom_autoglo, 'sn'     , ts(:,:,:,jp_sal,Kmm), ldxios = lrxios )
+      CALL iom_get( numror, jpdom_autoglo, 'sshn'   ,ssh(:,:         ,Kmm), ldxios = lrxios )
       IF( iom_varid( numror, 'rhop', ldstop = .FALSE. ) > 0 ) THEN
          CALL iom_get( numror, jpdom_autoglo, 'rhop'   , rhop, ldxios = lrxios )   ! now    potential density
       ELSE
-         CALL eos( tsn, rhd, rhop, gdept_n(:,:,:) )   
+         CALL eos( ts(:,:,:,:,Kmm), rhd, rhop, gdept(:,:,:,Kmm) )   
       ENDIF
       !
-      IF( neuler == 0 ) THEN                                  ! Euler restart (neuler=0)
-         tsb  (:,:,:,:) = tsn  (:,:,:,:)                             ! all before fields set to now values
-         ub   (:,:,:)   = un   (:,:,:)
-         vb   (:,:,:)   = vn   (:,:,:)
-         sshb (:,:)     = sshn (:,:)
+      IF( l_1st_euler ) THEN                                  ! Euler restart 
+         ts   (:,:,:,:,Kbb) = ts   (:,:,:,:,Kmm)              ! all before fields set to now values
+         uu   (:,:,:  ,Kbb) = uu   (:,:,:  ,Kmm)
+         vv   (:,:,:  ,Kbb) = vv   (:,:,:  ,Kmm)
+         ssh  (:,:    ,Kbb) = ssh  (:,:    ,Kmm)
          !
          IF( .NOT.ln_linssh ) THEN
             DO jk = 1, jpk
-               e3t_b(:,:,jk) = e3t_n(:,:,jk)
+               e3t(:,:,jk,Kbb) = e3t(:,:,jk,Kmm)
             END DO
          ENDIF
          !

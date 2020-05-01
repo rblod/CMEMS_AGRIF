@@ -20,28 +20,23 @@ MODULE domain
    !!   dom_nam        : read and contral domain namelists
    !!   dom_ctl        : control print for the ocean domain
    !!----------------------------------------------------------------------
-   USE oce             ! ocean variables
    USE dom_oce         ! domain: ocean
    USE phycst          ! physical constants
-   USE closea          ! closed seas
    USE domhgr          ! domain: set the horizontal mesh
    USE domzgr          ! domain: set the vertical mesh
-   USE domstp          ! domain: set the time-step
    USE dommsk          ! domain: set the mask system
-   USE domwri          ! domain: write the meshmask file
-   USE domvvl          ! variable volume
+   USE domclo          ! domain: set closed sea mask
    !
+   USE lib_mpp         !
    USE in_out_manager  ! I/O manager
    USE iom             ! 
-   USE wrk_nemo        ! Memory Allocation
-   USE lib_mpp         ! distributed memory computing library
-   USE lbclnk          ! ocean lateral boundary condition (or mpp link)
-   USE timing          ! Timing
 
    IMPLICIT NONE
    PRIVATE
 
    PUBLIC   dom_init   ! called by opa.F90
+   PUBLIC   dom_nam  ! called by opa.F90
+   PUBLIC   cfg_write   ! called by opa.F90
 
    !!-------------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
@@ -66,12 +61,6 @@ CONTAINS
       !!              - dom_wri: create the meshmask file if nmsh=1
       !!              - 1D configuration, move Coriolis, u and v at T-point
       !!----------------------------------------------------------------------
-      INTEGER ::   jk          ! dummy loop indices
-      INTEGER ::   iconf = 0   ! local integers
-      REAL(wp), POINTER, DIMENSION(:,:) ::   z1_hu_0, z1_hv_0
-      !!----------------------------------------------------------------------
-      !
-      IF( nn_timing == 1 )   CALL timing_start('dom_init')
       !
       IF(lwp) THEN
          WRITE(numout,*)
@@ -81,63 +70,21 @@ CONTAINS
       !
       !                       !==  Reference coordinate system  ==!
       !
-                     CALL dom_nam               ! read namelist ( namrun, namdom )
-                     CALL dom_clo               ! Closed seas and lake
-                     CALL dom_hgr               ! Horizontal mesh
-                     CALL dom_zgr               ! Vertical mesh and bathymetry
-                     CALL dom_msk               ! Masks
+      CALL dom_nam                  ! read namelist ( namrun, namdom )
       !
-      ht_0(:,:) = e3t_0(:,:,1) * tmask(:,:,1)   ! Reference ocean thickness
-      hu_0(:,:) = e3u_0(:,:,1) * umask(:,:,1)
-      hv_0(:,:) = e3v_0(:,:,1) * vmask(:,:,1)
-      DO jk = 2, jpk
-         ht_0(:,:) = ht_0(:,:) + e3t_0(:,:,jk) * tmask(:,:,jk)
-         hu_0(:,:) = hu_0(:,:) + e3u_0(:,:,jk) * umask(:,:,jk)
-         hv_0(:,:) = hv_0(:,:) + e3v_0(:,:,jk) * vmask(:,:,jk)
-      END DO
+      CALL dom_hgr                  ! Horizontal mesh
       !
-      !              !==  time varying part of coordinate system  ==!
+      CALL dom_zgr                  ! Vertical mesh and bathymetry
       !
-      IF( ln_linssh ) THEN          ! Fix in time : set to the reference one for all
-         !       before        !          now          !       after         !
-         ;  gdept_b = gdept_0  ;   gdept_n = gdept_0   !        ---          ! depth of grid-points
-         ;  gdepw_b = gdepw_0  ;   gdepw_n = gdepw_0   !        ---          !
-         ;                     ;   gde3w_n = gde3w_0   !        ---          !
-         !                                                                  
-         ;    e3t_b =   e3t_0  ;     e3t_n =   e3t_0   ;   e3t_a =  e3t_0    ! scale factors
-         ;    e3u_b =   e3u_0  ;     e3u_n =   e3u_0   ;   e3u_a =  e3u_0    !
-         ;    e3v_b =   e3v_0  ;     e3v_n =   e3v_0   ;   e3v_a =  e3v_0    !
-         ;                     ;     e3f_n =   e3f_0   !        ---          !
-         ;    e3w_b =   e3w_0  ;     e3w_n =   e3w_0   !        ---          !
-         ;   e3uw_b =  e3uw_0  ;    e3uw_n =  e3uw_0   !        ---          !
-         ;   e3vw_b =  e3vw_0  ;    e3vw_n =  e3vw_0   !        ---          !
-         !
-         CALL wrk_alloc( jpi,jpj,   z1_hu_0, z1_hv_0 )
-         !
-         z1_hu_0(:,:) = ssumask(:,:) / ( hu_0(:,:) + 1._wp - ssumask(:,:) )     ! _i mask due to ISF
-         z1_hv_0(:,:) = ssvmask(:,:) / ( hv_0(:,:) + 1._wp - ssvmask(:,:) )
-         !
-         !        before       !          now          !       after         !
-         ;                     ;      ht_n =    ht_0   !                     ! water column thickness
-         ;     hu_b =    hu_0  ;      hu_n =    hu_0   ;    hu_a =    hu_0   ! 
-         ;     hv_b =    hv_0  ;      hv_n =    hv_0   ;    hv_a =    hv_0   !
-         ;  r1_hu_b = z1_hu_0  ;   r1_hu_n = z1_hu_0   ; r1_hu_a = z1_hu_0   ! inverse of water column thickness
-         ;  r1_hv_b = z1_hv_0  ;   r1_hv_n = z1_hv_0   ; r1_hv_a = z1_hv_0   !
-         !
-         CALL wrk_dealloc( jpi,jpj,   z1_hu_0, z1_hv_0 )
-         !
-      ELSE                         ! time varying : initialize before/now/after variables
-         !
-         CALL dom_vvl_init 
-         !
-      ENDIF
+      CALL dom_msk                  ! compute mask (needed by write_cfg)
       !
-      CALL cfg_write         ! create the configuration file
+      IF ( ln_domclo ) CALL dom_clo ! Closed seas and lake
       !
-      IF( nn_timing == 1 )   CALL timing_stop('dom_init')
+      CALL dom_ctl                  ! print extrema of masked scale factors
+      ! 
+      CALL cfg_write                ! create the configuration file
       !
    END SUBROUTINE dom_init
-
 
    SUBROUTINE dom_nam
       !!----------------------------------------------------------------------
@@ -155,8 +102,9 @@ CONTAINS
          &             nn_it000, nn_itend , nn_date0    , nn_time0     , nn_leapy  , nn_istate ,     &
          &             nn_stock, nn_write , ln_mskland  , ln_clobber   , nn_chunksz, nn_euler  ,     &
          &             ln_cfmeta, ln_iscpl
-      NAMELIST/namdom/ nn_bathy, rn_bathy , rn_e3zps_min, rn_e3zps_rat, nn_msh, rn_hmin, rn_isfhmin, &
-         &             rn_atfp , rn_rdt   , nn_closea   , ln_crs      , jphgr_msh ,                  &
+      NAMELIST/namdom/ nn_bathy, cn_topo, cn_bath, cn_lon, cn_lat, nn_interp,                        &
+         &             rn_bathy , rn_e3zps_min, rn_e3zps_rat, nn_msh, rn_hmin,                       &
+         &             rn_atfp , rn_rdt   , ln_crs      , jphgr_msh ,                                &
          &             ppglam0, ppgphi0, ppe1_deg, ppe2_deg, ppe1_m, ppe2_m,                         &
          &             ppsur, ppa0, ppa1, ppkth, ppacr, ppdzmin, pphmax, ldbletanh,                  &
          &             ppa2, ppkth2, ppacr2
@@ -180,35 +128,13 @@ CONTAINS
          WRITE(numout,*) 'dom_nam  : domain initialization through namelist read'
          WRITE(numout,*) '~~~~~~~ '
          WRITE(numout,*) '   Namelist namrun'
-         WRITE(numout,*) '      job number                      nn_no      = ', nn_no
          WRITE(numout,*) '      experiment name for output      cn_exp     = ', cn_exp
-         WRITE(numout,*) '      file prefix restart input       cn_ocerst_in= ', cn_ocerst_in
-         WRITE(numout,*) '      restart input directory         cn_ocerst_indir= ', cn_ocerst_indir
-         WRITE(numout,*) '      file prefix restart output      cn_ocerst_out= ', cn_ocerst_out
-         WRITE(numout,*) '      restart output directory        cn_ocerst_outdir= ', cn_ocerst_outdir
-         WRITE(numout,*) '      restart logical                 ln_rstart  = ', ln_rstart
-         WRITE(numout,*) '      start with forward time step    nn_euler   = ', nn_euler
-         WRITE(numout,*) '      control of time step            nn_rstctl  = ', nn_rstctl
-         WRITE(numout,*) '      number of the first time step   nn_it000   = ', nn_it000
-         WRITE(numout,*) '      number of the last time step    nn_itend   = ', nn_itend
-         WRITE(numout,*) '      initial calendar date aammjj    nn_date0   = ', nn_date0
-         WRITE(numout,*) '      initial time of day in hhmm     nn_time0   = ', nn_time0
-         WRITE(numout,*) '      leap year calendar (0/1)        nn_leapy   = ', nn_leapy
-         WRITE(numout,*) '      initial state output            nn_istate  = ', nn_istate
-         IF( ln_rst_list ) THEN
-            WRITE(numout,*) '      list of restart dump times      nn_stocklist   =', nn_stocklist
-         ELSE
-            WRITE(numout,*) '      frequency of restart file       nn_stock   = ', nn_stock
-         ENDIF
-         WRITE(numout,*) '      frequency of output file        nn_write   = ', nn_write
          WRITE(numout,*) '      mask land points                ln_mskland = ', ln_mskland
          WRITE(numout,*) '      additional CF standard metadata ln_cfmeta  = ', ln_cfmeta
          WRITE(numout,*) '      overwrite an existing file      ln_clobber = ', ln_clobber
          WRITE(numout,*) '      NetCDF chunksize (bytes)        nn_chunksz = ', nn_chunksz
-         WRITE(numout,*) '      IS coupling at the restart step ln_iscpl   = ', ln_iscpl
       ENDIF
 
-      no = nn_no                    ! conversion DOCTOR names into model names (this should disappear soon)
       cexper = cn_exp
       nrstdt = nn_rstctl
       nit000 = nn_it000
@@ -270,10 +196,12 @@ CONTAINS
          WRITE(numout,*)
          WRITE(numout,*) '   Namelist namdom : space & time domain'
          WRITE(numout,*) '      flag read/compute bathymetry      nn_bathy     = ', nn_bathy
+         IF( nn_bathy == 2 ) THEN
+            WRITE(numout,*) '      compute bathymetry from file      cn_topo      = ', cn_topo
+         ENDIF   
          WRITE(numout,*) '      Depth (if =0 bathy=jpkm1)         rn_bathy     = ', rn_bathy
          WRITE(numout,*) '      min depth of the ocean    (>0) or    rn_hmin   = ', rn_hmin
          WRITE(numout,*) '      min number of ocean level (<0)       '
-         WRITE(numout,*) '      treshold to open the isf cavity   rn_isfhmin   = ', rn_isfhmin, ' (m)'
          WRITE(numout,*) '      minimum thickness of partial      rn_e3zps_min = ', rn_e3zps_min, ' (m)'
          WRITE(numout,*) '         step level                     rn_e3zps_rat = ', rn_e3zps_rat
          WRITE(numout,*) '      create mesh/mask file(s)          nn_msh       = ', nn_msh
@@ -281,10 +209,6 @@ CONTAINS
          WRITE(numout,*) '           = 1   mesh_mask                 '
          WRITE(numout,*) '           = 2   mesh and mask             '
          WRITE(numout,*) '           = 3   mesh_hgr, msh_zgr and mask'
-         WRITE(numout,*) '      ocean time step                       rn_rdt    = ', rn_rdt
-         WRITE(numout,*) '      asselin time filter parameter         rn_atfp   = ', rn_atfp
-         WRITE(numout,*) '      suppression of closed seas (=0)       nn_closea = ', nn_closea
-         WRITE(numout,*) '      online coarsening of dynamical fields ln_crs    = ', ln_crs
          WRITE(numout,*) '      type of horizontal mesh jphgr_msh           = ', jphgr_msh
          WRITE(numout,*) '      longitude of first raw and column T-point ppglam0 = ', ppglam0
          WRITE(numout,*) '      latitude  of first raw and column T-point ppgphi0 = ', ppgphi0
@@ -331,10 +255,14 @@ CONTAINS
       !!----------------------------------------------------------------------
       !
       IF(lk_mpp) THEN
-         CALL mpp_minloc( e1t(:,:), tmask_i(:,:), ze1min, iimi1,ijmi1 )
-         CALL mpp_minloc( e2t(:,:), tmask_i(:,:), ze2min, iimi2,ijmi2 )
-         CALL mpp_maxloc( e1t(:,:), tmask_i(:,:), ze1max, iima1,ijma1 )
-         CALL mpp_maxloc( e2t(:,:), tmask_i(:,:), ze2max, iima2,ijma2 )
+         CALL mpp_minloc( 'dom_ctl', e1t(:,:), tmask_i(:,:), ze1min, iloc )
+         iimi1 = iloc(1) ; ijmi1 = iloc(2)
+         CALL mpp_minloc( 'dom_ctl', e2t(:,:), tmask_i(:,:), ze2min, iloc )
+         iimi2 = iloc(1) ; ijmi2 = iloc(2)
+         CALL mpp_maxloc( 'dom_ctl', e1t(:,:), tmask_i(:,:), ze1max, iloc )
+         iima1 = iloc(1) ; ijma1 = iloc(2)
+         CALL mpp_maxloc( 'dom_ctl', e2t(:,:), tmask_i(:,:), ze2max, iloc )
+         iima2 = iloc(1) ; ijma2 = iloc(2)
       ELSE
          ze1min = MINVAL( e1t(:,:), mask = tmask_i(:,:) == 1._wp )    
          ze2min = MINVAL( e2t(:,:), mask = tmask_i(:,:) == 1._wp )    
@@ -399,7 +327,7 @@ CONTAINS
       !                       ! ============================= !
       !         
       clnam = 'domain_cfg'  ! filename (configuration information)
-      CALL iom_open( TRIM(clnam), inum, ldwrt = .TRUE., kiolib = jprstlib )
+      CALL iom_open( TRIM(clnam), inum, ldwrt = .TRUE.)!, kiolib = jprstlib )
       
       !
       !                             !==  ORCA family specificities  ==!
@@ -480,18 +408,24 @@ CONTAINS
       !
       CALL iom_rstput( 0, 0, inum, 'bottom_level' , REAL( mbkt, wp )*ssmask , ktype = jp_i4 )   ! nb of ocean T-points
       CALL iom_rstput( 0, 0, inum, 'top_level'    , REAL( mikt, wp )*ssmask , ktype = jp_i4 )   ! nb of ocean T-points (ISF)
-      DO jj = 1,jpj
-         DO ji = 1,jpi
-            z2d (ji,jj) = SUM ( e3t_0(ji,jj, 1:mbkt(ji,jj) ) ) * ssmask(ji,jj) 
-         END DO
-      END DO
-      CALL iom_rstput( 0, 0, inum, 'bathy_metry'   , z2d , ktype = jp_r4 )
-
+      CALL iom_rstput( 0, 0, inum, 'isf_draft'    , risfdep , ktype = jp_r8 )
+      CALL iom_rstput( 0, 0, inum, 'bathy_metry'  , bathy   , ktype = jp_r8 )
       !
-      IF( ln_sco ) THEN             ! s-coordinate: store grid stiffness ratio  (Not required anyway)
-         CALL dom_stiff( z2d )
-         CALL iom_rstput( 0, 0, inum, 'stiffness', z2d )        !    ! Max. grid stiffness ratio
-      ENDIF
+      !                              !== closed sea ==!
+      IF (ln_domclo) THEN
+         ! mask for the open sea
+         CALL iom_rstput( 0, 0, inum, 'mask_opensea' , msk_opnsea  , ktype = jp_i4 )
+         ! mask for all the under closed sea
+         CALL iom_rstput( 0, 0, inum, 'mask_csundef' , msk_csundef , ktype = jp_i4 )
+         ! mask for global, local net precip, local net precip and evaporation correction
+         CALL iom_rstput( 0, 0, inum, 'mask_csglo'   , msk_csglo   , ktype = jp_i4 )
+         CALL iom_rstput( 0, 0, inum, 'mask_csemp'   , msk_csemp   , ktype = jp_i4 )
+         CALL iom_rstput( 0, 0, inum, 'mask_csrnf'   , msk_csrnf   , ktype = jp_i4 )
+         ! mask for the various river mouth (in case multiple lake in the same outlet)
+         CALL iom_rstput( 0, 0, inum, 'mask_csgrpglo', msk_csgrpglo, ktype = jp_i4 )
+         CALL iom_rstput( 0, 0, inum, 'mask_csgrpemp', msk_csgrpemp, ktype = jp_i4 )
+         CALL iom_rstput( 0, 0, inum, 'mask_csgrprnf', msk_csgrprnf, ktype = jp_i4 )
+      END IF
       !
       !                                ! ============================
       !                                !        close the files 

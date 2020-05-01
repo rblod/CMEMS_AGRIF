@@ -38,12 +38,12 @@ MODULE phycst
    REAL(wp), PUBLIC ::   grav     = 9.80665_wp       !: gravity                            [m/s2]   
    REAL(wp), PUBLIC ::   rt0      = 273.15_wp        !: freezing point of fresh water [Kelvin]
 
-   REAL(wp), PUBLIC ::   rau0                        !: volumic mass of reference     [kg/m3]
-   REAL(wp), PUBLIC ::   r1_rau0                     !: = 1. / rau0                   [m3/kg]
+   REAL(wp), PUBLIC ::   rho0                        !: volumic mass of reference     [kg/m3]
+   REAL(wp), PUBLIC ::   r1_rho0                     !: = 1. / rho0                   [m3/kg]
    REAL(wp), PUBLIC ::   rcp                         !: ocean specific heat           [J/Kelvin]
    REAL(wp), PUBLIC ::   r1_rcp                      !: = 1. / rcp                    [Kelvin/J]
-   REAL(wp), PUBLIC ::   rau0_rcp                    !: = rau0 * rcp 
-   REAL(wp), PUBLIC ::   r1_rau0_rcp                 !: = 1. / ( rau0 * rcp )
+   REAL(wp), PUBLIC ::   rho0_rcp                    !: = rho0 * rcp 
+   REAL(wp), PUBLIC ::   r1_rho0_rcp                 !: = 1. / ( rho0 * rcp )
 
    REAL(wp), PUBLIC ::   emic     =    0.97_wp       !: emissivity of snow or ice (not used?)
 
@@ -67,7 +67,7 @@ MODULE phycst
    REAL(wp), PUBLIC ::   r1_rcpi                     !: 1 / rcpi
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: phycst.F90 10068 2018-08-28 14:09:04Z nicolasmartin $ 
+   !! $Id: phycst.F90 12489 2020-02-28 15:55:11Z davestorkey $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
    

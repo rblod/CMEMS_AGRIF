@@ -2,106 +2,193 @@
 ! NEMO system team, System and Interface for oceanic RElocable Nesting
 !----------------------------------------------------------------------
 !
-!
-! PROGRAM: create_coord
-!
 ! DESCRIPTION:
 !> @file
 !> @brief 
-!> This program creates fine grid coordinate file.
+!> this program creates fine grid coordinate file.
 !>
 !> @details
 !> @section sec1 method
-!>    All variables from the input coordinates coarse grid file, are extracted
-!>    and interpolated to create fine grid coordinates files.<br/>
-!>    @note 
-!>       interpolation method could be different for each variable.
+!> variables from the input coordinates coarse/source grid file, are extracted
+!> and interpolated to create a fine/taget grid coordinates file.<br/>
+!> @note 
+!>    interpolation method could be different for each variable.
+!>
+!> \image html  header_coord_40.png 
+!> <center> \image latex header_coord_40.png 
+!> </center>
 !>
 !> @section sec2 how to
-!>    to create fine grid coordinates files:<br/>
-!> @code{.sh}
-!>    ./SIREN/bin/create_coord create_coord.nam
-!> @endcode
-!>    
-!> @note 
-!>    you could find a template of the namelist in templates directory.
+!> USAGE: create_coord create_coord.nam [-v] [-h]<br/>
+!>    - positional arguments:<br/>
+!>       - create_coord.nam<br/>
+!>          namelist of create_coord
+!>          @note
+!>             a template of the namelist could be created running (in templates directory):
+!>             @code{.sh}
+!>                python create_templates.py create_coord
+!>             @endcode
 !>
-!>    create_coord.nam contains 6 namelists:<br/>
-!>       - logger namelist (namlog)
-!>       - config namelist (namcfg)
-!>       - coarse grid namelist (namcrs)
-!>       - variable namelist (namvar)
-!>       - nesting namelist (namnst)
-!>       - output namelist (namout)
-!>    
-!>    * _logger namelist (namlog)_:<br/>
-!>       - cn_logfile   : log filename
-!>       - cn_verbosity : verbosity ('trace','debug','info',
-!> 'warning','error','fatal','none')
-!>       - in_maxerror  : maximum number of error allowed
+!>    - optional arguments:<br/>
+!>       - -h, --help<br/>
+!>          show this help message (and exit)<br/>
+!>       - -v, --version<br/>
+!>          show Siren's version   (and exit)
 !>
-!>    * _config namelist (namcfg)_:<br/>
-!>       - cn_varcfg : variable configuration file 
-!> (see ./SIREN/cfg/variable.cfg)
-!>       - cn_dimcfg : dimension configuration file. define dimensions allowed 
-!> (see ./SIREN/cfg/dimension.cfg).
-!>       - cn_dumcfg : useless (dummy) configuration file, for useless 
-!> dimension or variable (see ./SIREN/cfg/dummy.cfg).
+!> @section sec_coord create_coord.nam
+!>    create_coord.nam contains 6 sub-namelists:<br/>
+!>       - **namlog** to set logger parameters
+!>       - **namcfg** to set configuration file parameters
+!>       - **namsrc** to set source/coarse grid parameters
+!>       - **namvar** to set variable parameters
+!>       - **namnst** to set sub domain and nesting paramters
+!>       - **namout** to set output parameters
 !>
-!>    * _coarse grid namelist (namcrs)_:<br/>
-!>       - cn_coord0 : coordinate file
-!>       - in_perio0 : NEMO periodicity index (see Model Boundary Condition in
-!> [NEMO documentation](http://www.nemo-ocean.eu/About-NEMO/Reference-manuals))
+!>    here after, each sub-namelist parameters is detailed.
+!>    @note 
+!>       default values are specified between brackets
 !>
-!>    * _variable namelist (namvar)_:<br/>
-!>       - cn_varinfo : list of variable and extra information about request(s)
-!> to be used.<br/>
-!>          each elements of *cn_varinfo* is a string character 
-!>          (separated by ',').<br/>
-!>          it is composed of the variable name follow by ':', 
-!>          then request(s) to be used on this variable.<br/> 
-!>          request could be:
-!>             - int = interpolation method
-!>             - ext = extrapolation method
-!> 
-!>                requests must be separated by ';' .<br/>
-!>                order of requests does not matter.<br/>
+!> @subsection sublog namlog
+!>    the logger sub-namelist parameters are :
 !>
-!>          informations about available method could be find in @ref interp,
-!>          @ref extrap and @ref filter modules.<br/>
+!>    - **cn_logfile** [@a create_coord.log]<br/>
+!>       logger filename
 !>
-!>          Example: 'glamt: int=linear; ext=dist_weight', 
-!>          'e1t: int=cubic/rhoi'<br/>
-!>          @note 
-!>             If you do not specify a method which is required, 
-!>             default one is applied.
+!>    - **cn_verbosity** [@a warning]<br/>
+!>       verbosity level, choose between :
+!>          - trace
+!>          - debug
+!>          - info
+!>          - warning
+!>          - error
+!>          - fatal
+!>          - none
 !>
-!>    * _nesting namelist (namnst)_:<br/>
-!>       you could define sub domain with coarse grid indices or with coordinates.
-!>       - in_imin0 : i-direction lower left  point indice 
-!> of coarse grid subdomain to be used
-!>       - in_imax0 : i-direction upper right point indice
-!> of coarse grid subdomain to be used
-!>       - in_jmin0 : j-direction lower left  point indice
-!> of coarse grid subdomain to be used
-!>       - in_jmax0 : j-direction upper right point indice
-!> of coarse grid subdomain to be used
-!>       - rn_lonmin0 : lower left  longitude of coarse grid subdomain to be used
-!>       - rn_lonmax0 : upper right longitude of coarse grid subdomain to be used
-!>       - rn_latmin0 : lower left  latitude  of coarse grid subdomain to be used
-!>       - rn_latmax0 : upper right latitude  of coarse grid subdomain to be used
-!>       - in_rhoi  : refinement factor in i-direction
-!>       - in_rhoj  : refinement factor in j-direction<br/>
+!>    - **in_maxerror** [@a 5]<br/> 
+!>       maximum number of error allowed
 !>
-!>       \image html  grid_zoom_40.png 
+!> @subsection subcfg namcfg
+!>    the configuration sub-namelist parameters are :
+!>
+!>    - **cn_varcfg** [@a ./cfg/variable.cfg]<br/>
+!>       path to the variable configuration file.<br/>
+!>       the variable configuration file defines standard name, 
+!>       default interpolation method, axis,... 
+!>       to be used for some known variables.<br/> 
+!>
+!>    - **cn_dimcfg** [@a ./cfg/dimension.cfg]<br/> 
+!>       path to the dimension configuration file.<br/> 
+!>       the dimension configuration file defines dimensions allowed.<br/> 
+!>
+!>    - **cn_dumcfg** [@a ./cfg/dummy.cfg]<br/> 
+!>       path to the useless (dummy) configuration file.<br/>
+!>       the dummy configuration file defines useless 
+!>       dimension or variable. these dimension(s) or variable(s) will not be
+!>       processed.<br/>
+!>
+!> @subsection subsrc namsrc 
+!>    the source/coarse grid sub-namelist parameters are :
+!>
+!>    - **cn_coord0** [@a ]<br/> 
+!>       path to the coordinate file
+!>
+!>    - **in_perio0** [@a ]<br/> 
+!>       NEMO periodicity index<br/> 
+!>       the NEMO periodicity could be choose between 0 to 6:
+!>       <dl>
+!>          <dt>in_perio=0</dt>
+!>          <dd>standard regional model</dd>
+!>          <dt>in_perio=1</dt>
+!>          <dd>east-west cyclic model</dd>
+!>          <dt>in_perio=2</dt>
+!>          <dd>model with symmetric boundary condition across the equator</dd>
+!>          <dt>in_perio=3</dt>
+!>          <dd>regional model with North fold boundary and T-point pivot</dd>
+!>          <dt>in_perio=4</dt>
+!>          <dd>global model with a T-point pivot.<br/>
+!>          example: ORCA2, ORCA025, ORCA12</dd>
+!>          <dt>in_perio=5</dt>
+!>          <dd>regional model with North fold boundary and F-point pivot</dd>
+!>          <dt>in_perio=6</dt>
+!>          <dd>global model with a F-point pivot<br/>
+!>          example: ORCA05</dd>
+!>          </dd>
+!>       </dl>
+!>       @sa For more information see @ref md_src_docsrc_6_perio
+!>       and Model Boundary Condition paragraph in the 
+!>       [NEMO documentation](https://forge.ipsl.jussieu.fr/nemo/chrome/site/doc/NEMO/manual/pdf/NEMO_manual.pdf)
+!>
+!> @subsection subvar namvar 
+!>    the variable sub-namelist parameters are :
+!>
+!>    - **cn_varinfo** [@a ]<br/> 
+!>       list of variable and extra information about request(s) to be used<br/>
+!>
+!>       each elements of *cn_varinfo* is a string character (separated by ',').<br/>
+!>       it is composed of the variable name follow by ':', 
+!>       then request(s) to be used on this variable.<br/> 
+!>       request could be:
+!>          - int = interpolation method
+!>          - ext = extrapolation method
+!>
+!>             requests must be separated by ';'.<br/>
+!>             order of requests does not matter.<br/>
+!>
+!>       informations about available method could be find in @ref interp,
+!>       @ref extrap and @ref filter modules.<br/>
+!>       Example: 
+!>          - 'glamt: int=linear; ext=dist_weight', 'e1t: int=cubic/rhoi'
+!>
+!>       @note 
+!>          If you do not specify a method which is required, 
+!>          default one is apply.
+!>
+!> @subsection subnst namnst 
+!>    the nesting sub-namelist parameters are :
+!>
+!>    - **in_imin0** [@a ]<br/>
+!>       i-direction lower left  point indice of coarse grid subdomain to be used
+!>    - **in_imax0** [@a ]<br/>
+!>       i-direction upper right point indice of coarse grid subdomain to be used
+!>    - **in_jmin0** [@a ]<br/>
+!>       j-direction lower left  point indice of coarse grid subdomain to be used
+!>    - **in_jmax0** [@a ]<br/>
+!>       j-direction upper right point indice of coarse grid subdomain to be used
+!> <br/>or<br/>
+!>    - **rn_lonmin0** [@a ]<br/>
+!>       lower left  longitude of coarse grid subdomain to be used
+!>    - **rn_lonmax0** [@a ]<br/>
+!>       upper right longitude of coarse grid subdomain to be used
+!>    - **rn_latmin0** [@a ]<br/>
+!>       lower left  latitude  of coarse grid subdomain to be used
+!>    - **rn_latmax0** [@a ]<br/>
+!>       upper right latitude  of coarse grid subdomain to be used
+!>    @note you could define sub domain with 
+!>       - coarse/source grid indices
+!>       <br/>or<br/>
+!>       - coordinates.<br/>
+!>    if coordinates are defined (-180 < lon < 360 and -90 < lat < 90),
+!>    SIREN does not take into account indices.
+!>
+!>    - **in_rhoi**  [@a 1]<br/> 
+!>       refinement factor in i-direction
+!>
+!>    - **in_rhoj**  [@a 1]<br/> 
+!>       refinement factor in j-direction
+!>
+!>       \image html  grid_zoom_60.png 
 !>       <center> \image latex grid_zoom_40.png 
 !>       </center>
 !>
-!>    * _output namelist (namout)_:
-!>       - cn_fileout : output coordinate file name
+!> @subsection subout namout 
+!>    the output sub-namelist parameter is :
 !>
+!>    - **cn_fileout** [@a coord_fine.nc]<br/>
+!>       output bathymetry filename
+!>
+!> <hr>
 !> @author J.Paul
-! REVISION HISTORY:
+!>
 !> @date November, 2013 - Initial Version
 !> @date September, 2014
 !> - add header for user
@@ -113,8 +200,15 @@
 !> - allow to use coordinate to define subdomain
 !> @date October, 2016
 !> - dimension to be used select from configuration file
+!> @date January, 2019
+!> - add url path to global attributes of output file(s)
+!> @date February, 2019
+!> - rename sub namelist namcrs to namsrc
+!> - create and clean file structure to avoid memory leaks
+!> @date Ocober, 2019
+!> - add help and version optional arguments
 !>
-!> @note Software governed by the CeCILL licence     (./LICENSE)
+!> @note Software governed by the CeCILL licence     (NEMOGCM/NEMO_CeCILL.txt)
 !----------------------------------------------------------------------
 PROGRAM create_coord
 
@@ -139,9 +233,15 @@ PROGRAM create_coord
 
    IMPLICIT NONE
 
+   ! parameters
+   CHARACTER(LEN=lc), PARAMETER  :: cp_myname = "create_coord"
+
    ! local variable
+   CHARACTER(LEN=lc)                                    :: cl_arg
    CHARACTER(LEN=lc)                                    :: cl_namelist
    CHARACTER(LEN=lc)                                    :: cl_date
+   CHARACTER(LEN=lc)                                    :: cl_url
+   CHARACTER(LEN=lc)                                    :: cl_errormsg
 
    INTEGER(i4)                                          :: il_narg
    INTEGER(i4)                                          :: il_status
@@ -169,6 +269,8 @@ PROGRAM create_coord
 
    TYPE(TDIM)       , DIMENSION(ip_maxdim)              :: tl_dim
 
+   TYPE(TFILE)                                          :: tl_file
+
    TYPE(TMPP)                                           :: tl_coord0
    TYPE(TFILE)                                          :: tl_fileout
 
@@ -178,27 +280,27 @@ PROGRAM create_coord
 
    ! namelist variable
    ! namlog
-   CHARACTER(LEN=lc) :: cn_logfile = 'create_coord.log' 
-   CHARACTER(LEN=lc) :: cn_verbosity = 'warning' 
+   CHARACTER(LEN=lc) :: cn_logfile  = 'create_coord.log' 
+   CHARACTER(LEN=lc) :: cn_verbosity= 'warning' 
    INTEGER(i4)       :: in_maxerror = 5
 
    ! namcfg
-   CHARACTER(LEN=lc) :: cn_varcfg = './cfg/variable.cfg' 
-   CHARACTER(LEN=lc) :: cn_dimcfg = './cfg/dimension.cfg' 
-   CHARACTER(LEN=lc) :: cn_dumcfg = './cfg/dummy.cfg'
+   CHARACTER(LEN=lc) :: cn_varcfg   = './cfg/variable.cfg' 
+   CHARACTER(LEN=lc) :: cn_dimcfg   = './cfg/dimension.cfg' 
+   CHARACTER(LEN=lc) :: cn_dumcfg   = './cfg/dummy.cfg'
 
-   ! namcrs
-   CHARACTER(LEN=lc) :: cn_coord0 = '' 
-   INTEGER(i4)       :: in_perio0 = -1
+   ! namsrc
+   CHARACTER(LEN=lc) :: cn_coord0   = '' 
+   INTEGER(i4)       :: in_perio0   = -1
 
    ! namvar
    CHARACTER(LEN=lc), DIMENSION(ip_maxvar) :: cn_varinfo = ''
 
    !namnst
-   REAL(sp)          :: rn_lonmin0 = -360.
-   REAL(sp)          :: rn_lonmax0 = -360.
-   REAL(sp)          :: rn_latmin0 = -360.
-   REAL(sp)          :: rn_latmax0 = -360.
+   REAL(sp)          :: rn_lonmin0  = -360.
+   REAL(sp)          :: rn_lonmax0  = -360.
+   REAL(sp)          :: rn_latmin0  = -360.
+   REAL(sp)          :: rn_latmax0  = -360.
    INTEGER(i4)       :: in_imin0 = 0
    INTEGER(i4)       :: in_imax0 = 0
    INTEGER(i4)       :: in_jmin0 = 0
@@ -207,7 +309,7 @@ PROGRAM create_coord
    INTEGER(i4)       :: in_rhoj  = 1
 
    !namout
-   CHARACTER(LEN=lc) :: cn_fileout= 'coord_fine.nc'
+   CHARACTER(LEN=lc) :: cn_fileout  = 'coord_fine.nc'
    !-------------------------------------------------------------------
 
    NAMELIST /namlog/ &  !  logger namelist
@@ -215,107 +317,136 @@ PROGRAM create_coord
    &  cn_verbosity,  &  !< logger verbosity
    &  in_maxerror       !< logger maximum error
 
-   NAMELIST /namcfg/ &  !  config namelist
-   &  cn_varcfg, &       !< variable configuration file
-   &  cn_dimcfg, &       !< dimension configuration file
-   &  cn_dumcfg          !< dummy configuration file
+   NAMELIST /namcfg/ &  !< configuration namelist
+   &  cn_varcfg,     &  !< variable configuration file
+   &  cn_dimcfg,     &  !< dimension configuration file
+   &  cn_dumcfg         !< dummy configuration file
 
-   NAMELIST /namcrs/ &  !  coarse grid namelist
-   &  cn_coord0 , &     !< coordinate file
+   NAMELIST /namsrc/ &  !< source/coarse grid namelist
+   &  cn_coord0 ,    &  !< coordinate file
    &  in_perio0         !< periodicity index
 
-   NAMELIST /namvar/ &  !  variable namelist
+   NAMELIST /namvar/ &  !< variable namelist
    &  cn_varinfo        !< list of variable and extra information about 
                         !< interpolation, extrapolation or filter method to be used. 
                         !< (ex: 'votemper:linear,hann,dist_weight','vosaline:cubic' ) 
-   
-   NAMELIST /namnst/ &  !  nesting namelist
-   &  rn_lonmin0, &     !< lower left  coarse grid longitude
-   &  rn_lonmax0, &     !< upper right coarse grid longitude
-   &  rn_latmin0, &     !< lower left  coarse grid latitude
-   &  rn_latmax0, &     !< upper right coarse grid latitude
-   &  in_imin0,   &     !< i-direction lower left  point indice 
-   &  in_imax0,   &     !< i-direction upper right point indice
-   &  in_jmin0,   &     !< j-direction lower left  point indice
-   &  in_jmax0,   &     !< j-direction upper right point indice
-   &  in_rhoi,    &     !< refinement factor in i-direction
+ 
+   NAMELIST /namnst/ &  !< nesting namelist
+   &  rn_lonmin0,    &  !< lower left  coarse grid longitude
+   &  rn_lonmax0,    &  !< upper right coarse grid longitude
+   &  rn_latmin0,    &  !< lower left  coarse grid latitude
+   &  rn_latmax0,    &  !< upper right coarse grid latitude
+   &  in_imin0,      &  !< i-direction lower left  point indice 
+   &  in_imax0,      &  !< i-direction upper right point indice
+   &  in_jmin0,      &  !< j-direction lower left  point indice
+   &  in_jmax0,      &  !< j-direction upper right point indice
+   &  in_rhoi,       &  !< refinement factor in i-direction
    &  in_rhoj           !< refinement factor in j-direction
 
-   NAMELIST /namout/ &  !  output namelist
+   NAMELIST /namout/ &  !< output namelist
    &  cn_fileout        !< fine grid coordinate file   
    !-------------------------------------------------------------------
 
-   ! namelist
-   ! get namelist
+   !
+   ! Initialisation
+   ! --------------
+   !
    il_narg=COMMAND_ARGUMENT_COUNT() !f03 intrinsec
-   IF( il_narg/=1 )THEN
-      PRINT *,"ERROR in create_coord: need a namelist"
-      STOP
+
+   ! Traitement des arguments fournis
+   ! --------------------------------
+   IF( il_narg /= 1 )THEN
+      WRITE(cl_errormsg,*) ' ERROR : one argument is needed '
+      CALL fct_help(cp_myname,cl_errormsg) 
+      CALL EXIT(1)
    ELSE
-      CALL GET_COMMAND_ARGUMENT(1,cl_namelist) !f03 intrinsec
-   ENDIF
-   
-   ! read namelist
-   INQUIRE(FILE=TRIM(cl_namelist), EXIST=ll_exist)
-   IF( ll_exist )THEN
+
+      CALL GET_COMMAND_ARGUMENT(1,cl_arg) !f03 intrinsec
+      SELECT CASE (cl_arg)
+         CASE ('-v', '--version')
+
+            CALL fct_version(cp_myname)
+            CALL EXIT(0)
+
+         CASE ('-h', '--help')
+
+            CALL fct_help(cp_myname)
+            CALL EXIT(0)
+
+         CASE DEFAULT
+
+            cl_namelist=cl_arg
+
+            ! read namelist
+            INQUIRE(FILE=TRIM(cl_namelist), EXIST=ll_exist)
+            IF( ll_exist )THEN
+
+               il_fileid=fct_getunit()
+
+               OPEN( il_fileid, FILE=TRIM(cl_namelist),  &
+               &                FORM='FORMATTED',        &
+               &                ACCESS='SEQUENTIAL',     &
+               &                STATUS='OLD',            &
+               &                ACTION='READ',           &
+               &                IOSTAT=il_status)
+               CALL fct_err(il_status)
+               IF( il_status /= 0 )THEN
+                  WRITE(cl_errormsg,*) " ERROR : error opening "//TRIM(cl_namelist)
+                  CALL fct_help(cp_myname,cl_errormsg) 
+                  CALL EXIT(1)
+               ENDIF
+
+               READ( il_fileid, NML = namlog )
  
-      il_fileid=fct_getunit()
+               ! define logger file
+               CALL logger_open(TRIM(cn_logfile),TRIM(cn_verbosity),in_maxerror)
+               CALL logger_header()
 
-      OPEN( il_fileid, FILE=TRIM(cl_namelist),   &
-      &                FORM='FORMATTED',         &
-      &                ACCESS='SEQUENTIAL',      &
-      &                STATUS='OLD',             &
-      &                ACTION='READ',            &
-      &                IOSTAT=il_status)
-      CALL fct_err(il_status)
-      IF( il_status /= 0 )THEN
-         PRINT *,"ERROR in create_coord: error opening "//TRIM(cl_namelist)
-         STOP
-      ENDIF
+               READ( il_fileid, NML = namcfg )
+               ! get variable extra information on configuration file
+               CALL var_def_extra(TRIM(cn_varcfg))
 
-      READ( il_fileid, NML = namlog )
-      ! define logger file
-      CALL logger_open(TRIM(cn_logfile),TRIM(cn_verbosity),in_maxerror)
-      CALL logger_header()
+               ! get dimension allowed
+               CALL dim_def_extra(TRIM(cn_dimcfg))
 
-      READ( il_fileid, NML = namcfg )
-      ! get variable extra information on configuration file
-      CALL var_def_extra(TRIM(cn_varcfg))
+               ! get dummy variable
+               CALL var_get_dummy(TRIM(cn_dumcfg))
+               ! get dummy dimension
+               CALL dim_get_dummy(TRIM(cn_dumcfg))
+               ! get dummy attribute
+               CALL att_get_dummy(TRIM(cn_dumcfg))
 
-      ! get dimension allowed
-      CALL dim_def_extra(TRIM(cn_dimcfg))
+               READ( il_fileid, NML = namsrc )
+               READ( il_fileid, NML = namvar )
+               ! add user change in extra information
+               CALL var_chg_extra( cn_varinfo )
 
-      ! get dummy variable
-      CALL var_get_dummy(TRIM(cn_dumcfg))
-      ! get dummy dimension
-      CALL dim_get_dummy(TRIM(cn_dumcfg))
-      ! get dummy attribute
-      CALL att_get_dummy(TRIM(cn_dumcfg))
+               READ( il_fileid, NML = namnst )
+               READ( il_fileid, NML = namout )
 
-      READ( il_fileid, NML = namcrs )
-      READ( il_fileid, NML = namvar )
-      ! add user change in extra information
-      CALL var_chg_extra( cn_varinfo )
+               CLOSE( il_fileid, IOSTAT=il_status )
+               CALL fct_err(il_status)
+               IF( il_status /= 0 )THEN
+                  CALL logger_error("CREATE COORD: closing "//TRIM(cl_namelist))
+               ENDIF
 
-      READ( il_fileid, NML = namnst )
-      READ( il_fileid, NML = namout )
+            ELSE
 
-      CLOSE( il_fileid, IOSTAT=il_status )
-      CALL fct_err(il_status)
-      IF( il_status /= 0 )THEN
-         CALL logger_error("CREATE COORD: closing "//TRIM(cl_namelist))
-      ENDIF
+               WRITE(cl_errormsg,*) " ERROR : can't find "//TRIM(cl_namelist)
+               CALL fct_help(cp_myname,cl_errormsg) 
+               CALL EXIT(1)
 
-   ELSE
+            ENDIF
 
-      PRINT *,"ERROR in create_coord: can't find "//TRIM(cl_namelist)
-      STOP
-
+      END SELECT
    ENDIF
 
    ! open files
    IF( cn_coord0 /= '' )THEN
-      tl_coord0=mpp_init( file_init(TRIM(cn_coord0)), id_perio=in_perio0)
+      tl_file=file_init(TRIM(cn_coord0))
+      tl_coord0=mpp_init( tl_file, id_perio=in_perio0)
+      ! clean
+      CALL file_clean(tl_file)
       CALL grid_get_info(tl_coord0)
    ELSE
       CALL logger_fatal("CREATE COORD: no coarse grid coordinate found. "//&
@@ -457,6 +588,12 @@ PROGRAM create_coord
    tl_att=att_init("Created_by","SIREN create_coord")
    CALL file_add_att(tl_fileout, tl_att)
 
+   !add source url
+   cl_url=fct_split(fct_split(cp_url,2,'$'),2,'URL:')
+   tl_att=att_init("SIREN_url",cl_url)
+   CALL file_add_att(tl_fileout, tl_att)
+
+   ! add date of creation
    cl_date=date_print(date_now())
    tl_att=att_init("Creation_date",cl_date)
    CALL file_add_att(tl_fileout, tl_att)
@@ -522,6 +659,9 @@ PROGRAM create_coord
    CALL logger_close() 
 
 CONTAINS
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION create_coord_get_offset(id_rho) &
+         & RESULT (if_offset)
    !-------------------------------------------------------------------
    !> @brief
    !> This function compute offset over Arakawa grid points, 
@@ -533,36 +673,40 @@ CONTAINS
    !> @param[in] id_rho array of refinement factor
    !> @return array of offset
    !-------------------------------------------------------------------
-   FUNCTION create_coord_get_offset( id_rho )
+
       IMPLICIT NONE
+
       ! Argument      
       INTEGER(i4), DIMENSION(:), INTENT(IN) :: id_rho
 
       ! function
-      INTEGER(i4), DIMENSION(2,2,ip_npoint) :: create_coord_get_offset
+      INTEGER(i4), DIMENSION(2,2,ip_npoint) :: if_offset
+
       ! local variable
       ! loop indices
       !----------------------------------------------------------------
 
       ! case 'T'
-      create_coord_get_offset(jp_I,:,jp_T)=FLOOR(REAL(id_rho(jp_I)-1,dp)*0.5)
-      create_coord_get_offset(jp_J,:,jp_T)=FLOOR(REAL(id_rho(jp_J)-1,dp)*0.5)
+      if_offset(jp_I,:,jp_T)=FLOOR(REAL(id_rho(jp_I)-1,dp)*0.5)
+      if_offset(jp_J,:,jp_T)=FLOOR(REAL(id_rho(jp_J)-1,dp)*0.5)
       ! case 'U'
-      create_coord_get_offset(jp_I,1,jp_U)=0
-      create_coord_get_offset(jp_I,2,jp_U)=id_rho(jp_I)-1
-      create_coord_get_offset(jp_J,:,jp_U)=FLOOR(REAL(id_rho(jp_J)-1,dp)*0.5)
+      if_offset(jp_I,1,jp_U)=0
+      if_offset(jp_I,2,jp_U)=id_rho(jp_I)-1
+      if_offset(jp_J,:,jp_U)=FLOOR(REAL(id_rho(jp_J)-1,dp)*0.5)
       ! case 'V'
-      create_coord_get_offset(jp_I,:,jp_V)=FLOOR(REAL(id_rho(jp_I)-1,dp)*0.5)
-      create_coord_get_offset(jp_J,1,jp_V)=0
-      create_coord_get_offset(jp_J,2,jp_V)=id_rho(jp_J)-1
+      if_offset(jp_I,:,jp_V)=FLOOR(REAL(id_rho(jp_I)-1,dp)*0.5)
+      if_offset(jp_J,1,jp_V)=0
+      if_offset(jp_J,2,jp_V)=id_rho(jp_J)-1
       ! case 'F'
-      create_coord_get_offset(jp_I,1,jp_F)=0
-      create_coord_get_offset(jp_I,2,jp_F)=id_rho(jp_I)-1
-      create_coord_get_offset(jp_J,1,jp_F)=0
-      create_coord_get_offset(jp_J,2,jp_F)=id_rho(jp_J)-1
-
+      if_offset(jp_I,1,jp_F)=0
+      if_offset(jp_I,2,jp_F)=id_rho(jp_I)-1
+      if_offset(jp_J,1,jp_F)=0
+      if_offset(jp_J,2,jp_F)=id_rho(jp_J)-1
 
    END FUNCTION create_coord_get_offset
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE create_coord_interp(td_var, id_rho, id_offset, &
+         &                        id_iext, id_jext)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine interpolate variable, given refinment factor.
@@ -585,10 +729,6 @@ CONTAINS
    !>
    !> @todo check if mask is really needed
    !-------------------------------------------------------------------
-   SUBROUTINE create_coord_interp( td_var,          &
-   &                               id_rho,          &
-   &                               id_offset,       &
-   &                               id_iext, id_jext)
 
       IMPLICIT NONE
 
@@ -690,4 +830,5 @@ CONTAINS
       CALL var_clean(tl_mask)
 
    END SUBROUTINE create_coord_interp
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 END PROGRAM create_coord

@@ -2,8 +2,6 @@
 ! NEMO system team, System and Interface for oceanic RElocable Nesting
 !----------------------------------------------------------------------
 !
-! MODULE: iom_dom
-!
 ! DESCRIPTION:
 !> @brief This module allow to read domain (defined as domain structure) in a mpp files.
 !>
@@ -23,12 +21,13 @@
 !>
 !> @author
 !> J.Paul
-! REVISION HISTORY:
+!>
 !> @date October, 2014 - Initial Version
 !>
-!> @note Software governed by the CeCILL licence     (./LICENSE)
+!> @note Software governed by the CeCILL licence     (NEMOGCM/NEMO_CeCILL.txt)
 !----------------------------------------------------------------------
 MODULE iom_dom
+
    USE netcdf                          ! nf90 library
    USE global                          ! global parameter
    USE kind                            ! F90 kind parameter
@@ -41,6 +40,7 @@ MODULE iom_dom
    USE mpp                             ! mpp manager
    USe dom                             ! domain manager
    USE iom_mpp                         ! I/O mpp manager
+
    IMPLICIT NONE
    ! NOTE_avoid_public_variables_if_possible
 
@@ -65,6 +65,8 @@ MODULE iom_dom
    END INTERFACE iom_dom_read_var
 
 CONTAINS
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_dom_open(td_mpp, td_dom, id_perio, id_ew)
    !-------------------------------------------------------------------
    !> @brief This subroutine open files composing mpp structure 
    !> over domain to be used.
@@ -74,8 +76,9 @@ CONTAINS
    !
    !> @param[inout] td_mpp mpp structure
    !-------------------------------------------------------------------
-   SUBROUTINE iom_dom_open(td_mpp, td_dom, id_perio, id_ew)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TMPP) , INTENT(INOUT) :: td_mpp
       TYPE(TDOM) , INTENT(IN)    :: td_dom
@@ -101,6 +104,8 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE iom_dom_open
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_dom_close(td_mpp)
    !-------------------------------------------------------------------
    !> @brief This subroutine close files composing mpp structure.
    !>
@@ -109,8 +114,9 @@ CONTAINS
    !
    !> @param[in] td_mpp mpp structure
    !-------------------------------------------------------------------
-   SUBROUTINE iom_dom_close(td_mpp)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TMPP), INTENT(INOUT) :: td_mpp
 
@@ -120,6 +126,9 @@ CONTAINS
       CALL iom_mpp_close(td_mpp)
 
    END SUBROUTINE iom_dom_close
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION iom_dom__read_var_id(td_mpp, id_varid, td_dom) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function read variable value in opened mpp files,
    !> given variable id and domain strcuture.
@@ -136,12 +145,16 @@ CONTAINS
    !> @param[in] td_dom    domain structure
    !> @return  variable structure 
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION iom_dom__read_var_id(td_mpp, id_varid, td_dom )
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TMPP) , INTENT(IN) :: td_mpp
       INTEGER(i4), INTENT(IN) :: id_varid
       TYPE(TDOM) , INTENT(IN) :: td_dom
+
+      ! function
+      TYPE(TVAR)              :: tf_var
 
       ! local variable
       INTEGER(i4), DIMENSION(1) :: il_ind
@@ -149,8 +162,8 @@ CONTAINS
       ! check if mpp exist
       IF( .NOT. ASSOCIATED(td_mpp%t_proc) )THEN
 
-         CALL logger_error( " IOM DOM READ VAR: domain decomposition "//&
-         &  "not define in mpp strcuture "//TRIM(td_mpp%c_name))
+         CALL logger_error(" IOM DOM READ VAR: domain decomposition "//&
+            &              "not define in mpp strcuture "//TRIM(td_mpp%c_name))
 
       ELSE
 
@@ -160,26 +173,28 @@ CONTAINS
             &           mask=(td_mpp%t_proc(1)%t_var(:)%i_id==id_varid))
             IF( il_ind(1) /= 0 )THEN
 
-               iom_dom__read_var_id=var_copy(td_mpp%t_proc(1)%t_var(il_ind(1)))
+               tf_var=var_copy(td_mpp%t_proc(1)%t_var(il_ind(1)))
 
                !!! read variable value
-               CALL iom_dom__read_var_value(td_mpp, iom_dom__read_var_id, &
-               &                            td_dom)
+               CALL iom_dom__read_var_value(td_mpp, tf_var, td_dom)
 
             ELSE
                CALL logger_error( &
-               &  " IOM DOM READ VAR: there is no variable with id "//&
-               &  TRIM(fct_str(id_varid))//" in processor/file "//&
-               &  TRIM(td_mpp%t_proc(1)%c_name))
+                  &  " IOM DOM READ VAR: there is no variable with id "//&
+                  &  TRIM(fct_str(id_varid))//" in processor/file "//&
+                  &  TRIM(td_mpp%t_proc(1)%c_name))
             ENDIF
          ELSE
             CALL logger_error(" IOM DOM READ VAR: can't read variable, mpp "//&
-            &  TRIM(td_mpp%c_name)//" not opened")
+               &              TRIM(td_mpp%c_name)//" not opened")
          ENDIF
 
       ENDIF
 
    END FUNCTION iom_dom__read_var_id
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION iom_dom__read_var_name(td_mpp, cd_name, td_dom) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function read variable value in opened mpp files, 
    !> given variable name or standard name, and domain structure.
@@ -191,21 +206,27 @@ CONTAINS
    !> look first for variable name. If it doesn't
    !> exist in file, look for variable standard name.<br/>
    !> If variable name is not present, check variable standard name.<br/>
-   !
+   !>
    !> @author J.Paul
    !> @date October, 2014 - Initial Version
-   !
+   !> @date May, 2019
+   !> - copy variable struct without array of value, then read array of value.
+   !>
    !> @param[in] td_mpp    mpp structure
    !> @param[in] cd_name   variable name
    !> @param[in] td_dom    domain structure
    !> @return  variable structure 
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION iom_dom__read_var_name(td_mpp, cd_name, td_dom )
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TMPP),       INTENT(IN) :: td_mpp
       CHARACTER(LEN=*), INTENT(IN) :: cd_name
       TYPE(TDOM)      , INTENT(IN) :: td_dom
+
+      ! function
+      TYPE(TVAR)                   :: tf_var
 
       ! local variable
       INTEGER(i4)       :: il_ind
@@ -215,31 +236,31 @@ CONTAINS
       IF( .NOT. ASSOCIATED(td_mpp%t_proc) )THEN
 
          CALL logger_error( " IOM DOM READ VAR: domain decomposition not define "//&
-         &               " in mpp strcuture "//TRIM(td_mpp%c_name))
+            &               " in mpp strcuture "//TRIM(td_mpp%c_name))
 
       ELSE
 
-            il_ind=var_get_index( td_mpp%t_proc(1)%t_var(:), cd_name)
-            IF( il_ind /= 0 )THEN
+         il_ind=var_get_index( td_mpp%t_proc(1)%t_var(:), cd_name)
+         IF( il_ind /= 0 )THEN
 
-               iom_dom__read_var_name=var_copy(td_mpp%t_proc(1)%t_var(il_ind))
+            tf_var=var_copy(td_mpp%t_proc(1)%t_var(il_ind), ld_value=.FALSE.)
 
-               !!! read variable value
-               CALL iom_dom__read_var_value( td_mpp, &
-               &                             iom_dom__read_var_name, &
-               &                             td_dom )
+            !!! read variable value
+            CALL iom_dom__read_var_value( td_mpp, tf_var, td_dom )
 
-            ELSE
+         ELSE
 
-               CALL logger_error( &
+            CALL logger_error( &
                &  " IOM DOM READ VAR: there is no variable with "//&
                &  "name or standard name "//TRIM(cd_name)//&
                &  " in processor/file "//TRIM(td_mpp%t_proc(1)%c_name))
-            ENDIF
+         ENDIF
 
       ENDIF
  
    END FUNCTION iom_dom__read_var_name
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_dom__read_var_value(td_mpp, td_var, td_dom)
    !-------------------------------------------------------------------
    !> @brief This subroutine read variable value
    !> in an mpp structure, given domain structure.
@@ -254,22 +275,23 @@ CONTAINS
    !> @param[inout] td_var variable structure
    !> @param[in] td_dom    domain structure
    !-------------------------------------------------------------------
-   SUBROUTINE iom_dom__read_var_value(td_mpp, td_var, td_dom )
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TMPP),   INTENT(IN)    :: td_mpp
       TYPE(TVAR),   INTENT(INOUT) :: td_var
       TYPE(TDOM),   INTENT(IN)    :: td_dom
 
       ! local variable
-      INTEGER(i4)                       :: il_status
+      INTEGER(i4)                 :: il_status
 
-      TYPE(TATT)                        :: tl_att
-      TYPE(TMPP)                        :: tl_mpp
-      TYPE(TDOM)                        :: tl_dom
+      TYPE(TATT)                  :: tl_att
+      TYPE(TMPP)                  :: tl_mpp
+      TYPE(TDOM)                  :: tl_dom
 
       ! loop indices
-      INTEGER(i4)                       :: jk
+      INTEGER(i4)                 :: jk
       !----------------------------------------------------------------
 
       CALL logger_debug(" IOM DOM READ VAR VALUE: name "//&
@@ -402,6 +424,8 @@ CONTAINS
       ENDIF      
 
    END SUBROUTINE iom_dom__read_var_value
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_dom__no_pole_no_overlap(td_mpp, td_var, td_dom)
    !-------------------------------------------------------------------
    !> @brief This subroutine read variable value
    !> in an mpp structure. 
@@ -411,13 +435,14 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date October, 2014 - Initial Version
-   !
+   !>
    !> @param[in] td_mpp    mpp structure
    !> @param[inout] td_var variable structure
    !> @param[in] td_dom    domain structure
    !-------------------------------------------------------------------
-   SUBROUTINE iom_dom__no_pole_no_overlap(td_mpp, td_var, td_dom )
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TMPP),  INTENT(IN)    :: td_mpp
       TYPE(TVAR),  INTENT(INOUT) :: td_var
@@ -456,6 +481,8 @@ CONTAINS
       CALL dom_clean(tl_dom)
 
    END SUBROUTINE iom_dom__no_pole_no_overlap
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_dom__no_pole_cyclic(td_mpp, td_var, td_dom)
    !-------------------------------------------------------------------
    !> @brief This subroutine read cyclic variable value
    !> in an mpp structure. 
@@ -470,8 +497,9 @@ CONTAINS
    !> @param[inout] td_var variable structure
    !> @param[in] td_dom    domain structure
    !-------------------------------------------------------------------
-   SUBROUTINE iom_dom__no_pole_cyclic(td_mpp, td_var, td_dom )
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TMPP),   INTENT(IN   ) :: td_mpp
       TYPE(TVAR),   INTENT(INOUT) :: td_var
@@ -515,6 +543,8 @@ CONTAINS
       CALL dom_clean(tl_dom)
 
    END SUBROUTINE iom_dom__no_pole_cyclic
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_dom__no_pole_overlap(td_mpp, td_var, td_dom)
    !-------------------------------------------------------------------
    !> @brief This subroutine read East West overlap variable value
    !> in an mpp structure.
@@ -529,8 +559,9 @@ CONTAINS
    !> @param[inout] td_var variable structure
    !> @param[in] td_dom    domain structure
    !-------------------------------------------------------------------
-   SUBROUTINE iom_dom__no_pole_overlap(td_mpp, td_var, td_dom )
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TMPP),   INTENT(IN)    :: td_mpp
       TYPE(TVAR),   INTENT(INOUT) :: td_var
@@ -627,6 +658,8 @@ CONTAINS
       CALL dom_clean(tl_dom)
 
    END SUBROUTINE iom_dom__no_pole_overlap
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+!   SUBROUTINE iom_dom__pole_no_overlap(td_mpp, td_var, td_dom)
    !-------------------------------------------------------------------
    !> @brief This subroutine read north fold variable value
    !> in an mpp structure. 
@@ -636,13 +669,14 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date October, 2014 - Initial Version
-   !
+   !>
    !> @param[in] td_mpp    mpp structure
    !> @param[inout] td_var variable structure
    !> @param[in] td_dom    domain structure
    !-------------------------------------------------------------------
-!   SUBROUTINE iom_dom__pole_no_overlap(td_mpp, td_var, td_dom )
+!
 !      IMPLICIT NONE
+!
 !      ! Argument      
 !      TYPE(TMPP),   INTENT(IN)    :: td_mpp
 !      TYPE(TVAR),   INTENT(INOUT) :: td_var
@@ -654,6 +688,8 @@ CONTAINS
 !      !----------------------------------------------------------------
 !
 !   END SUBROUTINE iom_dom__pole_no_overlap
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+!   SUBROUTINE iom_dom__pole_cyclic(td_mpp, td_var, td_dom)
    !-------------------------------------------------------------------
    !> @brief This subroutine read semi global variable value
    !> in an mpp structure. 
@@ -663,14 +699,15 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date October, 2014 - Initial Version
-   !
+   !>
    !> @param[in] td_mpp    mpp structure
    !> @param[inout] td_var variable structure
    !> @param[in] td_dom    domain structure
    !> @return variable structure completed 
    !-------------------------------------------------------------------
-!   SUBROUTINE iom_dom__pole_cyclic(td_mpp, td_var, td_dom )
+!
 !      IMPLICIT NONE
+!
 !      ! Argument      
 !      TYPE(TMPP),   INTENT(IN)    :: td_mpp
 !      TYPE(TVAR),   INTENT(INOUT) :: td_var
@@ -682,6 +719,8 @@ CONTAINS
 !      !----------------------------------------------------------------
 !
 !   END SUBROUTINE iom_dom__pole_cyclic
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+!   SUBROUTINE iom_dom__pole_overlap(td_mpp, td_var, td_dom)
    !-------------------------------------------------------------------
    !> @brief This subroutine read north fold East West overlap variable value
    !> in an mpp structure. 
@@ -691,14 +730,15 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date October, 2014 - Initial Version
-   !
+   !>
    !> @param[in] td_mpp    mpp structure
    !> @param[inout] td_var variable structure
    !> @param[in] td_dom    domain structure
    !> @return variable structure completed 
    !-------------------------------------------------------------------
-!   SUBROUTINE iom_dom__pole_overlap(td_mpp, td_var, td_dom )
+!
 !      IMPLICIT NONE
+!
 !      ! Argument      
 !      TYPE(TMPP),   INTENT(IN)    :: td_mpp
 !      TYPE(TVAR),   INTENT(INOUT) :: td_var
@@ -710,5 +750,5 @@ CONTAINS
 !      !----------------------------------------------------------------
 !
 !   END SUBROUTINE iom_dom__pole_overlap
-
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 END MODULE iom_dom

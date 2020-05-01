@@ -66,15 +66,15 @@ MODULE traqsr
    TYPE(FLD), ALLOCATABLE, DIMENSION(:) ::   sf_chl   ! structure of input Chl (file informations, fields read)
 
    !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: traqsr.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: traqsr.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE tra_qsr( kt )
+   SUBROUTINE tra_qsr( kt, Kmm, pts, Krhs )
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE tra_qsr  ***
       !!
@@ -86,7 +86,7 @@ CONTAINS
       !!      Considering the 2 wavebands case:
       !!         I(k) = Qsr*( rn_abs*EXP(z(k)/rn_si0) + (1.-rn_abs)*EXP(z(k)/rn_si1) )
       !!         The temperature trend associated with the solar radiation penetration 
-      !!         is given by : zta = 1/e3t dk[ I ] / (rau0*Cp)
+      !!         is given by : zta = 1/e3t dk[ I ] / (rho0*Cp)
       !!         At the bottom, boudary condition for the radiation is no flux :
       !!      all heat which has not been absorbed in the above levels is put
       !!      in the last ocean level.
@@ -100,7 +100,9 @@ CONTAINS
       !!              Lengaigne et al. 2007, Clim. Dyn., V28, 5, 503-516.
       !!              Morel, A. et Berthon, JF, 1989, Limnol Oceanogr 34(8), 1545-1562
       !!----------------------------------------------------------------------
-      INTEGER, INTENT(in) ::   kt     ! ocean time-step
+      INTEGER,                                   INTENT(in   ) :: kt            ! ocean time-step
+      INTEGER,                                   INTENT(in   ) :: Kmm, Krhs     ! time level indices
+      REAL(wp), DIMENSION(jpi,jpj,jpk,jpts,jpt), INTENT(inout) :: pts           ! active tracers and RHS of tracer equation
       !
       INTEGER  ::   ji, jj, jk               ! dummy loop indices
       INTEGER  ::   irgb                     ! local integers
@@ -125,15 +127,14 @@ CONTAINS
       !
       IF( l_trdtra ) THEN      ! trends diagnostic: save the input temperature trend
          ALLOCATE( ztrdt(jpi,jpj,jpk) ) 
-         ztrdt(:,:,:) = tsa(:,:,:,jp_tem)
+         ztrdt(:,:,:) = pts(:,:,:,jp_tem,Krhs)
       ENDIF
       !
       !                         !-----------------------------------!
       !                         !  before qsr induced heat content  !
       !                         !-----------------------------------!
       IF( kt == nit000 ) THEN          !==  1st time step  ==!
-!!gm case neuler  not taken into account....
-         IF( ln_rstart .AND. iom_varid( numror, 'qsr_hc_b', ldstop = .FALSE. ) > 0 ) THEN    ! read in restart
+         IF( ln_rstart .AND. iom_varid( numror, 'qsr_hc_b', ldstop = .FALSE. ) > 0  .AND. .NOT.l_1st_euler ) THEN    ! read in restart
             IF(lwp) WRITE(numout,*) '          nit000-1 qsr tracer content forcing field read in the restart file'
             z1_2 = 0.5_wp
             CALL iom_get( numror, jpdom_autoglo, 'qsr_hc_b', qsr_hc_b, ldxios = lrxios )   ! before heat content trend due to Qsr flux
@@ -153,7 +154,7 @@ CONTAINS
       CASE( np_BIO )                   !==  bio-model fluxes  ==!
          !
          DO jk = 1, nksr
-            qsr_hc(:,:,jk) = r1_rau0_rcp * ( etot3(:,:,jk) - etot3(:,:,jk+1) )
+            qsr_hc(:,:,jk) = r1_rho0_rcp * ( etot3(:,:,jk) - etot3(:,:,jk+1) )
          END DO
          !
       CASE( np_RGB , np_RGBc )         !==  R-G-B fluxes  ==!
@@ -166,12 +167,12 @@ CONTAINS
             CALL fld_read( kt, 1, sf_chl )         ! Read Chl data and provides it at the current time step
             DO jk = 1, nksr + 1
                DO jj = 2, jpjm1                       ! Separation in R-G-B depending of the surface Chl
-                  DO ji = fs_2, fs_jpim1
-                     zchl    = sf_chl(1)%fnow(ji,jj,1)
+                  DO ji = 2, jpim1
+                     zchl    = MIN( 10. , MAX( 0.03, sf_chl(1)%fnow(ji,jj,1) ) )
                      zCtot   = 40.6  * zchl**0.459
                      zze     = 568.2 * zCtot**(-0.746)
                      IF( zze > 102. ) zze = 200.0 * zCtot**(-0.293)
-                     zpsi    = gdepw_n(ji,jj,jk) / zze
+                     zpsi    = gdepw(ji,jj,jk,Kmm) / zze
                      !
                      zlogc   = LOG( zchl )
                      zlogc2  = zlogc * zlogc
@@ -194,93 +195,73 @@ CONTAINS
          ENDIF
          !
          zcoef  = ( 1. - rn_abs ) / 3._wp    !* surface equi-partition in R-G-B
-         DO jj = 2, jpjm1
-            DO ji = fs_2, fs_jpim1
-               ze0(ji,jj,1) = rn_abs * qsr(ji,jj)
-               ze1(ji,jj,1) = zcoef  * qsr(ji,jj)
-               ze2(ji,jj,1) = zcoef  * qsr(ji,jj)
-               ze3(ji,jj,1) = zcoef  * qsr(ji,jj)
-               zea(ji,jj,1) =          qsr(ji,jj)
-            END DO
-         END DO
+         DO_2D_00_00
+            ze0(ji,jj,1) = rn_abs * qsr(ji,jj)
+            ze1(ji,jj,1) = zcoef  * qsr(ji,jj)
+            ze2(ji,jj,1) = zcoef  * qsr(ji,jj)
+            ze3(ji,jj,1) = zcoef  * qsr(ji,jj)
+            zea(ji,jj,1) =          qsr(ji,jj)
+         END_2D
          !
          DO jk = 2, nksr+1                   !* interior equi-partition in R-G-B depending of vertical profile of Chl
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1
-                  zchl = MIN( 10. , MAX( 0.03, zchl3d(ji,jj,jk) ) )
-                  irgb = NINT( 41 + 20.*LOG10(zchl) + 1.e-15 )
-                  zekb(ji,jj) = rkrgb(1,irgb)
-                  zekg(ji,jj) = rkrgb(2,irgb)
-                  zekr(ji,jj) = rkrgb(3,irgb)
-               END DO
-            END DO
+            DO_2D_00_00
+               zchl = MIN( 10. , MAX( 0.03, zchl3d(ji,jj,jk) ) )
+               irgb = NINT( 41 + 20.*LOG10(zchl) + 1.e-15 )
+               zekb(ji,jj) = rkrgb(1,irgb)
+               zekg(ji,jj) = rkrgb(2,irgb)
+               zekr(ji,jj) = rkrgb(3,irgb)
+            END_2D
 
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1
-                  zc0 = ze0(ji,jj,jk-1) * EXP( - e3t_n(ji,jj,jk-1) * xsi0r       )
-                  zc1 = ze1(ji,jj,jk-1) * EXP( - e3t_n(ji,jj,jk-1) * zekb(ji,jj) )
-                  zc2 = ze2(ji,jj,jk-1) * EXP( - e3t_n(ji,jj,jk-1) * zekg(ji,jj) )
-                  zc3 = ze3(ji,jj,jk-1) * EXP( - e3t_n(ji,jj,jk-1) * zekr(ji,jj) )
-                  ze0(ji,jj,jk) = zc0
-                  ze1(ji,jj,jk) = zc1
-                  ze2(ji,jj,jk) = zc2
-                  ze3(ji,jj,jk) = zc3
-                  zea(ji,jj,jk) = ( zc0 + zc1 + zc2 + zc3 ) * wmask(ji,jj,jk)
-               END DO
-            END DO
+            DO_2D_00_00
+               zc0 = ze0(ji,jj,jk-1) * EXP( - e3t(ji,jj,jk-1,Kmm) * xsi0r       )
+               zc1 = ze1(ji,jj,jk-1) * EXP( - e3t(ji,jj,jk-1,Kmm) * zekb(ji,jj) )
+               zc2 = ze2(ji,jj,jk-1) * EXP( - e3t(ji,jj,jk-1,Kmm) * zekg(ji,jj) )
+               zc3 = ze3(ji,jj,jk-1) * EXP( - e3t(ji,jj,jk-1,Kmm) * zekr(ji,jj) )
+               ze0(ji,jj,jk) = zc0
+               ze1(ji,jj,jk) = zc1
+               ze2(ji,jj,jk) = zc2
+               ze3(ji,jj,jk) = zc3
+               zea(ji,jj,jk) = ( zc0 + zc1 + zc2 + zc3 ) * wmask(ji,jj,jk)
+            END_2D
          END DO
          !
-         DO jk = 1, nksr                     !* now qsr induced heat content
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1
-                  qsr_hc(ji,jj,jk) = r1_rau0_rcp * ( zea(ji,jj,jk) - zea(ji,jj,jk+1) )
-               END DO
-            END DO
-         END DO
+         DO_3D_00_00( 1, nksr )
+            qsr_hc(ji,jj,jk) = r1_rho0_rcp * ( zea(ji,jj,jk) - zea(ji,jj,jk+1) )
+         END_3D
          !
          DEALLOCATE( zekb , zekg , zekr , ze0 , ze1 , ze2 , ze3 , zea , zchl3d ) 
          !
       CASE( np_2BD  )            !==  2-bands fluxes  ==!
          !
-         zz0 =        rn_abs   * r1_rau0_rcp      ! surface equi-partition in 2-bands
-         zz1 = ( 1. - rn_abs ) * r1_rau0_rcp
-         DO jk = 1, nksr                          ! solar heat absorbed at T-point in the top 400m 
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1
-                  zc0 = zz0 * EXP( -gdepw_n(ji,jj,jk  )*xsi0r ) + zz1 * EXP( -gdepw_n(ji,jj,jk  )*xsi1r )
-                  zc1 = zz0 * EXP( -gdepw_n(ji,jj,jk+1)*xsi0r ) + zz1 * EXP( -gdepw_n(ji,jj,jk+1)*xsi1r )
-                  qsr_hc(ji,jj,jk) = qsr(ji,jj) * ( zc0 * wmask(ji,jj,jk) - zc1 * wmask(ji,jj,jk+1) ) 
-               END DO
-            END DO
-         END DO
+         zz0 =        rn_abs   * r1_rho0_rcp      ! surface equi-partition in 2-bands
+         zz1 = ( 1. - rn_abs ) * r1_rho0_rcp
+         DO_3D_00_00( 1, nksr )
+            zc0 = zz0 * EXP( -gdepw(ji,jj,jk  ,Kmm)*xsi0r ) + zz1 * EXP( -gdepw(ji,jj,jk  ,Kmm)*xsi1r )
+            zc1 = zz0 * EXP( -gdepw(ji,jj,jk+1,Kmm)*xsi0r ) + zz1 * EXP( -gdepw(ji,jj,jk+1,Kmm)*xsi1r )
+            qsr_hc(ji,jj,jk) = qsr(ji,jj) * ( zc0 * wmask(ji,jj,jk) - zc1 * wmask(ji,jj,jk+1) ) 
+         END_3D
          !
       END SELECT
       !
       !                          !-----------------------------!
-      DO jk = 1, nksr            !  update to the temp. trend  !
-         DO jj = 2, jpjm1        !-----------------------------!
-            DO ji = fs_2, fs_jpim1   ! vector opt.
-               tsa(ji,jj,jk,jp_tem) = tsa(ji,jj,jk,jp_tem)   &
-                  &                 + z1_2 * ( qsr_hc_b(ji,jj,jk) + qsr_hc(ji,jj,jk) ) / e3t_n(ji,jj,jk)
-            END DO
-         END DO
-      END DO
+      DO_3D_00_00( 1, nksr )
+         pts(ji,jj,jk,jp_tem,Krhs) = pts(ji,jj,jk,jp_tem,Krhs)   &
+            &                      + z1_2 * ( qsr_hc_b(ji,jj,jk) + qsr_hc(ji,jj,jk) ) / e3t(ji,jj,jk,Kmm)
+      END_3D
       !
       ! sea-ice: store the 1st ocean level attenuation coefficient
-      DO jj = 2, jpjm1 
-         DO ji = fs_2, fs_jpim1   ! vector opt.
-            IF( qsr(ji,jj) /= 0._wp ) THEN   ;   fraqsr_1lev(ji,jj) = qsr_hc(ji,jj,1) / ( r1_rau0_rcp * qsr(ji,jj) )
-            ELSE                             ;   fraqsr_1lev(ji,jj) = 1._wp
-            ENDIF
-         END DO
-      END DO
+      DO_2D_00_00
+         IF( qsr(ji,jj) /= 0._wp ) THEN   ;   fraqsr_1lev(ji,jj) = qsr_hc(ji,jj,1) / ( r1_rho0_rcp * qsr(ji,jj) )
+         ELSE                             ;   fraqsr_1lev(ji,jj) = 1._wp
+         ENDIF
+      END_2D
       CALL lbc_lnk( 'traqsr', fraqsr_1lev(:,:), 'T', 1._wp )
       !
       IF( iom_use('qsr3d') ) THEN      ! output the shortwave Radiation distribution
          ALLOCATE( zetot(jpi,jpj,jpk) )
          zetot(:,:,nksr+1:jpk) = 0._wp     ! below ~400m set to zero
          DO jk = nksr, 1, -1
-            zetot(:,:,jk) = zetot(:,:,jk+1) + qsr_hc(:,:,jk) * rau0_rcp
+            zetot(:,:,jk) = zetot(:,:,jk+1) + qsr_hc(:,:,jk) * rho0_rcp
          END DO         
          CALL iom_put( 'qsr3d', zetot )   ! 3D distribution of shortwave Radiation
          DEALLOCATE( zetot ) 
@@ -294,12 +275,12 @@ CONTAINS
       ENDIF
       !
       IF( l_trdtra ) THEN     ! qsr tracers trends saved for diagnostics
-         ztrdt(:,:,:) = tsa(:,:,:,jp_tem) - ztrdt(:,:,:)
-         CALL trd_tra( kt, 'TRA', jp_tem, jptra_qsr, ztrdt )
+         ztrdt(:,:,:) = pts(:,:,:,jp_tem,Krhs) - ztrdt(:,:,:)
+         CALL trd_tra( kt, Kmm, Krhs, 'TRA', jp_tem, jptra_qsr, ztrdt )
          DEALLOCATE( ztrdt ) 
       ENDIF
       !                       ! print mean trends (used for debugging)
-      IF(ln_ctl)   CALL prt_ctl( tab3d_1=tsa(:,:,:,jp_tem), clinfo1=' qsr  - Ta: ', mask1=tmask, clinfo3='tra-ta' )
+      IF(sn_cfctl%l_prtctl)   CALL prt_ctl( tab3d_1=pts(:,:,:,jp_tem,Krhs), clinfo1=' qsr  - Ta: ', mask1=tmask, clinfo3='tra-ta' )
       !
       IF( ln_timing )   CALL timing_stop('tra_qsr')
       !
@@ -335,13 +316,11 @@ CONTAINS
          &                  nn_chldta, rn_abs, rn_si0, rn_si1
       !!----------------------------------------------------------------------
       !
-      REWIND( numnam_ref )              ! Namelist namtra_qsr in reference     namelist
       READ  ( numnam_ref, namtra_qsr, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namtra_qsr in reference namelist', lwp )
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namtra_qsr in reference namelist' )
       !
-      REWIND( numnam_cfg )              ! Namelist namtra_qsr in configuration namelist
       READ  ( numnam_cfg, namtra_qsr, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namtra_qsr in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namtra_qsr in configuration namelist' )
       IF(lwm) WRITE ( numond, namtra_qsr )
       !
       IF(lwp) THEN                ! control print

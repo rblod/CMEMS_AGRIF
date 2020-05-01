@@ -67,9 +67,11 @@ MODULE trdmxl
    INTEGER ::   ndimtrd1                        
    INTEGER ::   ionce, icount                   
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: trdmxl.F90 10425 2018-12-19 21:54:16Z smasson $ 
+   !! $Id: trdmxl.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -85,7 +87,7 @@ CONTAINS
    END FUNCTION trd_mxl_alloc
 
 
-   SUBROUTINE trd_tra_mxl( ptrdx, ptrdy, ktrd, kt, p2dt, kmxln )
+   SUBROUTINE trd_tra_mxl( ptrdx, ptrdy, ktrd, kt, p2dt, kmxln, Kmm )
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE trd_tra_mng  ***
       !! 
@@ -97,6 +99,7 @@ CONTAINS
       REAL(wp), DIMENSION(:,:,:), INTENT(inout) ::   ptrdy   ! Salinity    or V trend
       INTEGER                   , INTENT(in   ) ::   ktrd    ! tracer trend index
       INTEGER                   , INTENT(in   ) ::   kt      ! time step index
+      INTEGER                   , INTENT(in   ) ::   Kmm     ! time level index
       REAL(wp)                  , INTENT(in   ) ::   p2dt    ! time step  [s]
       REAL(wp), DIMENSION(:,:)  , INTENT(in   ) ::   kmxln   ! number of t-box for the vertical average 
       !
@@ -115,13 +118,9 @@ CONTAINS
          
          !
          wkx(:,:,:) = 0._wp         !==  now ML weights for vertical averaging  ==!
-         DO jk = 1, jpktrd               ! initialize wkx with vertical scale factor in mixed-layer
-            DO jj = 1,jpj
-               DO ji = 1,jpi
-                  IF( jk - kmxln(ji,jj) < 0 )   wkx(ji,jj,jk) = e3t_n(ji,jj,jk) * tmask(ji,jj,jk)
-               END DO
-            END DO
-         END DO
+         DO_3D_11_11( 1, jpktrd )
+            IF( jk - kmxln(ji,jj) < 0 )   wkx(ji,jj,jk) = e3t(ji,jj,jk,Kmm) * tmask(ji,jj,jk)
+         END_3D
          hmxl(:,:) = 0._wp               ! NOW mixed-layer depth
          DO jk = 1, jpktrd
             hmxl(:,:) = hmxl(:,:) + wkx(:,:,jk)
@@ -135,8 +134,8 @@ CONTAINS
          !                          !==  Vertically averaged T and S  ==!
          tml(:,:) = 0._wp   ;   sml(:,:) = 0._wp
          DO jk = 1, jpktrd
-            tml(:,:) = tml(:,:) + wkx(:,:,jk) * tsn(:,:,jk,jp_tem)
-            sml(:,:) = sml(:,:) + wkx(:,:,jk) * tsn(:,:,jk,jp_sal)
+            tml(:,:) = tml(:,:) + wkx(:,:,jk) * ts(:,:,jk,jp_tem,Kmm)
+            sml(:,:) = sml(:,:) + wkx(:,:,jk) * ts(:,:,jk,jp_sal,Kmm)
          END DO
          !
       ENDIF
@@ -370,7 +369,7 @@ CONTAINS
 
          hmxlbn(:,:) = hmxl(:,:)
 
-         IF( ln_ctl ) THEN
+         IF( sn_cfctl%l_prtctl ) THEN
             WRITE(numout,*) '             we reach kt == nit000 + 1 = ', nit000+1
             CALL prt_ctl(tab2d_1=tmlbb   , clinfo1=' tmlbb   -   : ', mask1=tmask)
             CALL prt_ctl(tab2d_1=tmlbn   , clinfo1=' tmlbn   -   : ', mask1=tmask)
@@ -379,7 +378,7 @@ CONTAINS
          !
       END IF
 
-      IF( ( ln_rstart ) .AND. ( kt == nit000 ) .AND. ( ln_ctl ) ) THEN
+      IF( ( ln_rstart ) .AND. ( kt == nit000 ) .AND. sn_cfctl%l_prtctl ) THEN
          IF( ln_trdmxl_instant ) THEN
             WRITE(numout,*) '             restart from kt == nit000 = ', nit000
             CALL prt_ctl(tab2d_1=tmlbb   , clinfo1=' tmlbb   -   : ', mask1=tmask)
@@ -547,7 +546,7 @@ CONTAINS
          ! ML depth
          hmxlbn         (:,:)   = hmxl    (:,:)
          
-         IF( ln_ctl ) THEN
+         IF( sn_cfctl%l_prtctl ) THEN
             IF( ln_trdmxl_instant ) THEN
                CALL prt_ctl(tab2d_1=tmlbb   , clinfo1=' tmlbb   -   : ', mask1=tmask)
                CALL prt_ctl(tab2d_1=tmlbn   , clinfo1=' tmlbn   -   : ', mask1=tmask)
@@ -731,13 +730,11 @@ CONTAINS
          &                 nn_ctls, cn_trdrst_out, ln_trdmxl_instant, rn_ucf, rn_rho_c
       !!----------------------------------------------------------------------
       !
-      REWIND( numnam_ref )              ! Namelist namtrd_mxl in reference namelist : mixed layer trends diagnostic
       READ  ( numnam_ref, namtrd_mxl, IOSTAT = ios, ERR = 901 )
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namtrd_mxl in reference namelist', lwp )
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namtrd_mxl in reference namelist' )
 
-      REWIND( numnam_cfg )              ! Namelist namtrd_mxl in configuration namelist : mixed layer trends diagnostic
       READ  ( numnam_cfg, namtrd_mxl, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namtrd_mxl in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namtrd_mxl in configuration namelist' )
       IF(lwm) WRITE( numond, namtrd_mxl )
       !
       IF(lwp) THEN                      ! control print
@@ -763,16 +760,15 @@ CONTAINS
          &                                      'defined in zdfmxl.F90 module to calculate the mixed layer depth' )
 
       IF( MOD( nitend, nn_trd ) /= 0 ) THEN
-         WRITE(numout,cform_err)
-         WRITE(numout,*) '                Your nitend parameter, nitend = ', nitend
-         WRITE(numout,*) '                is no multiple of the trends diagnostics frequency        '
-         WRITE(numout,*) '                          you defined, nn_trd   = ', nn_trd
-         WRITE(numout,*) '                This will not allow you to restart from this simulation.  '
-         WRITE(numout,*) '                You should reconsider this choice.                        ' 
-         WRITE(numout,*) 
-         WRITE(numout,*) '                N.B. the nitend parameter is also constrained to be a     '
-         WRITE(numout,*) '                     multiple of the nn_fsbc parameter '
-         CALL ctl_stop( 'trd_mxl_init: see comment just above' )
+         WRITE(ctmp1,*) '                Your nitend parameter, nitend = ', nitend
+         WRITE(ctmp2,*) '                is no multiple of the trends diagnostics frequency        '
+         WRITE(ctmp3,*) '                          you defined, nn_trd   = ', nn_trd
+         WRITE(ctmp4,*) '                This will not allow you to restart from this simulation.  '
+         WRITE(ctmp5,*) '                You should reconsider this choice.                        ' 
+         WRITE(ctmp6,*) 
+         WRITE(ctmp7,*) '                N.B. the nitend parameter is also constrained to be a     '
+         WRITE(ctmp8,*) '                     multiple of the nn_fsbc parameter '
+         CALL ctl_stop( ctmp1, ctmp2, ctmp3, ctmp4, ctmp5, ctmp6, ctmp7, ctmp8 )
       END IF
 
       !                                   ! allocate trdmxl arrays

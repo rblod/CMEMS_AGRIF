@@ -32,7 +32,7 @@ MODULE sedinitrc
 CONTAINS
 
 
-   SUBROUTINE sed_initrc
+   SUBROUTINE sed_initrc( Kbb, Kmm )
       !!----------------------------------------------------------------------
       !!                   ***  ROUTINE sed_init  ***
       !!
@@ -49,6 +49,7 @@ CONTAINS
       !!        !  04-10  (N. Emprin, M. Gehlen )  Original code
       !!        !  06-07  (C. Ethe)  Re-organization
       !!----------------------------------------------------------------------
+      INTEGER, INTENT(in)  ::  Kbb, Kmm      ! time level indices
       INTEGER :: ji, jj, ikt
       !!----------------------------------------------------------------------
 
@@ -64,7 +65,7 @@ CONTAINS
       ! sets initial sediment composition
       ! ( only clay or reading restart file )
       !---------------------------------------
-      CALL sed_init_data
+      CALL sed_init_data( Kbb, Kmm )
 
 
       CALL sed_init_wri
@@ -73,7 +74,7 @@ CONTAINS
    END SUBROUTINE sed_initrc
 
 
-   SUBROUTINE sed_init_data
+   SUBROUTINE sed_init_data( Kbb, Kmm )
       !!----------------------------------------------------------------------
       !!                   ***  ROUTINE sed_init_data  ***
       !!
@@ -84,6 +85,7 @@ CONTAINS
       !!   History :
       !!        !  06-07  (C. Ethe)  original
       !!----------------------------------------------------------------------
+      INTEGER, INTENT(in)  ::  Kbb, Kmm      ! time level indices
  
       ! local variables
       INTEGER :: &
@@ -127,7 +129,7 @@ CONTAINS
 
 
       ! Load initial Pisces Data for bot. wat. Chem and fluxes
-      CALL sed_dta ( nitsed000 ) 
+      CALL sed_dta ( nitsed000, Kbb, Kmm ) 
 
       ! Initialization of chemical constants
       CALL sed_chem ( nitsed000 )

@@ -37,14 +37,16 @@ MODULE p4zbio
 
    PUBLIC  p4z_bio    
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/TOP 4.0 , NEMO Consortium (2018)
-   !! $Id: p4zbio.F90 10227 2018-10-25 14:42:24Z aumont $ 
+   !! $Id: p4zbio.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE p4z_bio ( kt, knt )
+   SUBROUTINE p4z_bio ( kt, knt, Kbb, Kmm, Krhs )
       !!---------------------------------------------------------------------
       !!                     ***  ROUTINE p4z_bio  ***
       !!
@@ -55,6 +57,7 @@ CONTAINS
       !! ** Method  : - ???
       !!---------------------------------------------------------------------
       INTEGER, INTENT(in) :: kt, knt
+      INTEGER, INTENT(in) :: Kbb, Kmm, Krhs  ! time level indices
       !
       INTEGER             :: ji, jj, jk, jn
       CHARACTER (len=25) :: charout
@@ -67,48 +70,44 @@ CONTAINS
 
       xdiss(:,:,:) = 1.
 !!gm the use of nmld should be better here?
-      DO jk = 2, jpkm1
-         DO jj = 1, jpj
-            DO ji = 1, jpi
+      DO_3D_11_11( 2, jpkm1 )
 !!gm  :  use nmln  and test on jk ...  less memory acces
-               IF( gdepw_n(ji,jj,jk+1) > hmld(ji,jj) )   xdiss(ji,jj,jk) = 0.01
-            END DO 
-         END DO
-      END DO
+         IF( gdepw(ji,jj,jk+1,Kmm) > hmld(ji,jj) )   xdiss(ji,jj,jk) = 0.01
+      END_3D
 
-      CALL p4z_opt     ( kt, knt )     ! Optic: PAR in the water column
-      CALL p4z_sink    ( kt, knt )     ! vertical flux of particulate organic matter
-      CALL p4z_fechem  ( kt, knt )     ! Iron chemistry/scavenging
+      CALL p4z_opt     ( kt, knt, Kbb, Kmm       )     ! Optic: PAR in the water column
+      CALL p4z_sink    ( kt, knt, Kbb, Kmm, Krhs )     ! vertical flux of particulate organic matter
+      CALL p4z_fechem  ( kt, knt, Kbb, Kmm, Krhs )     ! Iron chemistry/scavenging
       !
       IF( ln_p4z ) THEN
-         CALL p4z_lim  ( kt, knt )     ! co-limitations by the various nutrients
-         CALL p4z_prod ( kt, knt )     ! phytoplankton growth rate over the global ocean. 
-         !                             ! (for each element : C, Si, Fe, Chl )
-         CALL p4z_mort ( kt      )     ! phytoplankton mortality
-         !                             ! zooplankton sources/sinks routines 
-         CALL p4z_micro( kt, knt )           ! microzooplankton
-         CALL p4z_meso ( kt, knt )           ! mesozooplankton
+         CALL p4z_lim  ( kt, knt, Kbb, Kmm       )     ! co-limitations by the various nutrients
+         CALL p4z_prod ( kt, knt, Kbb, Kmm, Krhs )     ! phytoplankton growth rate over the global ocean. 
+         !                                          ! (for each element : C, Si, Fe, Chl )
+         CALL p4z_mort ( kt,      Kbb,      Krhs )     ! phytoplankton mortality
+         !                                          ! zooplankton sources/sinks routines 
+         CALL p4z_micro( kt, knt, Kbb,      Krhs )     ! microzooplankton
+         CALL p4z_meso ( kt, knt, Kbb,      Krhs )     ! mesozooplankton
       ELSE
-         CALL p5z_lim  ( kt, knt )     ! co-limitations by the various nutrients
-         CALL p5z_prod ( kt, knt )     ! phytoplankton growth rate over the global ocean. 
-         !                             ! (for each element : C, Si, Fe, Chl )
-         CALL p5z_mort ( kt      )     ! phytoplankton mortality
-         !                             ! zooplankton sources/sinks routines 
-         CALL p5z_micro( kt, knt )           ! microzooplankton
-         CALL p5z_meso ( kt, knt )           ! mesozooplankton
+         CALL p5z_lim  ( kt, knt, Kbb, Kmm       )     ! co-limitations by the various nutrients
+         CALL p5z_prod ( kt, knt, Kbb, Kmm, Krhs )     ! phytoplankton growth rate over the global ocean. 
+         !                                          ! (for each element : C, Si, Fe, Chl )
+         CALL p5z_mort ( kt,      Kbb,      Krhs      )     ! phytoplankton mortality
+         !                                          ! zooplankton sources/sinks routines 
+         CALL p5z_micro( kt, knt, Kbb,      Krhs )           ! microzooplankton
+         CALL p5z_meso ( kt, knt, Kbb,      Krhs )           ! mesozooplankton
       ENDIF
       !
-      CALL p4z_agg     ( kt, knt )     ! Aggregation of particles
-      CALL p4z_rem     ( kt, knt )     ! remineralization terms of organic matter+scavenging of Fe
-      CALL p4z_poc     ( kt, knt )     ! Remineralization of organic particles
+      CALL p4z_agg     ( kt, knt, Kbb,      Krhs )     ! Aggregation of particles
+      CALL p4z_rem     ( kt, knt, Kbb, Kmm, Krhs )     ! remineralization terms of organic matter+scavenging of Fe
+      CALL p4z_poc     ( kt, knt, Kbb, Kmm, Krhs )     ! Remineralization of organic particles
       !
       IF( ln_ligand )  &
-      & CALL p4z_ligand( kt, knt )
+      & CALL p4z_ligand( kt, knt, Kbb,      Krhs )
       !                                                             !
-      IF(ln_ctl)   THEN  ! print mean trends (used for debugging)
+      IF(sn_cfctl%l_prttrc)   THEN  ! print mean trends (used for debugging)
          WRITE(charout, FMT="('bio ')")
          CALL prt_ctl_trc_info(charout)
-         CALL prt_ctl_trc(tab4d=tra, mask=tmask, clinfo=ctrcnm)
+         CALL prt_ctl_trc(tab4d=tr(:,:,:,:,Krhs), mask=tmask, clinfo=ctrcnm)
       ENDIF
       !
       IF( ln_timing )   CALL timing_stop('p4z_bio')

@@ -44,7 +44,7 @@
 !-----------------------------------------------------------------------
    ln_linssh   = .true.    !  =T  linear free surface  ==>>  model level are fixed in time
    !
-   rn_rdt      = 7200.     !  time step for the dynamics
+   rn_Dt      = 7200.     !  time step for the dynamics
 /
 
 !!======================================================================
@@ -226,10 +226,8 @@
 !!   namhsb       Heat and salt budgets                                 (default: OFF)
 !!   namdiu       Cool skin and warm layer models                       (default: OFF)
 !!   namdiu       Cool skin and warm layer models                       (default: OFF)
-!!   namflo       float parameters                                      ("key_float")
-!!   nam_diaharm  Harmonic analysis of tidal constituents               ("key_diaharm")
-!!   namdct       transports through some sections                      ("key_diadct")
-!!   nam_diatmb   Top Middle Bottom Output                              (default: OFF)
+!!   namflo       float parameters                                      (default: OFF)
+!!   nam_diadct   transports through some sections                      (default: OFF)
 !!   nam_dia25h   25h Mean Output                                       (default: OFF)
 !!   namnc4       netcdf4 chunking and compression settings             ("key_netcdf4")
 !!======================================================================

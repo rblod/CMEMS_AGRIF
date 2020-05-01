@@ -24,34 +24,31 @@ MODULE trdini
 
    PUBLIC   trd_init   ! called by nemogcm.F90 module
 
-   !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: trdini.F90 10068 2018-08-28 14:09:04Z nicolasmartin $
+   !! $Id: trdini.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE trd_init
+   SUBROUTINE trd_init( Kmm )
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE trd_init  ***
       !! 
       !! ** Purpose :   Initialization of trend diagnostics
       !!----------------------------------------------------------------------
+      INTEGER, INTENT(in) ::   Kmm  ! time level index
       INTEGER ::   ios   ! local integer
       !!
       NAMELIST/namtrd/ ln_dyn_trd, ln_KE_trd, ln_vor_trd, ln_dyn_mxl,   &
          &             ln_tra_trd, ln_PE_trd, ln_glo_trd, ln_tra_mxl, nn_trd 
       !!----------------------------------------------------------------------
       !
-      REWIND( numnam_ref )              ! Namelist namtrd in reference namelist : trends diagnostic
       READ  ( numnam_ref, namtrd, IOSTAT = ios, ERR = 901 )
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namtrd in reference namelist', lwp )
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namtrd in reference namelist' )
       !
-      REWIND( numnam_cfg )              ! Namelist namtrd in configuration namelist : trends diagnostic
       READ  ( numnam_cfg, namtrd, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namtrd in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namtrd in configuration namelist' )
       IF(lwm) WRITE( numond, namtrd )
       !
       IF(lwp) THEN                  ! control print
@@ -95,7 +92,7 @@ CONTAINS
 !!gm  : bug/pb for vertical advection of tracer in vvl case: add T.dt[eta] in the output... 
 
       !                             ! diagnostic initialization  
-      IF( ln_glo_trd )   CALL trd_glo_init      ! global domain averaged trends
+      IF( ln_glo_trd )   CALL trd_glo_init( Kmm )      ! global domain averaged trends
       IF( ln_tra_mxl )   CALL trd_mxl_init      ! mixed-layer          trends  
       IF( ln_vor_trd )   CALL trd_vor_init      ! barotropic vorticity trends
       IF( ln_KE_trd  )   CALL trd_ken_init      ! 3D Kinetic    energy trends

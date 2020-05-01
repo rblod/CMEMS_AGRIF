@@ -49,6 +49,7 @@ MODULE iom_def
 
    TYPE, PUBLIC ::   file_descriptor
       CHARACTER(LEN=240)                        ::   name     !: name of the file
+      CHARACTER(LEN=3  )                        ::   comp     !: name of component opening the file ('OCE', 'ICE'...)
       INTEGER                                   ::   nfid     !: identifier of the file (0 if closed)
                                                               !: jpioipsl option has been removed)
       INTEGER                                   ::   nvars    !: number of identified varibles in the file
@@ -63,7 +64,6 @@ MODULE iom_def
       INTEGER, DIMENSION(jpmax_dims,jpmax_vars) ::   dimsz    !: size of variables dimensions 
       REAL(kind=wp), DIMENSION(jpmax_vars)      ::   scf      !: scale_factor of the variables
       REAL(kind=wp), DIMENSION(jpmax_vars)      ::   ofs      !: add_offset of the variables
-      INTEGER                                   ::   nlev     ! number of vertical levels
    END TYPE file_descriptor
    TYPE(file_descriptor), DIMENSION(jpmax_files), PUBLIC ::   iom_file !: array containing the info for all opened files
    INTEGER, PARAMETER, PUBLIC                   :: max_rst_fields = 95 !: maximum number of restart variables defined in iom_set_rst_vars
@@ -76,9 +76,11 @@ MODULE iom_def
    !
    TYPE(RST_FIELD), PUBLIC, SAVE :: rst_wfields(max_rst_fields), rst_rfields(max_rst_fields)
    !
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: iom_def.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: iom_def.F90 12649 2020-04-03 07:11:57Z smasson $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!======================================================================
 END MODULE iom_def

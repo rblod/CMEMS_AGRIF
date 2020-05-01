@@ -43,10 +43,10 @@ MODULE dommsk
    !                                            with analytical eqs.
 
    !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: dommsk.F90 10425 2018-12-19 21:54:16Z smasson $ 
+   !! $Id: dommsk.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -99,16 +99,13 @@ CONTAINS
          &             cn_dyn3d, nn_dyn3d_dta, cn_tra, nn_tra_dta,             &
          &             ln_tra_dmp, ln_dyn3d_dmp, rn_time_dmp, rn_time_dmp_out, &
          &             cn_ice, nn_ice_dta,                                     &
-         &             rn_ice_tem, rn_ice_sal, rn_ice_age,                     &
-         &             ln_vol, nn_volctl, nn_rimwidth, nb_jpk_bdy
+         &             ln_vol, nn_volctl, nn_rimwidth
       !!---------------------------------------------------------------------
       !
-      REWIND( numnam_ref )              ! Namelist namlbc in reference namelist : Lateral momentum boundary condition
       READ  ( numnam_ref, namlbc, IOSTAT = ios, ERR = 901 )
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namlbc in reference namelist', lwp )
-      REWIND( numnam_cfg )              ! Namelist namlbc in configuration namelist : Lateral momentum boundary condition
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namlbc in reference namelist' )
       READ  ( numnam_cfg, namlbc, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namlbc in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namlbc in configuration namelist' )
       IF(lwm) WRITE ( numond, namlbc )
       
       IF(lwp) THEN                  ! control print
@@ -133,38 +130,31 @@ CONTAINS
       ! ----------------------------
       !
       tmask(:,:,:) = 0._wp
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-            iktop = k_top(ji,jj)
-            ikbot = k_bot(ji,jj)
-            IF( iktop /= 0 ) THEN       ! water in the column
-               tmask(ji,jj,iktop:ikbot  ) = 1._wp
-            ENDIF
-         END DO  
-      END DO  
-!SF  add here lbc_lnk: bug not still understood : cause now domain configuration is read !
-!!gm I don't understand why...  
+      DO_2D_11_11
+         iktop = k_top(ji,jj)
+         ikbot = k_bot(ji,jj)
+         IF( iktop /= 0 ) THEN       ! water in the column
+            tmask(ji,jj,iktop:ikbot  ) = 1._wp
+         ENDIF
+      END_2D
+      !
+      ! the following call is mandatory
+      ! it masks boundaries (bathy=0) where needed depending on the configuration (closed, periodic...)  
       CALL lbc_lnk( 'dommsk', tmask  , 'T', 1._wp )      ! Lateral boundary conditions
 
      ! Mask corrections for bdy (read in mppini2)
-      REWIND( numnam_ref )              ! Namelist nambdy in reference namelist :Unstructured open boundaries
       READ  ( numnam_ref, nambdy, IOSTAT = ios, ERR = 903)
-903   IF( ios /= 0 )   CALL ctl_nam ( ios , 'nambdy in reference namelist', lwp )
-      REWIND( numnam_cfg )              ! Namelist nambdy in configuration namelist :Unstructured open boundaries
+903   IF( ios /= 0 )   CALL ctl_nam ( ios , 'nambdy in reference namelist' )
       READ  ( numnam_cfg, nambdy, IOSTAT = ios, ERR = 904 )
-904   IF( ios >  0 )   CALL ctl_nam ( ios , 'nambdy in configuration namelist', lwp )
+904   IF( ios >  0 )   CALL ctl_nam ( ios , 'nambdy in configuration namelist' )
       ! ------------------------
       IF ( ln_bdy .AND. ln_mask_file ) THEN
          CALL iom_open( cn_mask_file, inum )
          CALL iom_get ( inum, jpdom_data, 'bdy_msk', bdytmask(:,:) )
          CALL iom_close( inum )
-         DO jk = 1, jpkm1
-            DO jj = 1, jpj
-               DO ji = 1, jpi
-                  tmask(ji,jj,jk) = tmask(ji,jj,jk) * bdytmask(ji,jj)
-               END DO
-            END DO
-         END DO
+         DO_3D_11_11( 1, jpkm1 )
+            tmask(ji,jj,jk) = tmask(ji,jj,jk) * bdytmask(ji,jj)
+         END_3D
       ENDIF
          
       !  Ocean/land mask at u-, v-, and f-points   (computed from tmask)
@@ -172,7 +162,7 @@ CONTAINS
       ! NB: at this point, fmask is designed for free slip lateral boundary condition
       DO jk = 1, jpk
          DO jj = 1, jpjm1
-            DO ji = 1, fs_jpim1   ! vector loop
+            DO ji = 1, jpim1   ! vector loop
                umask(ji,jj,jk) = tmask(ji,jj  ,jk) * tmask(ji+1,jj  ,jk)
                vmask(ji,jj,jk) = tmask(ji,jj  ,jk) * tmask(ji  ,jj+1,jk)
             END DO
@@ -246,14 +236,12 @@ CONTAINS
          !
          DO jk = 1, jpk
             zwf(:,:) = fmask(:,:,jk)         
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1   ! vector opt.
-                  IF( fmask(ji,jj,jk) == 0._wp ) THEN
-                     fmask(ji,jj,jk) = rn_shlat * MIN( 1._wp , MAX( zwf(ji+1,jj), zwf(ji,jj+1),   &
-                        &                                           zwf(ji-1,jj), zwf(ji,jj-1)  )  )
-                  ENDIF
-               END DO
-            END DO
+            DO_2D_00_00
+               IF( fmask(ji,jj,jk) == 0._wp ) THEN
+                  fmask(ji,jj,jk) = rn_shlat * MIN( 1._wp , MAX( zwf(ji+1,jj), zwf(ji,jj+1),   &
+                     &                                           zwf(ji-1,jj), zwf(ji,jj-1)  )  )
+               ENDIF
+            END_2D
             DO jj = 2, jpjm1
                IF( fmask(1,jj,jk) == 0._wp ) THEN
                   fmask(1  ,jj,jk) = rn_shlat * MIN( 1._wp , MAX( zwf(2,jj), zwf(1,jj+1), zwf(1,jj-1) ) )

@@ -25,7 +25,7 @@ MODULE sbcssm
    USE iom            ! I/O library
    USE lib_mpp        ! distributed memory computing library
    USE prtctl         ! print control
-   USE fldread        ! read input fields 
+   USE fldread        ! read input fields
    USE timing         ! Timing
 
    IMPLICIT NONE
@@ -37,7 +37,7 @@ MODULE sbcssm
    CHARACTER(len=100) ::   cn_dir        ! Root directory for location of ssm files
    LOGICAL            ::   ln_3d_uve     ! specify whether input velocity data is 3D
    LOGICAL            ::   ln_read_frq   ! specify whether we must read frq or not
-   
+
    LOGICAL            ::   l_sasread     ! Ice intilisation: =T read a file ; =F anaytical initilaistion
    LOGICAL            ::   l_initdone = .false.
    INTEGER     ::   nfld_3d
@@ -56,22 +56,24 @@ MODULE sbcssm
 
    !!----------------------------------------------------------------------
    !! NEMO/SAS 4.0 , NEMO Consortium (2018)
-   !! $Id: sbcssm.F90 10068 2018-08-28 14:09:04Z nicolasmartin $
+   !! $Id: sbcssm.F90 12615 2020-03-26 15:18:49Z laurent $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE sbc_ssm( kt )
+   SUBROUTINE sbc_ssm( kt, Kbb, Kmm )
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE sbc_ssm  ***
       !!
       !! ** Purpose :  Prepares dynamics and physics fields from a NEMO run
       !!               for an off-line simulation using surface processes only
       !!
-      !! ** Method : calculates the position of data 
+      !! ** Method : calculates the position of data
       !!             - interpolates data if needed
       !!----------------------------------------------------------------------
       INTEGER, INTENT(in) ::   kt   ! ocean time-step index
+      INTEGER, INTENT(in) ::   Kbb, Kmm   ! ocean time level indices
+      ! (not needed for SAS but needed to keep a consistent interface in sbcmod.F90)
       !
       INTEGER  ::   ji, jj     ! dummy loop indices
       REAL(wp) ::   ztinta     ! ratio applied to after  records when doing time interpolation
@@ -79,27 +81,27 @@ CONTAINS
       !!----------------------------------------------------------------------
       !
       IF( ln_timing )   CALL timing_start( 'sbc_ssm')
-     
+
       IF ( l_sasread ) THEN
          IF( nfld_3d > 0 ) CALL fld_read( kt, 1, sf_ssm_3d )      !==   read data at kt time step   ==!
          IF( nfld_2d > 0 ) CALL fld_read( kt, 1, sf_ssm_2d )      !==   read data at kt time step   ==!
-         ! 
+         !
          IF( ln_3d_uve ) THEN
             IF( .NOT. ln_linssh ) THEN
-               e3t_m(:,:) = sf_ssm_3d(jf_e3t)%fnow(:,:,1) * tmask(:,:,1) ! vertical scale factor 
+               e3t_m(:,:) = sf_ssm_3d(jf_e3t)%fnow(:,:,1) * tmask(:,:,1) ! vertical scale factor
             ELSE
                e3t_m(:,:) = e3t_0(:,:,1)                                 ! vertical scale factor
             ENDIF
             ssu_m(:,:) = sf_ssm_3d(jf_usp)%fnow(:,:,1) * umask(:,:,1)    ! u-velocity
-            ssv_m(:,:) = sf_ssm_3d(jf_vsp)%fnow(:,:,1) * vmask(:,:,1)    ! v-velocity 
+            ssv_m(:,:) = sf_ssm_3d(jf_vsp)%fnow(:,:,1) * vmask(:,:,1)    ! v-velocity
          ELSE
             IF( .NOT. ln_linssh ) THEN
-               e3t_m(:,:) = sf_ssm_2d(jf_e3t)%fnow(:,:,1) * tmask(:,:,1) ! vertical scale factor 
+               e3t_m(:,:) = sf_ssm_2d(jf_e3t)%fnow(:,:,1) * tmask(:,:,1) ! vertical scale factor
             ELSE
                e3t_m(:,:) = e3t_0(:,:,1)                                 ! vertical scale factor
             ENDIF
             ssu_m(:,:) = sf_ssm_2d(jf_usp)%fnow(:,:,1) * umask(:,:,1)    ! u-velocity
-            ssv_m(:,:) = sf_ssm_2d(jf_vsp)%fnow(:,:,1) * vmask(:,:,1)    ! v-velocity 
+            ssv_m(:,:) = sf_ssm_2d(jf_vsp)%fnow(:,:,1) * vmask(:,:,1)    ! v-velocity
          ENDIF
          !
          sst_m(:,:) = sf_ssm_2d(jf_tem)%fnow(:,:,1) * tmask(:,:,1)    ! temperature
@@ -118,19 +120,19 @@ CONTAINS
          ssh_m(:,:) = 0._wp
          IF( .NOT. ln_linssh ) e3t_m(:,:) = e3t_0(:,:,1) !clem: necessary at least for sas2D
          frq_m(:,:) = 1._wp                              !              - -
-         sshn (:,:) = 0._wp                              !              - -
+         ssh  (:,:,Kmm) = 0._wp                              !              - -
       ENDIF
-      
+
       IF ( nn_ice == 1 ) THEN
-         tsn(:,:,1,jp_tem) = sst_m(:,:)
-         tsn(:,:,1,jp_sal) = sss_m(:,:)
-         tsb(:,:,1,jp_tem) = sst_m(:,:)
-         tsb(:,:,1,jp_sal) = sss_m(:,:)
+         ts(:,:,1,jp_tem,Kmm) = sst_m(:,:)
+         ts(:,:,1,jp_sal,Kmm) = sss_m(:,:)
+         ts(:,:,1,jp_tem,Kbb) = sst_m(:,:)
+         ts(:,:,1,jp_sal,Kbb) = sss_m(:,:)
       ENDIF
-      ub (:,:,1) = ssu_m(:,:)
-      vb (:,:,1) = ssv_m(:,:)
- 
-      IF(ln_ctl) THEN                  ! print control
+      uu (:,:,1,Kbb) = ssu_m(:,:)
+      vv (:,:,1,Kbb) = ssv_m(:,:)
+
+      IF(sn_cfctl%l_prtctl) THEN            ! print control
          CALL prt_ctl(tab2d_1=sst_m, clinfo1=' sst_m   - : ', mask1=tmask   )
          CALL prt_ctl(tab2d_1=sss_m, clinfo1=' sss_m   - : ', mask1=tmask   )
          CALL prt_ctl(tab2d_1=ssu_m, clinfo1=' ssu_m   - : ', mask1=umask   )
@@ -155,12 +157,14 @@ CONTAINS
    END SUBROUTINE sbc_ssm
 
 
-   SUBROUTINE sbc_ssm_init
+   SUBROUTINE sbc_ssm_init( Kbb, Kmm )
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE sbc_ssm_init  ***
       !!
-      !! ** Purpose :   Initialisation of sea surface mean data     
+      !! ** Purpose :   Initialisation of sea surface mean data
       !!----------------------------------------------------------------------
+      INTEGER, INTENT(in) ::   Kbb, Kmm   ! ocean time level indices
+      ! (not needed for SAS but needed to keep a consistent interface in sbcmod.F90)
       INTEGER  :: ierr, ierr0, ierr1, ierr2, ierr3   ! return error code
       INTEGER  :: ifpr                               ! dummy loop indice
       INTEGER  :: inum, idv, idimv, jpm              ! local integer
@@ -185,17 +189,15 @@ CONTAINS
          WRITE(numout,*) '~~~~~~~~~~~~ '
       ENDIF
       !
-      REWIND( numnam_ref )              ! Namelist namsbc_sas in reference namelist : Input fields
       READ  ( numnam_ref, namsbc_sas, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namsbc_sas in reference namelist', lwp )
-      REWIND( numnam_cfg )              ! Namelist namsbc_sas in configuration namelist : Input fields
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namsbc_sas in reference namelist' )
       READ  ( numnam_cfg, namsbc_sas, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namsbc_sas in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namsbc_sas in configuration namelist' )
       IF(lwm) WRITE ( numond, namsbc_sas )
-      !           
+      !
       IF(lwp) THEN                              ! Control print
          WRITE(numout,*) '   Namelist namsbc_sas'
-         WRITE(numout,*) '      Initialisation using an input file                                 l_sasread   = ', l_sasread 
+         WRITE(numout,*) '      Initialisation using an input file                                 l_sasread   = ', l_sasread
          WRITE(numout,*) '      Are we supplying a 3D u,v and e3 field                             ln_3d_uve   = ', ln_3d_uve
          WRITE(numout,*) '      Are we reading frq (fraction of qsr absorbed in the 1st T level)   ln_read_frq = ', ln_read_frq
       ENDIF
@@ -223,10 +225,10 @@ CONTAINS
          IF( lwp ) WRITE(numout,*) '         ==>>>   No closed seas adjustment needed with StandAlone Surface scheme'
          ln_closea = .false.
       ENDIF
-      
-      !                  
+
+      !
       IF( l_sasread ) THEN                       ! store namelist information in an array
-         ! 
+         !
          !! following code is a bit messy, but distinguishes between when u,v are 3d arrays and
          !! when we have other 3d arrays that we need to read in
          !! so if a new field is added i.e. jf_new, just give it the next integer in sequence
@@ -272,14 +274,14 @@ CONTAINS
             ENDIF
          ENDIF
          !
-         ierr1 = 0    ! default definition if slf_?d(ifpr)%ln_tint = .false. 
+         ierr1 = 0    ! default definition if slf_?d(ifpr)%ln_tint = .false.
          IF( nfld_3d > 0 ) THEN
             ALLOCATE( sf_ssm_3d(nfld_3d), STAT=ierr )         ! set sf structure
             IF( ierr > 0 ) THEN
                CALL ctl_stop( 'sbc_ssm_init: unable to allocate sf structure' )   ;   RETURN
             ENDIF
             DO ifpr = 1, nfld_3d
-                                            ALLOCATE( sf_ssm_3d(ifpr)%fnow(jpi,jpj,jpk)    , STAT=ierr0 )
+               ALLOCATE( sf_ssm_3d(ifpr)%fnow(jpi,jpj,jpk)    , STAT=ierr0 )
                IF( slf_3d(ifpr)%ln_tint )   ALLOCATE( sf_ssm_3d(ifpr)%fdta(jpi,jpj,jpk,2)  , STAT=ierr1 )
                IF( ierr0 + ierr1 > 0 ) THEN
                   CALL ctl_stop( 'sbc_ssm_init : unable to allocate sf_ssm_3d array structure' )   ;   RETURN
@@ -295,7 +297,7 @@ CONTAINS
                CALL ctl_stop( 'sbc_ssm_init: unable to allocate sf 2d structure' )   ;   RETURN
             ENDIF
             DO ifpr = 1, nfld_2d
-                                            ALLOCATE( sf_ssm_2d(ifpr)%fnow(jpi,jpj,1)    , STAT=ierr0 )
+               ALLOCATE( sf_ssm_2d(ifpr)%fnow(jpi,jpj,1)    , STAT=ierr0 )
                IF( slf_2d(ifpr)%ln_tint )   ALLOCATE( sf_ssm_2d(ifpr)%fdta(jpi,jpj,1,2)  , STAT=ierr1 )
                IF( ierr0 + ierr1 > 0 ) THEN
                   CALL ctl_stop( 'sbc_ssm_init : unable to allocate sf_ssm_2d array structure' )   ;   RETURN
@@ -310,7 +312,7 @@ CONTAINS
          !
       ENDIF
       !
-      CALL sbc_ssm( nit000 )   ! need to define ss?_m arrays used in iceistate
+      CALL sbc_ssm( nit000, Kbb, Kmm )   ! need to define ss?_m arrays used in iceistate
       l_initdone = .TRUE.
       !
    END SUBROUTINE sbc_ssm_init

@@ -74,9 +74,11 @@ MODULE icedyn_rdgrft
    REAL(wp) ::   rn_fsnwrft       !    fractional snow loss to the ocean during rafting
    REAL(wp) ::   rn_fpndrft       !    fractional pond loss to the ocean during rafting
    !
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/ICE 4.0 , NEMO Consortium (2018)
-   !! $Id: icedyn_rdgrft.F90 10531 2019-01-16 13:17:50Z clem $
+   !! $Id: icedyn_rdgrft.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL licence     (./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -85,9 +87,9 @@ CONTAINS
       !!-------------------------------------------------------------------
       !!                ***  ROUTINE ice_dyn_rdgrft_alloc ***
       !!-------------------------------------------------------------------
-      ALLOCATE( closing_net(jpij), opning(jpij)   , closing_gross(jpij),   &
-         &      apartf(jpij,0:jpl), hrmin(jpij,jpl), hraft(jpij,jpl)    , aridge(jpij,jpl),   &
-         &      hrmax(jpij,jpl), hi_hrdg(jpij,jpl)  , araft (jpij,jpl),  &
+      ALLOCATE( closing_net(jpij)  , opning(jpij)      , closing_gross(jpij) ,               &
+         &      apartf(jpij,0:jpl) , hrmin  (jpij,jpl) , hraft(jpij,jpl) , aridge(jpij,jpl), &
+         &      hrmax (jpij,jpl)   , hi_hrdg(jpij,jpl) , araft(jpij,jpl) ,                   &
          &      ze_i_2d(jpij,nlay_i,jpl), ze_s_2d(jpij,nlay_s,jpl), STAT=ice_dyn_rdgrft_alloc )
 
       CALL mpp_sum ( 'icedyn_rdgrft', ice_dyn_rdgrft_alloc )
@@ -136,18 +138,14 @@ CONTAINS
       INTEGER  ::   ipti                       ! local integer
       REAL(wp) ::   zfac                       ! local scalar
       INTEGER , DIMENSION(jpij) ::   iptidx        ! compute ridge/raft or not
-      REAL(wp), DIMENSION(jpij) ::   zdivu_adv     ! divu as implied by transport scheme  (1/s)
       REAL(wp), DIMENSION(jpij) ::   zdivu, zdelt  ! 1D divu_i & delta_i
       !
       INTEGER, PARAMETER ::   jp_itermax = 20    
       !!-------------------------------------------------------------------
-      ! clem: The redistribution of ice between categories can lead to small negative values (as for the remapping in ice_itd_rem)
-      !       likely due to truncation error ( i.e. 1. - 1. /= 0 )
-      !       I do not think it should be a concern since small areas and volumes are erased (in ice_var_zapsmall.F90)
-      
       ! controls
       IF( ln_timing    )   CALL timing_start('icedyn_rdgrft')                                                             ! timing
       IF( ln_icediachk )   CALL ice_cons_hsm(0, 'icedyn_rdgrft', rdiag_v, rdiag_s, rdiag_t, rdiag_fv, rdiag_fs, rdiag_ft) ! conservation
+      IF( ln_icediachk )   CALL ice_cons2D  (0, 'icedyn_rdgrft',  diag_v,  diag_s,  diag_t,  diag_fv,  diag_fs,  diag_ft) ! conservation
 
       IF( kt == nit000 ) THEN
          IF(lwp) WRITE(numout,*)
@@ -155,21 +153,19 @@ CONTAINS
          IF(lwp) WRITE(numout,*)'~~~~~~~~~~~~~~'
       ENDIF      
 
-      CALL ice_var_zapsmall   ! Zero out categories with very small areas
-
       !--------------------------------
       ! 0) Identify grid cells with ice
       !--------------------------------
+      at_i(:,:) = SUM( a_i, dim=3 )
+      !
       npti = 0   ;   nptidx(:) = 0
       ipti = 0   ;   iptidx(:) = 0
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-            IF ( at_i(ji,jj) > 0._wp ) THEN
-               npti           = npti + 1
-               nptidx( npti ) = (jj - 1) * jpi + ji
-            ENDIF
-         END DO
-      END DO
+      DO_2D_11_11
+         IF ( at_i(ji,jj) > epsi10 ) THEN
+            npti           = npti + 1
+            nptidx( npti ) = (jj - 1) * jpi + ji
+         ENDIF
+      END_2D
       
       !--------------------------------------------------------
       ! 1) Dynamical inputs (closing rate, divergence, opening)
@@ -177,30 +173,22 @@ CONTAINS
       IF( npti > 0 ) THEN
         
          ! just needed here
-         CALL tab_2d_1d( npti, nptidx(1:npti), zdivu(1:npti), divu_i(:,:) )
-         CALL tab_2d_1d( npti, nptidx(1:npti), zdelt(1:npti), delta_i(:,:) )
+         CALL tab_2d_1d( npti, nptidx(1:npti), zdelt   (1:npti)      , delta_i )
          ! needed here and in the iteration loop
-         CALL tab_3d_2d( npti, nptidx(1:npti), a_i_2d  (1:npti,1:jpl), a_i(:,:,:) )
-         CALL tab_3d_2d( npti, nptidx(1:npti), v_i_2d  (1:npti,1:jpl), v_i(:,:,:) )
-         CALL tab_2d_1d( npti, nptidx(1:npti), ato_i_1d(1:npti)      , ato_i(:,:) )
+         CALL tab_2d_1d( npti, nptidx(1:npti), zdivu   (1:npti)      , divu_i) ! zdivu is used as a work array here (no change in divu_i)
+         CALL tab_3d_2d( npti, nptidx(1:npti), a_i_2d  (1:npti,1:jpl), a_i   )
+         CALL tab_3d_2d( npti, nptidx(1:npti), v_i_2d  (1:npti,1:jpl), v_i   )
+         CALL tab_2d_1d( npti, nptidx(1:npti), ato_i_1d(1:npti)      , ato_i )
 
          DO ji = 1, npti
             ! closing_net = rate at which open water area is removed + ice area removed by ridging 
             !                                                        - ice area added in new ridges
             closing_net(ji) = rn_csrdg * 0.5_wp * ( zdelt(ji) - ABS( zdivu(ji) ) ) - MIN( zdivu(ji), 0._wp )
             !
-            ! divergence given by the advection scheme
-            !   (which may not be equal to divu as computed from the velocity field)
-            IF    ( ln_adv_Pra ) THEN
-               zdivu_adv(ji) = ( 1._wp - ato_i_1d(ji) - SUM( a_i_2d(ji,:) ) ) * r1_rdtice
-            ELSEIF( ln_adv_UMx ) THEN
-               zdivu_adv(ji) = zdivu(ji)
-            ENDIF
-            !
-            IF( zdivu_adv(ji) < 0._wp )   closing_net(ji) = MAX( closing_net(ji), -zdivu_adv(ji) )   ! make sure the closing rate is large enough
-            !                                                                                        ! to give asum = 1.0 after ridging
+            IF( zdivu(ji) < 0._wp )   closing_net(ji) = MAX( closing_net(ji), -zdivu(ji) )   ! make sure the closing rate is large enough
+            !                                                                                ! to give asum = 1.0 after ridging
             ! Opening rate (non-negative) that will give asum = 1.0 after ridging.
-            opning(ji) = closing_net(ji) + zdivu_adv(ji)
+            opning(ji) = closing_net(ji) + zdivu(ji)
          END DO
          !
          !------------------------------------
@@ -217,7 +205,7 @@ CONTAINS
                v_i_2d     (ipti,:) = v_i_2d     (ji,:)
                ato_i_1d   (ipti)   = ato_i_1d   (ji)
                closing_net(ipti)   = closing_net(ji)
-               zdivu_adv  (ipti)   = zdivu_adv  (ji)
+               zdivu      (ipti)   = zdivu      (ji)
                opning     (ipti)   = opning     (ji)
             ENDIF
          END DO
@@ -261,9 +249,9 @@ CONTAINS
                   ato_i_1d   (ji) = MAX( 0._wp, 1._wp - SUM( a_i_2d(ji,:) ) )
                ELSE
                   iterate_ridging  = 1
-                  zdivu_adv  (ji) = zfac * r1_rdtice
-                  closing_net(ji) = MAX( 0._wp, -zdivu_adv(ji) )
-                  opning     (ji) = MAX( 0._wp,  zdivu_adv(ji) )
+                  zdivu      (ji) = zfac * r1_Dt_ice
+                  closing_net(ji) = MAX( 0._wp, -zdivu(ji) )
+                  opning     (ji) = MAX( 0._wp,  zdivu(ji) )
                ENDIF
             END DO
             !
@@ -279,8 +267,10 @@ CONTAINS
       CALL ice_var_agg( 1 ) 
 
       ! controls
+      IF( sn_cfctl%l_prtctl )   CALL ice_prt3D   ('icedyn_rdgrft')                                                        ! prints
+      IF( ln_icectl    )   CALL ice_prt     (kt, iiceprt, jiceprt,-1, ' - ice dyn rdgrft - ')                             ! prints
       IF( ln_icediachk )   CALL ice_cons_hsm(1, 'icedyn_rdgrft', rdiag_v, rdiag_s, rdiag_t, rdiag_fv, rdiag_fs, rdiag_ft) ! conservation
-      IF( ln_ctl       )   CALL ice_prt3D   ('icedyn_rdgrft')                                                             ! prints
+      IF( ln_icediachk )   CALL ice_cons2D  (1, 'icedyn_rdgrft',  diag_v,  diag_s,  diag_t,  diag_fv,  diag_fs,  diag_ft) ! conservation
       IF( ln_timing    )   CALL timing_stop ('icedyn_rdgrft')                                                             ! timing
       !
    END SUBROUTINE ice_dyn_rdgrft
@@ -309,8 +299,8 @@ CONTAINS
       z1_astar = 1._wp / rn_astar
 
       !                       ! Ice thickness needed for rafting
-      WHERE( pa_i(1:npti,:) > 0._wp )   ;   zhi(1:npti,:) = pv_i(1:npti,:) / pa_i(1:npti,:)
-      ELSEWHERE                         ;   zhi(1:npti,:) = 0._wp
+      WHERE( pa_i(1:npti,:) > epsi10 )   ;   zhi(1:npti,:) = pv_i(1:npti,:) / pa_i(1:npti,:)
+      ELSEWHERE                          ;   zhi(1:npti,:) = 0._wp
       END WHERE
 
       ! 1) Participation function (apartf): a(h) = b(h).g(h)
@@ -328,8 +318,8 @@ CONTAINS
       ! This is in general not equal to one because of divergence during transport
       zasum(1:npti) = pato_i(1:npti) + SUM( pa_i(1:npti,:), dim=2 )
       !
-      WHERE( zasum(1:npti) > 0._wp )   ;   z1_asum(1:npti) = 1._wp / zasum(1:npti)
-      ELSEWHERE                        ;   z1_asum(1:npti) = 0._wp
+      WHERE( zasum(1:npti) > epsi10 )   ;   z1_asum(1:npti) = 1._wp / zasum(1:npti)
+      ELSEWHERE                         ;   z1_asum(1:npti) = 0._wp
       END WHERE
       !
       ! Compute cumulative thickness distribution function
@@ -454,8 +444,8 @@ CONTAINS
       !-----------------
       ! Based on the ITD of ridging and ridged ice, convert the net closing rate to a gross closing rate.  
       ! NOTE: 0 < aksum <= 1
-      WHERE( zaksum(1:npti) > 0._wp )   ;   closing_gross(1:npti) = pclosing_net(1:npti) / zaksum(1:npti)
-      ELSEWHERE                         ;   closing_gross(1:npti) = 0._wp
+      WHERE( zaksum(1:npti) > epsi10 )   ;   closing_gross(1:npti) = pclosing_net(1:npti) / zaksum(1:npti)
+      ELSEWHERE                          ;   closing_gross(1:npti) = 0._wp
       END WHERE
       
       ! correction to closing rate if excessive ice removal
@@ -464,9 +454,9 @@ CONTAINS
       ! Reduce the opening rate in proportion
       DO jl = 1, jpl
          DO ji = 1, npti
-            zfac = apartf(ji,jl) * closing_gross(ji) * rdt_ice
-            IF( zfac > pa_i(ji,jl) ) THEN
-               closing_gross(ji) = pa_i(ji,jl) / apartf(ji,jl) * r1_rdtice
+            zfac = apartf(ji,jl) * closing_gross(ji) * rDt_ice
+            IF( zfac > pa_i(ji,jl) .AND. apartf(ji,jl) /= 0._wp ) THEN
+               closing_gross(ji) = pa_i(ji,jl) / apartf(ji,jl) * r1_Dt_ice
             ENDIF
          END DO
       END DO      
@@ -476,11 +466,11 @@ CONTAINS
       ! Reduce the closing rate if more than 100% of the open water would be removed
       ! Reduce the opening rate in proportion
       DO ji = 1, npti  
-         zfac = pato_i(ji) + ( opning(ji) - apartf(ji,0) * closing_gross(ji) ) * rdt_ice
+         zfac = pato_i(ji) + ( opning(ji) - apartf(ji,0) * closing_gross(ji) ) * rDt_ice
          IF( zfac < 0._wp ) THEN           ! would lead to negative ato_i
-            opning(ji) = apartf(ji,0) * closing_gross(ji) - pato_i(ji) * r1_rdtice 
+            opning(ji) = apartf(ji,0) * closing_gross(ji) - pato_i(ji) * r1_Dt_ice 
          ELSEIF( zfac > zasum(ji) ) THEN   ! would lead to ato_i > asum
-            opning(ji) = apartf(ji,0) * closing_gross(ji) + ( zasum(ji) - pato_i(ji) ) * r1_rdtice 
+            opning(ji) = apartf(ji,0) * closing_gross(ji) + ( zasum(ji) - pato_i(ji) ) * r1_Dt_ice 
          ENDIF
       END DO
       !
@@ -509,6 +499,7 @@ CONTAINS
       REAL(wp), DIMENSION(jpij) ::   ersw             ! enth of water trapped into ridges
       REAL(wp), DIMENSION(jpij) ::   zswitch, fvol    ! new ridge volume going to jl2
       REAL(wp), DIMENSION(jpij) ::   z1_ai            ! 1 / a
+      REAL(wp), DIMENSION(jpij) ::   zvti             ! sum(v_i)
       !
       REAL(wp), DIMENSION(jpij,nlay_s) ::   esrft     ! snow energy of rafting ice
       REAL(wp), DIMENSION(jpij,nlay_i) ::   eirft     ! ice  energy of rafting ice
@@ -517,11 +508,13 @@ CONTAINS
       !
       INTEGER , DIMENSION(jpij) ::   itest_rdg, itest_rft   ! test for conservation
       !!-------------------------------------------------------------------
-
+      !
+      zvti(1:npti) = SUM( v_i_2d(1:npti,:), dim=2 )   ! total ice volume
+      !
       ! 1) Change in open water area due to closing and opening
       !--------------------------------------------------------
       DO ji = 1, npti
-         ato_i_1d(ji) = MAX( 0._wp, ato_i_1d(ji) + ( opning(ji) - apartf(ji,0) * closing_gross(ji) ) * rdt_ice )
+         ato_i_1d(ji) = MAX( 0._wp, ato_i_1d(ji) + ( opning(ji) - apartf(ji,0) * closing_gross(ji) ) * rDt_ice )
       END DO
       
       ! 2) compute categories in which ice is removed (jl1) 
@@ -534,11 +527,13 @@ CONTAINS
 
             IF( apartf(ji,jl1) > 0._wp .AND. closing_gross(ji) > 0._wp ) THEN   ! only if ice is ridging
 
-               z1_ai(ji) = 1._wp / a_i_2d(ji,jl1)
-
+               IF( a_i_2d(ji,jl1) > epsi10 ) THEN   ;   z1_ai(ji) = 1._wp / a_i_2d(ji,jl1)
+               ELSE                                 ;   z1_ai(ji) = 0._wp
+               ENDIF
+               
                ! area of ridging / rafting ice (airdg1) and of new ridge (airdg2)
-               airdg1 = aridge(ji,jl1) * closing_gross(ji) * rdt_ice
-               airft1 = araft (ji,jl1) * closing_gross(ji) * rdt_ice
+               airdg1 = aridge(ji,jl1) * closing_gross(ji) * rDt_ice
+               airft1 = araft (ji,jl1) * closing_gross(ji) * rDt_ice
 
                airdg2(ji) = airdg1 * hi_hrdg(ji,jl1)
                airft2(ji) = airft1 * hi_hrft
@@ -548,12 +543,15 @@ CONTAINS
                afrft = airft1 * z1_ai(ji)
 
                ! volume and enthalpy (J/m2, >0) of seawater trapped into ridges
-               vsw = v_i_2d(ji,jl1) * afrdg * rn_porordg
+               IF    ( zvti(ji) <= 10. ) THEN ; vsw = v_i_2d(ji,jl1) * afrdg * rn_porordg                                           ! v <= 10m then porosity = rn_porordg
+               ELSEIF( zvti(ji) >= 20. ) THEN ; vsw = 0._wp                                                                         ! v >= 20m then porosity = 0
+               ELSE                           ; vsw = v_i_2d(ji,jl1) * afrdg * rn_porordg * MAX( 0._wp, 2._wp - 0.1_wp * zvti(ji) ) ! v > 10m and v < 20m then porosity = linear transition to 0
+               ENDIF
                ersw(ji) = -rhoi * vsw * rcp * sst_1d(ji)   ! clem: if sst>0, then ersw <0 (is that possible?)
 
                ! volume etc of ridging / rafting ice and new ridges (vi, vs, sm, oi, es, ei)
                virdg1     = v_i_2d (ji,jl1)   * afrdg
-               virdg2(ji) = v_i_2d (ji,jl1)   * afrdg * ( 1. + rn_porordg )
+               virdg2(ji) = v_i_2d (ji,jl1)   * afrdg + vsw
                vsrdg(ji)  = v_s_2d (ji,jl1)   * afrdg
                sirdg1     = sv_i_2d(ji,jl1)   * afrdg
                sirdg2(ji) = sv_i_2d(ji,jl1)   * afrdg + vsw * sss_1d(ji)
@@ -576,20 +574,20 @@ CONTAINS
                ENDIF
 
                ! Ice-ocean exchanges associated with ice porosity
-               wfx_dyn_1d(ji) = wfx_dyn_1d(ji) - vsw * rhoi * r1_rdtice   ! increase in ice volume due to seawater frozen in voids
-               sfx_dyn_1d(ji) = sfx_dyn_1d(ji) - vsw * sss_1d(ji) * rhoi * r1_rdtice
-               hfx_dyn_1d(ji) = hfx_dyn_1d(ji) + ersw(ji) * r1_rdtice          ! > 0 [W.m-2] 
+               wfx_dyn_1d(ji) = wfx_dyn_1d(ji) - vsw * rhoi * r1_Dt_ice   ! increase in ice volume due to seawater frozen in voids
+               sfx_dyn_1d(ji) = sfx_dyn_1d(ji) - vsw * sss_1d(ji) * rhoi * r1_Dt_ice
+               hfx_dyn_1d(ji) = hfx_dyn_1d(ji) + ersw(ji) * r1_Dt_ice          ! > 0 [W.m-2] 
 
                ! Put the snow lost by ridging into the ocean
                !  Note that esrdg > 0; the ocean must cool to melt snow. If the ocean temp = Tf already, new ice must grow.
                wfx_snw_dyn_1d(ji) = wfx_snw_dyn_1d(ji) + ( rhos * vsrdg(ji) * ( 1._wp - rn_fsnwrdg )   &   ! fresh water source for ocean
-                  &                                      + rhos * vsrft(ji) * ( 1._wp - rn_fsnwrft ) ) * r1_rdtice
+                  &                                      + rhos * vsrft(ji) * ( 1._wp - rn_fsnwrft ) ) * r1_Dt_ice
 
                ! virtual salt flux to keep salinity constant
                IF( nn_icesal /= 2 )  THEN
-                  sirdg2(ji)     = sirdg2(ji)     - vsw * ( sss_1d(ji) - s_i_1d(ji) )        ! ridge salinity = s_i
-                  sfx_bri_1d(ji) = sfx_bri_1d(ji) + sss_1d(ji) * vsw * rhoi * r1_rdtice  &  ! put back sss_m into the ocean
-                     &                            - s_i_1d(ji) * vsw * rhoi * r1_rdtice     ! and get  s_i  from the ocean 
+                  sirdg2(ji)     = sirdg2(ji)     - vsw * ( sss_1d(ji) - s_i_1d(ji) )       ! ridge salinity = s_i
+                  sfx_bri_1d(ji) = sfx_bri_1d(ji) + sss_1d(ji) * vsw * rhoi * r1_Dt_ice  &  ! put back sss_m into the ocean
+                     &                            - s_i_1d(ji) * vsw * rhoi * r1_Dt_ice     ! and get  s_i  from the ocean 
                ENDIF
 
                ! Remove area, volume of new ridge to each category jl1
@@ -612,14 +610,14 @@ CONTAINS
             DO ji = 1, npti
                IF( apartf(ji,jl1) > 0._wp .AND. closing_gross(ji) > 0._wp ) THEN
                   ! Compute ridging /rafting fractions
-                  afrdg = aridge(ji,jl1) * closing_gross(ji) * rdt_ice * z1_ai(ji)
-                  afrft = araft (ji,jl1) * closing_gross(ji) * rdt_ice * z1_ai(ji)
+                  afrdg = aridge(ji,jl1) * closing_gross(ji) * rDt_ice * z1_ai(ji)
+                  afrft = araft (ji,jl1) * closing_gross(ji) * rDt_ice * z1_ai(ji)
                   ! Compute ridging /rafting ice and new ridges for es
                   esrdg(ji,jk) = ze_s_2d (ji,jk,jl1) * afrdg
                   esrft(ji,jk) = ze_s_2d (ji,jk,jl1) * afrft
                   ! Put the snow lost by ridging into the ocean
                   hfx_dyn_1d(ji) = hfx_dyn_1d(ji) + ( - esrdg(ji,jk) * ( 1._wp - rn_fsnwrdg )   &                 ! heat sink for ocean (<0, W.m-2)
-                     &                                - esrft(ji,jk) * ( 1._wp - rn_fsnwrft ) ) * r1_rdtice
+                     &                                - esrft(ji,jk) * ( 1._wp - rn_fsnwrft ) ) * r1_Dt_ice
                   !
                   ! Remove energy of new ridge to each category jl1
                   !-------------------------------------------------
@@ -633,8 +631,8 @@ CONTAINS
             DO ji = 1, npti
                IF( apartf(ji,jl1) > 0._wp .AND. closing_gross(ji) > 0._wp ) THEN
                   ! Compute ridging /rafting fractions
-                  afrdg = aridge(ji,jl1) * closing_gross(ji) * rdt_ice * z1_ai(ji)
-                  afrft = araft (ji,jl1) * closing_gross(ji) * rdt_ice * z1_ai(ji)
+                  afrdg = aridge(ji,jl1) * closing_gross(ji) * rDt_ice * z1_ai(ji)
+                  afrft = araft (ji,jl1) * closing_gross(ji) * rDt_ice * z1_ai(ji)
                   ! Compute ridging ice and new ridges for ei
                   eirdg(ji,jk) = ze_i_2d (ji,jk,jl1) * afrdg + ersw(ji) * r1_nlay_i
                   eirft(ji,jk) = ze_i_2d (ji,jk,jl1) * afrft
@@ -725,9 +723,10 @@ CONTAINS
          !
       END DO ! jl1
       !
+      ! roundoff errors
+      !----------------
       ! In case ridging/rafting lead to very small negative values (sometimes it happens)
-      WHERE( a_i_2d(1:npti,:) < 0._wp )   a_i_2d(1:npti,:) = 0._wp
-      WHERE( v_i_2d(1:npti,:) < 0._wp )   v_i_2d(1:npti,:) = 0._wp
+      CALL ice_var_roundoff( a_i_2d, v_i_2d, v_s_2d, sv_i_2d, oa_i_2d, a_ip_2d, v_ip_2d, ze_s_2d, ze_i_2d )
       !
    END SUBROUTINE rdgrft_shift
 
@@ -766,24 +765,20 @@ CONTAINS
       SELECT CASE( ismooth )         ! Smoothing ice strength                           !
       !                              !--------------------------------------------------!
       CASE( 1 )               !--- Spatial smoothing
-         DO jj = 2, jpjm1
-            DO ji = 2, jpim1
-               IF ( SUM( a_i(ji,jj,:) ) > 0._wp ) THEN 
-                  zworka(ji,jj) = ( 4.0 * strength(ji,jj)              &
-                     &                  + strength(ji-1,jj) * tmask(ji-1,jj,1) + strength(ji+1,jj) * tmask(ji+1,jj,1) &  
-                     &                  + strength(ji,jj-1) * tmask(ji,jj-1,1) + strength(ji,jj+1) * tmask(ji,jj+1,1) &
-                     &            ) / ( 4.0 + tmask(ji-1,jj,1) + tmask(ji+1,jj,1) + tmask(ji,jj-1,1) + tmask(ji,jj+1,1) )
-               ELSE
-                  zworka(ji,jj) = 0._wp
-               ENDIF
-            END DO
-         END DO
+         DO_2D_00_00
+            IF ( SUM( a_i(ji,jj,:) ) > 0._wp ) THEN 
+               zworka(ji,jj) = ( 4.0 * strength(ji,jj)              &
+                  &                  + strength(ji-1,jj) * tmask(ji-1,jj,1) + strength(ji+1,jj) * tmask(ji+1,jj,1) &  
+                  &                  + strength(ji,jj-1) * tmask(ji,jj-1,1) + strength(ji,jj+1) * tmask(ji,jj+1,1) &
+                  &            ) / ( 4.0 + tmask(ji-1,jj,1) + tmask(ji+1,jj,1) + tmask(ji,jj-1,1) + tmask(ji,jj+1,1) )
+            ELSE
+               zworka(ji,jj) = 0._wp
+            ENDIF
+         END_2D
          
-         DO jj = 2, jpjm1
-            DO ji = 2, jpim1
-               strength(ji,jj) = zworka(ji,jj)
-            END DO
-         END DO
+         DO_2D_00_00
+            strength(ji,jj) = zworka(ji,jj)
+         END_2D
          CALL lbc_lnk( 'icedyn_rdgrft', strength, 'T', 1. )
          !
       CASE( 2 )               !--- Temporal smoothing
@@ -792,19 +787,17 @@ CONTAINS
             zstrp2(:,:) = 0._wp
          ENDIF
          !
-         DO jj = 2, jpjm1
-            DO ji = 2, jpim1
-               IF ( SUM( a_i(ji,jj,:) ) > 0._wp ) THEN 
-                  itframe = 1 ! number of time steps for the running mean
-                  IF ( zstrp1(ji,jj) > 0._wp ) itframe = itframe + 1
-                  IF ( zstrp2(ji,jj) > 0._wp ) itframe = itframe + 1
-                  zp = ( strength(ji,jj) + zstrp1(ji,jj) + zstrp2(ji,jj) ) / itframe
-                  zstrp2  (ji,jj) = zstrp1  (ji,jj)
-                  zstrp1  (ji,jj) = strength(ji,jj)
-                  strength(ji,jj) = zp
-               ENDIF
-            END DO
-         END DO
+         DO_2D_00_00
+            IF ( SUM( a_i(ji,jj,:) ) > 0._wp ) THEN 
+               itframe = 1 ! number of time steps for the running mean
+               IF ( zstrp1(ji,jj) > 0._wp ) itframe = itframe + 1
+               IF ( zstrp2(ji,jj) > 0._wp ) itframe = itframe + 1
+               zp = ( strength(ji,jj) + zstrp1(ji,jj) + zstrp2(ji,jj) ) / itframe
+               zstrp2  (ji,jj) = zstrp1  (ji,jj)
+               zstrp1  (ji,jj) = strength(ji,jj)
+               strength(ji,jj) = zp
+            ENDIF
+         END_2D
          CALL lbc_lnk( 'icedyn_rdgrft', strength, 'T', 1. )
          !
       END SELECT
@@ -853,7 +846,7 @@ CONTAINS
          CALL tab_2d_1d( npti, nptidx(1:npti), hfx_dyn_1d    (1:npti), hfx_dyn    (:,:) )
          CALL tab_2d_1d( npti, nptidx(1:npti), wfx_snw_dyn_1d(1:npti), wfx_snw_dyn(:,:) )
          CALL tab_2d_1d( npti, nptidx(1:npti), wfx_pnd_1d    (1:npti), wfx_pnd    (:,:) )
-
+         !
          !                 !---------------------!
       CASE( 2 )            !==  from 1D to 2D  ==!
          !                 !---------------------!
@@ -908,12 +901,10 @@ CONTAINS
          &                    ln_rafting, rn_hraft, rn_craft  , rn_fsnwrft, rn_fpndrft
       !!-------------------------------------------------------------------
       !
-      REWIND( numnam_ice_ref )              ! Namelist namicetdme in reference namelist : Ice mechanical ice redistribution
       READ  ( numnam_ice_ref, namdyn_rdgrft, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namdyn_rdgrft in reference namelist', lwp )
-      REWIND( numnam_ice_cfg )              ! Namelist namdyn_rdgrft in configuration namelist : Ice mechanical ice redistribution
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namdyn_rdgrft in reference namelist' )
       READ  ( numnam_ice_cfg, namdyn_rdgrft, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namdyn_rdgrft in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namdyn_rdgrft in configuration namelist' )
       IF(lwm) WRITE ( numoni, namdyn_rdgrft )
       !
       IF (lwp) THEN                          ! control print
@@ -944,7 +935,21 @@ CONTAINS
       IF ( ( ln_partf_lin .AND. ln_partf_exp ) .OR. ( .NOT.ln_partf_lin .AND. .NOT.ln_partf_exp ) ) THEN
          CALL ctl_stop( 'ice_dyn_rdgrft_init: choose one and only one participation function (ln_partf_lin or ln_partf_exp)' )
       ENDIF
-      !                              ! allocate tke arrays
+      !
+      IF( .NOT. ln_icethd ) THEN
+         rn_porordg = 0._wp
+         rn_fsnwrdg = 1._wp ; rn_fsnwrft = 1._wp
+         rn_fpndrdg = 1._wp ; rn_fpndrft = 1._wp
+         IF( lwp ) THEN
+            WRITE(numout,*) '      ==> only ice dynamics is activated, thus some parameters must be changed'
+            WRITE(numout,*) '            rn_porordg   = ', rn_porordg
+            WRITE(numout,*) '            rn_fsnwrdg   = ', rn_fsnwrdg 
+            WRITE(numout,*) '            rn_fpndrdg   = ', rn_fpndrdg 
+            WRITE(numout,*) '            rn_fsnwrft   = ', rn_fsnwrft 
+            WRITE(numout,*) '            rn_fpndrft   = ', rn_fpndrft 
+         ENDIF
+      ENDIF
+      !                              ! allocate arrays
       IF( ice_dyn_rdgrft_alloc() /= 0 )   CALL ctl_stop( 'STOP', 'ice_dyn_rdgrft_init: unable to allocate arrays' )
       !
   END SUBROUTINE ice_dyn_rdgrft_init

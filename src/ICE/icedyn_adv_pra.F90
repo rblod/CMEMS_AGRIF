@@ -15,16 +15,17 @@ MODULE icedyn_adv_pra
    !!   adv_pra_init    : initialisation of the Prather scheme
    !!   adv_pra_rst     : read/write Prather field in ice restart file, or initialized to zero
    !!----------------------------------------------------------------------
+   USE phycst         ! physical constant
    USE dom_oce        ! ocean domain
    USE ice            ! sea-ice variables
    USE sbc_oce , ONLY : nn_fsbc   ! frequency of sea-ice call
+   USE icevar         ! sea-ice: operations
    !
    USE in_out_manager ! I/O manager
    USE iom            ! I/O manager library
    USE lib_mpp        ! MPP library
    USE lib_fortran    ! fortran utilities (glob_sum + no signed zero)
    USE lbclnk         ! lateral boundary conditions (or mpp links)
-   USE prtctl         ! Print control
 
    IMPLICIT NONE
    PRIVATE
@@ -35,25 +36,24 @@ MODULE icedyn_adv_pra
    ! Moments for advection
    REAL(wp), ALLOCATABLE, SAVE, DIMENSION(:,:,:)   ::   sxice, syice, sxxice, syyice, sxyice   ! ice thickness 
    REAL(wp), ALLOCATABLE, SAVE, DIMENSION(:,:,:)   ::   sxsn , sysn , sxxsn , syysn , sxysn    ! snow thickness
-   REAL(wp), ALLOCATABLE, SAVE, DIMENSION(:,:,:)   ::   sxa  , sya  , sxxa  , syya  , sxya     ! lead fraction
+   REAL(wp), ALLOCATABLE, SAVE, DIMENSION(:,:,:)   ::   sxa  , sya  , sxxa  , syya  , sxya     ! ice concentration
    REAL(wp), ALLOCATABLE, SAVE, DIMENSION(:,:,:)   ::   sxsal, sysal, sxxsal, syysal, sxysal   ! ice salinity
    REAL(wp), ALLOCATABLE, SAVE, DIMENSION(:,:,:)   ::   sxage, syage, sxxage, syyage, sxyage   ! ice age
-   REAL(wp), ALLOCATABLE, SAVE, DIMENSION(:,:)     ::   sxopw, syopw, sxxopw, syyopw, sxyopw   ! open water in sea ice
    REAL(wp), ALLOCATABLE, SAVE, DIMENSION(:,:,:,:) ::   sxc0 , syc0 , sxxc0 , syyc0 , sxyc0    ! snow layers heat content
    REAL(wp), ALLOCATABLE, SAVE, DIMENSION(:,:,:,:) ::   sxe  , sye  , sxxe  , syye  , sxye     ! ice layers heat content
    REAL(wp), ALLOCATABLE, SAVE, DIMENSION(:,:,:)   ::   sxap , syap , sxxap , syyap , sxyap    ! melt pond fraction
    REAL(wp), ALLOCATABLE, SAVE, DIMENSION(:,:,:)   ::   sxvp , syvp , sxxvp , syyvp , sxyvp    ! melt pond volume
 
    !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/ICE 4.0 , NEMO Consortium (2018)
-   !! $Id: icedyn_adv_pra.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: icedyn_adv_pra.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE ice_dyn_adv_pra( kt, pu_ice, pv_ice,  &
+   SUBROUTINE ice_dyn_adv_pra(         kt, pu_ice, pv_ice, ph_i, ph_s, ph_ip,  &
       &                        pato_i, pv_i, pv_s, psv_i, poa_i, pa_i, pa_ip, pv_ip, pe_s, pe_i )
       !!----------------------------------------------------------------------
       !!                **  routine ice_dyn_adv_pra  **
@@ -69,6 +69,9 @@ CONTAINS
       INTEGER                     , INTENT(in   ) ::   kt         ! time step
       REAL(wp), DIMENSION(:,:)    , INTENT(in   ) ::   pu_ice     ! ice i-velocity
       REAL(wp), DIMENSION(:,:)    , INTENT(in   ) ::   pv_ice     ! ice j-velocity
+      REAL(wp), DIMENSION(:,:,:)  , INTENT(in   ) ::   ph_i       ! ice thickness
+      REAL(wp), DIMENSION(:,:,:)  , INTENT(in   ) ::   ph_s       ! snw thickness
+      REAL(wp), DIMENSION(:,:,:)  , INTENT(in   ) ::   ph_ip      ! ice pond thickness
       REAL(wp), DIMENSION(:,:)    , INTENT(inout) ::   pato_i     ! open water area
       REAL(wp), DIMENSION(:,:,:)  , INTENT(inout) ::   pv_i       ! ice volume
       REAL(wp), DIMENSION(:,:,:)  , INTENT(inout) ::   pv_s       ! snw volume
@@ -80,193 +83,198 @@ CONTAINS
       REAL(wp), DIMENSION(:,:,:,:), INTENT(inout) ::   pe_s       ! snw heat content
       REAL(wp), DIMENSION(:,:,:,:), INTENT(inout) ::   pe_i       ! ice heat content
       !
-      INTEGER  ::   jk, jl, jt              ! dummy loop indices
-      INTEGER  ::   initad                  ! number of sub-timestep for the advection
-      REAL(wp) ::   zcfl , zusnit           !   -      -
-      REAL(wp), ALLOCATABLE, DIMENSION(:,:)     ::   zarea
-      REAL(wp), ALLOCATABLE, DIMENSION(:,:,:)   ::   z0opw
-      REAL(wp), ALLOCATABLE, DIMENSION(:,:,:)   ::   z0ice, z0snw, z0ai, z0smi, z0oi
-      REAL(wp), ALLOCATABLE, DIMENSION(:,:,:)   ::   z0ap , z0vp
-      REAL(wp), ALLOCATABLE, DIMENSION(:,:,:,:) ::   z0es
-      REAL(wp), ALLOCATABLE, DIMENSION(:,:,:,:) ::   z0ei
+      INTEGER  ::   ji,jj, jk, jl, jt       ! dummy loop indices
+      INTEGER  ::   icycle                  ! number of sub-timestep for the advection
+      REAL(wp) ::   zdt                     !   -      -
+      REAL(wp), DIMENSION(1)                  ::   zcflprv, zcflnow   ! for global communication
+      REAL(wp), DIMENSION(jpi,jpj)            ::   zati1, zati2
+      REAL(wp), DIMENSION(jpi,jpj)            ::   zudy, zvdx
+      REAL(wp), DIMENSION(jpi,jpj,jpl)        ::   zhi_max, zhs_max, zhip_max
+      REAL(wp), DIMENSION(jpi,jpj,jpl)        ::   zarea
+      REAL(wp), DIMENSION(jpi,jpj,jpl)        ::   z0ice, z0snw, z0ai, z0smi, z0oi
+      REAL(wp), DIMENSION(jpi,jpj,jpl)        ::   z0ap , z0vp
+      REAL(wp), DIMENSION(jpi,jpj,nlay_s,jpl) ::   z0es
+      REAL(wp), DIMENSION(jpi,jpj,nlay_i,jpl) ::   z0ei
       !!----------------------------------------------------------------------
       !
       IF( kt == nit000 .AND. lwp )   WRITE(numout,*) '-- ice_dyn_adv_pra: Prather advection scheme'
       !
-      ALLOCATE( zarea(jpi,jpj)    , z0opw(jpi,jpj, 1 ) , z0ice(jpi,jpj,jpl) , z0snw(jpi,jpj,jpl) ,                       &
-         &      z0ai(jpi,jpj,jpl) , z0smi(jpi,jpj,jpl) , z0oi (jpi,jpj,jpl) , z0ap (jpi,jpj,jpl) , z0vp(jpi,jpj,jpl) ,   &
-         &      z0es (jpi,jpj,nlay_s,jpl), z0ei(jpi,jpj,nlay_i,jpl) )
-      !
-      ! --- If ice drift field is too fast, use an appropriate time step for advection (CFL test for stability) --- !        
-      zcfl  =            MAXVAL( ABS( pu_ice(:,:) ) * rdt_ice * r1_e1u(:,:) )
-      zcfl  = MAX( zcfl, MAXVAL( ABS( pv_ice(:,:) ) * rdt_ice * r1_e2v(:,:) ) )
-      CALL mpp_max( 'icedyn_adv_pra', zcfl )
-      
-      IF( zcfl > 0.5 ) THEN   ;   initad = 2   ;   zusnit = 0.5_wp
-      ELSE                    ;   initad = 1   ;   zusnit = 1.0_wp
-      ENDIF
-      
-      zarea(:,:) = e1e2t(:,:)
-      !-------------------------
-      ! transported fields                                        
-      !-------------------------
-      z0opw(:,:,1) = pato_i(:,:) * e1e2t(:,:)              ! Open water area 
+      ! --- Record max of the surrounding 9-pts ice thick. (for call Hbig) --- !
       DO jl = 1, jpl
-         z0snw(:,:,jl) = pv_s (:,:,  jl) * e1e2t(:,:)     ! Snow volume
-         z0ice(:,:,jl) = pv_i (:,:,  jl) * e1e2t(:,:)     ! Ice  volume
-         z0ai (:,:,jl) = pa_i (:,:,  jl) * e1e2t(:,:)     ! Ice area
-         z0smi(:,:,jl) = psv_i(:,:,  jl) * e1e2t(:,:)     ! Salt content
-         z0oi (:,:,jl) = poa_i(:,:,  jl) * e1e2t(:,:)     ! Age content
-         DO jk = 1, nlay_s
-            z0es(:,:,jk,jl) = pe_s(:,:,jk,jl) * e1e2t(:,:) ! Snow heat content
-         END DO
-         DO jk = 1, nlay_i
-            z0ei(:,:,jk,jl) = pe_i(:,:,jk,jl) * e1e2t(:,:) ! Ice  heat content
-         END DO
-         IF ( ln_pnd_H12 ) THEN
-            z0ap(:,:,jl)  = pa_ip(:,:,jl) * e1e2t(:,:)     ! Melt pond fraction
-            z0vp(:,:,jl)  = pv_ip(:,:,jl) * e1e2t(:,:)     ! Melt pond volume
-         ENDIF
+         DO_2D_00_00
+            zhip_max(ji,jj,jl) = MAX( epsi20, ph_ip(ji,jj,jl), ph_ip(ji+1,jj  ,jl), ph_ip(ji  ,jj+1,jl), &
+               &                                               ph_ip(ji-1,jj  ,jl), ph_ip(ji  ,jj-1,jl), &
+               &                                               ph_ip(ji+1,jj+1,jl), ph_ip(ji-1,jj-1,jl), &
+               &                                               ph_ip(ji+1,jj-1,jl), ph_ip(ji-1,jj+1,jl) )
+            zhi_max (ji,jj,jl) = MAX( epsi20, ph_i (ji,jj,jl), ph_i (ji+1,jj  ,jl), ph_i (ji  ,jj+1,jl), &
+               &                                               ph_i (ji-1,jj  ,jl), ph_i (ji  ,jj-1,jl), &
+               &                                               ph_i (ji+1,jj+1,jl), ph_i (ji-1,jj-1,jl), &
+               &                                               ph_i (ji+1,jj-1,jl), ph_i (ji-1,jj+1,jl) )
+            zhs_max (ji,jj,jl) = MAX( epsi20, ph_s (ji,jj,jl), ph_s (ji+1,jj  ,jl), ph_s (ji  ,jj+1,jl), &
+               &                                               ph_s (ji-1,jj  ,jl), ph_s (ji  ,jj-1,jl), &
+               &                                               ph_s (ji+1,jj+1,jl), ph_s (ji-1,jj-1,jl), &
+               &                                               ph_s (ji+1,jj-1,jl), ph_s (ji-1,jj+1,jl) )
+         END_2D
       END DO
-
-      !                                                    !--------------------------------------------!
-      IF( MOD( ( kt - 1) / nn_fsbc , 2 ) == 0 ) THEN       !==  odd ice time step:  adv_x then adv_y  ==!
-         !                                                 !--------------------------------------------!
-         DO jt = 1, initad
-            CALL adv_x( zusnit, pu_ice, 1._wp, zarea, z0opw (:,:,1), sxopw(:,:),   &             !--- ice open water area
-               &                                      sxxopw(:,:)  , syopw(:,:), syyopw(:,:), sxyopw(:,:)  )
-            CALL adv_y( zusnit, pv_ice, 0._wp, zarea, z0opw (:,:,1), sxopw(:,:),   &
-               &                                      sxxopw(:,:)  , syopw(:,:), syyopw(:,:), sxyopw(:,:)  )
-            DO jl = 1, jpl
-               CALL adv_x( zusnit, pu_ice, 1._wp, zarea, z0ice (:,:,jl), sxice(:,:,jl),   &    !--- ice volume  ---
-                  &                                      sxxice(:,:,jl), syice(:,:,jl), syyice(:,:,jl), sxyice(:,:,jl)  )
-               CALL adv_y( zusnit, pv_ice, 0._wp, zarea, z0ice (:,:,jl), sxice(:,:,jl),   &
-                  &                                      sxxice(:,:,jl), syice(:,:,jl), syyice(:,:,jl), sxyice(:,:,jl)  )
-               CALL adv_x( zusnit, pu_ice, 1._wp, zarea, z0snw (:,:,jl), sxsn (:,:,jl),   &    !--- snow volume  ---
-                  &                                      sxxsn (:,:,jl), sysn (:,:,jl), syysn (:,:,jl), sxysn (:,:,jl)  )
-               CALL adv_y( zusnit, pv_ice, 0._wp, zarea, z0snw (:,:,jl), sxsn (:,:,jl),   &
-                  &                                      sxxsn (:,:,jl), sysn (:,:,jl), syysn (:,:,jl), sxysn (:,:,jl)  )
-               CALL adv_x( zusnit, pu_ice, 1._wp, zarea, z0smi (:,:,jl), sxsal(:,:,jl),   &    !--- ice salinity ---
-                  &                                      sxxsal(:,:,jl), sysal(:,:,jl), syysal(:,:,jl), sxysal(:,:,jl)  )
-               CALL adv_y( zusnit, pv_ice, 0._wp, zarea, z0smi (:,:,jl), sxsal(:,:,jl),   &
-                  &                                      sxxsal(:,:,jl), sysal(:,:,jl), syysal(:,:,jl), sxysal(:,:,jl)  )
-               CALL adv_x( zusnit, pu_ice, 1._wp, zarea, z0oi  (:,:,jl), sxage(:,:,jl),   &    !--- ice age      ---     
-                  &                                      sxxage(:,:,jl), syage(:,:,jl), syyage(:,:,jl), sxyage(:,:,jl)  )
-               CALL adv_y( zusnit, pv_ice, 0._wp, zarea, z0oi  (:,:,jl), sxage(:,:,jl),   &
-                  &                                      sxxage(:,:,jl), syage(:,:,jl), syyage(:,:,jl), sxyage(:,:,jl)  )
-               CALL adv_x( zusnit, pu_ice, 1._wp, zarea, z0ai  (:,:,jl), sxa  (:,:,jl),   &    !--- ice concentrations ---
-                  &                                      sxxa  (:,:,jl), sya  (:,:,jl), syya  (:,:,jl), sxya  (:,:,jl)  )
-               CALL adv_y( zusnit, pv_ice, 0._wp, zarea, z0ai  (:,:,jl), sxa  (:,:,jl),   & 
-                  &                                      sxxa  (:,:,jl), sya  (:,:,jl), syya  (:,:,jl), sxya  (:,:,jl)  )
-               DO jk = 1, nlay_s                                                               !--- snow heat contents ---
-                  CALL adv_x( zusnit, pu_ice, 1._wp, zarea, z0es (:,:,jk,jl), sxc0(:,:,jk,jl),   &
-                     &                                      sxxc0(:,:,jk,jl), syc0(:,:,jk,jl), syyc0(:,:,jk,jl), sxyc0(:,:,jk,jl) )
-                  CALL adv_y( zusnit, pv_ice, 0._wp, zarea, z0es (:,:,jk,jl), sxc0(:,:,jk,jl),   &
-                     &                                      sxxc0(:,:,jk,jl), syc0(:,:,jk,jl), syyc0(:,:,jk,jl), sxyc0(:,:,jk,jl) )
-               END DO
-               DO jk = 1, nlay_i                                                               !--- ice heat contents ---
-                  CALL adv_x( zusnit, pu_ice, 1._wp, zarea, z0ei(:,:,jk,jl), sxe(:,:,jk,jl),   & 
-                     &                                      sxxe(:,:,jk,jl), sye(:,:,jk,jl), syye(:,:,jk,jl), sxye(:,:,jk,jl) )
-                  CALL adv_y( zusnit, pv_ice, 0._wp, zarea, z0ei(:,:,jk,jl), sxe(:,:,jk,jl),   & 
-                     &                                      sxxe(:,:,jk,jl), sye(:,:,jk,jl), syye(:,:,jk,jl), sxye(:,:,jk,jl) )
-               END DO
-               IF ( ln_pnd_H12 ) THEN
-                  CALL adv_x( zusnit, pu_ice, 1._wp, zarea, z0ap  (:,:,jl), sxap (:,:,jl),   &    !--- melt pond fraction --
-                     &                                      sxxap (:,:,jl), syap (:,:,jl), syyap (:,:,jl), sxyap (:,:,jl)  )
-                  CALL adv_y( zusnit, pv_ice, 0._wp, zarea, z0ap  (:,:,jl), sxap (:,:,jl),   & 
-                     &                                      sxxap (:,:,jl), syap (:,:,jl), syyap (:,:,jl), sxyap (:,:,jl)  )
-                  CALL adv_x( zusnit, pu_ice, 1._wp, zarea, z0vp  (:,:,jl), sxvp (:,:,jl),   &    !--- melt pond volume   --
-                     &                                      sxxvp (:,:,jl), syvp (:,:,jl), syyvp (:,:,jl), sxyvp (:,:,jl)  )
-                  CALL adv_y( zusnit, pv_ice, 0._wp, zarea, z0vp  (:,:,jl), sxvp (:,:,jl),   & 
-                     &                                      sxxvp (:,:,jl), syvp (:,:,jl), syyvp (:,:,jl), sxyvp (:,:,jl)  )
-               ENDIF
-            END DO
-         END DO
-      !                                                    !--------------------------------------------!
-      ELSE                                                 !== even ice time step:  adv_y then adv_x  ==!
-         !                                                 !--------------------------------------------!
-         DO jt = 1, initad
-            CALL adv_y( zusnit, pv_ice, 1._wp, zarea, z0opw (:,:,1), sxopw(:,:),   &             !--- ice open water area
-               &                                      sxxopw(:,:)  , syopw(:,:), syyopw(:,:), sxyopw(:,:)  )
-            CALL adv_x( zusnit, pu_ice, 0._wp, zarea, z0opw (:,:,1), sxopw(:,:),   &
-               &                                      sxxopw(:,:)  , syopw(:,:), syyopw(:,:), sxyopw(:,:)  )
-            DO jl = 1, jpl
-               CALL adv_y( zusnit, pv_ice, 1._wp, zarea, z0ice (:,:,jl), sxice(:,:,jl),   &    !--- ice volume  ---
-                  &                                      sxxice(:,:,jl), syice(:,:,jl), syyice(:,:,jl), sxyice(:,:,jl)  )
-               CALL adv_x( zusnit, pu_ice, 0._wp, zarea, z0ice (:,:,jl), sxice(:,:,jl),   &
-                  &                                      sxxice(:,:,jl), syice(:,:,jl), syyice(:,:,jl), sxyice(:,:,jl)  )
-               CALL adv_y( zusnit, pv_ice, 1._wp, zarea, z0snw (:,:,jl), sxsn (:,:,jl),   &    !--- snow volume  ---
-                  &                                      sxxsn (:,:,jl), sysn (:,:,jl), syysn (:,:,jl), sxysn (:,:,jl)  )
-               CALL adv_x( zusnit, pu_ice, 0._wp, zarea, z0snw (:,:,jl), sxsn (:,:,jl),   &
-                  &                                      sxxsn (:,:,jl), sysn (:,:,jl), syysn (:,:,jl), sxysn (:,:,jl)  )
-               CALL adv_y( zusnit, pv_ice, 1._wp, zarea, z0smi (:,:,jl), sxsal(:,:,jl),   &    !--- ice salinity ---
-                  &                                      sxxsal(:,:,jl), sysal(:,:,jl), syysal(:,:,jl), sxysal(:,:,jl)  )
-               CALL adv_x( zusnit, pu_ice, 0._wp, zarea, z0smi (:,:,jl), sxsal(:,:,jl),   &
-                  &                                      sxxsal(:,:,jl), sysal(:,:,jl), syysal(:,:,jl), sxysal(:,:,jl)  )
-               CALL adv_y( zusnit, pv_ice, 1._wp, zarea, z0oi  (:,:,jl), sxage(:,:,jl),   &   !--- ice age      ---
-                  &                                      sxxage(:,:,jl), syage(:,:,jl), syyage(:,:,jl), sxyage(:,:,jl)  )
-               CALL adv_x( zusnit, pu_ice, 0._wp, zarea, z0oi  (:,:,jl), sxage(:,:,jl),   &
-                  &                                      sxxage(:,:,jl), syage(:,:,jl), syyage(:,:,jl), sxyage(:,:,jl)  )
-               CALL adv_y( zusnit, pv_ice, 1._wp, zarea, z0ai  (:,:,jl), sxa  (:,:,jl),   &   !--- ice concentrations ---
-                  &                                      sxxa  (:,:,jl), sya  (:,:,jl), syya  (:,:,jl), sxya  (:,:,jl)  )
-               CALL adv_x( zusnit, pu_ice, 0._wp, zarea, z0ai  (:,:,jl), sxa  (:,:,jl),   &
-                  &                                      sxxa  (:,:,jl), sya  (:,:,jl), syya  (:,:,jl), sxya  (:,:,jl)  )
-               DO jk = 1, nlay_s                                                             !--- snow heat contents ---
-                  CALL adv_y( zusnit, pv_ice, 1._wp, zarea, z0es (:,:,jk,jl), sxc0(:,:,jk,jl),   &
-                     &                                      sxxc0(:,:,jk,jl), syc0(:,:,jk,jl), syyc0(:,:,jk,jl), sxyc0(:,:,jk,jl) )
-                  CALL adv_x( zusnit, pu_ice, 0._wp, zarea, z0es (:,:,jk,jl), sxc0(:,:,jk,jl),   &
-                     &                                      sxxc0(:,:,jk,jl), syc0(:,:,jk,jl), syyc0(:,:,jk,jl), sxyc0(:,:,jk,jl) )
-               END DO
-               DO jk = 1, nlay_i                                                             !--- ice heat contents ---
-                  CALL adv_y( zusnit, pv_ice, 1._wp, zarea, z0ei(:,:,jk,jl), sxe(:,:,jk,jl),   & 
-                     &                                      sxxe(:,:,jk,jl), sye(:,:,jk,jl), syye(:,:,jk,jl), sxye(:,:,jk,jl) )
-                  CALL adv_x( zusnit, pu_ice, 0._wp, zarea, z0ei(:,:,jk,jl), sxe(:,:,jk,jl),   & 
-                     &                                      sxxe(:,:,jk,jl), sye(:,:,jk,jl), syye(:,:,jk,jl), sxye(:,:,jk,jl) )
-               END DO
-               IF ( ln_pnd_H12 ) THEN
-                  CALL adv_y( zusnit, pv_ice, 1._wp, zarea, z0ap  (:,:,jl), sxap (:,:,jl),   &   !--- melt pond fraction ---
-                     &                                      sxxap (:,:,jl), syap (:,:,jl), syyap (:,:,jl), sxyap (:,:,jl)  )
-                  CALL adv_x( zusnit, pu_ice, 0._wp, zarea, z0ap  (:,:,jl), sxap (:,:,jl),   &
-                     &                                      sxxap (:,:,jl), syap (:,:,jl), syyap (:,:,jl), sxyap (:,:,jl)  )
-                  CALL adv_y( zusnit, pv_ice, 1._wp, zarea, z0vp  (:,:,jl), sxvp (:,:,jl),   &   !--- melt pond volume   ---
-                     &                                      sxxvp (:,:,jl), syvp (:,:,jl), syyvp (:,:,jl), sxyvp (:,:,jl)  )
-                  CALL adv_x( zusnit, pu_ice, 0._wp, zarea, z0vp  (:,:,jl), sxvp (:,:,jl),   &
-                     &                                      sxxvp (:,:,jl), syvp (:,:,jl), syyvp (:,:,jl), sxyvp (:,:,jl)  )
-               ENDIF
-            END DO
-         END DO
-      ENDIF
-
-      !-------------------------------------------
-      ! Recover the properties from their contents
-      !-------------------------------------------
-      pato_i(:,:) = z0opw(:,:,1) * r1_e1e2t(:,:) * tmask(:,:,1)
-      DO jl = 1, jpl
-         pv_i (:,:,  jl) = z0ice(:,:,jl) * r1_e1e2t(:,:) * tmask(:,:,1)
-         pv_s (:,:,  jl) = z0snw(:,:,jl) * r1_e1e2t(:,:) * tmask(:,:,1)
-         psv_i(:,:,  jl) = z0smi(:,:,jl) * r1_e1e2t(:,:) * tmask(:,:,1)
-         poa_i(:,:,  jl) = z0oi (:,:,jl) * r1_e1e2t(:,:) * tmask(:,:,1)
-         pa_i (:,:,  jl) = z0ai (:,:,jl) * r1_e1e2t(:,:) * tmask(:,:,1)
-         DO jk = 1, nlay_s
-            pe_s(:,:,jk,jl) = z0es(:,:,jk,jl) * r1_e1e2t(:,:) * tmask(:,:,1)
-         END DO
-         DO jk = 1, nlay_i
-            pe_i(:,:,jk,jl) = z0ei(:,:,jk,jl) * r1_e1e2t(:,:) * tmask(:,:,1)
-         END DO
-         IF ( ln_pnd_H12 ) THEN
-            pa_ip  (:,:,jl) = z0ap (:,:,jl) * r1_e1e2t(:,:) * tmask(:,:,1)
-            pv_ip  (:,:,jl) = z0vp (:,:,jl) * r1_e1e2t(:,:) * tmask(:,:,1)
-         ENDIF
-      END DO
+      CALL lbc_lnk_multi( 'icedyn_adv_pra', zhi_max, 'T', 1., zhs_max, 'T', 1., zhip_max, 'T', 1. )
       !
-      DEALLOCATE( zarea , z0opw , z0ice, z0snw , z0ai , z0smi , z0oi , z0ap , z0vp , z0es, z0ei )
+      ! --- If ice drift is too fast, use  subtime steps for advection (CFL test for stability) --- !
+      !        Note: the advection split is applied at the next time-step in order to avoid blocking global comm.
+      !              this should not affect too much the stability
+      zcflnow(1) =                  MAXVAL( ABS( pu_ice(:,:) ) * rDt_ice * r1_e1u(:,:) )
+      zcflnow(1) = MAX( zcflnow(1), MAXVAL( ABS( pv_ice(:,:) ) * rDt_ice * r1_e2v(:,:) ) )
+      
+      ! non-blocking global communication send zcflnow and receive zcflprv
+      CALL mpp_delay_max( 'icedyn_adv_pra', 'cflice', zcflnow(:), zcflprv(:), kt == nitend - nn_fsbc + 1 )
+
+      IF( zcflprv(1) > .5 ) THEN   ;   icycle = 2
+      ELSE                         ;   icycle = 1
+      ENDIF
+      zdt = rDt_ice / REAL(icycle)
+      
+      ! --- transport --- !
+      zudy(:,:) = pu_ice(:,:) * e2u(:,:)
+      zvdx(:,:) = pv_ice(:,:) * e1v(:,:)
+
+      DO jt = 1, icycle
+
+         ! record at_i before advection (for open water)
+         zati1(:,:) = SUM( pa_i(:,:,:), dim=3 )
+         
+         ! --- transported fields --- !                                        
+         DO jl = 1, jpl
+            zarea(:,:,jl) = e1e2t(:,:)
+            z0snw(:,:,jl) = pv_s (:,:,jl) * e1e2t(:,:)        ! Snow volume
+            z0ice(:,:,jl) = pv_i (:,:,jl) * e1e2t(:,:)        ! Ice  volume
+            z0ai (:,:,jl) = pa_i (:,:,jl) * e1e2t(:,:)        ! Ice area
+            z0smi(:,:,jl) = psv_i(:,:,jl) * e1e2t(:,:)        ! Salt content
+            z0oi (:,:,jl) = poa_i(:,:,jl) * e1e2t(:,:)        ! Age content
+            DO jk = 1, nlay_s
+               z0es(:,:,jk,jl) = pe_s(:,:,jk,jl) * e1e2t(:,:) ! Snow heat content
+            END DO
+            DO jk = 1, nlay_i
+               z0ei(:,:,jk,jl) = pe_i(:,:,jk,jl) * e1e2t(:,:) ! Ice  heat content
+            END DO
+            IF ( ln_pnd_H12 ) THEN
+               z0ap(:,:,jl)  = pa_ip(:,:,jl) * e1e2t(:,:)     ! Melt pond fraction
+               z0vp(:,:,jl)  = pv_ip(:,:,jl) * e1e2t(:,:)     ! Melt pond volume
+            ENDIF
+         END DO
+         !
+         !                                                                  !--------------------------------------------!
+         IF( MOD( (kt - 1) / nn_fsbc , 2 ) ==  MOD( (jt - 1) , 2 ) ) THEN   !==  odd ice time step:  adv_x then adv_y  ==!
+            !                                                               !--------------------------------------------!
+            CALL adv_x( zdt , zudy , 1._wp , zarea , z0ice , sxice , sxxice , syice , syyice , sxyice ) !--- ice volume
+            CALL adv_y( zdt , zvdx , 0._wp , zarea , z0ice , sxice , sxxice , syice , syyice , sxyice )
+            CALL adv_x( zdt , zudy , 1._wp , zarea , z0snw , sxsn  , sxxsn  , sysn  , syysn  , sxysn  ) !--- snow volume
+            CALL adv_y( zdt , zvdx , 0._wp , zarea , z0snw , sxsn  , sxxsn  , sysn  , syysn  , sxysn  )
+            CALL adv_x( zdt , zudy , 1._wp , zarea , z0smi , sxsal , sxxsal , sysal , syysal , sxysal ) !--- ice salinity
+            CALL adv_y( zdt , zvdx , 0._wp , zarea , z0smi , sxsal , sxxsal , sysal , syysal , sxysal )
+            CALL adv_x( zdt , zudy , 1._wp , zarea , z0ai  , sxa   , sxxa   , sya   , syya   , sxya   ) !--- ice concentration
+            CALL adv_y( zdt , zvdx , 0._wp , zarea , z0ai  , sxa   , sxxa   , sya   , syya   , sxya   )
+            CALL adv_x( zdt , zudy , 1._wp , zarea , z0oi  , sxage , sxxage , syage , syyage , sxyage ) !--- ice age
+            CALL adv_y( zdt , zvdx , 0._wp , zarea , z0oi  , sxage , sxxage , syage , syyage , sxyage )
+            !
+            DO jk = 1, nlay_s                                                                           !--- snow heat content
+               CALL adv_x( zdt, zudy, 1._wp, zarea, z0es (:,:,jk,:), sxc0(:,:,jk,:),   &
+                  &                                 sxxc0(:,:,jk,:), syc0(:,:,jk,:), syyc0(:,:,jk,:), sxyc0(:,:,jk,:) )
+               CALL adv_y( zdt, zvdx, 0._wp, zarea, z0es (:,:,jk,:), sxc0(:,:,jk,:),   &
+                  &                                 sxxc0(:,:,jk,:), syc0(:,:,jk,:), syyc0(:,:,jk,:), sxyc0(:,:,jk,:) )
+            END DO
+            DO jk = 1, nlay_i                                                                           !--- ice heat content
+               CALL adv_x( zdt, zudy, 1._wp, zarea, z0ei(:,:,jk,:), sxe(:,:,jk,:),   & 
+                  &                                 sxxe(:,:,jk,:), sye(:,:,jk,:), syye(:,:,jk,:), sxye(:,:,jk,:) )
+               CALL adv_y( zdt, zvdx, 0._wp, zarea, z0ei(:,:,jk,:), sxe(:,:,jk,:),   & 
+                  &                                 sxxe(:,:,jk,:), sye(:,:,jk,:), syye(:,:,jk,:), sxye(:,:,jk,:) )
+            END DO
+            !
+            IF ( ln_pnd_H12 ) THEN
+               CALL adv_x( zdt , zudy , 1._wp , zarea , z0ap , sxap , sxxap , syap , syyap , sxyap )    !--- melt pond fraction
+               CALL adv_y( zdt , zvdx , 0._wp , zarea , z0ap , sxap , sxxap , syap , syyap , sxyap ) 
+               CALL adv_x( zdt , zudy , 1._wp , zarea , z0vp , sxvp , sxxvp , syvp , syyvp , sxyvp )    !--- melt pond volume
+               CALL adv_y( zdt , zvdx , 0._wp , zarea , z0vp , sxvp , sxxvp , syvp , syyvp , sxyvp ) 
+            ENDIF
+            !                                                               !--------------------------------------------!
+         ELSE                                                               !== even ice time step:  adv_y then adv_x  ==!
+            !                                                               !--------------------------------------------!
+            CALL adv_y( zdt , zvdx , 1._wp , zarea , z0ice , sxice , sxxice , syice , syyice , sxyice ) !--- ice volume
+            CALL adv_x( zdt , zudy , 0._wp , zarea , z0ice , sxice , sxxice , syice , syyice , sxyice )
+            CALL adv_y( zdt , zvdx , 1._wp , zarea , z0snw , sxsn  , sxxsn  , sysn  , syysn  , sxysn  ) !--- snow volume
+            CALL adv_x( zdt , zudy , 0._wp , zarea , z0snw , sxsn  , sxxsn  , sysn  , syysn  , sxysn  )
+            CALL adv_y( zdt , zvdx , 1._wp , zarea , z0smi , sxsal , sxxsal , sysal , syysal , sxysal ) !--- ice salinity
+            CALL adv_x( zdt , zudy , 0._wp , zarea , z0smi , sxsal , sxxsal , sysal , syysal , sxysal )
+            CALL adv_y( zdt , zvdx , 1._wp , zarea , z0ai  , sxa   , sxxa   , sya   , syya   , sxya   ) !--- ice concentration
+            CALL adv_x( zdt , zudy , 0._wp , zarea , z0ai  , sxa   , sxxa   , sya   , syya   , sxya   )
+            CALL adv_y( zdt , zvdx , 1._wp , zarea , z0oi  , sxage , sxxage , syage , syyage , sxyage ) !--- ice age
+            CALL adv_x( zdt , zudy , 0._wp , zarea , z0oi  , sxage , sxxage , syage , syyage , sxyage )
+            DO jk = 1, nlay_s                                                                           !--- snow heat content
+               CALL adv_y( zdt, zvdx, 1._wp, zarea, z0es (:,:,jk,:), sxc0(:,:,jk,:),   &
+                  &                                 sxxc0(:,:,jk,:), syc0(:,:,jk,:), syyc0(:,:,jk,:), sxyc0(:,:,jk,:) )
+               CALL adv_x( zdt, zudy, 0._wp, zarea, z0es (:,:,jk,:), sxc0(:,:,jk,:),   &
+                  &                                 sxxc0(:,:,jk,:), syc0(:,:,jk,:), syyc0(:,:,jk,:), sxyc0(:,:,jk,:) )
+            END DO
+            DO jk = 1, nlay_i                                                                           !--- ice heat content
+               CALL adv_y( zdt, zvdx, 1._wp, zarea, z0ei(:,:,jk,:), sxe(:,:,jk,:),   & 
+                  &                                 sxxe(:,:,jk,:), sye(:,:,jk,:), syye(:,:,jk,:), sxye(:,:,jk,:) )
+               CALL adv_x( zdt, zudy, 0._wp, zarea, z0ei(:,:,jk,:), sxe(:,:,jk,:),   & 
+                  &                                 sxxe(:,:,jk,:), sye(:,:,jk,:), syye(:,:,jk,:), sxye(:,:,jk,:) )
+            END DO
+            IF ( ln_pnd_H12 ) THEN
+               CALL adv_y( zdt , zvdx , 1._wp , zarea , z0ap , sxap , sxxap , syap , syyap , sxyap )    !--- melt pond fraction
+               CALL adv_x( zdt , zudy , 0._wp , zarea , z0ap , sxap , sxxap , syap , syyap , sxyap )
+               CALL adv_y( zdt , zvdx , 1._wp , zarea , z0vp , sxvp , sxxvp , syvp , syyvp , sxyvp )    !--- melt pond volume
+               CALL adv_x( zdt , zudy , 0._wp , zarea , z0vp , sxvp , sxxvp , syvp , syyvp , sxyvp )
+            ENDIF
+            !
+         ENDIF
+
+         ! --- Recover the properties from their contents --- !
+         DO jl = 1, jpl
+            pv_i (:,:,jl) = z0ice(:,:,jl) * r1_e1e2t(:,:) * tmask(:,:,1)
+            pv_s (:,:,jl) = z0snw(:,:,jl) * r1_e1e2t(:,:) * tmask(:,:,1)
+            psv_i(:,:,jl) = z0smi(:,:,jl) * r1_e1e2t(:,:) * tmask(:,:,1)
+            poa_i(:,:,jl) = z0oi (:,:,jl) * r1_e1e2t(:,:) * tmask(:,:,1)
+            pa_i (:,:,jl) = z0ai (:,:,jl) * r1_e1e2t(:,:) * tmask(:,:,1)
+            DO jk = 1, nlay_s
+               pe_s(:,:,jk,jl) = z0es(:,:,jk,jl) * r1_e1e2t(:,:) * tmask(:,:,1)
+            END DO
+            DO jk = 1, nlay_i
+               pe_i(:,:,jk,jl) = z0ei(:,:,jk,jl) * r1_e1e2t(:,:) * tmask(:,:,1)
+            END DO
+            IF ( ln_pnd_H12 ) THEN
+               pa_ip(:,:,jl) = z0ap(:,:,jl) * r1_e1e2t(:,:) * tmask(:,:,1)
+               pv_ip(:,:,jl) = z0vp(:,:,jl) * r1_e1e2t(:,:) * tmask(:,:,1)
+            ENDIF
+         END DO
+         !
+         ! derive open water from ice concentration
+         zati2(:,:) = SUM( pa_i(:,:,:), dim=3 )
+         DO_2D_00_00
+            pato_i(ji,jj) = pato_i(ji,jj) - ( zati2(ji,jj) - zati1(ji,jj) ) &                        !--- open water
+               &                          - ( zudy(ji,jj) - zudy(ji-1,jj) + zvdx(ji,jj) - zvdx(ji,jj-1) ) * r1_e1e2t(ji,jj) * zdt
+         END_2D
+         CALL lbc_lnk( 'icedyn_adv_pra', pato_i, 'T',  1. )
+         !
+         ! --- Ensure non-negative fields --- !
+         !     Remove negative values (conservation is ensured)
+         !     (because advected fields are not perfectly bounded and tiny negative values can occur, e.g. -1.e-20)
+         CALL ice_var_zapneg( zdt, pato_i, pv_i, pv_s, psv_i, poa_i, pa_i, pa_ip, pv_ip, pe_s, pe_i )
+         !
+         ! --- Make sure ice thickness is not too big --- !
+         !     (because ice thickness can be too large where ice concentration is very small)
+         CALL Hbig( zdt, zhi_max, zhs_max, zhip_max, pv_i, pv_s, pa_i, pa_ip, pv_ip, pe_s )
+         !
+         ! --- Ensure snow load is not too big --- !
+         CALL Hsnow( zdt, pv_i, pv_s, pa_i, pa_ip, pe_s )
+         !
+      END DO
       !
       IF( lrst_ice )   CALL adv_pra_rst( 'WRITE', kt )   !* write Prather fields in the restart file
       !
    END SUBROUTINE ice_dyn_adv_pra
    
    
-   SUBROUTINE adv_x( pdf, put , pcrh, psm , ps0 ,   &
+   SUBROUTINE adv_x( pdt, put , pcrh, psm , ps0 ,   &
       &              psx, psxx, psy , psyy, psxy )
       !!----------------------------------------------------------------------
       !!                **  routine adv_x  **
@@ -274,79 +282,75 @@ CONTAINS
       !! ** purpose :   Computes and adds the advection trend to sea-ice
       !!                variable on x axis
       !!----------------------------------------------------------------------
-      REAL(wp)                    , INTENT(in   ) ::   pdf                ! reduction factor for the time step
-      REAL(wp)                    , INTENT(in   ) ::   pcrh               ! call adv_x then adv_y (=1) or the opposite (=0)
-      REAL(wp), DIMENSION(jpi,jpj), INTENT(in   ) ::   put                ! i-direction ice velocity at U-point [m/s]
-      REAL(wp), DIMENSION(jpi,jpj), INTENT(inout) ::   psm                ! area
-      REAL(wp), DIMENSION(jpi,jpj), INTENT(inout) ::   ps0                ! field to be advected
-      REAL(wp), DIMENSION(jpi,jpj), INTENT(inout) ::   psx , psy          ! 1st moments 
-      REAL(wp), DIMENSION(jpi,jpj), INTENT(inout) ::   psxx, psyy, psxy   ! 2nd moments
+      REAL(wp)                  , INTENT(in   ) ::   pdt                ! the time step
+      REAL(wp)                  , INTENT(in   ) ::   pcrh               ! call adv_x then adv_y (=1) or the opposite (=0)
+      REAL(wp), DIMENSION(:,:)  , INTENT(in   ) ::   put                ! i-direction ice velocity at U-point [m/s]
+      REAL(wp), DIMENSION(:,:,:), INTENT(inout) ::   psm                ! area
+      REAL(wp), DIMENSION(:,:,:), INTENT(inout) ::   ps0                ! field to be advected
+      REAL(wp), DIMENSION(:,:,:), INTENT(inout) ::   psx , psy          ! 1st moments 
+      REAL(wp), DIMENSION(:,:,:), INTENT(inout) ::   psxx, psyy, psxy   ! 2nd moments
       !! 
-      INTEGER  ::   ji, jj                               ! dummy loop indices
-      REAL(wp) ::   zs1max, zrdt, zslpmax, ztemp         ! local scalars
+      INTEGER  ::   ji, jj, jl, jcat                     ! dummy loop indices
+      REAL(wp) ::   zs1max, zslpmax, ztemp               ! local scalars
       REAL(wp) ::   zs1new, zalf , zalfq , zbt           !   -      -
       REAL(wp) ::   zs2new, zalf1, zalf1q, zbt1          !   -      -
       REAL(wp), DIMENSION(jpi,jpj) ::   zf0 , zfx  , zfy   , zbet   ! 2D workspace
       REAL(wp), DIMENSION(jpi,jpj) ::   zfm , zfxx , zfyy  , zfxy   !  -      -
       REAL(wp), DIMENSION(jpi,jpj) ::   zalg, zalg1, zalg1q         !  -      -
       !-----------------------------------------------------------------------
-
-      ! Limitation of moments.                                           
-
-      zrdt = rdt_ice * pdf      ! If ice drift field is too fast, use an appropriate time step for advection.
-
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-            zslpmax = MAX( 0._wp, ps0(ji,jj) )
+      !
+      jcat = SIZE( ps0 , 3 )   ! size of input arrays
+      !
+      DO jl = 1, jcat   ! loop on categories
+         !
+         ! Limitation of moments.                                           
+         DO_2D_00_11
+            !  Initialize volumes of boxes  (=area if adv_x first called, =psm otherwise)                                     
+            psm (ji,jj,jl) = MAX( pcrh * e1e2t(ji,jj) + ( 1.0 - pcrh ) * psm(ji,jj,jl) , epsi20 )
+            !
+            zslpmax = MAX( 0._wp, ps0(ji,jj,jl) )
             zs1max  = 1.5 * zslpmax
-            zs1new  = MIN( zs1max, MAX( -zs1max, psx(ji,jj) ) )
+            zs1new  = MIN( zs1max, MAX( -zs1max, psx(ji,jj,jl) ) )
             zs2new  = MIN(  2.0 * zslpmax - 0.3334 * ABS( zs1new ),      &
-               &            MAX( ABS( zs1new ) - zslpmax, psxx(ji,jj) )  )
+               &            MAX( ABS( zs1new ) - zslpmax, psxx(ji,jj,jl) )  )
             rswitch = ( 1.0 - MAX( 0._wp, SIGN( 1._wp, -zslpmax) ) ) * tmask(ji,jj,1)   ! Case of empty boxes & Apply mask
 
-            ps0 (ji,jj) = zslpmax  
-            psx (ji,jj) = zs1new      * rswitch
-            psxx(ji,jj) = zs2new      * rswitch
-            psy (ji,jj) = psy (ji,jj) * rswitch
-            psyy(ji,jj) = psyy(ji,jj) * rswitch
-            psxy(ji,jj) = MIN( zslpmax, MAX( -zslpmax, psxy(ji,jj) ) ) * rswitch
-         END DO
-      END DO
+            ps0 (ji,jj,jl) = zslpmax  
+            psx (ji,jj,jl) = zs1new         * rswitch
+            psxx(ji,jj,jl) = zs2new         * rswitch
+            psy (ji,jj,jl) = psy (ji,jj,jl) * rswitch
+            psyy(ji,jj,jl) = psyy(ji,jj,jl) * rswitch
+            psxy(ji,jj,jl) = MIN( zslpmax, MAX( -zslpmax, psxy(ji,jj,jl) ) ) * rswitch
+         END_2D
 
-      !  Initialize volumes of boxes  (=area if adv_x first called, =psm otherwise)                                     
-      psm (:,:)  = MAX( pcrh * e1e2t(:,:) + ( 1.0 - pcrh ) * psm(:,:) , epsi20 )
-
-      !  Calculate fluxes and moments between boxes i<-->i+1              
-      DO jj = 1, jpj                      !  Flux from i to i+1 WHEN u GT 0 
-         DO ji = 1, jpi
+         !  Calculate fluxes and moments between boxes i<-->i+1              
+         DO_2D_00_11
             zbet(ji,jj)  =  MAX( 0._wp, SIGN( 1._wp, put(ji,jj) ) )
-            zalf         =  MAX( 0._wp, put(ji,jj) ) * zrdt * e2u(ji,jj) / psm(ji,jj)
+            zalf         =  MAX( 0._wp, put(ji,jj) ) * pdt / psm(ji,jj,jl)
             zalfq        =  zalf * zalf
             zalf1        =  1.0 - zalf
             zalf1q       =  zalf1 * zalf1
             !
-            zfm (ji,jj)  =  zalf  *   psm (ji,jj)
-            zf0 (ji,jj)  =  zalf  * ( ps0 (ji,jj) + zalf1 * ( psx(ji,jj) + (zalf1 - zalf) * psxx(ji,jj) )  )
-            zfx (ji,jj)  =  zalfq * ( psx (ji,jj) + 3.0 * zalf1 * psxx(ji,jj) )
-            zfxx(ji,jj)  =  zalf  *   psxx(ji,jj) * zalfq
-            zfy (ji,jj)  =  zalf  * ( psy (ji,jj) + zalf1 * psxy(ji,jj) )
-            zfxy(ji,jj)  =  zalfq *   psxy(ji,jj)
-            zfyy(ji,jj)  =  zalf  *   psyy(ji,jj)
+            zfm (ji,jj)  =  zalf  *   psm (ji,jj,jl)
+            zf0 (ji,jj)  =  zalf  * ( ps0 (ji,jj,jl) + zalf1 * ( psx(ji,jj,jl) + (zalf1 - zalf) * psxx(ji,jj,jl) ) )
+            zfx (ji,jj)  =  zalfq * ( psx (ji,jj,jl) + 3.0 * zalf1 * psxx(ji,jj,jl) )
+            zfxx(ji,jj)  =  zalf  *   psxx(ji,jj,jl) * zalfq
+            zfy (ji,jj)  =  zalf  * ( psy (ji,jj,jl) + zalf1 * psxy(ji,jj,jl) )
+            zfxy(ji,jj)  =  zalfq *   psxy(ji,jj,jl)
+            zfyy(ji,jj)  =  zalf  *   psyy(ji,jj,jl)
 
             !  Readjust moments remaining in the box.
-            psm (ji,jj)  =  psm (ji,jj) - zfm(ji,jj)
-            ps0 (ji,jj)  =  ps0 (ji,jj) - zf0(ji,jj)
-            psx (ji,jj)  =  zalf1q * ( psx(ji,jj) - 3.0 * zalf * psxx(ji,jj) )
-            psxx(ji,jj)  =  zalf1  * zalf1q * psxx(ji,jj)
-            psy (ji,jj)  =  psy (ji,jj) - zfy(ji,jj)
-            psyy(ji,jj)  =  psyy(ji,jj) - zfyy(ji,jj)
-            psxy(ji,jj)  =  zalf1q * psxy(ji,jj)
-         END DO
-      END DO
+            psm (ji,jj,jl)  =  psm (ji,jj,jl) - zfm(ji,jj)
+            ps0 (ji,jj,jl)  =  ps0 (ji,jj,jl) - zf0(ji,jj)
+            psx (ji,jj,jl)  =  zalf1q * ( psx(ji,jj,jl) - 3.0 * zalf * psxx(ji,jj,jl) )
+            psxx(ji,jj,jl)  =  zalf1  * zalf1q * psxx(ji,jj,jl)
+            psy (ji,jj,jl)  =  psy (ji,jj,jl) - zfy(ji,jj)
+            psyy(ji,jj,jl)  =  psyy(ji,jj,jl) - zfyy(ji,jj)
+            psxy(ji,jj,jl)  =  zalf1q * psxy(ji,jj,jl)
+         END_2D
 
-      DO jj = 1, jpjm1                      !  Flux from i+1 to i when u LT 0.
-         DO ji = 1, fs_jpim1
-            zalf          = MAX( 0._wp, -put(ji,jj) ) * zrdt * e2u(ji,jj) / psm(ji+1,jj) 
+         DO_2D_00_10
+            zalf          = MAX( 0._wp, -put(ji,jj) ) * pdt / psm(ji+1,jj,jl) 
             zalg  (ji,jj) = zalf
             zalfq         = zalf * zalf
             zalf1         = 1.0 - zalf
@@ -354,92 +358,80 @@ CONTAINS
             zalf1q        = zalf1 * zalf1
             zalg1q(ji,jj) = zalf1q
             !
-            zfm   (ji,jj) = zfm (ji,jj) + zalf  *   psm (ji+1,jj)
-            zf0   (ji,jj) = zf0 (ji,jj) + zalf  * ( ps0 (ji+1,jj) - zalf1 * ( psx(ji+1,jj) - (zalf1 - zalf ) * psxx(ji+1,jj) ) )
-            zfx   (ji,jj) = zfx (ji,jj) + zalfq * ( psx (ji+1,jj) - 3.0 * zalf1 * psxx(ji+1,jj) )
-            zfxx  (ji,jj) = zfxx(ji,jj) + zalf  *   psxx(ji+1,jj) * zalfq
-            zfy   (ji,jj) = zfy (ji,jj) + zalf  * ( psy (ji+1,jj) - zalf1 * psxy(ji+1,jj) )
-            zfxy  (ji,jj) = zfxy(ji,jj) + zalfq *   psxy(ji+1,jj)
-            zfyy  (ji,jj) = zfyy(ji,jj) + zalf  *   psyy(ji+1,jj)
-         END DO
-      END DO
+            zfm   (ji,jj) = zfm (ji,jj) + zalf  *    psm (ji+1,jj,jl)
+            zf0   (ji,jj) = zf0 (ji,jj) + zalf  * (  ps0 (ji+1,jj,jl) &
+               &                                   - zalf1 * ( psx(ji+1,jj,jl) - (zalf1 - zalf ) * psxx(ji+1,jj,jl) ) )
+            zfx   (ji,jj) = zfx (ji,jj) + zalfq * (  psx (ji+1,jj,jl) - 3.0 * zalf1 * psxx(ji+1,jj,jl) )
+            zfxx  (ji,jj) = zfxx(ji,jj) + zalf  *    psxx(ji+1,jj,jl) * zalfq
+            zfy   (ji,jj) = zfy (ji,jj) + zalf  * (  psy (ji+1,jj,jl) - zalf1 * psxy(ji+1,jj,jl) )
+            zfxy  (ji,jj) = zfxy(ji,jj) + zalfq *    psxy(ji+1,jj,jl)
+            zfyy  (ji,jj) = zfyy(ji,jj) + zalf  *    psyy(ji+1,jj,jl)
+         END_2D
 
-      DO jj = 2, jpjm1                     !  Readjust moments remaining in the box. 
-         DO ji = fs_2, fs_jpim1
+         DO_2D_00_00
             zbt  =       zbet(ji-1,jj)
             zbt1 = 1.0 - zbet(ji-1,jj)
             !
-            psm (ji,jj) = zbt * psm(ji,jj) + zbt1 * ( psm(ji,jj) - zfm(ji-1,jj) )
-            ps0 (ji,jj) = zbt * ps0(ji,jj) + zbt1 * ( ps0(ji,jj) - zf0(ji-1,jj) )
-            psx (ji,jj) = zalg1q(ji-1,jj) * ( psx(ji,jj) + 3.0 * zalg(ji-1,jj) * psxx(ji,jj) )
-            psxx(ji,jj) = zalg1 (ji-1,jj) * zalg1q(ji-1,jj) * psxx(ji,jj)
-            psy (ji,jj) = zbt * psy (ji,jj) + zbt1 * ( psy (ji,jj) - zfy (ji-1,jj) )
-            psyy(ji,jj) = zbt * psyy(ji,jj) + zbt1 * ( psyy(ji,jj) - zfyy(ji-1,jj) )
-            psxy(ji,jj) = zalg1q(ji-1,jj) * psxy(ji,jj)
-         END DO
-      END DO
+            psm (ji,jj,jl) = zbt * psm(ji,jj,jl) + zbt1 * ( psm(ji,jj,jl) - zfm(ji-1,jj) )
+            ps0 (ji,jj,jl) = zbt * ps0(ji,jj,jl) + zbt1 * ( ps0(ji,jj,jl) - zf0(ji-1,jj) )
+            psx (ji,jj,jl) = zalg1q(ji-1,jj) * ( psx(ji,jj,jl) + 3.0 * zalg(ji-1,jj) * psxx(ji,jj,jl) )
+            psxx(ji,jj,jl) = zalg1 (ji-1,jj) * zalg1q(ji-1,jj) * psxx(ji,jj,jl)
+            psy (ji,jj,jl) = zbt * psy (ji,jj,jl) + zbt1 * ( psy (ji,jj,jl) - zfy (ji-1,jj) )
+            psyy(ji,jj,jl) = zbt * psyy(ji,jj,jl) + zbt1 * ( psyy(ji,jj,jl) - zfyy(ji-1,jj) )
+            psxy(ji,jj,jl) = zalg1q(ji-1,jj) * psxy(ji,jj,jl)
+         END_2D
 
-      !   Put the temporary moments into appropriate neighboring boxes.    
-      DO jj = 2, jpjm1                     !   Flux from i to i+1 IF u GT 0.
-         DO ji = fs_2, fs_jpim1
+         !   Put the temporary moments into appropriate neighboring boxes.    
+         DO_2D_00_00
             zbt  =       zbet(ji-1,jj)
             zbt1 = 1.0 - zbet(ji-1,jj)
-            psm(ji,jj)  = zbt * ( psm(ji,jj) + zfm(ji-1,jj) ) + zbt1 * psm(ji,jj)
-            zalf        = zbt * zfm(ji-1,jj) / psm(ji,jj)
-            zalf1       = 1.0 - zalf
-            ztemp       = zalf * ps0(ji,jj) - zalf1 * zf0(ji-1,jj)
+            psm(ji,jj,jl) = zbt * ( psm(ji,jj,jl) + zfm(ji-1,jj) ) + zbt1 * psm(ji,jj,jl)
+            zalf          = zbt * zfm(ji-1,jj) / psm(ji,jj,jl)
+            zalf1         = 1.0 - zalf
+            ztemp         = zalf * ps0(ji,jj,jl) - zalf1 * zf0(ji-1,jj)
             !
-            ps0 (ji,jj) = zbt * ( ps0(ji,jj) + zf0(ji-1,jj) ) + zbt1 * ps0(ji,jj)
-            psx (ji,jj) = zbt * ( zalf * zfx(ji-1,jj) + zalf1 * psx(ji,jj) + 3.0 * ztemp ) + zbt1 * psx(ji,jj)
-            psxx(ji,jj) = zbt * ( zalf * zalf * zfxx(ji-1,jj) + zalf1 * zalf1 * psxx(ji,jj)                               &
-               &                + 5.0 * ( zalf * zalf1 * ( psx (ji,jj) - zfx(ji-1,jj) ) - ( zalf1 - zalf ) * ztemp )  )   &
-               &                                                + zbt1 * psxx(ji,jj)
-            psxy(ji,jj) = zbt * ( zalf * zfxy(ji-1,jj) + zalf1 * psxy(ji,jj)             &
-               &                + 3.0 * (- zalf1*zfy(ji-1,jj)  + zalf * psy(ji,jj) ) )   &
-               &                                                + zbt1 * psxy(ji,jj)
-            psy (ji,jj) = zbt * ( psy (ji,jj) + zfy (ji-1,jj) ) + zbt1 * psy (ji,jj)
-            psyy(ji,jj) = zbt * ( psyy(ji,jj) + zfyy(ji-1,jj) ) + zbt1 * psyy(ji,jj)
-         END DO
-      END DO
+            ps0 (ji,jj,jl) =  zbt  * ( ps0(ji,jj,jl) + zf0(ji-1,jj) ) + zbt1 * ps0(ji,jj,jl)
+            psx (ji,jj,jl) =  zbt  * ( zalf * zfx(ji-1,jj) + zalf1 * psx(ji,jj,jl) + 3.0 * ztemp ) + zbt1 * psx(ji,jj,jl)
+            psxx(ji,jj,jl) =  zbt  * ( zalf * zalf * zfxx(ji-1,jj) + zalf1 * zalf1 * psxx(ji,jj,jl)                             &
+               &                     + 5.0 * ( zalf * zalf1 * ( psx (ji,jj,jl) - zfx(ji-1,jj) ) - ( zalf1 - zalf ) * ztemp )  ) &
+               &            + zbt1 * psxx(ji,jj,jl)
+            psxy(ji,jj,jl) =  zbt  * ( zalf * zfxy(ji-1,jj) + zalf1 * psxy(ji,jj,jl)             &
+               &                     + 3.0 * (- zalf1*zfy(ji-1,jj)  + zalf * psy(ji,jj,jl) ) )   &
+               &            + zbt1 * psxy(ji,jj,jl)
+            psy (ji,jj,jl) =  zbt  * ( psy (ji,jj,jl) + zfy (ji-1,jj) ) + zbt1 * psy (ji,jj,jl)
+            psyy(ji,jj,jl) =  zbt  * ( psyy(ji,jj,jl) + zfyy(ji-1,jj) ) + zbt1 * psyy(ji,jj,jl)
+         END_2D
 
-      DO jj = 2, jpjm1                     !  Flux from i+1 to i IF u LT 0.
-         DO ji = fs_2, fs_jpim1
+         DO_2D_00_00
             zbt  =       zbet(ji,jj)
             zbt1 = 1.0 - zbet(ji,jj)
-            psm(ji,jj)  = zbt * psm(ji,jj)  + zbt1 * ( psm(ji,jj) + zfm(ji,jj) )
-            zalf        = zbt1 * zfm(ji,jj) / psm(ji,jj)
-            zalf1       = 1.0 - zalf
-            ztemp       = - zalf * ps0(ji,jj) + zalf1 * zf0(ji,jj)
+            psm(ji,jj,jl) = zbt * psm(ji,jj,jl) + zbt1 * ( psm(ji,jj,jl) + zfm(ji,jj) )
+            zalf          = zbt1 * zfm(ji,jj) / psm(ji,jj,jl)
+            zalf1         = 1.0 - zalf
+            ztemp         = - zalf * ps0(ji,jj,jl) + zalf1 * zf0(ji,jj)
             !
-            ps0(ji,jj)  = zbt * ps0 (ji,jj) + zbt1 * ( ps0(ji,jj) + zf0(ji,jj) )
-            psx(ji,jj)  = zbt * psx (ji,jj) + zbt1 * ( zalf * zfx(ji,jj) + zalf1 * psx(ji,jj) + 3.0 * ztemp )
-            psxx(ji,jj) = zbt * psxx(ji,jj) + zbt1 * ( zalf * zalf * zfxx(ji,jj)  + zalf1 * zalf1 * psxx(ji,jj)  &
-               &                                      + 5.0 *( zalf * zalf1 * ( - psx(ji,jj) + zfx(ji,jj) )      &
-               &                                      + ( zalf1 - zalf ) * ztemp ) )
-            psxy(ji,jj) = zbt * psxy(ji,jj) + zbt1 * (  zalf * zfxy(ji,jj) + zalf1 * psxy(ji,jj)  &
-               &                                      + 3.0 * ( zalf1 * zfy(ji,jj) - zalf * psy(ji,jj) )  )
-            psy(ji,jj)  = zbt * psy (ji,jj)  + zbt1 * ( psy (ji,jj) + zfy (ji,jj) )
-            psyy(ji,jj) = zbt * psyy(ji,jj)  + zbt1 * ( psyy(ji,jj) + zfyy(ji,jj) )
-         END DO
+            ps0 (ji,jj,jl) = zbt * ps0 (ji,jj,jl) + zbt1 * ( ps0(ji,jj,jl) + zf0(ji,jj) )
+            psx (ji,jj,jl) = zbt * psx (ji,jj,jl) + zbt1 * ( zalf * zfx(ji,jj) + zalf1 * psx(ji,jj,jl) + 3.0 * ztemp )
+            psxx(ji,jj,jl) = zbt * psxx(ji,jj,jl) + zbt1 * ( zalf * zalf * zfxx(ji,jj) + zalf1 * zalf1 * psxx(ji,jj,jl) &
+               &                                           + 5.0 * ( zalf * zalf1 * ( - psx(ji,jj,jl) + zfx(ji,jj) )    &
+               &                                           + ( zalf1 - zalf ) * ztemp ) )
+            psxy(ji,jj,jl) = zbt * psxy(ji,jj,jl) + zbt1 * ( zalf * zfxy(ji,jj) + zalf1 * psxy(ji,jj,jl)  &
+               &                                           + 3.0 * ( zalf1 * zfy(ji,jj) - zalf * psy(ji,jj,jl) ) )
+            psy (ji,jj,jl) = zbt * psy (ji,jj,jl) + zbt1 * ( psy (ji,jj,jl) + zfy (ji,jj) )
+            psyy(ji,jj,jl) = zbt * psyy(ji,jj,jl) + zbt1 * ( psyy(ji,jj,jl) + zfyy(ji,jj) )
+         END_2D
+
       END DO
 
       !-- Lateral boundary conditions
-      CALL lbc_lnk_multi( 'icedyn_adv_pra', psm , 'T',  1., ps0 , 'T',  1.   &
-         &              , psx , 'T', -1., psy , 'T', -1.   &   ! caution gradient ==> the sign changes
-         &              , psxx, 'T',  1., psyy, 'T',  1.   &
-         &              , psxy, 'T',  1. )
-
-      IF(ln_ctl) THEN
-         CALL prt_ctl(tab2d_1=psm  , clinfo1=' adv_x: psm  :', tab2d_2=ps0 , clinfo2=' ps0  : ')
-         CALL prt_ctl(tab2d_1=psx  , clinfo1=' adv_x: psx  :', tab2d_2=psxx, clinfo2=' psxx : ')
-         CALL prt_ctl(tab2d_1=psy  , clinfo1=' adv_x: psy  :', tab2d_2=psyy, clinfo2=' psyy : ')
-         CALL prt_ctl(tab2d_1=psxy , clinfo1=' adv_x: psxy :')
-      ENDIF
+      CALL lbc_lnk_multi( 'icedyn_adv_pra', psm(:,:,1:jcat) , 'T',  1., ps0 , 'T',  1.   &
+         &                                , psx             , 'T', -1., psy , 'T', -1.   &   ! caution gradient ==> the sign changes
+         &                                , psxx            , 'T',  1., psyy, 'T',  1. , psxy, 'T',  1. )
       !
    END SUBROUTINE adv_x
 
 
-   SUBROUTINE adv_y( pdf, pvt , pcrh, psm , ps0 ,   &
+   SUBROUTINE adv_y( pdt, pvt , pcrh, psm , ps0 ,   &
       &              psx, psxx, psy , psyy, psxy )
       !!---------------------------------------------------------------------
       !!                **  routine adv_y  **
@@ -447,79 +439,75 @@ CONTAINS
       !! ** purpose :   Computes and adds the advection trend to sea-ice 
       !!                variable on y axis
       !!---------------------------------------------------------------------
-      REAL(wp)                    , INTENT(in   ) ::   pdf                ! reduction factor for the time step
-      REAL(wp)                    , INTENT(in   ) ::   pcrh               ! call adv_x then adv_y (=1) or the opposite (=0)
-      REAL(wp), DIMENSION(jpi,jpj), INTENT(in   ) ::   pvt                ! j-direction ice velocity at V-point [m/s]
-      REAL(wp), DIMENSION(jpi,jpj), INTENT(inout) ::   psm                ! area
-      REAL(wp), DIMENSION(jpi,jpj), INTENT(inout) ::   ps0                ! field to be advected
-      REAL(wp), DIMENSION(jpi,jpj), INTENT(inout) ::   psx , psy          ! 1st moments 
-      REAL(wp), DIMENSION(jpi,jpj), INTENT(inout) ::   psxx, psyy, psxy   ! 2nd moments
+      REAL(wp)                  , INTENT(in   ) ::   pdt                ! time step
+      REAL(wp)                  , INTENT(in   ) ::   pcrh               ! call adv_x then adv_y (=1) or the opposite (=0)
+      REAL(wp), DIMENSION(:,:)  , INTENT(in   ) ::   pvt                ! j-direction ice velocity at V-point [m/s]
+      REAL(wp), DIMENSION(:,:,:), INTENT(inout) ::   psm                ! area
+      REAL(wp), DIMENSION(:,:,:), INTENT(inout) ::   ps0                ! field to be advected
+      REAL(wp), DIMENSION(:,:,:), INTENT(inout) ::   psx , psy          ! 1st moments 
+      REAL(wp), DIMENSION(:,:,:), INTENT(inout) ::   psxx, psyy, psxy   ! 2nd moments
       !!
-      INTEGER  ::   ji, jj                               ! dummy loop indices
-      REAL(wp) ::   zs1max, zrdt, zslpmax, ztemp         ! temporary scalars
+      INTEGER  ::   ji, jj, jl, jcat                     ! dummy loop indices
+      REAL(wp) ::   zs1max, zslpmax, ztemp               ! temporary scalars
       REAL(wp) ::   zs1new, zalf , zalfq , zbt           !    -         -
       REAL(wp) ::   zs2new, zalf1, zalf1q, zbt1          !    -         -
       REAL(wp), DIMENSION(jpi,jpj) ::   zf0, zfx , zfy , zbet   ! 2D workspace
       REAL(wp), DIMENSION(jpi,jpj) ::   zfm, zfxx, zfyy, zfxy   !  -      -
       REAL(wp), DIMENSION(jpi,jpj) ::   zalg, zalg1, zalg1q     !  -      -
       !---------------------------------------------------------------------
-
-      ! Limitation of moments.
-
-      zrdt = rdt_ice * pdf ! If ice drift field is too fast, use an appropriate time step for advection.
-
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-            zslpmax = MAX( 0._wp, ps0(ji,jj) )
+      !
+      jcat = SIZE( ps0 , 3 )   ! size of input arrays
+      !      
+      DO jl = 1, jcat   ! loop on categories
+         !
+         ! Limitation of moments.
+         DO_2D_11_00
+            !  Initialize volumes of boxes (=area if adv_x first called, =psm otherwise)
+            psm(ji,jj,jl) = MAX(  pcrh * e1e2t(ji,jj) + ( 1.0 - pcrh ) * psm(ji,jj,jl) , epsi20  )
+            !
+            zslpmax = MAX( 0._wp, ps0(ji,jj,jl) )
             zs1max  = 1.5 * zslpmax
-            zs1new  = MIN( zs1max, MAX( -zs1max, psy(ji,jj) ) )
+            zs1new  = MIN( zs1max, MAX( -zs1max, psy(ji,jj,jl) ) )
             zs2new  = MIN(  ( 2.0 * zslpmax - 0.3334 * ABS( zs1new ) ),   &
-               &             MAX( ABS( zs1new )-zslpmax, psyy(ji,jj) )  )
+               &             MAX( ABS( zs1new )-zslpmax, psyy(ji,jj,jl) )  )
             rswitch = ( 1.0 - MAX( 0._wp, SIGN( 1._wp, -zslpmax) ) ) * tmask(ji,jj,1)   ! Case of empty boxes & Apply mask
             !
-            ps0 (ji,jj) = zslpmax  
-            psx (ji,jj) = psx (ji,jj) * rswitch
-            psxx(ji,jj) = psxx(ji,jj) * rswitch
-            psy (ji,jj) = zs1new * rswitch
-            psyy(ji,jj) = zs2new * rswitch
-            psxy(ji,jj) = MIN( zslpmax, MAX( -zslpmax, psxy(ji,jj) ) ) * rswitch
-         END DO
-      END DO
-
-      !  Initialize volumes of boxes (=area if adv_x first called, =psm otherwise)
-      psm(:,:)  = MAX(  pcrh * e1e2t(:,:) + ( 1.0 - pcrh ) * psm(:,:) , epsi20  )
-
-      !  Calculate fluxes and moments between boxes j<-->j+1              
-      DO jj = 1, jpj                     !  Flux from j to j+1 WHEN v GT 0   
-         DO ji = 1, jpi
+            ps0 (ji,jj,jl) = zslpmax  
+            psx (ji,jj,jl) = psx (ji,jj,jl) * rswitch
+            psxx(ji,jj,jl) = psxx(ji,jj,jl) * rswitch
+            psy (ji,jj,jl) = zs1new         * rswitch
+            psyy(ji,jj,jl) = zs2new         * rswitch
+            psxy(ji,jj,jl) = MIN( zslpmax, MAX( -zslpmax, psxy(ji,jj,jl) ) ) * rswitch
+         END_2D
+ 
+         !  Calculate fluxes and moments between boxes j<-->j+1              
+         DO_2D_11_00
             zbet(ji,jj)  =  MAX( 0._wp, SIGN( 1._wp, pvt(ji,jj) ) )
-            zalf         =  MAX( 0._wp, pvt(ji,jj) ) * zrdt * e1v(ji,jj) / psm(ji,jj)
+            zalf         =  MAX( 0._wp, pvt(ji,jj) ) * pdt / psm(ji,jj,jl)
             zalfq        =  zalf * zalf
             zalf1        =  1.0 - zalf
             zalf1q       =  zalf1 * zalf1
             !
-            zfm (ji,jj)  =  zalf  * psm(ji,jj)
-            zf0 (ji,jj)  =  zalf  * ( ps0(ji,jj) + zalf1 * ( psy(ji,jj)  + (zalf1-zalf) * psyy(ji,jj)  ) ) 
-            zfy (ji,jj)  =  zalfq *( psy(ji,jj) + 3.0*zalf1*psyy(ji,jj) )
-            zfyy(ji,jj)  =  zalf  * zalfq * psyy(ji,jj)
-            zfx (ji,jj)  =  zalf  * ( psx(ji,jj) + zalf1 * psxy(ji,jj) )
-            zfxy(ji,jj)  =  zalfq * psxy(ji,jj)
-            zfxx(ji,jj)  =  zalf  * psxx(ji,jj)
+            zfm (ji,jj)  =  zalf  * psm(ji,jj,jl)
+            zf0 (ji,jj)  =  zalf  * ( ps0(ji,jj,jl) + zalf1 * ( psy(ji,jj,jl)  + (zalf1-zalf) * psyy(ji,jj,jl) ) ) 
+            zfy (ji,jj)  =  zalfq *( psy(ji,jj,jl) + 3.0*zalf1*psyy(ji,jj,jl) )
+            zfyy(ji,jj)  =  zalf  * zalfq * psyy(ji,jj,jl)
+            zfx (ji,jj)  =  zalf  * ( psx(ji,jj,jl) + zalf1 * psxy(ji,jj,jl) )
+            zfxy(ji,jj)  =  zalfq * psxy(ji,jj,jl)
+            zfxx(ji,jj)  =  zalf  * psxx(ji,jj,jl)
             !
             !  Readjust moments remaining in the box.
-            psm (ji,jj)  =  psm (ji,jj) - zfm(ji,jj)
-            ps0 (ji,jj)  =  ps0 (ji,jj) - zf0(ji,jj)
-            psy (ji,jj)  =  zalf1q * ( psy(ji,jj) -3.0 * zalf * psyy(ji,jj) )
-            psyy(ji,jj)  =  zalf1 * zalf1q * psyy(ji,jj)
-            psx (ji,jj)  =  psx (ji,jj) - zfx(ji,jj)
-            psxx(ji,jj)  =  psxx(ji,jj) - zfxx(ji,jj)
-            psxy(ji,jj)  =  zalf1q * psxy(ji,jj)
-         END DO
-      END DO
-      !
-      DO jj = 1, jpjm1                   !  Flux from j+1 to j when v LT 0.
-         DO ji = 1, jpi
-            zalf          = ( MAX(0._wp, -pvt(ji,jj) ) * zrdt * e1v(ji,jj) ) / psm(ji,jj+1) 
+            psm (ji,jj,jl)  =  psm (ji,jj,jl) - zfm(ji,jj)
+            ps0 (ji,jj,jl)  =  ps0 (ji,jj,jl) - zf0(ji,jj)
+            psy (ji,jj,jl)  =  zalf1q * ( psy(ji,jj,jl) -3.0 * zalf * psyy(ji,jj,jl) )
+            psyy(ji,jj,jl)  =  zalf1 * zalf1q * psyy(ji,jj,jl)
+            psx (ji,jj,jl)  =  psx (ji,jj,jl) - zfx(ji,jj)
+            psxx(ji,jj,jl)  =  psxx(ji,jj,jl) - zfxx(ji,jj)
+            psxy(ji,jj,jl)  =  zalf1q * psxy(ji,jj,jl)
+         END_2D
+         !
+         DO_2D_10_00
+            zalf          = MAX( 0._wp, -pvt(ji,jj) ) * pdt / psm(ji,jj+1,jl) 
             zalg  (ji,jj) = zalf
             zalfq         = zalf * zalf
             zalf1         = 1.0 - zalf
@@ -527,90 +515,197 @@ CONTAINS
             zalf1q        = zalf1 * zalf1
             zalg1q(ji,jj) = zalf1q
             !
-            zfm   (ji,jj) = zfm (ji,jj) + zalf  *   psm (ji,jj+1)
-            zf0   (ji,jj) = zf0 (ji,jj) + zalf  * ( ps0 (ji,jj+1) - zalf1 * (psy(ji,jj+1) - (zalf1 - zalf ) * psyy(ji,jj+1) ) )
-            zfy   (ji,jj) = zfy (ji,jj) + zalfq * ( psy (ji,jj+1) - 3.0 * zalf1 * psyy(ji,jj+1) )
-            zfyy  (ji,jj) = zfyy(ji,jj) + zalf  *   psyy(ji,jj+1) * zalfq
-            zfx   (ji,jj) = zfx (ji,jj) + zalf  * ( psx (ji,jj+1) - zalf1 * psxy(ji,jj+1) )
-            zfxy  (ji,jj) = zfxy(ji,jj) + zalfq *   psxy(ji,jj+1)
-            zfxx  (ji,jj) = zfxx(ji,jj) + zalf  *   psxx(ji,jj+1)
-         END DO
-      END DO
+            zfm   (ji,jj) = zfm (ji,jj) + zalf  *    psm (ji,jj+1,jl)
+            zf0   (ji,jj) = zf0 (ji,jj) + zalf  * (  ps0 (ji,jj+1,jl) &
+               &                                   - zalf1 * (psy(ji,jj+1,jl) - (zalf1 - zalf ) * psyy(ji,jj+1,jl) ) )
+            zfy   (ji,jj) = zfy (ji,jj) + zalfq * (  psy (ji,jj+1,jl) - 3.0 * zalf1 * psyy(ji,jj+1,jl) )
+            zfyy  (ji,jj) = zfyy(ji,jj) + zalf  *    psyy(ji,jj+1,jl) * zalfq
+            zfx   (ji,jj) = zfx (ji,jj) + zalf  * (  psx (ji,jj+1,jl) - zalf1 * psxy(ji,jj+1,jl) )
+            zfxy  (ji,jj) = zfxy(ji,jj) + zalfq *    psxy(ji,jj+1,jl)
+            zfxx  (ji,jj) = zfxx(ji,jj) + zalf  *    psxx(ji,jj+1,jl)
+         END_2D
 
-      !  Readjust moments remaining in the box. 
-      DO jj = 2, jpj
-         DO ji = 1, jpi
+         !  Readjust moments remaining in the box. 
+         DO_2D_00_00
             zbt  =         zbet(ji,jj-1)
             zbt1 = ( 1.0 - zbet(ji,jj-1) )
             !
-            psm (ji,jj) = zbt * psm(ji,jj) + zbt1 * ( psm(ji,jj) - zfm(ji,jj-1) )
-            ps0 (ji,jj) = zbt * ps0(ji,jj) + zbt1 * ( ps0(ji,jj) - zf0(ji,jj-1) )
-            psy (ji,jj) = zalg1q(ji,jj-1) * ( psy(ji,jj) + 3.0 * zalg(ji,jj-1) * psyy(ji,jj) )
-            psyy(ji,jj) = zalg1 (ji,jj-1) * zalg1q(ji,jj-1) * psyy(ji,jj)
-            psx (ji,jj) = zbt * psx (ji,jj) + zbt1 * ( psx (ji,jj) - zfx (ji,jj-1) )
-            psxx(ji,jj) = zbt * psxx(ji,jj) + zbt1 * ( psxx(ji,jj) - zfxx(ji,jj-1) )
-            psxy(ji,jj) = zalg1q(ji,jj-1) * psxy(ji,jj)
-         END DO
-      END DO
+            psm (ji,jj,jl) = zbt * psm(ji,jj,jl) + zbt1 * ( psm(ji,jj,jl) - zfm(ji,jj-1) )
+            ps0 (ji,jj,jl) = zbt * ps0(ji,jj,jl) + zbt1 * ( ps0(ji,jj,jl) - zf0(ji,jj-1) )
+            psy (ji,jj,jl) = zalg1q(ji,jj-1) * ( psy(ji,jj,jl) + 3.0 * zalg(ji,jj-1) * psyy(ji,jj,jl) )
+            psyy(ji,jj,jl) = zalg1 (ji,jj-1) * zalg1q(ji,jj-1) * psyy(ji,jj,jl)
+            psx (ji,jj,jl) = zbt * psx (ji,jj,jl) + zbt1 * ( psx (ji,jj,jl) - zfx (ji,jj-1) )
+            psxx(ji,jj,jl) = zbt * psxx(ji,jj,jl) + zbt1 * ( psxx(ji,jj,jl) - zfxx(ji,jj-1) )
+            psxy(ji,jj,jl) = zalg1q(ji,jj-1) * psxy(ji,jj,jl)
+         END_2D
 
-      !   Put the temporary moments into appropriate neighboring boxes.    
-      DO jj = 2, jpjm1                    !   Flux from j to j+1 IF v GT 0.
-         DO ji = 1, jpi
-            zbt  =         zbet(ji,jj-1)
-            zbt1 = ( 1.0 - zbet(ji,jj-1) )
-            psm(ji,jj)  = zbt * ( psm(ji,jj) + zfm(ji,jj-1) ) + zbt1 * psm(ji,jj) 
-            zalf        = zbt * zfm(ji,jj-1) / psm(ji,jj) 
-            zalf1       = 1.0 - zalf
-            ztemp       = zalf * ps0(ji,jj) - zalf1 * zf0(ji,jj-1)
+         !   Put the temporary moments into appropriate neighboring boxes.    
+         DO_2D_00_00
+            zbt  =       zbet(ji,jj-1)
+            zbt1 = 1.0 - zbet(ji,jj-1)
+            psm(ji,jj,jl) = zbt * ( psm(ji,jj,jl) + zfm(ji,jj-1) ) + zbt1 * psm(ji,jj,jl) 
+            zalf          = zbt * zfm(ji,jj-1) / psm(ji,jj,jl) 
+            zalf1         = 1.0 - zalf
+            ztemp         = zalf * ps0(ji,jj,jl) - zalf1 * zf0(ji,jj-1)
             !
-            ps0(ji,jj)  = zbt  * ( ps0(ji,jj) + zf0(ji,jj-1) ) + zbt1 * ps0(ji,jj)
-            psy(ji,jj)  = zbt  * ( zalf * zfy(ji,jj-1) + zalf1 * psy(ji,jj) + 3.0 * ztemp )   &
-               &                                               + zbt1 * psy(ji,jj)  
-            psyy(ji,jj) = zbt  * ( zalf * zalf * zfyy(ji,jj-1) + zalf1 * zalf1 * psyy(ji,jj)                             &
-               &                 + 5.0 * ( zalf * zalf1 * ( psy(ji,jj) - zfy(ji,jj-1) ) - ( zalf1 - zalf ) * ztemp ) )   & 
-               &                                               + zbt1 * psyy(ji,jj)
-            psxy(ji,jj) = zbt  * (  zalf * zfxy(ji,jj-1) + zalf1 * psxy(ji,jj)               &
-               &                  + 3.0 * (- zalf1 * zfx(ji,jj-1) + zalf * psx(ji,jj) )  )   &
-               &                                                + zbt1 * psxy(ji,jj)
-            psx (ji,jj) = zbt * ( psx (ji,jj) + zfx (ji,jj-1) ) + zbt1 * psx (ji,jj)
-            psxx(ji,jj) = zbt * ( psxx(ji,jj) + zfxx(ji,jj-1) ) + zbt1 * psxx(ji,jj)
-         END DO
-      END DO
+            ps0(ji,jj,jl)  =   zbt  * ( ps0(ji,jj,jl) + zf0(ji,jj-1) ) + zbt1 * ps0(ji,jj,jl)
+            psy(ji,jj,jl)  =   zbt  * ( zalf * zfy(ji,jj-1) + zalf1 * psy(ji,jj,jl) + 3.0 * ztemp )  &
+               &             + zbt1 * psy(ji,jj,jl)  
+            psyy(ji,jj,jl) =   zbt  * ( zalf * zalf * zfyy(ji,jj-1) + zalf1 * zalf1 * psyy(ji,jj,jl)                           &
+               &                      + 5.0 * ( zalf * zalf1 * ( psy(ji,jj,jl) - zfy(ji,jj-1) ) - ( zalf1 - zalf ) * ztemp ) ) & 
+               &             + zbt1 * psyy(ji,jj,jl)
+            psxy(ji,jj,jl) =   zbt  * (  zalf * zfxy(ji,jj-1) + zalf1 * psxy(ji,jj,jl)            &
+               &                      + 3.0 * (- zalf1 * zfx(ji,jj-1) + zalf * psx(ji,jj,jl) ) )  &
+               &             + zbt1 * psxy(ji,jj,jl)
+            psx (ji,jj,jl) =   zbt * ( psx (ji,jj,jl) + zfx (ji,jj-1) ) + zbt1 * psx (ji,jj,jl)
+            psxx(ji,jj,jl) =   zbt * ( psxx(ji,jj,jl) + zfxx(ji,jj-1) ) + zbt1 * psxx(ji,jj,jl)
+         END_2D
 
-      DO jj = 2, jpjm1                   !  Flux from j+1 to j IF v LT 0.
-         DO ji = 1, jpi
-            zbt  =         zbet(ji,jj)
-            zbt1 = ( 1.0 - zbet(ji,jj) )
-            psm(ji,jj)  = zbt * psm(ji,jj) + zbt1 * ( psm(ji,jj) + zfm(ji,jj) )
-            zalf        = zbt1 * zfm(ji,jj) / psm(ji,jj)
-            zalf1       = 1.0 - zalf
-            ztemp       = - zalf * ps0 (ji,jj) + zalf1 * zf0(ji,jj)
-            ps0 (ji,jj) =   zbt  * ps0 (ji,jj) + zbt1  * ( ps0(ji,jj) + zf0(ji,jj) )
-            psy (ji,jj) =   zbt  * psy (ji,jj) + zbt1  * ( zalf * zfy(ji,jj) + zalf1 * psy(ji,jj) + 3.0 * ztemp )
-            psyy(ji,jj) =   zbt  * psyy(ji,jj) + zbt1 * (  zalf * zalf * zfyy(ji,jj) + zalf1 * zalf1 * psyy(ji,jj)   &
-               &                                         + 5.0 *( zalf *zalf1 *( -psy(ji,jj) + zfy(ji,jj) )          &
-               &                                         + ( zalf1 - zalf ) * ztemp )                                )
-            psxy(ji,jj) =   zbt  * psxy(ji,jj) + zbt1 * (  zalf * zfxy(ji,jj) + zalf1 * psxy(ji,jj)       &
-               &                                         + 3.0 * ( zalf1 * zfx(ji,jj) - zalf * psx(ji,jj) )  )
-            psx (ji,jj) =   zbt  * psx (ji,jj) + zbt1 * ( psx (ji,jj) + zfx (ji,jj) )
-            psxx(ji,jj) =   zbt  * psxx(ji,jj) + zbt1 * ( psxx(ji,jj) + zfxx(ji,jj) )
-         END DO
+         DO_2D_00_00
+            zbt  =       zbet(ji,jj)
+            zbt1 = 1.0 - zbet(ji,jj)
+            psm(ji,jj,jl) = zbt * psm(ji,jj,jl) + zbt1 * ( psm(ji,jj,jl) + zfm(ji,jj) )
+            zalf          = zbt1 * zfm(ji,jj) / psm(ji,jj,jl)
+            zalf1         = 1.0 - zalf
+            ztemp         = - zalf * ps0(ji,jj,jl) + zalf1 * zf0(ji,jj)
+            !
+            ps0 (ji,jj,jl) = zbt * ps0 (ji,jj,jl) + zbt1 * (  ps0(ji,jj,jl) + zf0(ji,jj) )
+            psy (ji,jj,jl) = zbt * psy (ji,jj,jl) + zbt1 * (  zalf * zfy(ji,jj) + zalf1 * psy(ji,jj,jl) + 3.0 * ztemp )
+            psyy(ji,jj,jl) = zbt * psyy(ji,jj,jl) + zbt1 * (  zalf * zalf * zfyy(ji,jj) + zalf1 * zalf1 * psyy(ji,jj,jl) &
+               &                                            + 5.0 * ( zalf * zalf1 * ( - psy(ji,jj,jl) + zfy(ji,jj) )    &
+               &                                            + ( zalf1 - zalf ) * ztemp ) )
+            psxy(ji,jj,jl) = zbt * psxy(ji,jj,jl) + zbt1 * (  zalf * zfxy(ji,jj) + zalf1 * psxy(ji,jj,jl)  &
+               &                                            + 3.0 * ( zalf1 * zfx(ji,jj) - zalf * psx(ji,jj,jl) ) )
+            psx (ji,jj,jl) = zbt * psx (ji,jj,jl) + zbt1 * ( psx (ji,jj,jl) + zfx (ji,jj) )
+            psxx(ji,jj,jl) = zbt * psxx(ji,jj,jl) + zbt1 * ( psxx(ji,jj,jl) + zfxx(ji,jj) )
+         END_2D
+
       END DO
 
       !-- Lateral boundary conditions
-      CALL lbc_lnk_multi( 'icedyn_adv_pra', psm , 'T',  1.,  ps0 , 'T',  1.   &
-         &              , psx , 'T', -1.,  psy , 'T', -1.   &   ! caution gradient ==> the sign changes
-         &              , psxx, 'T',  1.,  psyy, 'T',  1.   &
-         &              , psxy, 'T',  1. )
-
-      IF(ln_ctl) THEN
-         CALL prt_ctl(tab2d_1=psm  , clinfo1=' adv_y: psm  :', tab2d_2=ps0 , clinfo2=' ps0  : ')
-         CALL prt_ctl(tab2d_1=psx  , clinfo1=' adv_y: psx  :', tab2d_2=psxx, clinfo2=' psxx : ')
-         CALL prt_ctl(tab2d_1=psy  , clinfo1=' adv_y: psy  :', tab2d_2=psyy, clinfo2=' psyy : ')
-         CALL prt_ctl(tab2d_1=psxy , clinfo1=' adv_y: psxy :')
-      ENDIF
+      CALL lbc_lnk_multi( 'icedyn_adv_pra', psm(:,:,1:jcat) , 'T',  1., ps0 , 'T',  1.   &
+         &                                , psx             , 'T', -1., psy , 'T', -1.   &   ! caution gradient ==> the sign changes
+         &                                , psxx            , 'T',  1., psyy, 'T',  1. , psxy, 'T',  1. )
       !
    END SUBROUTINE adv_y
+
+
+   SUBROUTINE Hbig( pdt, phi_max, phs_max, phip_max, pv_i, pv_s, pa_i, pa_ip, pv_ip, pe_s )
+      !!-------------------------------------------------------------------
+      !!                  ***  ROUTINE Hbig  ***
+      !!
+      !! ** Purpose : Thickness correction in case advection scheme creates
+      !!              abnormally tick ice or snow
+      !!
+      !! ** Method  : 1- check whether ice thickness is larger than the surrounding 9-points
+      !!                 (before advection) and reduce it by adapting ice concentration
+      !!              2- check whether snow thickness is larger than the surrounding 9-points
+      !!                 (before advection) and reduce it by sending the excess in the ocean
+      !!
+      !! ** input   : Max thickness of the surrounding 9-points
+      !!-------------------------------------------------------------------
+      REAL(wp)                    , INTENT(in   ) ::   pdt                          ! tracer time-step
+      REAL(wp), DIMENSION(:,:,:)  , INTENT(in   ) ::   phi_max, phs_max, phip_max   ! max ice thick from surrounding 9-pts
+      REAL(wp), DIMENSION(:,:,:)  , INTENT(inout) ::   pv_i, pv_s, pa_i, pa_ip, pv_ip
+      REAL(wp), DIMENSION(:,:,:,:), INTENT(inout) ::   pe_s
+      !
+      INTEGER  ::   ji, jj, jl         ! dummy loop indices
+      REAL(wp) ::   z1_dt, zhip, zhi, zhs, zfra
+      !!-------------------------------------------------------------------
+      !
+      z1_dt = 1._wp / pdt
+      !
+      DO jl = 1, jpl
+
+         DO_2D_11_11
+            IF ( pv_i(ji,jj,jl) > 0._wp ) THEN
+               !
+               !                               ! -- check h_ip -- !
+               ! if h_ip is larger than the surrounding 9 pts => reduce h_ip and increase a_ip
+               IF( ln_pnd_H12 .AND. pv_ip(ji,jj,jl) > 0._wp ) THEN
+                  zhip = pv_ip(ji,jj,jl) / MAX( epsi20, pa_ip(ji,jj,jl) )
+                  IF( zhip > phip_max(ji,jj,jl) .AND. pa_ip(ji,jj,jl) < 0.15 ) THEN
+                     pa_ip(ji,jj,jl) = pv_ip(ji,jj,jl) / phip_max(ji,jj,jl)
+                  ENDIF
+               ENDIF
+               !
+               !                               ! -- check h_i -- !
+               ! if h_i is larger than the surrounding 9 pts => reduce h_i and increase a_i
+               zhi = pv_i(ji,jj,jl) / pa_i(ji,jj,jl)
+               IF( zhi > phi_max(ji,jj,jl) .AND. pa_i(ji,jj,jl) < 0.15 ) THEN
+                  pa_i(ji,jj,jl) = pv_i(ji,jj,jl) / MIN( phi_max(ji,jj,jl), hi_max(jpl) )   !-- bound h_i to hi_max (99 m)
+               ENDIF
+               !
+               !                               ! -- check h_s -- !
+               ! if h_s is larger than the surrounding 9 pts => put the snow excess in the ocean
+               zhs = pv_s(ji,jj,jl) / pa_i(ji,jj,jl)
+               IF( pv_s(ji,jj,jl) > 0._wp .AND. zhs > phs_max(ji,jj,jl) .AND. pa_i(ji,jj,jl) < 0.15 ) THEN
+                  zfra = phs_max(ji,jj,jl) / MAX( zhs, epsi20 )
+                  !
+                  wfx_res(ji,jj) = wfx_res(ji,jj) + ( pv_s(ji,jj,jl) - pa_i(ji,jj,jl) * phs_max(ji,jj,jl) ) * rhos * z1_dt
+                  hfx_res(ji,jj) = hfx_res(ji,jj) - SUM( pe_s(ji,jj,1:nlay_s,jl) ) * ( 1._wp - zfra ) * z1_dt ! W.m-2 <0
+                  !
+                  pe_s(ji,jj,1:nlay_s,jl) = pe_s(ji,jj,1:nlay_s,jl) * zfra
+                  pv_s(ji,jj,jl)          = pa_i(ji,jj,jl) * phs_max(ji,jj,jl)
+               ENDIF           
+               !                  
+            ENDIF
+         END_2D
+      END DO 
+      !
+   END SUBROUTINE Hbig
+
+
+   SUBROUTINE Hsnow( pdt, pv_i, pv_s, pa_i, pa_ip, pe_s )
+      !!-------------------------------------------------------------------
+      !!                  ***  ROUTINE Hsnow  ***
+      !!
+      !! ** Purpose : 1- Check snow load after advection
+      !!              2- Correct pond concentration to avoid a_ip > a_i
+      !!
+      !! ** Method :  If snow load makes snow-ice interface to deplet below the ocean surface
+      !!              then put the snow excess in the ocean
+      !!
+      !! ** Notes :   This correction is crucial because of the call to routine icecor afterwards
+      !!              which imposes a mini of ice thick. (rn_himin). This imposed mini can artificially
+      !!              make the snow very thick (if concentration decreases drastically)
+      !!              This behavior has been seen in Ultimate-Macho and supposedly it can also be true for Prather
+      !!-------------------------------------------------------------------
+      REAL(wp)                    , INTENT(in   ) ::   pdt   ! tracer time-step
+      REAL(wp), DIMENSION(:,:,:)  , INTENT(inout) ::   pv_i, pv_s, pa_i, pa_ip
+      REAL(wp), DIMENSION(:,:,:,:), INTENT(inout) ::   pe_s
+      !
+      INTEGER  ::   ji, jj, jl   ! dummy loop indices
+      REAL(wp) ::   z1_dt, zvs_excess, zfra
+      !!-------------------------------------------------------------------
+      !
+      z1_dt = 1._wp / pdt
+      !
+      ! -- check snow load -- !
+      DO jl = 1, jpl
+         DO_2D_11_11
+            IF ( pv_i(ji,jj,jl) > 0._wp ) THEN
+               !
+               zvs_excess = MAX( 0._wp, pv_s(ji,jj,jl) - pv_i(ji,jj,jl) * (rho0-rhoi) * r1_rhos )
+               !
+               IF( zvs_excess > 0._wp ) THEN   ! snow-ice interface deplets below the ocean surface
+                  ! put snow excess in the ocean
+                  zfra = ( pv_s(ji,jj,jl) - zvs_excess ) / MAX( pv_s(ji,jj,jl), epsi20 )
+                  wfx_res(ji,jj) = wfx_res(ji,jj) + zvs_excess * rhos * z1_dt
+                  hfx_res(ji,jj) = hfx_res(ji,jj) - SUM( pe_s(ji,jj,1:nlay_s,jl) ) * ( 1._wp - zfra ) * z1_dt ! W.m-2 <0
+                  ! correct snow volume and heat content
+                  pe_s(ji,jj,1:nlay_s,jl) = pe_s(ji,jj,1:nlay_s,jl) * zfra
+                  pv_s(ji,jj,jl)          = pv_s(ji,jj,jl) - zvs_excess
+               ENDIF
+               !
+            ENDIF
+         END_2D
+      END DO
+      !
+      !-- correct pond concentration to avoid a_ip > a_i -- !
+      WHERE( pa_ip(:,:,:) > pa_i(:,:,:) )   pa_ip(:,:,:) = pa_i(:,:,:)
+      !
+   END SUBROUTINE Hsnow
 
 
    SUBROUTINE adv_pra_init
@@ -623,8 +718,7 @@ CONTAINS
       !!-------------------------------------------------------------------
       !
       !                             !* allocate prather fields
-      ALLOCATE( sxopw(jpi,jpj)     , syopw(jpi,jpj)     , sxxopw(jpi,jpj)     , syyopw(jpi,jpj)     , sxyopw(jpi,jpj)     ,   &
-         &      sxice(jpi,jpj,jpl) , syice(jpi,jpj,jpl) , sxxice(jpi,jpj,jpl) , syyice(jpi,jpj,jpl) , sxyice(jpi,jpj,jpl) ,   &
+      ALLOCATE( sxice(jpi,jpj,jpl) , syice(jpi,jpj,jpl) , sxxice(jpi,jpj,jpl) , syyice(jpi,jpj,jpl) , sxyice(jpi,jpj,jpl) ,   &
          &      sxsn (jpi,jpj,jpl) , sysn (jpi,jpj,jpl) , sxxsn (jpi,jpj,jpl) , syysn (jpi,jpj,jpl) , sxysn (jpi,jpj,jpl) ,   &
          &      sxa  (jpi,jpj,jpl) , sya  (jpi,jpj,jpl) , sxxa  (jpi,jpj,jpl) , syya  (jpi,jpj,jpl) , sxya  (jpi,jpj,jpl) ,   &
          &      sxsal(jpi,jpj,jpl) , sysal(jpi,jpj,jpl) , sxxsal(jpi,jpj,jpl) , syysal(jpi,jpj,jpl) , sxysal(jpi,jpj,jpl) ,   &
@@ -651,7 +745,7 @@ CONTAINS
       !!---------------------------------------------------------------------
       !!                   ***  ROUTINE adv_pra_rst  ***
       !!                     
-      !! ** Purpose :   Read or write RHG file in restart file
+      !! ** Purpose :   Read or write file in restart file
       !!
       !! ** Method  :   use of IOM library
       !!----------------------------------------------------------------------
@@ -670,7 +764,7 @@ CONTAINS
       IF( TRIM(cdrw) == 'READ' ) THEN        !==  Read or initialize  ==!
          !                                   !==========================!
          !
-         IF( ln_rstart ) THEN   ;   id1 = iom_varid( numrir, 'sxopw' , ldstop = .FALSE. )    ! file exist: id1>0
+         IF( ln_rstart ) THEN   ;   id1 = iom_varid( numrir, 'sxice' , ldstop = .FALSE. )    ! file exist: id1>0
          ELSE                   ;   id1 = 0                                                  ! no restart: id1=0
          ENDIF
          !
@@ -688,7 +782,7 @@ CONTAINS
             CALL iom_get( numrir, jpdom_autoglo, 'sxxsn' , sxxsn  )
             CALL iom_get( numrir, jpdom_autoglo, 'syysn' , syysn  )
             CALL iom_get( numrir, jpdom_autoglo, 'sxysn' , sxysn  )
-            !                                                        ! lead fraction
+            !                                                        ! ice concentration
             CALL iom_get( numrir, jpdom_autoglo, 'sxa'   , sxa    )
             CALL iom_get( numrir, jpdom_autoglo, 'sya'   , sya    )
             CALL iom_get( numrir, jpdom_autoglo, 'sxxa'  , sxxa   )
@@ -706,12 +800,6 @@ CONTAINS
             CALL iom_get( numrir, jpdom_autoglo, 'sxxage', sxxage )
             CALL iom_get( numrir, jpdom_autoglo, 'syyage', syyage )
             CALL iom_get( numrir, jpdom_autoglo, 'sxyage', sxyage )
-            !                                                        ! open water in sea ice
-            CALL iom_get( numrir, jpdom_autoglo, 'sxopw' , sxopw  )
-            CALL iom_get( numrir, jpdom_autoglo, 'syopw' , syopw  )
-            CALL iom_get( numrir, jpdom_autoglo, 'sxxopw', sxxopw )
-            CALL iom_get( numrir, jpdom_autoglo, 'syyopw', syyopw )
-            CALL iom_get( numrir, jpdom_autoglo, 'sxyopw', sxyopw )
             !                                                        ! snow layers heat content
             DO jk = 1, nlay_s
                WRITE(zchar1,'(I2.2)') jk
@@ -751,10 +839,9 @@ CONTAINS
             !
             sxice = 0._wp   ;   syice = 0._wp   ;   sxxice = 0._wp   ;   syyice = 0._wp   ;   sxyice = 0._wp      ! ice thickness
             sxsn  = 0._wp   ;   sysn  = 0._wp   ;   sxxsn  = 0._wp   ;   syysn  = 0._wp   ;   sxysn  = 0._wp      ! snow thickness
-            sxa   = 0._wp   ;   sya   = 0._wp   ;   sxxa   = 0._wp   ;   syya   = 0._wp   ;   sxya   = 0._wp      ! lead fraction
+            sxa   = 0._wp   ;   sya   = 0._wp   ;   sxxa   = 0._wp   ;   syya   = 0._wp   ;   sxya   = 0._wp      ! ice concentration
             sxsal = 0._wp   ;   sysal = 0._wp   ;   sxxsal = 0._wp   ;   syysal = 0._wp   ;   sxysal = 0._wp      ! ice salinity
             sxage = 0._wp   ;   syage = 0._wp   ;   sxxage = 0._wp   ;   syyage = 0._wp   ;   sxyage = 0._wp      ! ice age
-            sxopw = 0._wp   ;   syopw = 0._wp   ;   sxxopw = 0._wp   ;   syyopw = 0._wp   ;   sxyopw = 0._wp      ! open water in sea ice
             sxc0  = 0._wp   ;   syc0  = 0._wp   ;   sxxc0  = 0._wp   ;   syyc0  = 0._wp   ;   sxyc0  = 0._wp      ! snow layers heat content
             sxe   = 0._wp   ;   sye   = 0._wp   ;   sxxe   = 0._wp   ;   syye   = 0._wp   ;   sxye   = 0._wp      ! ice layers heat content
             IF( ln_pnd_H12 ) THEN
@@ -785,7 +872,7 @@ CONTAINS
          CALL iom_rstput( iter, nitrst, numriw, 'sxxsn' , sxxsn  )
          CALL iom_rstput( iter, nitrst, numriw, 'syysn' , syysn  )
          CALL iom_rstput( iter, nitrst, numriw, 'sxysn' , sxysn  )
-         !                                                           ! lead fraction
+         !                                                           ! ice concentration
          CALL iom_rstput( iter, nitrst, numriw, 'sxa'   , sxa    )
          CALL iom_rstput( iter, nitrst, numriw, 'sya'   , sya    )
          CALL iom_rstput( iter, nitrst, numriw, 'sxxa'  , sxxa   )
@@ -803,12 +890,6 @@ CONTAINS
          CALL iom_rstput( iter, nitrst, numriw, 'sxxage', sxxage )
          CALL iom_rstput( iter, nitrst, numriw, 'syyage', syyage )
          CALL iom_rstput( iter, nitrst, numriw, 'sxyage', sxyage )
-         !                                                           ! open water in sea ice
-         CALL iom_rstput( iter, nitrst, numriw, 'sxopw' , sxopw  )
-         CALL iom_rstput( iter, nitrst, numriw, 'syopw' , syopw  )
-         CALL iom_rstput( iter, nitrst, numriw, 'sxxopw', sxxopw )
-         CALL iom_rstput( iter, nitrst, numriw, 'syyopw', syyopw )
-         CALL iom_rstput( iter, nitrst, numriw, 'sxyopw', sxyopw )
          !                                                           ! snow layers heat content
          DO jk = 1, nlay_s
             WRITE(zchar1,'(I2.2)') jk

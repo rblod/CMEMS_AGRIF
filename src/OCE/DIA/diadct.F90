@@ -10,10 +10,8 @@ MODULE diadct
    !!             -   ! 04/2007 (C Bricaud) test on sec%nb_point, initialisation of ztransp1,ztransp2,...
    !!            3.4  ! 09/2011 (C Bricaud)
    !!----------------------------------------------------------------------
-#if defined key_diadct
-   !!----------------------------------------------------------------------
-   !!   'key_diadct' :
-   !!----------------------------------------------------------------------
+   !! does not work with agrif
+#if ! defined key_agrif
    !!----------------------------------------------------------------------
    !!   dia_dct      :  Compute the transport through a sec.
    !!   dia_dct_init :  Read namelist.
@@ -41,18 +39,13 @@ MODULE diadct
    PRIVATE
 
    PUBLIC   dia_dct      ! routine called by step.F90
-   PUBLIC   dia_dct_init ! routine called by opa.F90
-   PUBLIC   diadct_alloc ! routine called by nemo_init in nemogcm.F90 
-   PRIVATE  readsec
-   PRIVATE  removepoints
-   PRIVATE  transport
-   PRIVATE  dia_dct_wri
+   PUBLIC   dia_dct_init ! routine called by nemogcm.F90
 
-   LOGICAL, PUBLIC, PARAMETER ::   lk_diadct = .TRUE.   !: model-data diagnostics flag
-
-   INTEGER :: nn_dct        ! Frequency of computation
-   INTEGER :: nn_dctwri     ! Frequency of output
-   INTEGER :: nn_secdebug   ! Number of the section to debug
+   !                         !!** namelist variables **
+   LOGICAL, PUBLIC ::   ln_diadct     !: Calculate transport thru a section or not
+   INTEGER         ::   nn_dct        !  Frequency of computation
+   INTEGER         ::   nn_dctwri     !  Frequency of output
+   INTEGER         ::   nn_secdebug   !  Number of the section to debug
    
    INTEGER, PARAMETER :: nb_class_max  = 10
    INTEGER, PARAMETER :: nb_sec_max    = 150
@@ -98,26 +91,23 @@ MODULE diadct
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: diadct.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: diadct.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
  
-  INTEGER FUNCTION diadct_alloc() 
-     !!---------------------------------------------------------------------- 
-     !!                   ***  FUNCTION diadct_alloc  *** 
-     !!---------------------------------------------------------------------- 
-     INTEGER :: ierr(2) 
-     !!---------------------------------------------------------------------- 
+   INTEGER FUNCTION diadct_alloc() 
+      !!---------------------------------------------------------------------- 
+      !!                   ***  FUNCTION diadct_alloc  *** 
+      !!---------------------------------------------------------------------- 
 
-     ALLOCATE(transports_3d(nb_3d_vars,nb_sec_max,nb_point_max,jpk), STAT=ierr(1) ) 
-     ALLOCATE(transports_2d(nb_2d_vars,nb_sec_max,nb_point_max)    , STAT=ierr(2) ) 
+      ALLOCATE( transports_3d(nb_3d_vars,nb_sec_max,nb_point_max,jpk), &
+         &      transports_2d(nb_2d_vars,nb_sec_max,nb_point_max)    , STAT=diadct_alloc ) 
 
-     diadct_alloc = MAXVAL( ierr ) 
-     IF( diadct_alloc /= 0 )   CALL ctl_stop( 'STOP', 'diadct_alloc: failed to allocate arrays' ) 
- 
-  END FUNCTION diadct_alloc 
+      CALL mpp_sum( 'diadct', diadct_alloc ) 
+      IF( diadct_alloc /= 0 )   CALL ctl_stop( 'STOP', 'diadct_alloc: failed to allocate arrays' ) 
 
+   END FUNCTION diadct_alloc
 
    SUBROUTINE dia_dct_init
       !!---------------------------------------------------------------------
@@ -129,24 +119,23 @@ CONTAINS
       !!---------------------------------------------------------------------
       INTEGER  ::   ios                 ! Local integer output status for namelist read
       !!
-      NAMELIST/namdct/nn_dct,nn_dctwri,nn_secdebug
+      NAMELIST/nam_diadct/ln_diadct, nn_dct, nn_dctwri, nn_secdebug
       !!---------------------------------------------------------------------
 
-     REWIND( numnam_ref )              ! Namelist namdct in reference namelist : Diagnostic: transport through sections
-     READ  ( numnam_ref, namdct, IOSTAT = ios, ERR = 901)
-901  IF( ios /= 0 ) CALL ctl_nam ( ios , 'namdct in reference namelist', lwp )
+     READ  ( numnam_ref, nam_diadct, IOSTAT = ios, ERR = 901)
+901  IF( ios /= 0 ) CALL ctl_nam ( ios , 'nam_diadct in reference namelist' )
 
-     REWIND( numnam_cfg )              ! Namelist namdct in configuration namelist : Diagnostic: transport through sections
-     READ  ( numnam_cfg, namdct, IOSTAT = ios, ERR = 902 )
-902  IF( ios >  0 ) CALL ctl_nam ( ios , 'namdct in configuration namelist', lwp )
-     IF(lwm) WRITE ( numond, namdct )
+     READ  ( numnam_cfg, nam_diadct, IOSTAT = ios, ERR = 902 )
+902  IF( ios >  0 ) CALL ctl_nam ( ios , 'nam_diadct in configuration namelist' )
+     IF(lwm) WRITE ( numond, nam_diadct )
 
      IF( lwp ) THEN
         WRITE(numout,*) " "
         WRITE(numout,*) "diadct_init: compute transports through sections "
         WRITE(numout,*) "~~~~~~~~~~~~~~~~~~~~~"
-        WRITE(numout,*) "       Frequency of computation: nn_dct    = ",nn_dct
-        WRITE(numout,*) "       Frequency of write:       nn_dctwri = ",nn_dctwri
+        WRITE(numout,*) "       Calculate transport thru sections: ln_diadct = ", ln_diadct
+        WRITE(numout,*) "       Frequency of computation:          nn_dct    = ", nn_dct
+        WRITE(numout,*) "       Frequency of write:                nn_dctwri = ", nn_dctwri
 
         IF      ( nn_secdebug .GE. 1 .AND. nn_secdebug .LE. nb_sec_max )THEN
                                             WRITE(numout,*)"       Debug section number: ", nn_secdebug 
@@ -154,30 +143,36 @@ CONTAINS
         ELSE IF ( nn_secdebug == -1 )THEN ; WRITE(numout,*)"       Debug all sections"
         ELSE                              ; WRITE(numout,*)"       Wrong value for nn_secdebug : ",nn_secdebug
         ENDIF
+     ENDIF
 
+     IF( ln_diadct ) THEN
+        ! control
         IF(nn_dct .GE. nn_dctwri .AND. MOD(nn_dct,nn_dctwri) .NE. 0)  &
-          &  CALL ctl_stop( 'diadct: nn_dct should be smaller and a multiple of nn_dctwri' )
+           &  CALL ctl_stop( 'diadct: nn_dct should be smaller and a multiple of nn_dctwri' )
 
+        ! allocate dia_dct arrays
+        IF( diadct_alloc() /= 0 )   CALL ctl_stop( 'STOP', 'diadct_alloc: failed to allocate arrays' )
+
+        !Read section_ijglobal.diadct
+        CALL readsec
+
+        !open output file
+        IF( lwm ) THEN
+           CALL ctl_opn( numdct_vol,  'volume_transport', 'NEW', 'FORMATTED', 'SEQUENTIAL', -1, numout,  .FALSE. )
+           CALL ctl_opn( numdct_heat, 'heat_transport'  , 'NEW', 'FORMATTED', 'SEQUENTIAL', -1, numout,  .FALSE. )
+           CALL ctl_opn( numdct_salt, 'salt_transport'  , 'NEW', 'FORMATTED', 'SEQUENTIAL', -1, numout,  .FALSE. )
+        ENDIF
+
+        ! Initialise arrays to zero 
+        transports_3d(:,:,:,:)=0.0 
+        transports_2d(:,:,:)  =0.0 
+        !
      ENDIF
-
-     !Read section_ijglobal.diadct
-     CALL readsec
-
-     !open output file
-     IF( lwm ) THEN
-        CALL ctl_opn( numdct_vol,  'volume_transport', 'NEW', 'FORMATTED', 'SEQUENTIAL', -1, numout,  .FALSE. )
-        CALL ctl_opn( numdct_heat, 'heat_transport'  , 'NEW', 'FORMATTED', 'SEQUENTIAL', -1, numout,  .FALSE. )
-        CALL ctl_opn( numdct_salt, 'salt_transport'  , 'NEW', 'FORMATTED', 'SEQUENTIAL', -1, numout,  .FALSE. )
-     ENDIF
-
-     ! Initialise arrays to zero 
-     transports_3d(:,:,:,:)=0.0 
-     transports_2d(:,:,:)  =0.0 
      !
   END SUBROUTINE dia_dct_init
  
  
-  SUBROUTINE dia_dct( kt )
+  SUBROUTINE dia_dct( kt, Kmm )
      !!---------------------------------------------------------------------
      !!               ***  ROUTINE diadct  ***  
      !!
@@ -194,7 +189,8 @@ CONTAINS
      !!               Call dia_dct_wri to write the transports into file 
      !!               Reinitialise all relevant arrays to zero 
      !!---------------------------------------------------------------------
-     INTEGER, INTENT(in) ::   kt
+     INTEGER, INTENT(in) ::   kt    ! ocean time step
+     INTEGER, INTENT(in) ::   Kmm   ! time level index
      !
      INTEGER ::   jsec              ! loop on sections
      INTEGER ::   itotal            ! nb_sec_max*nb_type_class*nb_class_max
@@ -234,7 +230,7 @@ CONTAINS
            IF( (jsec==nn_secdebug .OR. nn_secdebug==-1) .AND.  kt==nit000+nn_dct-1 ) lldebug=.TRUE. 
 
            !Compute transport through section  
-           CALL transport(secs(jsec),lldebug,jsec) 
+           CALL transport(Kmm,secs(jsec),lldebug,jsec) 
 
         ENDDO
              
@@ -248,7 +244,7 @@ CONTAINS
  
            ! Sum over each class 
            DO jsec=1,nb_sec 
-              CALL dia_dct_sum(secs(jsec),jsec) 
+              CALL dia_dct_sum(Kmm,secs(jsec),jsec) 
            ENDDO 
 
            !Sum on all procs 
@@ -560,7 +556,7 @@ CONTAINS
    END SUBROUTINE removepoints
 
 
-   SUBROUTINE transport(sec,ld_debug,jsec)
+   SUBROUTINE transport(Kmm,sec,ld_debug,jsec)
      !!-------------------------------------------------------------------------------------------
      !!                     ***  ROUTINE transport  ***
      !!
@@ -580,6 +576,7 @@ CONTAINS
      !!              point in a section, summed over each nn_dct. 
      !!
      !!-------------------------------------------------------------------------------------------
+     INTEGER      ,INTENT(IN)    :: Kmm         ! time level index
      TYPE(SECTION),INTENT(INOUT) :: sec
      LOGICAL      ,INTENT(IN)    :: ld_debug
      INTEGER      ,INTENT(IN)    :: jsec        ! numeric identifier of section
@@ -675,34 +672,34 @@ CONTAINS
             !           ! compute temperature, salinity, insitu & potential density, ssh and depth at U/V point 
             SELECT CASE( sec%direction(jseg) )
                CASE(0,1) 
-                  ztn   = interp(k%I,k%J,jk,'V',tsn(:,:,:,jp_tem) ) 
-                  zsn   = interp(k%I,k%J,jk,'V',tsn(:,:,:,jp_sal) ) 
-                  zrhop = interp(k%I,k%J,jk,'V',rhop) 
-                  zrhoi = interp(k%I,k%J,jk,'V',rhd*rau0+rau0) 
-                  zsshn =  0.5*( sshn(k%I,k%J) + sshn(k%I,k%J+1)    ) * vmask(k%I,k%J,1) 
+                  ztn   = interp(Kmm,k%I,k%J,jk,'V',ts(:,:,:,jp_tem,Kmm) ) 
+                  zsn   = interp(Kmm,k%I,k%J,jk,'V',ts(:,:,:,jp_sal,Kmm) ) 
+                  zrhop = interp(Kmm,k%I,k%J,jk,'V',rhop) 
+                  zrhoi = interp(Kmm,k%I,k%J,jk,'V',rhd*rho0+rho0) 
+                  zsshn =  0.5*( ssh(k%I,k%J,Kmm) + ssh(k%I,k%J+1,Kmm)    ) * vmask(k%I,k%J,1) 
                CASE(2,3) 
-                  ztn   = interp(k%I,k%J,jk,'U',tsn(:,:,:,jp_tem) ) 
-                  zsn   = interp(k%I,k%J,jk,'U',tsn(:,:,:,jp_sal) ) 
-                  zrhop = interp(k%I,k%J,jk,'U',rhop) 
-                  zrhoi = interp(k%I,k%J,jk,'U',rhd*rau0+rau0) 
-                  zsshn =  0.5*( sshn(k%I,k%J) + sshn(k%I+1,k%J)    ) * umask(k%I,k%J,1)  
+                  ztn   = interp(Kmm,k%I,k%J,jk,'U',ts(:,:,:,jp_tem,Kmm) ) 
+                  zsn   = interp(Kmm,k%I,k%J,jk,'U',ts(:,:,:,jp_sal,Kmm) ) 
+                  zrhop = interp(Kmm,k%I,k%J,jk,'U',rhop) 
+                  zrhoi = interp(Kmm,k%I,k%J,jk,'U',rhd*rho0+rho0) 
+                  zsshn =  0.5*( ssh(k%I,k%J,Kmm) + ssh(k%I+1,k%J,Kmm)    ) * umask(k%I,k%J,1)  
                END SELECT 
                !
-               zdep= gdept_n(k%I,k%J,jk) 
+               zdep= gdept(k%I,k%J,jk,Kmm) 
   
                SELECT CASE( sec%direction(jseg) )                !compute velocity with the correct direction 
                CASE(0,1)   
                   zumid=0._wp
-                  zvmid=isgnv*vn(k%I,k%J,jk)*vmask(k%I,k%J,jk) 
+                  zvmid=isgnv*vv(k%I,k%J,jk,Kmm)*vmask(k%I,k%J,jk) 
                CASE(2,3) 
-                  zumid=isgnu*un(k%I,k%J,jk)*umask(k%I,k%J,jk) 
+                  zumid=isgnu*uu(k%I,k%J,jk,Kmm)*umask(k%I,k%J,jk) 
                   zvmid=0._wp
                END SELECT 
  
                !zTnorm=transport through one cell; 
                !velocity* cell's length * cell's thickness 
-               zTnorm = zumid*e2u(k%I,k%J) * e3u_n(k%I,k%J,jk)     & 
-                  &   + zvmid*e1v(k%I,k%J) * e3v_n(k%I,k%J,jk) 
+               zTnorm = zumid*e2u(k%I,k%J) * e3u(k%I,k%J,jk,Kmm)     & 
+                  &   + zvmid*e1v(k%I,k%J) * e3v(k%I,k%J,jk,Kmm) 
 
 !!gm  THIS is WRONG  no transport due to ssh in linear free surface case !!!!!
                IF( ln_linssh ) THEN              !add transport due to free surface 
@@ -767,7 +764,7 @@ CONTAINS
   END SUBROUTINE transport
 
 
-  SUBROUTINE dia_dct_sum(sec,jsec) 
+  SUBROUTINE dia_dct_sum(Kmm,sec,jsec) 
      !!------------------------------------------------------------- 
      !! Purpose: Average the transport over nn_dctwri time steps  
      !! and sum over the density/salinity/temperature/depth classes 
@@ -786,6 +783,7 @@ CONTAINS
      !!           segments linking each point of sec%listPoint  with the next one.    
      !! 
      !!------------------------------------------------------------- 
+     INTEGER      ,INTENT(IN)    :: Kmm         ! time level index
      TYPE(SECTION),INTENT(INOUT) :: sec 
      INTEGER      ,INTENT(IN)    :: jsec        ! numeric identifier of section 
  
@@ -847,20 +845,20 @@ CONTAINS
               ! compute temperature, salinity, insitu & potential density, ssh and depth at U/V point 
               SELECT CASE( sec%direction(jseg) ) 
               CASE(0,1) 
-                 ztn   = interp(k%I,k%J,jk,'V',tsn(:,:,:,jp_tem) ) 
-                 zsn   = interp(k%I,k%J,jk,'V',tsn(:,:,:,jp_sal) ) 
-                 zrhop = interp(k%I,k%J,jk,'V',rhop) 
-                 zrhoi = interp(k%I,k%J,jk,'V',rhd*rau0+rau0) 
+                 ztn   = interp(Kmm,k%I,k%J,jk,'V',ts(:,:,:,jp_tem,Kmm) ) 
+                 zsn   = interp(Kmm,k%I,k%J,jk,'V',ts(:,:,:,jp_sal,Kmm) ) 
+                 zrhop = interp(Kmm,k%I,k%J,jk,'V',rhop) 
+                 zrhoi = interp(Kmm,k%I,k%J,jk,'V',rhd*rho0+rho0) 
 
               CASE(2,3) 
-                 ztn   = interp(k%I,k%J,jk,'U',tsn(:,:,:,jp_tem) ) 
-                 zsn   = interp(k%I,k%J,jk,'U',tsn(:,:,:,jp_sal) ) 
-                 zrhop = interp(k%I,k%J,jk,'U',rhop) 
-                 zrhoi = interp(k%I,k%J,jk,'U',rhd*rau0+rau0) 
-                 zsshn =  0.5*( sshn(k%I,k%J)    + sshn(k%I+1,k%J)    ) * umask(k%I,k%J,1)  
+                 ztn   = interp(Kmm,k%I,k%J,jk,'U',ts(:,:,:,jp_tem,Kmm) ) 
+                 zsn   = interp(Kmm,k%I,k%J,jk,'U',ts(:,:,:,jp_sal,Kmm) ) 
+                 zrhop = interp(Kmm,k%I,k%J,jk,'U',rhop) 
+                 zrhoi = interp(Kmm,k%I,k%J,jk,'U',rhd*rho0+rho0) 
+                 zsshn =  0.5*( ssh(k%I,k%J,Kmm)    + ssh(k%I+1,k%J,Kmm)    ) * umask(k%I,k%J,1)  
               END SELECT 
  
-              zdep= gdept_n(k%I,k%J,jk) 
+              zdep= gdept(k%I,k%J,jk,Kmm) 
   
               !------------------------------- 
               !  LOOP ON THE DENSITY CLASSES | 
@@ -1103,7 +1101,7 @@ CONTAINS
    END SUBROUTINE dia_dct_wri
 
 
-   FUNCTION interp(ki, kj, kk, cd_point, ptab)
+   FUNCTION interp(Kmm, ki, kj, kk, cd_point, ptab)
   !!----------------------------------------------------------------------
   !!
   !!   Purpose: compute temperature/salinity/density at U-point or V-point
@@ -1164,6 +1162,7 @@ CONTAINS
   !!
   !!----------------------------------------------------------------------
   !*arguments
+  INTEGER, INTENT(IN)                          :: Kmm          ! time level index
   INTEGER, INTENT(IN)                          :: ki, kj, kk   ! coordinate of point
   CHARACTER(len=1), INTENT(IN)                 :: cd_point     ! type of point (U, V)
   REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(IN) :: ptab         ! variable to compute at (ki, kj, kk )
@@ -1198,9 +1197,9 @@ CONTAINS
 
   IF( ln_sco )THEN   ! s-coordinate case
 
-     zdepu = ( gdept_n(ii1,ij1,kk) +  gdept_n(ii2,ij2,kk) ) * 0.5_wp 
-     zdep1 = gdept_n(ii1,ij1,kk) - zdepu
-     zdep2 = gdept_n(ii2,ij2,kk) - zdepu
+     zdepu = ( gdept(ii1,ij1,kk,Kmm) +  gdept(ii2,ij2,kk,Kmm) ) * 0.5_wp 
+     zdep1 = gdept(ii1,ij1,kk,Kmm) - zdepu
+     zdep2 = gdept(ii2,ij2,kk,Kmm) - zdepu
 
      ! weights
      zwgt1 = SQRT( ( 0.5 * zet1 ) * ( 0.5 * zet1 ) + ( zdep1 * zdep1 ) )
@@ -1212,9 +1211,9 @@ CONTAINS
 
   ELSE       ! full step or partial step case 
 
-     ze3t  = e3t_n(ii2,ij2,kk) - e3t_n(ii1,ij1,kk) 
-     zwgt1 = ( e3w_n(ii2,ij2,kk) - e3w_n(ii1,ij1,kk) ) / e3w_n(ii2,ij2,kk)
-     zwgt2 = ( e3w_n(ii1,ij1,kk) - e3w_n(ii2,ij2,kk) ) / e3w_n(ii1,ij1,kk)
+     ze3t  = e3t(ii2,ij2,kk,Kmm) - e3t(ii1,ij1,kk,Kmm) 
+     zwgt1 = ( e3w(ii2,ij2,kk,Kmm) - e3w(ii1,ij1,kk,Kmm) ) / e3w(ii2,ij2,kk,Kmm)
+     zwgt2 = ( e3w(ii1,ij1,kk,Kmm) - e3w(ii2,ij2,kk,Kmm) ) / e3w(ii1,ij1,kk,Kmm)
 
      IF(kk .NE. 1)THEN
 
@@ -1240,23 +1239,21 @@ CONTAINS
 
 #else
    !!----------------------------------------------------------------------
-   !!   Default option :                                       Dummy module
+   !!   Dummy module                                             
    !!----------------------------------------------------------------------
-   LOGICAL, PUBLIC, PARAMETER ::   lk_diadct = .FALSE.    !: diamht flag
-   PUBLIC 
-   !! $Id: diadct.F90 10425 2018-12-19 21:54:16Z smasson $
+   LOGICAL, PUBLIC ::   ln_diadct = .FALSE.
 CONTAINS
-
-   SUBROUTINE dia_dct_init          ! Dummy routine
+   SUBROUTINE dia_dct_init
       IMPLICIT NONE
-      WRITE(*,*) 'dia_dct_init: You should not have seen this print! error?'
    END SUBROUTINE dia_dct_init
 
-   SUBROUTINE dia_dct( kt )         ! Dummy routine
+   SUBROUTINE dia_dct( kt, Kmm )         ! Dummy routine
       IMPLICIT NONE
       INTEGER, INTENT( in ) :: kt   ! ocean time-step index
+      INTEGER, INTENT( in ) :: Kmm  ! ocean time level index
       WRITE(*,*) 'dia_dct: You should not have seen this print! error?', kt
    END SUBROUTINE dia_dct
+   !
 #endif
 
    !!======================================================================

@@ -16,7 +16,7 @@ MODULE domzgr
    !!            3.3  ! 2010-11  (G. Madec) add mbk. arrays associated to the deepest ocean level
    !!            3.4  ! 2012-08  (J. Siddorn) added Siddorn and Furner stretching function
    !!            3.4  ! 2012-12  (R. Bourdalle-Badie and G. Reffray)  modify C1D case  
-   !!            3.6  ! 2014-11  (P. Mathiot and C. Harris) add ice shelf capabilitye  
+   !!            3.6  ! 2014-11  (P. Mathiot and C. Harris) add ice shelf capability
    !!            3.?  ! 2015-11  (H. Liu) Modifications for Wetting/Drying
    !!----------------------------------------------------------------------
 
@@ -34,22 +34,21 @@ MODULE domzgr
    !!       fssig1       : Song and Haidvogel 1994 stretch function
    !!       fgamma       : Siddorn and Furner 2012 stretching function
    !!---------------------------------------------------------------------
-   USE oce               ! ocean variables
    USE dom_oce           ! ocean domain
-   USE closea            ! closed seas
    !
    USE in_out_manager    ! I/O manager
    USE iom               ! I/O library
    USE lbclnk            ! ocean lateral boundary conditions (or mpp link)
    USE lib_mpp           ! distributed memory computing library
-   USE wrk_nemo          ! Memory allocation
-   USE timing            ! Timing
+   USE lib_fortran
+   USE dombat
+   USE domisf
 
    IMPLICIT NONE
    PRIVATE
 
    PUBLIC   dom_zgr        ! called by dom_init.F90
-
+   !
    !                              !!* Namelist namzgr_sco *
    LOGICAL  ::   ln_s_sh94         ! use hybrid s-sig Song and Haidvogel 1994 stretching function fssig1 (ln_sco=T)
    LOGICAL  ::   ln_s_sf12         ! use hybrid s-z-sig Siddorn and Furner 2012 stretching function fgamma (ln_sco=T)
@@ -58,6 +57,7 @@ MODULE domzgr
    REAL(wp) ::   rn_sbot_max       ! maximum depth of s-bottom surface (= ocean depth) (>0) (m)
    REAL(wp) ::   rn_rmax           ! maximum cut-off r-value allowed (0<rn_rmax<1)
    REAL(wp) ::   rn_hc             ! Critical depth for transition from sigma to stretched coordinates
+
    ! Song and Haidvogel 1994 stretching parameters
    REAL(wp) ::   rn_theta          ! surface control parameter (0<=rn_theta<=20)
    REAL(wp) ::   rn_thetb          ! bottom control parameter  (0<=rn_thetb<= 1)
@@ -114,7 +114,6 @@ CONTAINS
       NAMELIST/namzgr/ ln_zco, ln_zps, ln_sco, ln_isfcav, ln_linssh
       !!----------------------------------------------------------------------
       !
-      IF( nn_timing == 1 )   CALL timing_start('dom_zgr')
       !
       REWIND( numnam_ref )              ! Namelist namzgr in reference namelist : Vertical coordinate
       READ  ( numnam_ref, namzgr, IOSTAT = ios, ERR = 901 )
@@ -145,6 +144,7 @@ CONTAINS
       IF( ln_sco      )   ioptio = ioptio + 1
       IF( ioptio /= 1 )   CALL ctl_stop( ' none or several vertical coordinate options used' )
       !
+      IF ( ln_isfcav ) CALL zgr_isf_nam
       ioptio = 0
       IF ( ln_zco .AND. ln_isfcav ) ioptio = ioptio + 1
       IF ( ln_sco .AND. ln_isfcav ) ioptio = ioptio + 1
@@ -157,32 +157,29 @@ CONTAINS
       IF( ln_zco      )   CALL zgr_zco          ! z-coordinate
       IF( ln_zps      )   CALL zgr_zps          ! Partial step z-coordinate
       IF( ln_sco      )   CALL zgr_sco          ! s-coordinate or hybrid z-s coordinate
+                          CALL zgr_bat_ctl      ! check bathymetry (mbathy) and suppress isolated ocean points
       !
       ! final adjustment of mbathy & check 
       ! -----------------------------------
-      IF( lzoom       )   CALL zgr_bat_zoom     ! correct mbathy in case of zoom subdomain
-                          CALL zgr_bat_ctl      ! check bathymetry (mbathy) and suppress isolated ocean points
                           CALL zgr_bot_level    ! deepest ocean level for t-, u- and v-points
                           CALL zgr_top_level    ! shallowest ocean level for T-, U-, V- points
       !
       IF( nprint == 1 .AND. lwp )   THEN
          WRITE(numout,*) ' MIN val mbathy  ', MINVAL(  mbathy(:,:) ), ' MAX ', MAXVAL( mbathy(:,:) )
          WRITE(numout,*) ' MIN val depth t ', MINVAL( gdept_0(:,:,:) ),   &
-            &                          ' w ', MINVAL( gdepw_0(:,:,:) ), '3w ', MINVAL( gde3w_0(:,:,:) )
+            &                          ' w ', MINVAL( gdepw_0(:,:,:) )
          WRITE(numout,*) ' MIN val e3    t ', MINVAL(   e3t_0(:,:,:) ), ' f ', MINVAL(   e3f_0(:,:,:) ),  &
             &                          ' u ', MINVAL(   e3u_0(:,:,:) ), ' u ', MINVAL(   e3v_0(:,:,:) ),  &
             &                          ' uw', MINVAL(  e3uw_0(:,:,:) ), ' vw', MINVAL(  e3vw_0(:,:,:)),   &
             &                          ' w ', MINVAL(   e3w_0(:,:,:) )
 
          WRITE(numout,*) ' MAX val depth t ', MAXVAL( gdept_0(:,:,:) ),   &
-            &                          ' w ', MAXVAL( gdepw_0(:,:,:) ), '3w ', MAXVAL( gde3w_0(:,:,:) )
+            &                          ' w ', MAXVAL( gdepw_0(:,:,:) )
          WRITE(numout,*) ' MAX val e3    t ', MAXVAL(   e3t_0(:,:,:) ), ' f ', MAXVAL(   e3f_0(:,:,:) ),  &
             &                          ' u ', MAXVAL(   e3u_0(:,:,:) ), ' u ', MAXVAL(   e3v_0(:,:,:) ),  &
             &                          ' uw', MAXVAL(  e3uw_0(:,:,:) ), ' vw', MAXVAL(  e3vw_0(:,:,:) ),  &
             &                          ' w ', MAXVAL(   e3w_0(:,:,:) )
       ENDIF
-      !
-      IF( nn_timing == 1 )  CALL timing_stop('dom_zgr')
       !
    END SUBROUTINE dom_zgr
 
@@ -215,8 +212,6 @@ CONTAINS
       REAL(wp) ::   zrefdep                ! depth of the reference level (~10m)
       REAL(wp) ::   za2, zkth2, zacr2      ! Values for optional double tanh function set from parameters 
       !!----------------------------------------------------------------------
-      !
-      IF( nn_timing == 1 )  CALL timing_start('zgr_z')
       !
       ! Set variables from parameters
       ! ------------------------------
@@ -315,10 +310,6 @@ CONTAINS
 
       IF ( ln_isfcav .OR. ln_e3_dep ) THEN      ! e3. = dk[gdep]   
          !
-!==>>>   need to be like this to compute the pressure gradient with ISF. 
-!        If not, level beneath the ISF are not aligned (sum(e3t) /= depth)
-!        define e3t_0 and e3w_0 as the differences between gdept and gdepw respectively
-!
          DO jk = 1, jpkm1
             e3t_1d(jk) = gdepw_1d(jk+1)-gdepw_1d(jk) 
          END DO
@@ -347,8 +338,6 @@ CONTAINS
          IF( e3w_1d  (jk) <= 0._wp .OR. e3t_1d  (jk) <= 0._wp )   CALL ctl_stop( 'dom:zgr_z: e3w_1d or e3t_1d =< 0 '    )
          IF( gdepw_1d(jk) <  0._wp .OR. gdept_1d(jk) <  0._wp )   CALL ctl_stop( 'dom:zgr_z: gdepw_1d or gdept_1d < 0 ' )
       END DO
-      !
-      IF( nn_timing == 1 )  CALL timing_stop('zgr_z')
       !
    END SUBROUTINE zgr_z
 
@@ -394,8 +383,6 @@ CONTAINS
       REAL(wp), ALLOCATABLE, DIMENSION(:,:) ::   zdta   ! global domain scalar data
       !!----------------------------------------------------------------------
       !
-      IF( nn_timing == 1 )  CALL timing_start('zgr_bat')
-      !
       IF(lwp) WRITE(numout,*)
       IF(lwp) WRITE(numout,*) '    zgr_bat : defines level and meter bathymetry'
       IF(lwp) WRITE(numout,*) '    ~~~~~~~'
@@ -404,9 +391,9 @@ CONTAINS
          !                                            ! ================== !
          !                                            ! global domain level and meter bathymetry (idta,zdta)
          !
-         ALLOCATE( idta(jpidta,jpjdta), STAT=ierror )
+         ALLOCATE( idta(jpiglo,jpjglo), STAT=ierror )
          IF( ierror > 0 )   CALL ctl_stop( 'STOP', 'zgr_bat: unable to allocate idta array' )
-         ALLOCATE( zdta(jpidta,jpjdta), STAT=ierror )
+         ALLOCATE( zdta(jpiglo,jpjglo), STAT=ierror )
          IF( ierror > 0 )   CALL ctl_stop( 'STOP', 'zgr_bat: unable to allocate zdta array' )
          !
          IF( ntopo == 0 ) THEN                        ! flat basin
@@ -432,8 +419,8 @@ CONTAINS
          ELSE                                         ! bump centered in the basin
             IF(lwp) WRITE(numout,*)
             IF(lwp) WRITE(numout,*) '         bathymetry field: flat basin with a bump'
-            ii_bump = jpidta / 2                           ! i-index of the bump center
-            ij_bump = jpjdta / 2                           ! j-index of the bump center
+            ii_bump = jpiglo / 2                           ! i-index of the bump center
+            ij_bump = jpjglo / 2                           ! j-index of the bump center
             r_bump  = 50000._wp                            ! bump radius (meters)       
             h_bump  =  2700._wp                            ! bump height (meters)
             h_oce   = gdepw_1d(jpk)                        ! background ocean depth (meters)
@@ -443,8 +430,8 @@ CONTAINS
             IF(lwp) WRITE(numout,*) '               bump radius         = ', r_bump , ' index'
             IF(lwp) WRITE(numout,*) '            background ocean depth = ', h_oce  , ' meters'
             !                                        
-            DO jj = 1, jpjdta                              ! zdta :
-               DO ji = 1, jpidta
+            DO jj = 1, jpjglo                              ! zdta :
+               DO ji = 1, jpiglo
                   zi = FLOAT( ji - ii_bump ) * ppe1_m / r_bump
                   zj = FLOAT( jj - ij_bump ) * ppe2_m / r_bump
                   zdta(ji,jj) = h_oce - h_bump * EXP( -( zi*zi + zj*zj ) )
@@ -460,23 +447,23 @@ CONTAINS
                END DO
             ENDIF
          ENDIF
+         !
          !                                            ! set GLOBAL boundary conditions 
-         !                                            ! Caution : idta on the global domain: use of jperio, not nperio
          IF( jperio == 1 .OR. jperio == 4 .OR. jperio == 6 ) THEN
             idta( :    , 1    ) = -1                ;      zdta( :    , 1    ) = -1._wp
-            idta( :    ,jpjdta) =  0                ;      zdta( :    ,jpjdta) =  0._wp
+            idta( :    ,jpjglo) =  0                ;      zdta( :    ,jpjglo) =  0._wp
          ELSEIF( jperio == 2 ) THEN
             idta( :    , 1    ) = idta( : ,  3  )   ;      zdta( :    , 1    ) = zdta( : ,  3  )
-            idta( :    ,jpjdta) = 0                 ;      zdta( :    ,jpjdta) =  0._wp
+            idta( :    ,jpjglo) = 0                 ;      zdta( :    ,jpjglo) =  0._wp
             idta( 1    , :    ) = 0                 ;      zdta( 1    , :    ) =  0._wp
-            idta(jpidta, :    ) = 0                 ;      zdta(jpidta, :    ) =  0._wp
+            idta(jpiglo, :    ) = 0                 ;      zdta(jpiglo, :    ) =  0._wp
          ELSE
             ih = 0                                  ;      zh = 0._wp
             IF( ln_sco )   ih = jpkm1               ;      IF( ln_sco )   zh = h_oce
             idta( :    , 1    ) = ih                ;      zdta( :    , 1    ) =  zh
-            idta( :    ,jpjdta) = ih                ;      zdta( :    ,jpjdta) =  zh
+            idta( :    ,jpjglo) = ih                ;      zdta( :    ,jpjglo) =  zh
             idta( 1    , :    ) = ih                ;      zdta( 1    , :    ) =  zh
-            idta(jpidta, :    ) = ih                ;      zdta(jpidta, :    ) =  zh
+            idta(jpiglo, :    ) = ih                ;      zdta(jpiglo, :    ) =  zh
          ENDIF
 
          !                                            ! local domain level and meter bathymetries (mbathy,bathy)
@@ -491,31 +478,10 @@ CONTAINS
          risfdep(:,:)=0.e0
          misfdep(:,:)=1
          !
-         ! (ISF) TODO build ice draft netcdf file for isomip and build the corresponding part of code
-         IF( cp_cfg == "isomip" .AND. ln_isfcav ) THEN 
-            risfdep(:,:)=200.e0 
-            misfdep(:,:)=1 
-            ij0 = 1 ; ij1 = 40 
-            DO jj = mj0(ij0), mj1(ij1) 
-               risfdep(:,jj)=700.0_wp-(gphit(:,jj)+80.0_wp)*125.0_wp 
-            END DO 
-            WHERE( bathy(:,:) <= 0._wp )  risfdep(:,:) = 0._wp 
-         ! 
-         ELSEIF ( cp_cfg == "isomip2" .AND. ln_isfcav ) THEN
-         ! 
-            risfdep(:,:)=0.e0
-            misfdep(:,:)=1
-            ij0 = 1 ; ij1 = 40
-            DO jj = mj0(ij0), mj1(ij1)
-               risfdep(:,jj)=700.0_wp-(gphit(:,jj)+80.0_wp)*125.0_wp
-            END DO
-            WHERE( bathy(:,:) <= 0._wp )  risfdep(:,:) = 0._wp
-         END IF
-         !
          DEALLOCATE( idta, zdta )
          !
          !                                            ! ================ !
-      ELSEIF( ntopo == 1 ) THEN                       !   read in file   ! (over the local domain)
+      ELSEIF( ntopo == 1 .OR. ntopo ==2 ) THEN                       !   read in file   ! (over the local domain)
          !                                            ! ================ !
          !
          IF( ln_zco )   THEN                          ! zco : read level bathymetry 
@@ -553,13 +519,29 @@ CONTAINS
             !
          ENDIF
          IF( ln_zps .OR. ln_sco )   THEN              ! zps or sco : read meter bathymetry
-            CALL iom_open ( 'bathy_meter.nc', inum ) 
-            IF ( ln_isfcav ) THEN
-               CALL iom_get  ( inum, jpdom_data, 'Bathymetry_isf', bathy, lrowattr=.false. )
+#if defined key_agrif
+            IF (agrif_root()) THEN
+#endif
+            IF( ntopo == 1) THEN
+               CALL iom_open ( 'bathy_meter.nc', inum ) 
+               IF ( ln_isfcav ) THEN
+                  CALL iom_get  ( inum, jpdom_data, 'Bathymetry_isf', bathy, lrowattr=.false. )
+               ELSE
+                  CALL iom_get  ( inum, jpdom_data, 'Bathymetry'    , bathy, lrowattr=ln_use_jattr  )
+               END IF
+               CALL iom_close( inum )
             ELSE
-               CALL iom_get  ( inum, jpdom_data, 'Bathymetry'    , bathy, lrowattr=ln_use_jattr  )
-            END IF
-            CALL iom_close( inum )
+               CALL dom_bat
+            ENDIF       
+#if defined key_agrif
+            ELSE
+               IF( ntopo == 1) THEN
+                  CALL agrif_create_bathy_meter()
+               ELSE 
+                  CALL dom_bat 
+               ENDIF    
+            ENDIF
+#endif
             !                                                
             ! initialisation isf variables
             risfdep(:,:)=0._wp ; misfdep(:,:)=1             
@@ -568,14 +550,6 @@ CONTAINS
                CALL iom_open ( 'isf_draft_meter.nc', inum ) 
                CALL iom_get  ( inum, jpdom_data, 'isf_draft', risfdep )
                CALL iom_close( inum )
-               WHERE( bathy(:,:) <= 0._wp )  risfdep(:,:) = 0._wp
-
-               ! set grounded point to 0 
-               ! (a treshold could be set here if needed, or set it offline based on the grounded fraction)
-               WHERE ( bathy(:,:) <= risfdep(:,:) + rn_isfhmin )
-                  misfdep(:,:) = 0 ; risfdep(:,:) = 0._wp
-                  mbathy (:,:) = 0 ; bathy  (:,:) = 0._wp
-               END WHERE
             END IF
             !       
             IF( cp_cfg == "orca" .AND. jp_cfg == 2 ) THEN    ! ORCA R2 configuration
@@ -610,75 +584,18 @@ CONTAINS
          CALL ctl_stop( '    zgr_bat : '//trim(ctmp1) )
       ENDIF
       !
-      IF( nn_closea == 0 )   CALL clo_bat( bathy, mbathy )    !==  NO closed seas or lakes  ==!
-      !                       
       IF ( .not. ln_sco ) THEN                                !==  set a minimum depth  ==!
          IF( rn_hmin < 0._wp ) THEN    ;   ik = - INT( rn_hmin )                                      ! from a nb of level
          ELSE                          ;   ik = MINLOC( gdepw_1d, mask = gdepw_1d > rn_hmin, dim = 1 )  ! from a depth
          ENDIF
-         zhmin = gdepw_1d(ik+1)                                                         ! minimum depth = ik+1 w-levels 
+         zhmin = gdepw_1d(ik+1)                                                        ! minimum depth = ik+1 w-levels 
          WHERE( bathy(:,:) <= 0._wp )   ;   bathy(:,:) = 0._wp                         ! min=0     over the lands
-         ELSE WHERE                     ;   bathy(:,:) = MAX(  zhmin , bathy(:,:)  )   ! min=zhmin over the oceans
+         ELSE WHERE ( risfdep == 0._wp );   bathy(:,:) = MAX(  zhmin , bathy(:,:)  )   ! min=zhmin over the oceans
          END WHERE
          IF(lwp) write(numout,*) 'Minimum ocean depth: ', zhmin, ' minimum number of ocean levels : ', ik
       ENDIF
       !
-      IF( nn_timing == 1 )  CALL timing_stop('zgr_bat')
-      !
    END SUBROUTINE zgr_bat
-
-
-   SUBROUTINE zgr_bat_zoom
-      !!----------------------------------------------------------------------
-      !!                    ***  ROUTINE zgr_bat_zoom  ***
-      !!
-      !! ** Purpose : - Close zoom domain boundary if necessary
-      !!              - Suppress Med Sea from ORCA R2 and R05 arctic zoom
-      !!
-      !! ** Method  : 
-      !!
-      !! ** Action  : - update mbathy: level bathymetry (in level index)
-      !!----------------------------------------------------------------------
-      INTEGER ::   ii0, ii1, ij0, ij1   ! temporary integers
-      !!----------------------------------------------------------------------
-      !
-      IF(lwp) WRITE(numout,*)
-      IF(lwp) WRITE(numout,*) '    zgr_bat_zoom : modify the level bathymetry for zoom domain'
-      IF(lwp) WRITE(numout,*) '    ~~~~~~~~~~~~'
-      !
-      ! Zoom domain
-      ! ===========
-      !
-      ! Forced closed boundary if required
-      IF( lzoom_s )   mbathy(  : , mj0(jpjzoom):mj1(jpjzoom) )      = 0
-      IF( lzoom_w )   mbathy(      mi0(jpizoom):mi1(jpizoom) , :  ) = 0
-      IF( lzoom_e )   mbathy(      mi0(jpiglo+jpizoom-1):mi1(jpiglo+jpizoom-1) , :  ) = 0
-      IF( lzoom_n )   mbathy(  : , mj0(jpjglo+jpjzoom-1):mj1(jpjglo+jpjzoom-1) )      = 0
-      !
-      ! Configuration specific domain modifications
-      ! (here, ORCA arctic configuration: suppress Med Sea)
-      IF( cp_cfg == "orca" .AND. cp_cfz == "arctic" ) THEN
-         SELECT CASE ( jp_cfg )
-         !                                        ! =======================
-         CASE ( 2 )                               !  ORCA_R2 configuration
-            !                                     ! =======================
-            IF(lwp) WRITE(numout,*) '                   ORCA R2 arctic zoom: suppress the Med Sea'
-            ii0 = 141   ;   ii1 = 162      ! Sea box i,j indices
-            ij0 =  98   ;   ij1 = 110
-            !                                     ! =======================
-         CASE ( 05 )                              !  ORCA_R05 configuration
-            !                                     ! =======================
-            IF(lwp) WRITE(numout,*) '                   ORCA R05 arctic zoom: suppress the Med Sea'
-            ii0 = 563   ;   ii1 = 642      ! zero over the Med Sea boxe
-            ij0 = 314   ;   ij1 = 370 
-         END SELECT
-         !
-         mbathy( mi0(ii0):mi1(ii1) , mj0(ij0):mj1(ij1) ) = 0   ! zero over the Med Sea boxe
-         !
-      ENDIF
-      !
-   END SUBROUTINE zgr_bat_zoom
-
 
    SUBROUTINE zgr_bat_ctl
       !!----------------------------------------------------------------------
@@ -704,12 +621,10 @@ CONTAINS
       !!----------------------------------------------------------------------
       INTEGER ::   ji, jj, jl                    ! dummy loop indices
       INTEGER ::   icompt, ibtest, ikmax         ! temporary integers
-      REAL(wp), POINTER, DIMENSION(:,:) ::  zbathy
+      REAL(wp), ALLOCATABLE, DIMENSION(:,:) ::  zbathy
       !!----------------------------------------------------------------------
       !
-      IF( nn_timing == 1 )  CALL timing_start('zgr_bat_ctl')
-      !
-      CALL wrk_alloc( jpi, jpj, zbathy )
+      ALLOCATE(zbathy(jpi,jpj))
       !
       IF(lwp) WRITE(numout,*)
       IF(lwp) WRITE(numout,*) '    zgr_bat_ctl : check the bathymetry'
@@ -720,10 +635,14 @@ CONTAINS
       IF(lwp) WRITE(numout,*)'                   -----------------------------------'
       icompt = 0
       DO jl = 1, 2
-         IF( nperio == 1 .OR. nperio  ==  4 .OR. nperio  ==  6 ) THEN
+         IF( l_Iperio ) THEN
             mbathy( 1 ,:) = mbathy(jpim1,:)           ! local domain is cyclic east-west
             mbathy(jpi,:) = mbathy(  2  ,:)
          ENDIF
+         zbathy(:,:) = FLOAT( mbathy(:,:) )
+         CALL lbc_lnk( 'domzgr',zbathy, 'T', 1._wp )
+         mbathy(:,:) = INT( zbathy(:,:) )
+         
          DO jj = 2, jpjm1
             DO ji = 2, jpim1
                ibtest = MAX(  mbathy(ji-1,jj), mbathy(ji+1,jj),   &
@@ -737,20 +656,21 @@ CONTAINS
             END DO
          END DO
       END DO
-      IF( lk_mpp )   CALL mpp_sum( icompt )
+
+      IF( lk_mpp )   CALL mpp_sum( 'domzgr', icompt )
       IF( icompt == 0 ) THEN
          IF(lwp) WRITE(numout,*)'     no isolated ocean grid points'
       ELSE
          IF(lwp) WRITE(numout,*)'    ',icompt,' ocean grid points suppressed'
       ENDIF
-      IF( lk_mpp ) THEN
-         zbathy(:,:) = FLOAT( mbathy(:,:) )
-         CALL lbc_lnk( zbathy, 'T', 1._wp )
-         mbathy(:,:) = INT( zbathy(:,:) )
-      ENDIF
+
+      zbathy(:,:) = FLOAT( mbathy(:,:) )
+      CALL lbc_lnk( 'domzgr',zbathy, 'T', 1._wp )
+      mbathy(:,:) = INT( zbathy(:,:) )
+
       !                                          ! East-west cyclic boundary conditions
-      IF( nperio == 0 ) THEN
-         IF(lwp) WRITE(numout,*) ' mbathy set to 0 along east and west boundary: nperio = ', nperio
+      IF( jperio == 0 ) THEN
+         IF(lwp) WRITE(numout,*) ' mbathy set to 0 along east and west boundary: jperio = ', jperio
          IF( lk_mpp ) THEN
             IF( nbondi == -1 .OR. nbondi == 2 ) THEN
                IF( jperio /= 1 )   mbathy(1,:) = 0
@@ -767,33 +687,31 @@ CONTAINS
                mbathy(jpi,:) = jpkm1
             ENDIF
          ENDIF
-      ELSEIF( nperio == 1 .OR. nperio == 4 .OR. nperio ==  6 ) THEN
-         IF(lwp) WRITE(numout,*)' east-west cyclic boundary conditions on mbathy: nperio = ', nperio
+      ELSEIF( l_Iperio ) THEN
+         IF(lwp) WRITE(numout,*)' east-west cyclic boundary conditions on mbathy: jperio = ', jperio
          mbathy( 1 ,:) = mbathy(jpim1,:)
          mbathy(jpi,:) = mbathy(  2  ,:)
-      ELSEIF( nperio == 2 ) THEN
-         IF(lwp) WRITE(numout,*) '   equatorial boundary conditions on mbathy: nperio = ', nperio
+      ELSEIF( jperio == 2 ) THEN
+         IF(lwp) WRITE(numout,*) '   equatorial boundary conditions on mbathy: jperio = ', jperio
       ELSE
          IF(lwp) WRITE(numout,*) '    e r r o r'
-         IF(lwp) WRITE(numout,*) '    parameter , nperio = ', nperio
+         IF(lwp) WRITE(numout,*) '    parameter , jperio = ', jperio
          !         STOP 'dom_mba'
       ENDIF
+
       !  Boundary condition on mbathy
       IF( .NOT.lk_mpp ) THEN 
 !!gm     !!bug ???  think about it !
          !   ... mono- or macro-tasking: T-point, >0, 2D array, no slab
          zbathy(:,:) = FLOAT( mbathy(:,:) )
-         CALL lbc_lnk( zbathy, 'T', 1._wp )
+         CALL lbc_lnk( 'domzgr',zbathy, 'T', 1._wp )
          mbathy(:,:) = INT( zbathy(:,:) )
       ENDIF
+
       ! Number of ocean level inferior or equal to jpkm1
-      ikmax = 0
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-            ikmax = MAX( ikmax, mbathy(ji,jj) )
-         END DO
-      END DO
-!!gm  !!! test to do:   ikmax = MAX( mbathy(:,:) )   ???
+      zbathy(:,:) = FLOAT( mbathy(:,:) )
+      ikmax = glob_max( 'domzgr', zbathy(:,:) )
+
       IF( ikmax > jpkm1 ) THEN
          IF(lwp) WRITE(numout,*) ' maximum number of ocean level = ', ikmax,' >  jpk-1'
          IF(lwp) WRITE(numout,*) ' change jpk to ',ikmax+1,' to use the exact ead bathymetry'
@@ -802,9 +720,7 @@ CONTAINS
          IF(lwp) WRITE(numout,*) ' you can decrease jpk to ', ikmax+1
       ENDIF
       !
-      CALL wrk_dealloc( jpi, jpj, zbathy )
-      !
-      IF( nn_timing == 1 )  CALL timing_stop('zgr_bat_ctl')
+      DEALLOCATE( zbathy )
       !
    END SUBROUTINE zgr_bat_ctl
 
@@ -822,12 +738,10 @@ CONTAINS
       !!                                     (min value = 1 over land)
       !!----------------------------------------------------------------------
       INTEGER ::   ji, jj   ! dummy loop indices
-      REAL(wp), POINTER, DIMENSION(:,:) ::  zmbk
+      REAL(wp), ALLOCATABLE, DIMENSION(:,:) ::  zmbk
       !!----------------------------------------------------------------------
       !
-      IF( nn_timing == 1 )  CALL timing_start('zgr_bot_level')
-      !
-      CALL wrk_alloc( jpi, jpj, zmbk )
+      ALLOCATE( zmbk(jpi,jpj) )
       !
       IF(lwp) WRITE(numout,*)
       IF(lwp) WRITE(numout,*) '    zgr_bot_level : ocean bottom k-index of T-, U-, V- and W-levels '
@@ -843,12 +757,10 @@ CONTAINS
          END DO
       END DO
       ! converte into REAL to use lbc_lnk ; impose a min value of 1 as a zero can be set in lbclnk 
-      zmbk(:,:) = REAL( mbku(:,:), wp )   ;   CALL lbc_lnk(zmbk,'U',1.)   ;   mbku  (:,:) = MAX( INT( zmbk(:,:) ), 1 )
-      zmbk(:,:) = REAL( mbkv(:,:), wp )   ;   CALL lbc_lnk(zmbk,'V',1.)   ;   mbkv  (:,:) = MAX( INT( zmbk(:,:) ), 1 )
+      zmbk(:,:) = REAL( mbku(:,:), wp )   ;   CALL lbc_lnk('domzgr',zmbk,'U',1.)   ;   mbku  (:,:) = MAX( INT( zmbk(:,:) ), 1 )
+      zmbk(:,:) = REAL( mbkv(:,:), wp )   ;   CALL lbc_lnk('domzgr',zmbk,'V',1.)   ;   mbkv  (:,:) = MAX( INT( zmbk(:,:) ), 1 )
       !
-      CALL wrk_dealloc( jpi, jpj, zmbk )
-      !
-      IF( nn_timing == 1 )  CALL timing_stop('zgr_bot_level')
+      DEALLOCATE( zmbk )
       !
    END SUBROUTINE zgr_bot_level
 
@@ -866,12 +778,10 @@ CONTAINS
       !!                                     (min value = 1)
       !!----------------------------------------------------------------------
       INTEGER ::   ji, jj   ! dummy loop indices
-      REAL(wp), POINTER, DIMENSION(:,:) ::  zmik
+      REAL(wp), ALLOCATABLE, DIMENSION(:,:) ::  zmik
       !!----------------------------------------------------------------------
       !
-      IF( nn_timing == 1 )  CALL timing_start('zgr_top_level')
-      !
-      CALL wrk_alloc( jpi, jpj, zmik )
+      ALLOCATE( zmik(jpi,jpj) )
       !
       IF(lwp) WRITE(numout,*)
       IF(lwp) WRITE(numout,*) '    zgr_top_level : ocean top k-index of T-, U-, V- and W-levels '
@@ -888,13 +798,11 @@ CONTAINS
       END DO
 
       ! converte into REAL to use lbc_lnk ; impose a min value of 1 as a zero can be set in lbclnk 
-      zmik(:,:) = REAL( miku(:,:), wp )   ;   CALL lbc_lnk(zmik,'U',1.)   ;   miku  (:,:) = MAX( INT( zmik(:,:) ), 1 )
-      zmik(:,:) = REAL( mikv(:,:), wp )   ;   CALL lbc_lnk(zmik,'V',1.)   ;   mikv  (:,:) = MAX( INT( zmik(:,:) ), 1 )
-      zmik(:,:) = REAL( mikf(:,:), wp )   ;   CALL lbc_lnk(zmik,'F',1.)   ;   mikf  (:,:) = MAX( INT( zmik(:,:) ), 1 )
+      zmik(:,:) = REAL( miku(:,:), wp )   ;   CALL lbc_lnk('domzgr',zmik,'U',1.)   ;   miku  (:,:) = MAX( INT( zmik(:,:) ), 1 )
+      zmik(:,:) = REAL( mikv(:,:), wp )   ;   CALL lbc_lnk('domzgr',zmik,'V',1.)   ;   mikv  (:,:) = MAX( INT( zmik(:,:) ), 1 )
+      zmik(:,:) = REAL( mikf(:,:), wp )   ;   CALL lbc_lnk('domzgr',zmik,'F',1.)   ;   mikf  (:,:) = MAX( INT( zmik(:,:) ), 1 )
       !
-      CALL wrk_dealloc( jpi, jpj, zmik )
-      !
-      IF( nn_timing == 1 )  CALL timing_stop('zgr_top_level')
+      DEALLOCATE( zmik )
       !
    END SUBROUTINE zgr_top_level
 
@@ -910,12 +818,9 @@ CONTAINS
       INTEGER  ::   jk
       !!----------------------------------------------------------------------
       !
-      IF( nn_timing == 1 )  CALL timing_start('zgr_zco')
-      !
       DO jk = 1, jpk
          gdept_0(:,:,jk) = gdept_1d(jk)
          gdepw_0(:,:,jk) = gdepw_1d(jk)
-         gde3w_0(:,:,jk) = gdepw_1d(jk)
          e3t_0  (:,:,jk) = e3t_1d  (jk)
          e3u_0  (:,:,jk) = e3t_1d  (jk)
          e3v_0  (:,:,jk) = e3t_1d  (jk)
@@ -924,8 +829,6 @@ CONTAINS
          e3uw_0 (:,:,jk) = e3w_1d  (jk)
          e3vw_0 (:,:,jk) = e3w_1d  (jk)
       END DO
-      !
-      IF( nn_timing == 1 )  CALL timing_stop('zgr_zco')
       !
    END SUBROUTINE zgr_zco
 
@@ -981,17 +884,19 @@ CONTAINS
       REAL(wp) ::   zdepwp, zdepth   ! Ajusted ocean depth to avoid too small e3t
       REAL(wp) ::   zdiff            ! temporary scalar
       REAL(wp) ::   zmax             ! temporary scalar
-      REAL(wp), POINTER, DIMENSION(:,:,:) ::  zprt
+      REAL(wp), ALLOCATABLE, DIMENSION(:,:,:) ::  zprt
       !!---------------------------------------------------------------------
       !
-      IF( nn_timing == 1 )  CALL timing_start('zgr_zps')
-      !
-      CALL wrk_alloc( jpi,jpj,jpk,   zprt )
+      ALLOCATE( zprt(jpi,jpj,jpk) )
       !
       IF(lwp) WRITE(numout,*)
       IF(lwp) WRITE(numout,*) '    zgr_zps : z-coordinate with partial steps'
       IF(lwp) WRITE(numout,*) '    ~~~~~~~ '
       IF(lwp) WRITE(numout,*) '              mbathy is recomputed : bathy_level file is NOT used'
+
+      ! compute position of the ice shelf grounding line
+      ! set bathy and isfdraft to 0 where grounded
+      IF ( ln_isfcav ) CALL zgr_isf_zspace
 
       ! bathymetry in level (from bathy_meter)
       ! ===================
@@ -1010,6 +915,11 @@ CONTAINS
          WHERE( 0._wp < bathy(:,:) .AND. bathy(:,:) <= zdepth )   mbathy(:,:) = jk-1
       END DO
 
+      ! Check compatibility between bathy and iceshelf draft
+      ! insure at least 2 wet level on the vertical under an ice shelf
+      ! compute misfdep and adjust isf draft if needed
+      IF ( ln_isfcav ) CALL zgr_isf_kspace
+
       ! Scale factors and depth at T- and W-points
       DO jk = 1, jpk                        ! intitialization to the reference z-coordinate
          gdept_0(:,:,jk) = gdept_1d(jk)
@@ -1018,737 +928,7 @@ CONTAINS
          e3w_0  (:,:,jk) = e3w_1d  (jk)
       END DO
       
-      ! Bathy, iceshelf draft, scale factor and depth at T- and W- points in case of isf
-      IF ( ln_isfcav ) CALL zgr_isf
-
       ! Scale factors and depth at T- and W-points
-      IF ( .NOT. ln_isfcav ) THEN
-         DO jj = 1, jpj
-            DO ji = 1, jpi
-               ik = mbathy(ji,jj)
-               IF( ik > 0 ) THEN               ! ocean point only
-                  ! max ocean level case
-                  IF( ik == jpkm1 ) THEN
-                     zdepwp = bathy(ji,jj)
-                     ze3tp  = bathy(ji,jj) - gdepw_1d(ik)
-                     ze3wp = 0.5_wp * e3w_1d(ik) * ( 1._wp + ( ze3tp/e3t_1d(ik) ) )
-                     e3t_0(ji,jj,ik  ) = ze3tp
-                     e3t_0(ji,jj,ik+1) = ze3tp
-                     e3w_0(ji,jj,ik  ) = ze3wp
-                     e3w_0(ji,jj,ik+1) = ze3tp
-                     gdepw_0(ji,jj,ik+1) = zdepwp
-                     gdept_0(ji,jj,ik  ) = gdept_1d(ik-1) + ze3wp
-                     gdept_0(ji,jj,ik+1) = gdept_0(ji,jj,ik) + ze3tp
-                     !
-                  ELSE                         ! standard case
-                     IF( bathy(ji,jj) <= gdepw_1d(ik+1) ) THEN  ;   gdepw_0(ji,jj,ik+1) = bathy(ji,jj)
-                     ELSE                                       ;   gdepw_0(ji,jj,ik+1) = gdepw_1d(ik+1)
-                     ENDIF
-   !gm Bug?  check the gdepw_1d
-                     !       ... on ik
-                     gdept_0(ji,jj,ik) = gdepw_1d(ik) + ( gdepw_0(ji,jj,ik+1) - gdepw_1d(ik) )   &
-                        &                             * ((gdept_1d(     ik  ) - gdepw_1d(ik) )   &
-                        &                             / ( gdepw_1d(     ik+1) - gdepw_1d(ik) ))
-                     e3t_0  (ji,jj,ik) = e3t_1d  (ik) * ( gdepw_0 (ji,jj,ik+1) - gdepw_1d(ik) )   & 
-                        &                             / ( gdepw_1d(      ik+1) - gdepw_1d(ik) ) 
-                     e3w_0(ji,jj,ik) = 0.5_wp * ( gdepw_0(ji,jj,ik+1) + gdepw_1d(ik+1) - 2._wp * gdepw_1d(ik) )   &
-                        &                     * ( e3w_1d(ik) / ( gdepw_1d(ik+1) - gdepw_1d(ik) ) )
-                     !       ... on ik+1
-                     e3w_0  (ji,jj,ik+1) = e3t_0  (ji,jj,ik)
-                     e3t_0  (ji,jj,ik+1) = e3t_0  (ji,jj,ik)
-                     gdept_0(ji,jj,ik+1) = gdept_0(ji,jj,ik) + e3t_0(ji,jj,ik)
-                  ENDIF
-               ENDIF
-            END DO
-         END DO
-         !
-         it = 0
-         DO jj = 1, jpj
-            DO ji = 1, jpi
-               ik = mbathy(ji,jj)
-               IF( ik > 0 ) THEN               ! ocean point only
-                  e3tp (ji,jj) = e3t_0(ji,jj,ik)
-                  e3wp (ji,jj) = e3w_0(ji,jj,ik)
-                  ! test
-                  zdiff= gdepw_0(ji,jj,ik+1) - gdept_0(ji,jj,ik  )
-                  IF( zdiff <= 0._wp .AND. lwp ) THEN 
-                     it = it + 1
-                     WRITE(numout,*) ' it      = ', it, ' ik      = ', ik, ' (i,j) = ', ji, jj
-                     WRITE(numout,*) ' bathy = ', bathy(ji,jj)
-                     WRITE(numout,*) ' gdept_0 = ', gdept_0(ji,jj,ik), ' gdepw_0 = ', gdepw_0(ji,jj,ik+1), ' zdiff = ', zdiff
-                     WRITE(numout,*) ' e3tp    = ', e3t_0  (ji,jj,ik), ' e3wp    = ', e3w_0  (ji,jj,ik  )
-                  ENDIF
-               ENDIF
-            END DO
-         END DO
-      END IF
-      !
-      ! Scale factors and depth at U-, V-, UW and VW-points
-      DO jk = 1, jpk                        ! initialisation to z-scale factors
-         e3u_0 (:,:,jk) = e3t_1d(jk)
-         e3v_0 (:,:,jk) = e3t_1d(jk)
-         e3uw_0(:,:,jk) = e3w_1d(jk)
-         e3vw_0(:,:,jk) = e3w_1d(jk)
-      END DO
-
-      DO jk = 1,jpk                         ! Computed as the minimum of neighbooring scale factors
-         DO jj = 1, jpjm1
-            DO ji = 1, jpim1   ! vector opt.
-               e3u_0 (ji,jj,jk) = MIN( e3t_0(ji,jj,jk), e3t_0(ji+1,jj,jk) )
-               e3v_0 (ji,jj,jk) = MIN( e3t_0(ji,jj,jk), e3t_0(ji,jj+1,jk) )
-               e3uw_0(ji,jj,jk) = MIN( e3w_0(ji,jj,jk), e3w_0(ji+1,jj,jk) )
-               e3vw_0(ji,jj,jk) = MIN( e3w_0(ji,jj,jk), e3w_0(ji,jj+1,jk) )
-            END DO
-         END DO
-      END DO
-      IF ( ln_isfcav ) THEN
-      ! (ISF) define e3uw (adapted for 2 cells in the water column)
-         DO jj = 2, jpjm1 
-            DO ji = 2, jpim1   ! vector opt. 
-               ikb = MAX(mbathy (ji,jj),mbathy (ji+1,jj))
-               ikt = MAX(misfdep(ji,jj),misfdep(ji+1,jj))
-               IF (ikb == ikt+1) e3uw_0(ji,jj,ikb) =  MIN( gdept_0(ji,jj,ikb  ), gdept_0(ji+1,jj  ,ikb  ) ) &
-                                       &            - MAX( gdept_0(ji,jj,ikb-1), gdept_0(ji+1,jj  ,ikb-1) )
-               ikb = MAX(mbathy (ji,jj),mbathy (ji,jj+1))
-               ikt = MAX(misfdep(ji,jj),misfdep(ji,jj+1))
-               IF (ikb == ikt+1) e3vw_0(ji,jj,ikb) =  MIN( gdept_0(ji,jj,ikb  ), gdept_0(ji  ,jj+1,ikb  ) ) &
-                                       &            - MAX( gdept_0(ji,jj,ikb-1), gdept_0(ji  ,jj+1,ikb-1) )
-            END DO
-         END DO
-      END IF
-
-      CALL lbc_lnk( e3u_0 , 'U', 1._wp )   ;   CALL lbc_lnk( e3uw_0, 'U', 1._wp )   ! lateral boundary conditions
-      CALL lbc_lnk( e3v_0 , 'V', 1._wp )   ;   CALL lbc_lnk( e3vw_0, 'V', 1._wp )
-      !
-
-      DO jk = 1, jpk                        ! set to z-scale factor if zero (i.e. along closed boundaries)
-         WHERE( e3u_0 (:,:,jk) == 0._wp )   e3u_0 (:,:,jk) = e3t_1d(jk)
-         WHERE( e3v_0 (:,:,jk) == 0._wp )   e3v_0 (:,:,jk) = e3t_1d(jk)
-         WHERE( e3uw_0(:,:,jk) == 0._wp )   e3uw_0(:,:,jk) = e3w_1d(jk)
-         WHERE( e3vw_0(:,:,jk) == 0._wp )   e3vw_0(:,:,jk) = e3w_1d(jk)
-      END DO
-      
-      ! Scale factor at F-point
-      DO jk = 1, jpk                        ! initialisation to z-scale factors
-         e3f_0(:,:,jk) = e3t_1d(jk)
-      END DO
-      DO jk = 1, jpk                        ! Computed as the minimum of neighbooring V-scale factors
-         DO jj = 1, jpjm1
-            DO ji = 1, jpim1   ! vector opt.
-               e3f_0(ji,jj,jk) = MIN( e3v_0(ji,jj,jk), e3v_0(ji+1,jj,jk) )
-            END DO
-         END DO
-      END DO
-      CALL lbc_lnk( e3f_0, 'F', 1._wp )       ! Lateral boundary conditions
-      !
-      DO jk = 1, jpk                        ! set to z-scale factor if zero (i.e. along closed boundaries)
-         WHERE( e3f_0(:,:,jk) == 0._wp )   e3f_0(:,:,jk) = e3t_1d(jk)
-      END DO
-!!gm  bug ? :  must be a do loop with mj0,mj1
-      ! 
-      e3t_0(:,mj0(1),:) = e3t_0(:,mj0(2),:)     ! we duplicate factor scales for jj = 1 and jj = 2
-      e3w_0(:,mj0(1),:) = e3w_0(:,mj0(2),:) 
-      e3u_0(:,mj0(1),:) = e3u_0(:,mj0(2),:) 
-      e3v_0(:,mj0(1),:) = e3v_0(:,mj0(2),:) 
-      e3f_0(:,mj0(1),:) = e3f_0(:,mj0(2),:) 
-
-      ! Control of the sign
-      IF( MINVAL( e3t_0  (:,:,:) ) <= 0._wp )   CALL ctl_stop( '    zgr_zps :   e r r o r   e3t_0 <= 0' )
-      IF( MINVAL( e3w_0  (:,:,:) ) <= 0._wp )   CALL ctl_stop( '    zgr_zps :   e r r o r   e3w_0 <= 0' )
-      IF( MINVAL( gdept_0(:,:,:) ) <  0._wp )   CALL ctl_stop( '    zgr_zps :   e r r o r   gdept_0 <  0' )
-      IF( MINVAL( gdepw_0(:,:,:) ) <  0._wp )   CALL ctl_stop( '    zgr_zps :   e r r o r   gdepw_0 <  0' )
-     
-      ! Compute gde3w_0 (vertical sum of e3w)
-      IF ( ln_isfcav ) THEN ! if cavity
-         WHERE( misfdep == 0 )   misfdep = 1
-         DO jj = 1,jpj
-            DO ji = 1,jpi
-               gde3w_0(ji,jj,1) = 0.5_wp * e3w_0(ji,jj,1)
-               DO jk = 2, misfdep(ji,jj)
-                  gde3w_0(ji,jj,jk) = gde3w_0(ji,jj,jk-1) + e3w_0(ji,jj,jk) 
-               END DO
-               IF( misfdep(ji,jj) >= 2 )   gde3w_0(ji,jj,misfdep(ji,jj)) = risfdep(ji,jj) + 0.5_wp * e3w_0(ji,jj,misfdep(ji,jj))
-               DO jk = misfdep(ji,jj) + 1, jpk
-                  gde3w_0(ji,jj,jk) = gde3w_0(ji,jj,jk-1) + e3w_0(ji,jj,jk) 
-               END DO
-            END DO
-         END DO
-      ELSE ! no cavity
-         gde3w_0(:,:,1) = 0.5_wp * e3w_0(:,:,1)
-         DO jk = 2, jpk
-            gde3w_0(:,:,jk) = gde3w_0(:,:,jk-1) + e3w_0(:,:,jk)
-         END DO
-      END IF
-      !
-      CALL wrk_dealloc( jpi,jpj,jpk,   zprt )
-      !
-      IF( nn_timing == 1 )  CALL timing_stop('zgr_zps')
-      !
-   END SUBROUTINE zgr_zps
-
-
-   SUBROUTINE zgr_isf
-      !!----------------------------------------------------------------------
-      !!                    ***  ROUTINE zgr_isf  ***
-      !!   
-      !! ** Purpose :   check the bathymetry in levels
-      !!   
-      !! ** Method  :   THe water column have to contained at least 2 cells
-      !!                Bathymetry and isfdraft are modified (dig/close) to respect
-      !!                this criterion.
-      !!   
-      !! ** Action  : - test compatibility between isfdraft and bathy 
-      !!              - bathy and isfdraft are modified
-      !!----------------------------------------------------------------------
-      INTEGER  ::   ji, jj, jl, jk       ! dummy loop indices
-      INTEGER  ::   ik, it               ! temporary integers
-      INTEGER  ::   icompt, ibtest       ! (ISF)
-      INTEGER  ::   ibtestim1, ibtestip1 ! (ISF)
-      INTEGER  ::   ibtestjm1, ibtestjp1 ! (ISF)
-      REAL(wp) ::   zdepth           ! Ajusted ocean depth to avoid too small e3t
-      REAL(wp) ::   zmax             ! Maximum and minimum depth
-      REAL(wp) ::   zbathydiff       ! isf temporary scalar
-      REAL(wp) ::   zrisfdepdiff     ! isf temporary scalar
-      REAL(wp) ::   ze3tp , ze3wp    ! Last ocean level thickness at T- and W-points
-      REAL(wp) ::   zdepwp           ! Ajusted ocean depth to avoid too small e3t
-      REAL(wp) ::   zdiff            ! temporary scalar
-      REAL(wp), POINTER, DIMENSION(:,:)   ::   zrisfdep, zbathy, zmask   ! 2D workspace (ISH)
-      INTEGER , POINTER, DIMENSION(:,:)   ::   zmbathy, zmisfdep         ! 2D workspace (ISH)
-      !!---------------------------------------------------------------------
-      !
-      IF( nn_timing == 1 )   CALL timing_start('zgr_isf')
-      !
-      CALL wrk_alloc( jpi,jpj,   zbathy, zmask, zrisfdep)
-      CALL wrk_alloc( jpi,jpj,   zmisfdep, zmbathy )
-
-      ! (ISF) compute misfdep
-      WHERE( risfdep(:,:) == 0._wp .AND. bathy(:,:) /= 0 ) ;   misfdep(:,:) = 1   ! open water : set misfdep to 1  
-      ELSEWHERE                      ;                         misfdep(:,:) = 2   ! iceshelf : initialize misfdep to second level 
-      END WHERE  
-
-      ! Compute misfdep for ocean points (i.e. first wet level) 
-      ! find the first ocean level such that the first level thickness 
-      ! is larger than the bot_level of e3zps_min and e3zps_rat * e3t_0 (where 
-      ! e3t_0 is the reference level thickness 
-      DO jk = 2, jpkm1 
-         zdepth = gdepw_1d(jk+1) - MIN( e3zps_min, e3t_1d(jk)*e3zps_rat ) 
-         WHERE( 0._wp < risfdep(:,:) .AND. risfdep(:,:) >= zdepth )   misfdep(:,:) = jk+1 
-      END DO 
-      WHERE ( 0._wp < risfdep(:,:) .AND. risfdep(:,:) <= e3t_1d(1) )
-         risfdep(:,:) = 0. ; misfdep(:,:) = 1
-      END WHERE
-
-      ! remove very shallow ice shelf (less than ~ 10m if 75L)
-      WHERE (risfdep(:,:) <= 10._wp .AND. misfdep(:,:) > 1)
-         misfdep = 0; risfdep = 0.0_wp;
-         mbathy  = 0; bathy   = 0.0_wp;
-      END WHERE
-      WHERE (bathy(:,:) <= 30.0_wp .AND. gphit < -60._wp)
-         misfdep = 0; risfdep = 0.0_wp;
-         mbathy  = 0; bathy   = 0.0_wp;
-      END WHERE
- 
-! basic check for the compatibility of bathy and risfdep. I think it should be offline because it is not perfect and cannot solved all the situation
-      icompt = 0 
-! run the bathy check 10 times to be sure all the modif in the bathy or iceshelf draft are compatible together
-      DO jl = 1, 10     
-         ! check at each iteration if isf is grounded or not (1cm treshold have to be update after first coupling experiments)
-         WHERE (bathy(:,:) <= risfdep(:,:) + rn_isfhmin)
-            misfdep(:,:) = 0 ; risfdep(:,:) = 0._wp
-            mbathy (:,:) = 0 ; bathy  (:,:) = 0._wp
-         END WHERE
-         WHERE (mbathy(:,:) <= 0) 
-            misfdep(:,:) = 0; risfdep(:,:) = 0._wp 
-            mbathy (:,:) = 0; bathy  (:,:) = 0._wp
-         END WHERE
-         IF( lk_mpp ) THEN
-            zbathy(:,:)  = FLOAT( misfdep(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
-            misfdep(:,:) = INT( zbathy(:,:) )
-
-            CALL lbc_lnk( risfdep,'T', 1. )
-            CALL lbc_lnk( bathy,  'T', 1. )
-
-            zbathy(:,:)  = FLOAT( mbathy(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
-            mbathy(:,:)  = INT( zbathy(:,:) )
-         ENDIF
-         IF( nperio == 1 .OR. nperio  ==  4 .OR. nperio  ==  6 ) THEN 
-            misfdep( 1 ,:) = misfdep(jpim1,:)            ! local domain is cyclic east-west 
-            misfdep(jpi,:) = misfdep(  2  ,:) 
-            mbathy( 1 ,:)  = mbathy(jpim1,:)             ! local domain is cyclic east-west
-            mbathy(jpi,:)  = mbathy(  2  ,:)
-         ENDIF
-
-         ! split last cell if possible (only where water column is 2 cell or less)
-         ! if coupled to ice sheet, we do not modify the bathymetry (can be discuss).
-         IF ( .NOT. ln_iscpl) THEN
-            DO jk = jpkm1, 1, -1
-               zmax = gdepw_1d(jk) + MIN( e3zps_min, e3t_1d(jk)*e3zps_rat )
-               WHERE( gdepw_1d(jk) < bathy(:,:) .AND. bathy(:,:) <= zmax .AND. misfdep + 1 >= mbathy)
-                  mbathy(:,:) = jk
-                  bathy(:,:)  = zmax
-               END WHERE
-            END DO
-         END IF
- 
-         ! split top cell if possible (only where water column is 2 cell or less)
-         DO jk = 2, jpkm1
-            zmax = gdepw_1d(jk+1) - MIN( e3zps_min, e3t_1d(jk)*e3zps_rat )
-            WHERE( gdepw_1d(jk+1) > risfdep(:,:) .AND. risfdep(:,:) >= zmax .AND. misfdep + 1 >= mbathy)
-               misfdep(:,:) = jk
-               risfdep(:,:) = zmax
-            END WHERE
-         END DO
-
- 
- ! Case where bathy and risfdep compatible but not the level variable mbathy/misfdep because of partial cell condition
-         DO jj = 1, jpj
-            DO ji = 1, jpi
-               ! find the minimum change option:
-               ! test bathy
-               IF (risfdep(ji,jj) > 1) THEN
-                  IF ( .NOT. ln_iscpl ) THEN
-                     zbathydiff  =ABS(bathy(ji,jj)   - (gdepw_1d(mbathy (ji,jj)+1) &
-                         &            + MIN( e3zps_min, e3t_1d(mbathy (ji,jj)+1)*e3zps_rat )))
-                     zrisfdepdiff=ABS(risfdep(ji,jj) - (gdepw_1d(misfdep(ji,jj)  ) &
-                         &            - MIN( e3zps_min, e3t_1d(misfdep(ji,jj)-1)*e3zps_rat )))
-                     IF (bathy(ji,jj) > risfdep(ji,jj) .AND. mbathy(ji,jj) <  misfdep(ji,jj)) THEN
-                        IF (zbathydiff <= zrisfdepdiff) THEN
-                           bathy(ji,jj) = gdepw_1d(mbathy(ji,jj)) + MIN( e3zps_min, e3t_1d(mbathy(ji,jj)+1)*e3zps_rat )
-                           mbathy(ji,jj)= mbathy(ji,jj) + 1
-                        ELSE
-                           risfdep(ji,jj) = gdepw_1d(misfdep(ji,jj)) - MIN( e3zps_min, e3t_1d(misfdep(ji,jj)-1)*e3zps_rat )
-                           misfdep(ji,jj) = misfdep(ji,jj) - 1
-                        END IF
-                     ENDIF
-                  ELSE
-                     IF (bathy(ji,jj) > risfdep(ji,jj) .AND. mbathy(ji,jj) <  misfdep(ji,jj)) THEN
-                        risfdep(ji,jj) = gdepw_1d(misfdep(ji,jj)) - MIN( e3zps_min, e3t_1d(misfdep(ji,jj)-1)*e3zps_rat )
-                        misfdep(ji,jj) = misfdep(ji,jj) - 1
-                     END IF
-                  END IF
-               END IF
-            END DO
-         END DO
- 
-         ! At least 2 levels for water thickness at T, U, and V point.
-         DO jj = 1, jpj
-            DO ji = 1, jpi
-               ! find the minimum change option:
-               ! test bathy
-               IF( misfdep(ji,jj) == mbathy(ji,jj) .AND. mbathy(ji,jj) > 1) THEN
-                  IF ( .NOT. ln_iscpl ) THEN 
-                     zbathydiff  =ABS(bathy(ji,jj)   - ( gdepw_1d(mbathy (ji,jj)+1) &
-                         &                             + MIN( e3zps_min,e3t_1d(mbathy (ji,jj)+1)*e3zps_rat )))
-                     zrisfdepdiff=ABS(risfdep(ji,jj) - ( gdepw_1d(misfdep(ji,jj)  ) & 
-                         &                             - MIN( e3zps_min,e3t_1d(misfdep(ji,jj)-1)*e3zps_rat )))
-                     IF (zbathydiff <= zrisfdepdiff) THEN
-                        mbathy(ji,jj) = mbathy(ji,jj) + 1
-                        bathy(ji,jj)  = gdepw_1d(mbathy (ji,jj)) + MIN( e3zps_min, e3t_1d(mbathy(ji,jj) +1)*e3zps_rat )
-                     ELSE
-                        misfdep(ji,jj)= misfdep(ji,jj) - 1
-                        risfdep(ji,jj) = gdepw_1d(misfdep(ji,jj)+1) - MIN( e3zps_min, e3t_1d(misfdep(ji,jj))*e3zps_rat )
-                     END IF
-                  ELSE
-                     misfdep(ji,jj)= misfdep(ji,jj) - 1
-                     risfdep(ji,jj)= gdepw_1d(misfdep(ji,jj)+1) - MIN( e3zps_min, e3t_1d(misfdep(ji,jj))*e3zps_rat )
-                  END IF
-               ENDIF
-            END DO
-         END DO
- 
- ! point V mbathy(ji,jj) == misfdep(ji,jj+1) 
-         DO jj = 1, jpjm1
-            DO ji = 1, jpim1
-               IF( misfdep(ji,jj+1) == mbathy(ji,jj) .AND. mbathy(ji,jj) > 1) THEN
-                  IF ( .NOT. ln_iscpl ) THEN 
-                     zbathydiff  =ABS(bathy(ji,jj    ) - ( gdepw_1d(mbathy (ji,jj)+1) &
-                          &                              + MIN( e3zps_min, e3t_1d(mbathy (ji,jj  )+1)*e3zps_rat )))
-                     zrisfdepdiff=ABS(risfdep(ji,jj+1) - ( gdepw_1d(misfdep(ji,jj+1)) &
-                          &                              - MIN( e3zps_min, e3t_1d(misfdep(ji,jj+1)-1)*e3zps_rat )))
-                     IF (zbathydiff <= zrisfdepdiff) THEN
-                        mbathy(ji,jj) = mbathy(ji,jj) + 1
-                        bathy(ji,jj)  = gdepw_1d(mbathy (ji,jj  )) + MIN( e3zps_min, e3t_1d(mbathy(ji,jj   )+1)*e3zps_rat )
-                     ELSE
-                        misfdep(ji,jj+1)  = misfdep(ji,jj+1) - 1
-                        risfdep (ji,jj+1) = gdepw_1d(misfdep(ji,jj+1)+1) - MIN( e3zps_min, e3t_1d(misfdep(ji,jj+1))*e3zps_rat )
-                     END IF
-                  ELSE
-                     misfdep(ji,jj+1)  = misfdep(ji,jj+1) - 1
-                     risfdep (ji,jj+1) = gdepw_1d(misfdep(ji,jj+1)+1) - MIN( e3zps_min, e3t_1d(misfdep(ji,jj+1))*e3zps_rat )
-                  END IF
-               ENDIF
-            END DO
-         END DO
- 
-         IF( lk_mpp ) THEN
-            zbathy(:,:)  = FLOAT( misfdep(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
-            misfdep(:,:) = INT( zbathy(:,:) )
-
-            CALL lbc_lnk( risfdep,'T', 1. )
-            CALL lbc_lnk( bathy,  'T', 1. )
-
-            zbathy(:,:)  = FLOAT( mbathy(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
-            mbathy(:,:)  = INT( zbathy(:,:) )
-         ENDIF
- ! point V misdep(ji,jj) == mbathy(ji,jj+1) 
-         DO jj = 1, jpjm1
-            DO ji = 1, jpim1
-               IF( misfdep(ji,jj) == mbathy(ji,jj+1) .AND. mbathy(ji,jj) > 1) THEN
-                  IF ( .NOT. ln_iscpl ) THEN 
-                     zbathydiff  =ABS(  bathy(ji,jj+1) - ( gdepw_1d(mbathy (ji,jj+1)+1) &
-                           &                             + MIN( e3zps_min, e3t_1d(mbathy (ji,jj+1)+1)*e3zps_rat )))
-                     zrisfdepdiff=ABS(risfdep(ji,jj  ) - ( gdepw_1d(misfdep(ji,jj  )  ) &
-                           &                             - MIN( e3zps_min, e3t_1d(misfdep(ji,jj  )-1)*e3zps_rat )))
-                     IF (zbathydiff <= zrisfdepdiff) THEN
-                        mbathy (ji,jj+1) = mbathy(ji,jj+1) + 1
-                        bathy  (ji,jj+1) = gdepw_1d(mbathy (ji,jj+1)  ) + MIN( e3zps_min, e3t_1d(mbathy (ji,jj+1)+1)*e3zps_rat )
-                     ELSE
-                        misfdep(ji,jj)   = misfdep(ji,jj) - 1
-                        risfdep(ji,jj)   = gdepw_1d(misfdep(ji,jj  )+1) - MIN( e3zps_min, e3t_1d(misfdep(ji,jj  )  )*e3zps_rat )
-                     END IF
-                  ELSE
-                     misfdep(ji,jj)   = misfdep(ji,jj) - 1
-                     risfdep(ji,jj)   = gdepw_1d(misfdep(ji,jj  )+1) - MIN( e3zps_min, e3t_1d(misfdep(ji,jj  )  )*e3zps_rat )
-                  END IF
-               ENDIF
-            END DO
-         END DO
- 
- 
-         IF( lk_mpp ) THEN 
-            zbathy(:,:)  = FLOAT( misfdep(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
-            misfdep(:,:) = INT( zbathy(:,:) )
-
-            CALL lbc_lnk( risfdep,'T', 1. )
-            CALL lbc_lnk( bathy,  'T', 1. )
-
-            zbathy(:,:)  = FLOAT( mbathy(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
-            mbathy(:,:)  = INT( zbathy(:,:) )
-         ENDIF 
- 
- ! point U mbathy(ji,jj) == misfdep(ji,jj+1) 
-         DO jj = 1, jpjm1
-            DO ji = 1, jpim1
-               IF( misfdep(ji+1,jj) == mbathy(ji,jj) .AND. mbathy(ji,jj) > 1) THEN
-                  IF ( .NOT. ln_iscpl ) THEN 
-                  zbathydiff  =ABS(  bathy(ji  ,jj) - ( gdepw_1d(mbathy (ji,jj)+1) &
-                       &                              + MIN( e3zps_min, e3t_1d(mbathy (ji  ,jj)+1)*e3zps_rat )))
-                  zrisfdepdiff=ABS(risfdep(ji+1,jj) - ( gdepw_1d(misfdep(ji+1,jj)) &
-                       &                              - MIN( e3zps_min, e3t_1d(misfdep(ji+1,jj)-1)*e3zps_rat )))
-                  IF (zbathydiff <= zrisfdepdiff) THEN
-                     mbathy(ji,jj) = mbathy(ji,jj) + 1
-                     bathy(ji,jj)  = gdepw_1d(mbathy (ji,jj)) + MIN( e3zps_min, e3t_1d(mbathy(ji,jj) +1)*e3zps_rat )
-                  ELSE
-                     misfdep(ji+1,jj)= misfdep(ji+1,jj) - 1
-                     risfdep(ji+1,jj) = gdepw_1d(misfdep(ji+1,jj)+1) - MIN( e3zps_min, e3t_1d(misfdep(ji+1,jj))*e3zps_rat )
-                  END IF
-                  ELSE
-                     misfdep(ji+1,jj)= misfdep(ji+1,jj) - 1
-                     risfdep(ji+1,jj) = gdepw_1d(misfdep(ji+1,jj)+1) - MIN( e3zps_min, e3t_1d(misfdep(ji+1,jj))*e3zps_rat )
-                  ENDIF
-               ENDIF
-            ENDDO
-         ENDDO
- 
-         IF( lk_mpp ) THEN 
-            zbathy(:,:)  = FLOAT( misfdep(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
-            misfdep(:,:) = INT( zbathy(:,:) )
-
-            CALL lbc_lnk( risfdep,'T', 1. )
-            CALL lbc_lnk( bathy,  'T', 1. )
-
-            zbathy(:,:)  = FLOAT( mbathy(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
-            mbathy(:,:)  = INT( zbathy(:,:) )
-         ENDIF 
- 
- ! point U misfdep(ji,jj) == bathy(ji,jj+1) 
-         DO jj = 1, jpjm1
-            DO ji = 1, jpim1
-               IF( misfdep(ji,jj) == mbathy(ji+1,jj) .AND. mbathy(ji,jj) > 1) THEN
-                  IF ( .NOT. ln_iscpl ) THEN 
-                     zbathydiff  =ABS(  bathy(ji+1,jj) - ( gdepw_1d(mbathy (ji+1,jj)+1) &
-                          &                              + MIN( e3zps_min, e3t_1d(mbathy (ji+1,jj)+1)*e3zps_rat )))
-                     zrisfdepdiff=ABS(risfdep(ji  ,jj) - ( gdepw_1d(misfdep(ji  ,jj)  ) &
-                          &                              - MIN( e3zps_min, e3t_1d(misfdep(ji  ,jj)-1)*e3zps_rat )))
-                     IF (zbathydiff <= zrisfdepdiff) THEN
-                        mbathy(ji+1,jj)  = mbathy (ji+1,jj) + 1
-                        bathy (ji+1,jj)  = gdepw_1d(mbathy (ji+1,jj)  ) + MIN( e3zps_min, e3t_1d(mbathy (ji+1,jj) +1)*e3zps_rat )
-                     ELSE
-                        misfdep(ji,jj)   = misfdep(ji  ,jj) - 1
-                        risfdep(ji,jj)   = gdepw_1d(misfdep(ji  ,jj)+1) - MIN( e3zps_min, e3t_1d(misfdep(ji  ,jj)   )*e3zps_rat )
-                     END IF
-                  ELSE
-                     misfdep(ji,jj)   = misfdep(ji  ,jj) - 1
-                     risfdep(ji,jj)   = gdepw_1d(misfdep(ji  ,jj)+1) - MIN( e3zps_min, e3t_1d(misfdep(ji  ,jj)   )*e3zps_rat )
-                  ENDIF
-               ENDIF
-            ENDDO
-         ENDDO
- 
-         IF( lk_mpp ) THEN
-            zbathy(:,:)  = FLOAT( misfdep(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
-            misfdep(:,:) = INT( zbathy(:,:) )
-
-            CALL lbc_lnk( risfdep,'T', 1. )
-            CALL lbc_lnk( bathy,  'T', 1. )
-
-            zbathy(:,:)  = FLOAT( mbathy(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
-            mbathy(:,:)  = INT( zbathy(:,:) )
-         ENDIF
-      END DO
-      ! end dig bathy/ice shelf to be compatible
-      ! now fill single point in "coastline" of ice shelf, bathy, hole, and test again one cell tickness
-      DO jl = 1,20
- 
- ! remove single point "bay" on isf coast line in the ice shelf draft'
-         DO jk = 2, jpk
-            WHERE (misfdep==0) misfdep=jpk
-            zmask=0._wp
-            WHERE (misfdep <= jk) zmask=1
-            DO jj = 2, jpjm1
-               DO ji = 2, jpim1
-                  IF (misfdep(ji,jj) == jk) THEN
-                     ibtest = zmask(ji-1,jj) + zmask(ji+1,jj) + zmask(ji,jj-1) + zmask(ji,jj+1)
-                     IF (ibtest <= 1) THEN
-                        risfdep(ji,jj)=gdepw_1d(jk+1) ; misfdep(ji,jj)=jk+1
-                        IF (misfdep(ji,jj) > mbathy(ji,jj)) misfdep(ji,jj) = jpk
-                     END IF
-                  END IF
-               END DO
-            END DO
-         END DO
-         WHERE (misfdep==jpk)
-             misfdep=0 ; risfdep=0._wp ; mbathy=0 ; bathy=0._wp
-         END WHERE
-         IF( lk_mpp ) THEN
-            zbathy(:,:)  = FLOAT( misfdep(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
-            misfdep(:,:) = INT( zbathy(:,:) )
-
-            CALL lbc_lnk( risfdep,'T', 1. )
-            CALL lbc_lnk( bathy,  'T', 1. )
-
-            zbathy(:,:)  = FLOAT( mbathy(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
-            mbathy(:,:)  = INT( zbathy(:,:) )
-         ENDIF
- 
- ! remove single point "bay" on bathy coast line beneath an ice shelf'
-         DO jk = jpk,1,-1
-            zmask=0._wp
-            WHERE (mbathy >= jk ) zmask=1
-            DO jj = 2, jpjm1
-               DO ji = 2, jpim1
-                  IF (mbathy(ji,jj) == jk .AND. misfdep(ji,jj) >= 2) THEN
-                     ibtest = zmask(ji-1,jj) + zmask(ji+1,jj) + zmask(ji,jj-1) + zmask(ji,jj+1)
-                     IF (ibtest <= 1) THEN
-                        bathy(ji,jj)=gdepw_1d(jk) ; mbathy(ji,jj)=jk-1
-                        IF (misfdep(ji,jj) > mbathy(ji,jj)) mbathy(ji,jj) = 0
-                     END IF
-                  END IF
-               END DO
-            END DO
-         END DO
-         WHERE (mbathy==0)
-             misfdep=0 ; risfdep=0._wp ; mbathy=0 ; bathy=0._wp
-         END WHERE
-         IF( lk_mpp ) THEN
-            zbathy(:,:)  = FLOAT( misfdep(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
-            misfdep(:,:) = INT( zbathy(:,:) )
-
-            CALL lbc_lnk( risfdep,'T', 1. )
-            CALL lbc_lnk( bathy,  'T', 1. )
-
-            zbathy(:,:)  = FLOAT( mbathy(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
-            mbathy(:,:)  = INT( zbathy(:,:) )
-         ENDIF
- 
- ! fill hole in ice shelf
-         zmisfdep = misfdep
-         zrisfdep = risfdep
-         WHERE (zmisfdep <= 1._wp) zmisfdep=jpk
-         DO jj = 2, jpjm1
-            DO ji = 2, jpim1
-               ibtestim1 = zmisfdep(ji-1,jj  ) ; ibtestip1 = zmisfdep(ji+1,jj  )
-               ibtestjm1 = zmisfdep(ji  ,jj-1) ; ibtestjp1 = zmisfdep(ji  ,jj+1)
-               IF( zmisfdep(ji,jj) >= mbathy(ji-1,jj  ) ) ibtestim1 = jpk
-               IF( zmisfdep(ji,jj) >= mbathy(ji+1,jj  ) ) ibtestip1 = jpk
-               IF( zmisfdep(ji,jj) >= mbathy(ji  ,jj-1) ) ibtestjm1 = jpk
-               IF( zmisfdep(ji,jj) >= mbathy(ji  ,jj+1) ) ibtestjp1 = jpk
-               ibtest=MIN(ibtestim1, ibtestip1, ibtestjm1, ibtestjp1)
-               IF( ibtest == jpk .AND. misfdep(ji,jj) >= 2) THEN
-                  mbathy(ji,jj) = 0 ; bathy(ji,jj) = 0.0_wp ; misfdep(ji,jj) = 0 ; risfdep(ji,jj) = 0.0_wp
-               END IF
-               IF( zmisfdep(ji,jj) < ibtest .AND. misfdep(ji,jj) >= 2) THEN
-                  misfdep(ji,jj) = ibtest
-                  risfdep(ji,jj) = gdepw_1d(ibtest)
-               ENDIF
-            ENDDO
-         ENDDO
- 
-         IF( lk_mpp ) THEN 
-            zbathy(:,:)  = FLOAT( misfdep(:,:) ) 
-            CALL lbc_lnk( zbathy,  'T', 1. ) 
-            misfdep(:,:) = INT( zbathy(:,:) ) 
-
-            CALL lbc_lnk( risfdep, 'T', 1. ) 
-            CALL lbc_lnk( bathy,   'T', 1. )
-
-            zbathy(:,:) = FLOAT( mbathy(:,:) )
-            CALL lbc_lnk( zbathy,  'T', 1. )
-            mbathy(:,:) = INT( zbathy(:,:) )
-         ENDIF 
- !
- !! fill hole in bathymetry
-         zmbathy (:,:)=mbathy (:,:)
-         DO jj = 2, jpjm1
-            DO ji = 2, jpim1
-               ibtestim1 = zmbathy(ji-1,jj  ) ; ibtestip1 = zmbathy(ji+1,jj  )
-               ibtestjm1 = zmbathy(ji  ,jj-1) ; ibtestjp1 = zmbathy(ji  ,jj+1)
-               IF( zmbathy(ji,jj) <  misfdep(ji-1,jj  ) ) ibtestim1 = 0
-               IF( zmbathy(ji,jj) <  misfdep(ji+1,jj  ) ) ibtestip1 = 0
-               IF( zmbathy(ji,jj) <  misfdep(ji  ,jj-1) ) ibtestjm1 = 0
-               IF( zmbathy(ji,jj) <  misfdep(ji  ,jj+1) ) ibtestjp1 = 0
-               ibtest=MAX(ibtestim1, ibtestip1, ibtestjm1, ibtestjp1)
-               IF( ibtest == 0 .AND. misfdep(ji,jj) >= 2) THEN
-                  mbathy(ji,jj) = 0 ; bathy(ji,jj) = 0.0_wp ; misfdep(ji,jj) = 0 ; risfdep(ji,jj) = 0.0_wp ;
-               END IF
-               IF( ibtest < zmbathy(ji,jj) .AND. misfdep(ji,jj) >= 2) THEN
-                  mbathy(ji,jj) = ibtest
-                  bathy(ji,jj)  = gdepw_1d(ibtest+1) 
-               ENDIF
-            END DO
-         END DO
-         IF( lk_mpp ) THEN 
-            zbathy(:,:)  = FLOAT( misfdep(:,:) ) 
-            CALL lbc_lnk( zbathy,  'T', 1. ) 
-            misfdep(:,:) = INT( zbathy(:,:) ) 
-
-            CALL lbc_lnk( risfdep, 'T', 1. ) 
-            CALL lbc_lnk( bathy,   'T', 1. )
-
-            zbathy(:,:) = FLOAT( mbathy(:,:) )
-            CALL lbc_lnk( zbathy,  'T', 1. )
-            mbathy(:,:) = INT( zbathy(:,:) )
-         ENDIF 
- ! if not compatible after all check (ie U point water column less than 2 cells), mask U
-         DO jj = 1, jpjm1
-            DO ji = 1, jpim1
-               IF (mbathy(ji,jj) == misfdep(ji+1,jj) .AND. mbathy(ji,jj) >= 1 .AND. mbathy(ji+1,jj) >= 1) THEN
-                  mbathy(ji,jj)  = mbathy(ji,jj) - 1 ; bathy(ji,jj)   = gdepw_1d(mbathy(ji,jj)+1) ;
-               END IF
-            END DO
-         END DO
-         IF( lk_mpp ) THEN 
-            zbathy(:,:)  = FLOAT( misfdep(:,:) ) 
-            CALL lbc_lnk( zbathy,  'T', 1. ) 
-            misfdep(:,:) = INT( zbathy(:,:) ) 
-
-            CALL lbc_lnk( risfdep, 'T', 1. ) 
-            CALL lbc_lnk( bathy,   'T', 1. )
-
-            zbathy(:,:) = FLOAT( mbathy(:,:) )
-            CALL lbc_lnk( zbathy,  'T', 1. )
-            mbathy(:,:) = INT( zbathy(:,:) )
-         ENDIF 
- ! if not compatible after all check (ie U point water column less than 2 cells), mask U
-         DO jj = 1, jpjm1
-            DO ji = 1, jpim1
-               IF (misfdep(ji,jj) == mbathy(ji+1,jj) .AND. mbathy(ji,jj) >= 1 .AND. mbathy(ji+1,jj) >= 1) THEN
-                  mbathy(ji+1,jj)  = mbathy(ji+1,jj) - 1;   bathy(ji+1,jj)   = gdepw_1d(mbathy(ji+1,jj)+1) ;
-               END IF
-            END DO
-         END DO
-         IF( lk_mpp ) THEN 
-            zbathy(:,:)  = FLOAT( misfdep(:,:) ) 
-            CALL lbc_lnk( zbathy, 'T', 1. ) 
-            misfdep(:,:) = INT( zbathy(:,:) ) 
-
-            CALL lbc_lnk( risfdep,'T', 1. ) 
-            CALL lbc_lnk( bathy,  'T', 1. )
-
-            zbathy(:,:) = FLOAT( mbathy(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
-            mbathy(:,:) = INT( zbathy(:,:) )
-         ENDIF 
- ! if not compatible after all check (ie V point water column less than 2 cells), mask V
-         DO jj = 1, jpjm1
-            DO ji = 1, jpi
-               IF (mbathy(ji,jj) == misfdep(ji,jj+1) .AND. mbathy(ji,jj) >= 1 .AND. mbathy(ji,jj+1) >= 1) THEN
-                  mbathy(ji,jj)  = mbathy(ji,jj) - 1 ; bathy(ji,jj)   = gdepw_1d(mbathy(ji,jj)+1) ;
-               END IF
-            END DO
-         END DO
-         IF( lk_mpp ) THEN 
-            zbathy(:,:)  = FLOAT( misfdep(:,:) ) 
-            CALL lbc_lnk( zbathy, 'T', 1. ) 
-            misfdep(:,:) = INT( zbathy(:,:) ) 
-
-            CALL lbc_lnk( risfdep,'T', 1. ) 
-            CALL lbc_lnk( bathy,  'T', 1. )
-
-            zbathy(:,:) = FLOAT( mbathy(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
-            mbathy(:,:) = INT( zbathy(:,:) )
-         ENDIF 
- ! if not compatible after all check (ie V point water column less than 2 cells), mask V
-         DO jj = 1, jpjm1
-            DO ji = 1, jpi
-               IF (misfdep(ji,jj) == mbathy(ji,jj+1) .AND. mbathy(ji,jj) >= 1 .AND. mbathy(ji,jj+1) >= 1) THEN
-                  mbathy(ji,jj+1)  = mbathy(ji,jj+1) - 1 ; bathy(ji,jj+1) = gdepw_1d(mbathy(ji,jj+1)+1) ;
-               END IF
-            END DO
-         END DO
-         IF( lk_mpp ) THEN 
-            zbathy(:,:)  = FLOAT( misfdep(:,:) ) 
-            CALL lbc_lnk( zbathy, 'T', 1. ) 
-            misfdep(:,:) = INT( zbathy(:,:) ) 
-
-            CALL lbc_lnk( risfdep,'T', 1. ) 
-            CALL lbc_lnk( bathy,  'T', 1. )
-
-            zbathy(:,:) = FLOAT( mbathy(:,:) )
-            CALL lbc_lnk( zbathy, 'T', 1. )
-            mbathy(:,:) = INT( zbathy(:,:) )
-         ENDIF 
- ! if not compatible after all check, mask T
-         DO jj = 1, jpj
-            DO ji = 1, jpi
-               IF (mbathy(ji,jj) <= misfdep(ji,jj)) THEN
-                  misfdep(ji,jj) = 0 ; risfdep(ji,jj) = 0._wp ; mbathy(ji,jj)  = 0 ; bathy(ji,jj)   = 0._wp ;
-               END IF
-            END DO
-         END DO
- 
-         WHERE (mbathy(:,:) == 1)
-            mbathy = 0; bathy = 0.0_wp ; misfdep = 0 ; risfdep = 0.0_wp
-         END WHERE
-      END DO 
-! end check compatibility ice shelf/bathy
-      ! remove very shallow ice shelf (less than ~ 10m if 75L)
-      WHERE (risfdep(:,:) <= 10._wp)
-         misfdep = 1; risfdep = 0.0_wp;
-      END WHERE
-
-      IF( icompt == 0 ) THEN 
-         IF(lwp) WRITE(numout,*)'     no points with ice shelf too close to bathymetry' 
-      ELSE 
-         IF(lwp) WRITE(numout,*)'    ',icompt,' ocean grid points with ice shelf thickness reduced to avoid bathymetry' 
-      ENDIF 
-
-      ! compute scale factor and depth at T- and W- points
       DO jj = 1, jpj
          DO ji = 1, jpi
             ik = mbathy(ji,jj)
@@ -1770,17 +950,19 @@ CONTAINS
                   IF( bathy(ji,jj) <= gdepw_1d(ik+1) ) THEN  ;   gdepw_0(ji,jj,ik+1) = bathy(ji,jj)
                   ELSE                                       ;   gdepw_0(ji,jj,ik+1) = gdepw_1d(ik+1)
                   ENDIF
-      !            gdepw_0(ji,jj,ik+1) = gdepw_1d(ik+1)
 !gm Bug?  check the gdepw_1d
                   !       ... on ik
                   gdept_0(ji,jj,ik) = gdepw_1d(ik) + ( gdepw_0(ji,jj,ik+1) - gdepw_1d(ik) )   &
                      &                             * ((gdept_1d(     ik  ) - gdepw_1d(ik) )   &
                      &                             / ( gdepw_1d(     ik+1) - gdepw_1d(ik) ))
-                  e3t_0  (ji,jj,ik  ) = gdepw_0(ji,jj,ik+1) - gdepw_1d(ik  )
-                  e3w_0  (ji,jj,ik  ) = gdept_0(ji,jj,ik  ) - gdept_1d(ik-1)
+                  e3t_0  (ji,jj,ik) = e3t_1d  (ik) * ( gdepw_0 (ji,jj,ik+1) - gdepw_1d(ik) )   & 
+                     &                             / ( gdepw_1d(      ik+1) - gdepw_1d(ik) ) 
+                  e3w_0(ji,jj,ik) = 0.5_wp * ( gdepw_0(ji,jj,ik+1) + gdepw_1d(ik+1) - 2._wp * gdepw_1d(ik) )   &
+                     &                     * ( e3w_1d(ik) / ( gdepw_1d(ik+1) - gdepw_1d(ik) ) )
                   !       ... on ik+1
                   e3w_0  (ji,jj,ik+1) = e3t_0  (ji,jj,ik)
                   e3t_0  (ji,jj,ik+1) = e3t_0  (ji,jj,ik)
+                  gdept_0(ji,jj,ik+1) = gdept_0(ji,jj,ik) + e3t_0(ji,jj,ik)
                ENDIF
             ENDIF
          END DO
@@ -1806,61 +988,77 @@ CONTAINS
          END DO
       END DO
       !
-      ! (ISF) Definition of e3t, u, v, w for ISF case
-      DO jj = 1, jpj 
-         DO ji = 1, jpi 
-            ik = misfdep(ji,jj) 
-            IF( ik > 1 ) THEN               ! ice shelf point only 
-               IF( risfdep(ji,jj) < gdepw_1d(ik) )  risfdep(ji,jj)= gdepw_1d(ik) 
-               gdepw_0(ji,jj,ik) = risfdep(ji,jj) 
-!gm Bug?  check the gdepw_0 
-            !       ... on ik 
-               gdept_0(ji,jj,ik) = gdepw_1d(ik+1) - ( gdepw_1d(ik+1) - gdepw_0(ji,jj,ik) )   & 
-                  &                               * ( gdepw_1d(ik+1) - gdept_1d(ik)      )   & 
-                  &                               / ( gdepw_1d(ik+1) - gdepw_1d(ik)      ) 
-               e3t_0  (ji,jj,ik  ) = gdepw_1d(ik+1) - gdepw_0(ji,jj,ik) 
-               e3w_0  (ji,jj,ik+1) = gdept_1d(ik+1) - gdept_0(ji,jj,ik)
-
-               IF( ik + 1 == mbathy(ji,jj) ) THEN               ! ice shelf point only (2 cell water column) 
-                  e3w_0  (ji,jj,ik+1) = gdept_0(ji,jj,ik+1) - gdept_0(ji,jj,ik) 
-               ENDIF 
-            !       ... on ik / ik-1 
-               e3w_0  (ji,jj,ik  ) = e3t_0  (ji,jj,ik) !2._wp * (gdept_0(ji,jj,ik) - gdepw_0(ji,jj,ik)) 
-               gdept_0(ji,jj,ik-1) = gdept_0(ji,jj,ik) - e3w_0(ji,jj,ik)
-               e3t_0  (ji,jj,ik-1) = gdepw_0(ji,jj,ik) - gdepw_1d(ik-1)
-               e3w_0  (ji,jj,ik-1) = gdept_0(ji,jj,ik-1) - gdept_1d(ik-2)
-               gdepw_0(ji,jj,ik-1) = gdepw_0(ji,jj,ik) - e3t_0(ji,jj,ik-1)
-            ENDIF 
-         END DO 
-      END DO 
-   
-      it = 0 
-      DO jj = 1, jpj 
-         DO ji = 1, jpi 
-            ik = misfdep(ji,jj) 
-            IF( ik > 1 ) THEN               ! ice shelf point only 
-               e3tp (ji,jj) = e3t_0(ji,jj,ik  ) 
-               e3wp (ji,jj) = e3w_0(ji,jj,ik+1 ) 
-            ! test 
-               zdiff= gdept_0(ji,jj,ik) - gdepw_0(ji,jj,ik  ) 
-               IF( zdiff <= 0. .AND. lwp ) THEN  
-                  it = it + 1 
-                  WRITE(numout,*) ' it      = ', it, ' ik      = ', ik, ' (i,j) = ', ji, jj 
-                  WRITE(numout,*) ' risfdep = ', risfdep(ji,jj) 
-                  WRITE(numout,*) ' gdept = ', gdept_0(ji,jj,ik), ' gdepw = ', gdepw_0(ji,jj,ik+1), ' zdiff = ', zdiff 
-                  WRITE(numout,*) ' e3tp  = ', e3tp(ji,jj), ' e3wp  = ', e3wp(ji,jj) 
-               ENDIF 
-            ENDIF 
-         END DO 
-      END DO 
-
-      CALL wrk_dealloc( jpi, jpj, zmask, zbathy, zrisfdep )
-      CALL wrk_dealloc( jpi, jpj, zmisfdep, zmbathy )
+      ! compute top scale factor if ice shelf
+      IF (ln_isfcav) CALL zps_isf
       !
-      IF( nn_timing == 1 )   CALL timing_stop('zgr_isf')
-      !      
-   END SUBROUTINE zgr_isf
+      ! Scale factors and depth at U-, V-, UW and VW-points
+      DO jk = 1, jpk                        ! initialisation to z-scale factors
+         e3u_0 (:,:,jk) = e3t_1d(jk)
+         e3v_0 (:,:,jk) = e3t_1d(jk)
+         e3uw_0(:,:,jk) = e3w_1d(jk)
+         e3vw_0(:,:,jk) = e3w_1d(jk)
+      END DO
 
+      DO jk = 1,jpk                         ! Computed as the minimum of neighbooring scale factors
+         DO jj = 1, jpjm1
+            DO ji = 1, jpim1   ! vector opt.
+               e3u_0 (ji,jj,jk) = MIN( e3t_0(ji,jj,jk), e3t_0(ji+1,jj,jk) )
+               e3v_0 (ji,jj,jk) = MIN( e3t_0(ji,jj,jk), e3t_0(ji,jj+1,jk) )
+               e3uw_0(ji,jj,jk) = MIN( e3w_0(ji,jj,jk), e3w_0(ji+1,jj,jk) )
+               e3vw_0(ji,jj,jk) = MIN( e3w_0(ji,jj,jk), e3w_0(ji,jj+1,jk) )
+            END DO
+         END DO
+      END DO
+
+      ! update e3uw in case only 2 cells in the water column
+      IF ( ln_isfcav ) CALL zps_isf_e3uv_w
+      !
+      CALL lbc_lnk('domzgr', e3u_0 , 'U', 1._wp )   ;   CALL lbc_lnk('domzgr', e3uw_0, 'U', 1._wp )   ! lateral boundary conditions
+      CALL lbc_lnk('domzgr', e3v_0 , 'V', 1._wp )   ;   CALL lbc_lnk('domzgr', e3vw_0, 'V', 1._wp )
+      !
+      DO jk = 1, jpk                        ! set to z-scale factor if zero (i.e. along closed boundaries)
+         WHERE( e3u_0 (:,:,jk) == 0._wp )   e3u_0 (:,:,jk) = e3t_1d(jk)
+         WHERE( e3v_0 (:,:,jk) == 0._wp )   e3v_0 (:,:,jk) = e3t_1d(jk)
+         WHERE( e3uw_0(:,:,jk) == 0._wp )   e3uw_0(:,:,jk) = e3w_1d(jk)
+         WHERE( e3vw_0(:,:,jk) == 0._wp )   e3vw_0(:,:,jk) = e3w_1d(jk)
+      END DO
+      
+      ! Scale factor at F-point
+      DO jk = 1, jpk                        ! initialisation to z-scale factors
+         e3f_0(:,:,jk) = e3t_1d(jk)
+      END DO
+      DO jk = 1, jpk                        ! Computed as the minimum of neighbooring V-scale factors
+         DO jj = 1, jpjm1
+            DO ji = 1, jpim1   ! vector opt.
+               e3f_0(ji,jj,jk) = MIN( e3v_0(ji,jj,jk), e3v_0(ji+1,jj,jk) )
+            END DO
+         END DO
+      END DO
+      CALL lbc_lnk('domzgr', e3f_0, 'F', 1._wp )       ! Lateral boundary conditions
+      !
+      DO jk = 1, jpk                        ! set to z-scale factor if zero (i.e. along closed boundaries)
+         WHERE( e3f_0(:,:,jk) == 0._wp )   e3f_0(:,:,jk) = e3t_1d(jk)
+      END DO
+!!gm  bug ? :  must be a do loop with mj0,mj1
+      ! 
+      e3t_0(:,mj0(1),:) = e3t_0(:,mj0(2),:)     ! we duplicate factor scales for jj = 1 and jj = 2
+      e3w_0(:,mj0(1),:) = e3w_0(:,mj0(2),:) 
+      e3u_0(:,mj0(1),:) = e3u_0(:,mj0(2),:) 
+      e3v_0(:,mj0(1),:) = e3v_0(:,mj0(2),:) 
+      e3f_0(:,mj0(1),:) = e3f_0(:,mj0(2),:) 
+
+      ! Control of the sign
+      IF( MINVAL( e3t_0  (:,:,:) ) <= 0._wp )   CALL ctl_stop( '    zgr_zps :   e r r o r   e3t_0 <= 0' )
+      IF( MINVAL( e3w_0  (:,:,:) ) <= 0._wp )   CALL ctl_stop( '    zgr_zps :   e r r o r   e3w_0 <= 0' )
+      IF( MINVAL( gdept_0(:,:,:) ) <  0._wp )   CALL ctl_stop( '    zgr_zps :   e r r o r   gdept_0 <  0' )
+      IF( MINVAL( gdepw_0(:,:,:) ) <  0._wp )   CALL ctl_stop( '    zgr_zps :   e r r o r   gdepw_0 <  0' )
+      !
+      ! if in the future gde3w_0 need to be compute, use the function defined in NEMO
+      ! for now gde3w_0 computation is removed as not an output of domcfg
+
+      DEALLOCATE( zprt )
+      !
+   END SUBROUTINE zgr_zps
 
    SUBROUTINE zgr_sco
       !!----------------------------------------------------------------------
@@ -1912,16 +1110,14 @@ CONTAINS
       REAL(wp) ::   zrmax, ztaper   ! temporary scalars
       REAL(wp) ::   zrfact
       !
-      REAL(wp), POINTER, DIMENSION(:,:  ) :: ztmpi1, ztmpi2, ztmpj1, ztmpj2
-      REAL(wp), POINTER, DIMENSION(:,:  ) :: zenv, ztmp, zmsk, zri, zrj, zhbat
+      REAL(wp), ALLOCATABLE, DIMENSION(:,:  ) :: ztmpi1, ztmpi2, ztmpj1, ztmpj2
+      REAL(wp), ALLOCATABLE, DIMENSION(:,:  ) :: zenv, ztmp, zmsk, zri, zrj, zhbat
       !!
       NAMELIST/namzgr_sco/ln_s_sh94, ln_s_sf12, ln_sigcrit, rn_sbot_min, rn_sbot_max, rn_hc, rn_rmax,rn_theta, &
          &                rn_thetb, rn_bb, rn_alpha, rn_efold, rn_zs, rn_zb_a, rn_zb_b
      !!----------------------------------------------------------------------
       !
-      IF( nn_timing == 1 )  CALL timing_start('zgr_sco')
-      !
-      CALL wrk_alloc( jpi,jpj,   zenv, ztmp, zmsk, zri, zrj, zhbat , ztmpi1, ztmpi2, ztmpj1, ztmpj2 )
+      ALLOCATE( zenv(jpi,jpj), ztmp(jpi,jpj), zmsk(jpi,jpj), zri(jpi,jpj), zrj(jpi,jpj), zhbat(jpi,jpj) , ztmpi1(jpi,jpj), ztmpi2(jpi,jpj), ztmpj1(jpi,jpj), ztmpj2(jpi,jpj) )
       !
       REWIND( numnam_ref )              ! Namelist namzgr_sco in reference namelist : Sigma-stretching parameters
       READ  ( numnam_ref, namzgr_sco, IOSTAT = ios, ERR = 901)
@@ -2001,7 +1197,7 @@ CONTAINS
          END DO
 
       ! apply lateral boundary condition   CAUTION: keep the value when the lbc field is zero
-      CALL lbc_lnk( zenv, 'T', 1._wp, 'no0' )
+      CALL lbc_lnk( 'domzgr',zenv, 'T', 1._wp, 'no0' )
       ! 
       ! smooth the bathymetry (if required)
       scosrf(:,:) = 0._wp             ! ocean surface depth (here zero: no under ice-shelf sea)
@@ -2055,7 +1251,7 @@ CONTAINS
                IF( zrj(ji,jj) < -rn_rmax )   ztmpj2(ji  ,ijp1) = zenv(ji  ,jj  ) * zrfact
             END DO
          END DO
-         IF( lk_mpp )   CALL mpp_max( zrmax )   ! max over the global domain
+  !       IF( lk_mpp )   CALL mpp_max( zrmax )   ! max over the global domain
          !
          IF(lwp)WRITE(numout,*) 'zgr_sco :   iter= ',jl, ' rmax= ', zrmax
          !
@@ -2065,7 +1261,7 @@ CONTAINS
             END DO
          END DO
          ! apply lateral boundary condition   CAUTION: keep the value when the lbc field is zero
-         CALL lbc_lnk( zenv, 'T', 1._wp, 'no0' )
+         CALL lbc_lnk( 'domzgr',zenv, 'T', 1._wp, 'no0' )
          !                                                  ! ================ !
       END DO                                                !     End loop     !
       !                                                     ! ================ !
@@ -2109,7 +1305,7 @@ CONTAINS
       ! 
       ! Apply lateral boundary condition
 !!gm  ! CAUTION: retain non zero value in the initial file this should be OK for orca cfg, not for EEL
-      zhbat(:,:) = hbatu(:,:)   ;   CALL lbc_lnk( hbatu, 'U', 1._wp )
+      zhbat(:,:) = hbatu(:,:)   ;   CALL lbc_lnk('domzgr', hbatu, 'U', 1._wp )
       DO jj = 1, jpj
          DO ji = 1, jpi
             IF( hbatu(ji,jj) == 0._wp ) THEN
@@ -2119,7 +1315,7 @@ CONTAINS
             ENDIF
          END DO
       END DO
-      zhbat(:,:) = hbatv(:,:)   ;   CALL lbc_lnk( hbatv, 'V', 1._wp )
+      zhbat(:,:) = hbatv(:,:)   ;   CALL lbc_lnk('domzgr', hbatv, 'V', 1._wp )
       DO jj = 1, jpj
          DO ji = 1, jpi
             IF( hbatv(ji,jj) == 0._wp ) THEN
@@ -2128,7 +1324,7 @@ CONTAINS
             ENDIF
          END DO
       END DO
-      zhbat(:,:) = hbatf(:,:)   ;   CALL lbc_lnk( hbatf, 'F', 1._wp )
+      zhbat(:,:) = hbatf(:,:)   ;   CALL lbc_lnk('domzgr', hbatf, 'F', 1._wp )
       DO jj = 1, jpj
          DO ji = 1, jpi
             IF( hbatf(ji,jj) == 0._wp ) THEN
@@ -2176,13 +1372,13 @@ CONTAINS
                            CALL s_tanh()
       ENDIF 
 
-      CALL lbc_lnk( e3t_0 , 'T', 1._wp )
-      CALL lbc_lnk( e3u_0 , 'U', 1._wp )
-      CALL lbc_lnk( e3v_0 , 'V', 1._wp )
-      CALL lbc_lnk( e3f_0 , 'F', 1._wp )
-      CALL lbc_lnk( e3w_0 , 'W', 1._wp )
-      CALL lbc_lnk( e3uw_0, 'U', 1._wp )
-      CALL lbc_lnk( e3vw_0, 'V', 1._wp )
+      CALL lbc_lnk( 'domzgr',e3t_0 , 'T', 1._wp )
+      CALL lbc_lnk( 'domzgr',e3u_0 , 'U', 1._wp )
+      CALL lbc_lnk( 'domzgr',e3v_0 , 'V', 1._wp )
+      CALL lbc_lnk( 'domzgr',e3f_0 , 'F', 1._wp )
+      CALL lbc_lnk( 'domzgr',e3w_0 , 'W', 1._wp )
+      CALL lbc_lnk( 'domzgr',e3uw_0, 'U', 1._wp )
+      CALL lbc_lnk('domzgr', e3vw_0, 'V', 1._wp )
       !
         WHERE( e3t_0 (:,:,:) == 0._wp )   e3t_0 (:,:,:) = 1._wp
         WHERE( e3u_0 (:,:,:) == 0._wp )   e3u_0 (:,:,:) = 1._wp
@@ -2191,29 +1387,12 @@ CONTAINS
         WHERE( e3w_0 (:,:,:) == 0._wp )   e3w_0 (:,:,:) = 1._wp
         WHERE( e3uw_0(:,:,:) == 0._wp )   e3uw_0(:,:,:) = 1._wp
         WHERE( e3vw_0(:,:,:) == 0._wp )   e3vw_0(:,:,:) = 1._wp
-
-
-!!gm   I don't like that HERE we are supposed to set the reference coordinate (i.e. _0 arrays)
-!!gm   and only that !!!!!
-!!gm   THIS should be removed from here !
-      gdept_n(:,:,:) = gdept_0(:,:,:)
-      gdepw_n(:,:,:) = gdepw_0(:,:,:)
-      gde3w_n(:,:,:) = gde3w_0(:,:,:)
-      e3t_n  (:,:,:) = e3t_0  (:,:,:)
-      e3u_n  (:,:,:) = e3u_0  (:,:,:)
-      e3v_n  (:,:,:) = e3v_0  (:,:,:)
-      e3f_n  (:,:,:) = e3f_0  (:,:,:)
-      e3w_n  (:,:,:) = e3w_0  (:,:,:)
-      e3uw_n (:,:,:) = e3uw_0 (:,:,:)
-      e3vw_n (:,:,:) = e3vw_0 (:,:,:)
-!!gm and obviously in the following, use the _0 arrays until the end of this subroutine
-!! gm end
 !!
       ! HYBRID : 
       DO jj = 1, jpj
          DO ji = 1, jpi
             DO jk = 1, jpkm1
-               IF( scobot(ji,jj) >= gdept_n(ji,jj,jk) )   mbathy(ji,jj) = MAX( 2, jk )
+               IF( scobot(ji,jj) >= gdept_0(ji,jj,jk) )   mbathy(ji,jj) = MAX( 2, jk )
             END DO
          END DO
       END DO
@@ -2223,14 +1402,14 @@ CONTAINS
       IF( nprint == 1  .AND. lwp )   THEN         ! min max values over the local domain
          WRITE(numout,*) ' MIN val mbathy  ', MINVAL( mbathy(:,:)    ), ' MAX ', MAXVAL( mbathy(:,:) )
          WRITE(numout,*) ' MIN val depth t ', MINVAL( gdept_0(:,:,:) ),   &
-            &                          ' w ', MINVAL( gdepw_0(:,:,:) ), '3w '  , MINVAL( gde3w_0(:,:,:) )
+            &                          ' w ', MINVAL( gdepw_0(:,:,:) )
          WRITE(numout,*) ' MIN val e3    t ', MINVAL( e3t_0  (:,:,:) ), ' f '  , MINVAL( e3f_0  (:,:,:) ),   &
             &                          ' u ', MINVAL( e3u_0  (:,:,:) ), ' u '  , MINVAL( e3v_0  (:,:,:) ),   &
             &                          ' uw', MINVAL( e3uw_0 (:,:,:) ), ' vw'  , MINVAL( e3vw_0 (:,:,:) ),   &
             &                          ' w ', MINVAL( e3w_0  (:,:,:) )
 
          WRITE(numout,*) ' MAX val depth t ', MAXVAL( gdept_0(:,:,:) ),   &
-            &                          ' w ', MAXVAL( gdepw_0(:,:,:) ), '3w '  , MAXVAL( gde3w_0(:,:,:) )
+            &                          ' w ', MAXVAL( gdepw_0(:,:,:) )
          WRITE(numout,*) ' MAX val e3    t ', MAXVAL( e3t_0  (:,:,:) ), ' f '  , MAXVAL( e3f_0  (:,:,:) ),   &
             &                          ' u ', MAXVAL( e3u_0  (:,:,:) ), ' u '  , MAXVAL( e3v_0  (:,:,:) ),   &
             &                          ' uw', MAXVAL( e3uw_0 (:,:,:) ), ' vw'  , MAXVAL( e3vw_0 (:,:,:) ),   &
@@ -2275,36 +1454,36 @@ CONTAINS
             IF( hbatt(ji,jj) > 0._wp) THEN
                DO jk = 1, mbathy(ji,jj)
                  ! check coordinate is monotonically increasing
-                 IF (e3w_n(ji,jj,jk) <= 0._wp .OR. e3t_n(ji,jj,jk) <= 0._wp ) THEN
+                 IF (e3w_0(ji,jj,jk) <= 0._wp .OR. e3t_0(ji,jj,jk) <= 0._wp ) THEN
                     WRITE(ctmp1,*) 'ERROR zgr_sco :   e3w   or e3t   =< 0  at point (i,j,k)= ', ji, jj, jk
                     WRITE(numout,*) 'ERROR zgr_sco :   e3w   or e3t   =< 0  at point (i,j,k)= ', ji, jj, jk
-                    WRITE(numout,*) 'e3w',e3w_n(ji,jj,:)
-                    WRITE(numout,*) 'e3t',e3t_n(ji,jj,:)
+                    WRITE(numout,*) 'e3w',e3w_0(ji,jj,:)
+                    WRITE(numout,*) 'e3t',e3t_0(ji,jj,:)
                     CALL ctl_stop( ctmp1 )
                  ENDIF
                  ! and check it has never gone negative
-                 IF( gdepw_n(ji,jj,jk) < 0._wp .OR. gdept_n(ji,jj,jk) < 0._wp ) THEN
+                 IF( gdepw_0(ji,jj,jk) < 0._wp .OR. gdept_0(ji,jj,jk) < 0._wp ) THEN
                     WRITE(ctmp1,*) 'ERROR zgr_sco :   gdepw or gdept =< 0  at point (i,j,k)= ', ji, jj, jk
                     WRITE(numout,*) 'ERROR zgr_sco :   gdepw   or gdept   =< 0  at point (i,j,k)= ', ji, jj, jk
-                    WRITE(numout,*) 'gdepw',gdepw_n(ji,jj,:)
-                    WRITE(numout,*) 'gdept',gdept_n(ji,jj,:)
+                    WRITE(numout,*) 'gdepw',gdepw_0(ji,jj,:)
+                    WRITE(numout,*) 'gdept',gdept_0(ji,jj,:)
                     CALL ctl_stop( ctmp1 )
                  ENDIF
                  ! and check it never exceeds the total depth
-                 IF( gdepw_n(ji,jj,jk) > hbatt(ji,jj) ) THEN
+                 IF( gdepw_0(ji,jj,jk) > hbatt(ji,jj) ) THEN
                     WRITE(ctmp1,*) 'ERROR zgr_sco :   gdepw > hbatt  at point (i,j,k)= ', ji, jj, jk
                     WRITE(numout,*) 'ERROR zgr_sco :   gdepw > hbatt  at point (i,j,k)= ', ji, jj, jk
-                    WRITE(numout,*) 'gdepw',gdepw_n(ji,jj,:)
+                    WRITE(numout,*) 'gdepw',gdepw_0(ji,jj,:)
                     CALL ctl_stop( ctmp1 )
                  ENDIF
                END DO
                !
                DO jk = 1, mbathy(ji,jj)-1
                  ! and check it never exceeds the total depth
-                IF( gdept_n(ji,jj,jk) > hbatt(ji,jj) ) THEN
+                IF( gdept_0(ji,jj,jk) > hbatt(ji,jj) ) THEN
                     WRITE(ctmp1,*) 'ERROR zgr_sco :   gdept > hbatt  at point (i,j,k)= ', ji, jj, jk
                     WRITE(numout,*) 'ERROR zgr_sco :   gdept > hbatt  at point (i,j,k)= ', ji, jj, jk
-                    WRITE(numout,*) 'gdept',gdept_n(ji,jj,:)
+                    WRITE(numout,*) 'gdept',gdept_0(ji,jj,:)
                     CALL ctl_stop( ctmp1 )
                  ENDIF
                END DO
@@ -2312,9 +1491,7 @@ CONTAINS
          END DO
       END DO
       !
-      CALL wrk_dealloc( jpi, jpj, zenv, ztmp, zmsk, zri, zrj, zhbat , ztmpi1, ztmpi2, ztmpj1, ztmpj2 )
-      !
-      IF( nn_timing == 1 )  CALL timing_stop('zgr_sco')
+      DEALLOCATE( zenv, ztmp, zmsk, zri, zrj, zhbat , ztmpi1, ztmpi2, ztmpj1, ztmpj2 )
       !
    END SUBROUTINE zgr_sco
 
@@ -2335,14 +1512,15 @@ CONTAINS
       REAL(wp) ::   ztmpu,  ztmpv,  ztmpf
       REAL(wp) ::   ztmpu1, ztmpv1, ztmpf1
       !
-      REAL(wp), POINTER, DIMENSION(:,:,:) :: z_gsigw3, z_gsigt3, z_gsi3w3
-      REAL(wp), POINTER, DIMENSION(:,:,:) :: z_esigt3, z_esigw3, z_esigtu3, z_esigtv3, z_esigtf3, z_esigwu3, z_esigwv3           
+      REAL(wp), ALLOCATABLE, DIMENSION(:,:,:) :: z_gsigw3, z_gsigt3
+      REAL(wp), ALLOCATABLE, DIMENSION(:,:,:) :: z_esigt3, z_esigw3, z_esigtu3, z_esigtv3, z_esigtf3, z_esigwu3, z_esigwv3           
       !!----------------------------------------------------------------------
 
-      CALL wrk_alloc( jpi,jpj,jpk,   z_gsigw3, z_gsigt3, z_gsi3w3                                      )
-      CALL wrk_alloc( jpi,jpj,jpk,   z_esigt3, z_esigw3, z_esigtu3, z_esigtv3, z_esigtf3, z_esigwu3, z_esigwv3 )
+      ALLOCATE( z_gsigw3 (jpi,jpj,jpk), z_gsigt3 (jpi,jpj,jpk) )
+      ALLOCATE( z_esigt3 (jpi,jpj,jpk), z_esigw3 (jpi,jpj,jpk), z_esigtu3(jpi,jpj,jpk), z_esigtv3(jpi,jpj,jpk) )
+      ALLOCATE( z_esigtf3(jpi,jpj,jpk), z_esigwu3(jpi,jpj,jpk), z_esigwv3(jpi,jpj,jpk) )
 
-      z_gsigw3  = 0._wp   ;   z_gsigt3  = 0._wp   ;   z_gsi3w3  = 0._wp
+      z_gsigw3  = 0._wp   ;   z_gsigt3  = 0._wp
       z_esigt3  = 0._wp   ;   z_esigw3  = 0._wp 
       z_esigtu3 = 0._wp   ;   z_esigtv3 = 0._wp   ;   z_esigtf3 = 0._wp
       z_esigwu3 = 0._wp   ;   z_esigwv3 = 0._wp
@@ -2369,18 +1547,11 @@ CONTAINS
             z_esigw3(ji,jj,1  ) = 2._wp * ( z_gsigt3(ji,jj,1  ) - z_gsigw3(ji,jj,1  ) )
             z_esigt3(ji,jj,jpk) = 2._wp * ( z_gsigt3(ji,jj,jpk) - z_gsigw3(ji,jj,jpk) )
             !
-            ! Coefficients for vertical depth as the sum of e3w scale factors
-            z_gsi3w3(ji,jj,1) = 0.5_wp * z_esigw3(ji,jj,1)
-            DO jk = 2, jpk
-               z_gsi3w3(ji,jj,jk) = z_gsi3w3(ji,jj,jk-1) + z_esigw3(ji,jj,jk)
-            END DO
-            !
             DO jk = 1, jpk
                zcoeft = ( REAL(jk,wp) - 0.5_wp ) / REAL(jpkm1,wp)
                zcoefw = ( REAL(jk,wp) - 1.0_wp ) / REAL(jpkm1,wp)
                gdept_0(ji,jj,jk) = ( scosrf(ji,jj) + (hbatt(ji,jj)-rn_hc)*z_gsigt3(ji,jj,jk)+rn_hc*zcoeft )
                gdepw_0(ji,jj,jk) = ( scosrf(ji,jj) + (hbatt(ji,jj)-rn_hc)*z_gsigw3(ji,jj,jk)+rn_hc*zcoefw )
-               gde3w_0(ji,jj,jk) = ( scosrf(ji,jj) + (hbatt(ji,jj)-rn_hc)*z_gsi3w3(ji,jj,jk)+rn_hc*zcoeft )
             END DO
            !
          END DO   ! for all jj's
@@ -2425,8 +1596,8 @@ CONTAINS
         END DO
       END DO
       !
-      CALL wrk_dealloc( jpi,jpj,jpk,   z_gsigw3, z_gsigt3, z_gsi3w3                                      )
-      CALL wrk_dealloc( jpi,jpj,jpk,   z_esigt3, z_esigw3, z_esigtu3, z_esigtv3, z_esigtf3, z_esigwu3, z_esigwv3 )
+      DEALLOCATE( z_gsigw3, z_gsigt3                                                        )
+      DEALLOCATE( z_esigt3, z_esigw3, z_esigtu3, z_esigtv3, z_esigtf3, z_esigwu3, z_esigwv3 )
       !
    END SUBROUTINE s_sh94
 
@@ -2453,14 +1624,15 @@ CONTAINS
       REAL(wp) ::   ztmpu, ztmpv, ztmpf
       REAL(wp) ::   ztmpu1, ztmpv1, ztmpf1
       !
-      REAL(wp), POINTER, DIMENSION(:,:,:) :: z_gsigw3, z_gsigt3, z_gsi3w3
-      REAL(wp), POINTER, DIMENSION(:,:,:) :: z_esigt3, z_esigw3, z_esigtu3, z_esigtv3, z_esigtf3, z_esigwu3, z_esigwv3           
+      REAL(wp), ALLOCATABLE, DIMENSION(:,:,:) :: z_gsigw3, z_gsigt3
+      REAL(wp), ALLOCATABLE, DIMENSION(:,:,:) :: z_esigt3, z_esigw3, z_esigtu3, z_esigtv3, z_esigtf3, z_esigwu3, z_esigwv3           
       !!----------------------------------------------------------------------
       !
-      CALL wrk_alloc( jpi, jpj, jpk, z_gsigw3, z_gsigt3, z_gsi3w3                                      )
-      CALL wrk_alloc( jpi, jpj, jpk, z_esigt3, z_esigw3, z_esigtu3, z_esigtv3, z_esigtf3, z_esigwu3, z_esigwv3 )
+      ALLOCATE( z_gsigw3 (jpi,jpj,jpk), z_gsigt3 (jpi,jpj,jpk) )
+      ALLOCATE( z_esigt3 (jpi,jpj,jpk), z_esigw3 (jpi,jpj,jpk), z_esigtu3(jpi,jpj,jpk), z_esigtv3(jpi,jpj,jpk))
+      ALLOCATE( z_esigtf3(jpi,jpj,jpk), z_esigwu3(jpi,jpj,jpk), z_esigwv3(jpi,jpj,jpk) )
 
-      z_gsigw3  = 0._wp   ;   z_gsigt3  = 0._wp   ;   z_gsi3w3  = 0._wp
+      z_gsigw3  = 0._wp   ;   z_gsigt3  = 0._wp
       z_esigt3  = 0._wp   ;   z_esigw3  = 0._wp 
       z_esigtu3 = 0._wp   ;   z_esigtv3 = 0._wp   ;   z_esigtf3 = 0._wp
       z_esigwu3 = 0._wp   ;   z_esigwv3 = 0._wp
@@ -2512,16 +1684,9 @@ CONTAINS
           z_esigw3(ji,jj,1  ) = 2.0_wp * (z_gsigt3(ji,jj,1  ) - z_gsigw3(ji,jj,1  ))
           z_esigt3(ji,jj,jpk) = 2.0_wp * (z_gsigt3(ji,jj,jpk) - z_gsigw3(ji,jj,jpk))
 
-          ! Coefficients for vertical depth as the sum of e3w scale factors
-          z_gsi3w3(ji,jj,1) = 0.5 * z_esigw3(ji,jj,1)
-          DO jk = 2, jpk
-             z_gsi3w3(ji,jj,jk) = z_gsi3w3(ji,jj,jk-1) + z_esigw3(ji,jj,jk)
-          END DO
-
           DO jk = 1, jpk
              gdept_0(ji,jj,jk) = (scosrf(ji,jj)+hbatt(ji,jj))*z_gsigt3(ji,jj,jk)
              gdepw_0(ji,jj,jk) = (scosrf(ji,jj)+hbatt(ji,jj))*z_gsigw3(ji,jj,jk)
-             gde3w_0(ji,jj,jk) = (scosrf(ji,jj)+hbatt(ji,jj))*z_gsi3w3(ji,jj,jk)
           END DO
 
         ENDDO   ! for all jj's
@@ -2585,13 +1750,13 @@ CONTAINS
         ENDDO
       ENDDO
       !
-      CALL lbc_lnk(e3t_0 ,'T',1.) ; CALL lbc_lnk(e3u_0 ,'T',1.)
-      CALL lbc_lnk(e3v_0 ,'T',1.) ; CALL lbc_lnk(e3f_0 ,'T',1.)
-      CALL lbc_lnk(e3w_0 ,'T',1.)
-      CALL lbc_lnk(e3uw_0,'T',1.) ; CALL lbc_lnk(e3vw_0,'T',1.)
+      CALL lbc_lnk('domzgr',e3t_0 ,'T',1.) ; CALL lbc_lnk('domzgr',e3u_0 ,'T',1.)
+      CALL lbc_lnk('domzgr',e3v_0 ,'T',1.) ; CALL lbc_lnk('domzgr',e3f_0 ,'T',1.)
+      CALL lbc_lnk('domzgr',e3w_0 ,'T',1.)
+      CALL lbc_lnk('domzgr',e3uw_0,'T',1.) ; CALL lbc_lnk('domzgr',e3vw_0,'T',1.)
       !
-      CALL wrk_dealloc( jpi,jpj,jpk,   z_gsigw3, z_gsigt3, z_gsi3w3                                      )
-      CALL wrk_dealloc( jpi,jpj,jpk,   z_esigt3, z_esigw3, z_esigtu3, z_esigtv3, z_esigtf3, z_esigwu3, z_esigwv3 )
+      DEALLOCATE( z_gsigw3, z_gsigt3                                                        )
+      DEALLOCATE( z_esigt3, z_esigw3, z_esigtu3, z_esigtv3, z_esigtf3, z_esigwu3, z_esigwv3 )
       !
    END SUBROUTINE s_sf12
 
@@ -2608,14 +1773,14 @@ CONTAINS
       !!----------------------------------------------------------------------
       INTEGER  ::   ji, jj, jk       ! dummy loop argument
       REAL(wp) ::   zcoeft, zcoefw   ! temporary scalars
-      REAL(wp), POINTER, DIMENSION(:) :: z_gsigw, z_gsigt, z_gsi3w
-      REAL(wp), POINTER, DIMENSION(:) :: z_esigt, z_esigw
+      REAL(wp), ALLOCATABLE, DIMENSION(:) :: z_gsigw, z_gsigt
+      REAL(wp), ALLOCATABLE, DIMENSION(:) :: z_esigt, z_esigw
       !!----------------------------------------------------------------------
 
-      CALL wrk_alloc( jpk,   z_gsigw, z_gsigt, z_gsi3w )
-      CALL wrk_alloc( jpk,   z_esigt, z_esigw )
+      ALLOCATE( z_gsigw(jpk), z_gsigt(jpk) )
+      ALLOCATE( z_esigt(jpk), z_esigw(jpk) )
 
-      z_gsigw  = 0._wp   ;   z_gsigt  = 0._wp   ;   z_gsi3w  = 0._wp
+      z_gsigw  = 0._wp   ;   z_gsigt  = 0._wp
       z_esigt  = 0._wp   ;   z_esigw  = 0._wp 
 
       DO jk = 1, jpk
@@ -2634,20 +1799,13 @@ CONTAINS
       z_esigw( 1 ) = 2._wp * ( z_gsigt(1  ) - z_gsigw(1  ) ) 
       z_esigt(jpk) = 2._wp * ( z_gsigt(jpk) - z_gsigw(jpk) )
       !
-      ! Coefficients for vertical depth as the sum of e3w scale factors
-      z_gsi3w(1) = 0.5_wp * z_esigw(1)
-      DO jk = 2, jpk
-         z_gsi3w(jk) = z_gsi3w(jk-1) + z_esigw(jk)
-      END DO
-!!gm: depuw, depvw can be suppressed (modif in ldfslp) and depw=dep3w can be set (save 3 3D arrays)
       DO jk = 1, jpk
          zcoeft = ( REAL(jk,wp) - 0.5_wp ) / REAL(jpkm1,wp)
          zcoefw = ( REAL(jk,wp) - 1.0_wp ) / REAL(jpkm1,wp)
          gdept_0(:,:,jk) = ( scosrf(:,:) + (hbatt(:,:)-hift(:,:))*z_gsigt(jk) + hift(:,:)*zcoeft )
          gdepw_0(:,:,jk) = ( scosrf(:,:) + (hbatt(:,:)-hift(:,:))*z_gsigw(jk) + hift(:,:)*zcoefw )
-         gde3w_0(:,:,jk) = ( scosrf(:,:) + (hbatt(:,:)-hift(:,:))*z_gsi3w(jk) + hift(:,:)*zcoeft )
       END DO
-!!gm: e3uw, e3vw can be suppressed  (modif in dynzdf, dynzdf_iso, zdfbfr) (save 2 3D arrays)
+
       DO jj = 1, jpj
          DO ji = 1, jpi
             DO jk = 1, jpk
@@ -2663,8 +1821,8 @@ CONTAINS
          END DO
       END DO
       !
-      CALL wrk_dealloc( jpk,   z_gsigw, z_gsigt, z_gsi3w )
-      CALL wrk_dealloc( jpk,   z_esigt, z_esigw          )
+      DEALLOCATE( z_gsigw, z_gsigt )
+      DEALLOCATE( z_esigt, z_esigw )
       !
    END SUBROUTINE s_tanh
 

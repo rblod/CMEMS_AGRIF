@@ -21,14 +21,16 @@ MODULE seddta
    REAL(wp) ::  rsecday  ! number of second per a day
    REAL(wp) ::  conv2    ! [kg/m2/month]-->[g/cm2/s] ( 1 month has 30 days )
 
-   !! $Id: seddta.F90 10362 2018-11-30 15:38:17Z aumont $
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
+   !! $Id: seddta.F90 12489 2020-02-28 15:55:11Z davestorkey $
 CONTAINS
 
    !!---------------------------------------------------------------------------
    !!   sed_dta  : read the NetCDF data file in online version using module iom
    !!---------------------------------------------------------------------------
 
-   SUBROUTINE sed_dta( kt )
+   SUBROUTINE sed_dta( kt, Kbb, Kmm )
       !!----------------------------------------------------------------------
       !!                   ***  ROUTINE sed_dta  ***
       !!                    
@@ -42,7 +44,8 @@ CONTAINS
       !!----------------------------------------------------------------------
 
       !! Arguments
-      INTEGER, INTENT(in) ::  kt    ! time-step
+      INTEGER, INTENT(in) ::  kt         ! time-step
+      INTEGER, INTENT(in) ::  Kbb, Kmm   ! time level indices
 
       !! * Local declarations
       INTEGER  ::  ji, jj, js, jw, ikt
@@ -71,7 +74,7 @@ CONTAINS
       ! open file
       IF( kt == nitsed000 ) THEN
          IF (lwp) WRITE(numsed,*) ' sed_dta : Sediment fields'
-         dtsed = r2dttrc
+         dtsed = rDt_trc
          rsecday = 60.* 60. * 24.
 !         conv2   = 1.0e+3 / ( 1.0e+4 * rsecday * 30. )
          conv2 = 1.0e+3 /  1.0e+4 
@@ -91,51 +94,45 @@ CONTAINS
       !    by data and from the coagulation theory
       !    -----------------------------------------------------------
       IF (ln_sediment_offline) THEN
-         DO jj = 1, jpj
-            DO ji = 1, jpi
-               ikt = mbkt(ji,jj)
-               zwsbio4(ji,jj) = wsbio2 / rday
-               zwsbio3(ji,jj) = wsbio  / rday
-            END DO
-         END DO
+         DO_2D_11_11
+            ikt = mbkt(ji,jj)
+            zwsbio4(ji,jj) = wsbio2 / rday
+            zwsbio3(ji,jj) = wsbio  / rday
+         END_2D
       ELSE
-         DO jj = 1, jpj
-            DO ji = 1, jpi
-               ikt = mbkt(ji,jj)
-               zdep = e3t_n(ji,jj,ikt) / r2dttrc
-               zwsbio4(ji,jj) = MIN( 0.99 * zdep, wsbio4(ji,jj,ikt) / rday )
-               zwsbio3(ji,jj) = MIN( 0.99 * zdep, wsbio3(ji,jj,ikt) / rday )
-            END DO
-         END DO
+         DO_2D_11_11
+            ikt = mbkt(ji,jj)
+            zdep = e3t(ji,jj,ikt,Kmm) / rDt_trc
+            zwsbio4(ji,jj) = MIN( 0.99 * zdep, wsbio4(ji,jj,ikt) / rday )
+            zwsbio3(ji,jj) = MIN( 0.99 * zdep, wsbio3(ji,jj,ikt) / rday )
+         END_2D
       ENDIF
 
       trc_data(:,:,:) = 0.
-      DO jj = 1,jpj
-         DO ji = 1, jpi
-            ikt = mbkt(ji,jj)
-            IF ( tmask(ji,jj,ikt) == 1 ) THEN
-               trc_data(ji,jj,1)   = trb(ji,jj,ikt,jpsil)
-               trc_data(ji,jj,2)   = trb(ji,jj,ikt,jpoxy)
-               trc_data(ji,jj,3)   = trb(ji,jj,ikt,jpdic)
-               trc_data(ji,jj,4)   = trb(ji,jj,ikt,jpno3) / 7.625
-               trc_data(ji,jj,5)   = trb(ji,jj,ikt,jppo4) / 122.
-               trc_data(ji,jj,6)   = trb(ji,jj,ikt,jptal)
-               trc_data(ji,jj,7)   = trb(ji,jj,ikt,jpnh4) / 7.625
-               trc_data(ji,jj,8)   = 0.0
-               trc_data(ji,jj,9)   = 28.0E-3
-               trc_data(ji,jj,10)  = trb(ji,jj,ikt,jpfer)
-               trc_data(ji,jj,11 ) = MIN(trb(ji,jj,ikt,jpgsi), 1E-4) * zwsbio4(ji,jj) * 1E3
-               trc_data(ji,jj,12 ) = MIN(trb(ji,jj,ikt,jppoc), 1E-4) * zwsbio3(ji,jj) * 1E3
-               trc_data(ji,jj,13 ) = MIN(trb(ji,jj,ikt,jpgoc), 1E-4) * zwsbio4(ji,jj) * 1E3
-               trc_data(ji,jj,14)  = MIN(trb(ji,jj,ikt,jpcal), 1E-4) * zwsbio4(ji,jj) * 1E3
-               trc_data(ji,jj,15)  = tsn(ji,jj,ikt,jp_tem)
-               trc_data(ji,jj,16)  = tsn(ji,jj,ikt,jp_sal)
-               trc_data(ji,jj,17 ) = ( trb(ji,jj,ikt,jpsfe) * zwsbio3(ji,jj) + trb(ji,jj,ikt,jpbfe)  &
-               &                     * zwsbio4(ji,jj)  ) * 1E3 / ( trc_data(ji,jj,12 ) + trc_data(ji,jj,13 ) + rtrn )
-               trc_data(ji,jj,17 ) = MIN(1E-3, trc_data(ji,jj,17 ) )
-            ENDIF
-         ENDDO
-      ENDDO
+      DO_2D_11_11
+         ikt = mbkt(ji,jj)
+         IF ( tmask(ji,jj,ikt) == 1 ) THEN
+            trc_data(ji,jj,1)   = tr(ji,jj,ikt,jpsil,Kbb)
+            trc_data(ji,jj,2)   = tr(ji,jj,ikt,jpoxy,Kbb)
+            trc_data(ji,jj,3)   = tr(ji,jj,ikt,jpdic,Kbb)
+            trc_data(ji,jj,4)   = tr(ji,jj,ikt,jpno3,Kbb) / 7.625
+            trc_data(ji,jj,5)   = tr(ji,jj,ikt,jppo4,Kbb) / 122.
+            trc_data(ji,jj,6)   = tr(ji,jj,ikt,jptal,Kbb)
+            trc_data(ji,jj,7)   = tr(ji,jj,ikt,jpnh4,Kbb) / 7.625
+            trc_data(ji,jj,8)   = 0.0
+            trc_data(ji,jj,9)   = 28.0E-3
+            trc_data(ji,jj,10)  = tr(ji,jj,ikt,jpfer,Kbb)
+            trc_data(ji,jj,11 ) = MIN(tr(ji,jj,ikt,jpgsi,Kbb), 1E-4) * zwsbio4(ji,jj) * 1E3
+            trc_data(ji,jj,12 ) = MIN(tr(ji,jj,ikt,jppoc,Kbb), 1E-4) * zwsbio3(ji,jj) * 1E3
+            trc_data(ji,jj,13 ) = MIN(tr(ji,jj,ikt,jpgoc,Kbb), 1E-4) * zwsbio4(ji,jj) * 1E3
+            trc_data(ji,jj,14)  = MIN(tr(ji,jj,ikt,jpcal,Kbb), 1E-4) * zwsbio4(ji,jj) * 1E3
+            trc_data(ji,jj,15)  = ts(ji,jj,ikt,jp_tem,Kmm)
+            trc_data(ji,jj,16)  = ts(ji,jj,ikt,jp_sal,Kmm)
+            trc_data(ji,jj,17 ) = ( tr(ji,jj,ikt,jpsfe,Kbb) * zwsbio3(ji,jj) + tr(ji,jj,ikt,jpbfe,Kbb)  &
+            &                     * zwsbio4(ji,jj)  ) * 1E3 / ( trc_data(ji,jj,12 ) + trc_data(ji,jj,13 ) + rtrn )
+            trc_data(ji,jj,17 ) = MIN(1E-3, trc_data(ji,jj,17 ) )
+         ENDIF
+      END_2D
 
       ! Pore water initial concentration [mol/l] in  k=1
       !-------------------------------------------------

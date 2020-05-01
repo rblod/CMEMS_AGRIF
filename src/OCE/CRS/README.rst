@@ -2,6 +2,10 @@
 On line biogeochemistry coarsening
 **********************************
 
+.. todo::
+
+
+
 .. contents::
    :local:
 
@@ -62,8 +66,8 @@ Some parameters are available in the namelist_cfg:
 	   nn_crs_kz   = 3         ! 0, volume-weighted MEAN of KZ
 	                           ! 1, MAX of KZ
 	                           ! 2, MIN of KZ
-	                           ! 3, 10^(MEAN(LOG(KZ)) 
-	                           ! 4, MEDIANE of KZ 
+	                           ! 3, 10^(MEAN(LOG(KZ))
+	                           ! 4, MEDIANE of KZ
 	   ln_crs_wn   = .false.   ! wn coarsened (T) or computed using horizontal divergence ( F )
 	                           !                           !
 	   ln_crs_top = .true.     !coarsening online for the bio
@@ -72,14 +76,14 @@ Some parameters are available in the namelist_cfg:
 - Only ``nn_factx = 3`` is available and the coarsening only works for grids with a T-pivot point for
   the north-fold lateral boundary condition (ORCA025, ORCA12, ORCA36, ...).
 - ``nn_msh_crs = 1`` will activate the generation of the coarsened grid meshmask.
-- ``nn_crs_kz`` is the operator to coarsen the vertical mixing coefficient. 
+- ``nn_crs_kz`` is the operator to coarsen the vertical mixing coefficient.
 - ``ln_crs_wn``
 
   - when ``key_vvl`` is activated, this logical has no effect;
     the coarsened vertical velocities are computed using horizontal divergence.
   - when ``key_vvl`` is not activated,
 
-    - coarsened vertical velocities are computed using horizontal divergence (``ln_crs_wn = .false.``) 
+    - coarsened vertical velocities are computed using horizontal divergence (``ln_crs_wn = .false.``)
     - or coarsened vertical velocities are computed with an average operator (``ln_crs_wn = .true.``)
 - ``ln_crs_top = .true.``: should be activated to run BCG model in coarsened space;
   so only works when ``key_top`` is in the cpp list and eventually ``key_pisces`` or ``key_my_trc``.
@@ -96,7 +100,7 @@ Example of xml files to output coarsened variables with XIOS
 ------------------------------------------------------------
 
 In the [attachment:iodef.xml iodef.xml]  file, a "nemo" context is defined and
-some variable defined in [attachment:file_def.xml file_def.xml] are writted on the ocean-dynamic grid.  
+some variable defined in [attachment:file_def.xml file_def.xml] are writted on the ocean-dynamic grid.
 To write variables on the coarsened grid, and in particular the passive tracers,
 a "nemo_crs" context should be defined in [attachment:iodef.xml iodef.xml] and
 the associated variable are listed in [attachment:file_crs_def.xml file_crs_def.xml ].
@@ -110,7 +114,7 @@ When initial conditions are provided in NetCDF files, the field might be:
 - or they can be on another grid and
   interpolated `on-the-fly <http://forge.ipsl.jussieu.fr/nemo/wiki/Users/SetupNewConfiguration/Weight-creator>`_.
   Example of namelist for PISCES :
-  
+
 	.. code-block:: fortran
 
 		!-----------------------------------------------------------------------
@@ -133,7 +137,7 @@ When initial conditions are provided in NetCDF files, the field might be:
 		   rn_trfac(10)  =   1.0e-06  !  -      -      -     -
 	   	rn_trfac(14)  =   1.0e-06  !  -      -      -     -
 		   rn_trfac(23)  =   7.6e-06  !  -      -      -     -
-		
+
 	   	cn_dir        =  './'      !  root directory for the location of the data files
 
 PISCES forcing files

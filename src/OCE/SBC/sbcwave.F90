@@ -71,15 +71,15 @@ MODULE sbcwave
    REAL(wp), PUBLIC, ALLOCATABLE, DIMENSION(:,:,:) ::   usd  , vsd  , wsd   !: Stokes drift velocities at u-, v- & w-points, resp.
 
    !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: sbcwave.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: sbcwave.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE sbc_stokes( )
+   SUBROUTINE sbc_stokes( Kmm )
       !!---------------------------------------------------------------------
       !!                     ***  ROUTINE sbc_stokes  ***
       !!
@@ -91,6 +91,7 @@ CONTAINS
       !!              - Integrate the horizontal divergenze from the bottom 
       !! ** action  
       !!---------------------------------------------------------------------
+      INTEGER, INTENT(in) :: Kmm ! ocean time level index
       INTEGER  ::   jj, ji, jk   ! dummy loop argument
       INTEGER  ::   ik           ! local integer 
       REAL(wp) ::  ztransp, zfac, zsp0
@@ -110,107 +111,89 @@ CONTAINS
       ! exp. wave number at t-point
       IF( ll_st_bv_li ) THEN   ! (Eq. (19) in Breivik et al. (2014) )
          zfac = 2.0_wp * rpi / 16.0_wp
-         DO jj = 1, jpj
-            DO ji = 1, jpi
-               ! Stokes drift velocity estimated from Hs and Tmean
-               ztransp = zfac * hsw(ji,jj)*hsw(ji,jj) / MAX( wmp(ji,jj), 0.0000001_wp )
-               ! Stokes surface speed
-               tsd2d(ji,jj) = SQRT( ut0sd(ji,jj)*ut0sd(ji,jj) + vt0sd(ji,jj)*vt0sd(ji,jj))
-               ! Wavenumber scale
-               zk_t(ji,jj) = ABS( tsd2d(ji,jj) ) / MAX( ABS( 5.97_wp*ztransp ), 0.0000001_wp )
-            END DO
-         END DO
-         DO jj = 1, jpjm1              ! exp. wave number & Stokes drift velocity at u- & v-points
-            DO ji = 1, jpim1
-               zk_u(ji,jj) = 0.5_wp * ( zk_t(ji,jj) + zk_t(ji+1,jj) )
-               zk_v(ji,jj) = 0.5_wp * ( zk_t(ji,jj) + zk_t(ji,jj+1) )
-               !
-               zu0_sd(ji,jj) = 0.5_wp * ( ut0sd(ji,jj) + ut0sd(ji+1,jj) )
-               zv0_sd(ji,jj) = 0.5_wp * ( vt0sd(ji,jj) + vt0sd(ji,jj+1) )
-            END DO
-         END DO
+         DO_2D_11_11
+            ! Stokes drift velocity estimated from Hs and Tmean
+            ztransp = zfac * hsw(ji,jj)*hsw(ji,jj) / MAX( wmp(ji,jj), 0.0000001_wp )
+            ! Stokes surface speed
+            tsd2d(ji,jj) = SQRT( ut0sd(ji,jj)*ut0sd(ji,jj) + vt0sd(ji,jj)*vt0sd(ji,jj))
+            ! Wavenumber scale
+            zk_t(ji,jj) = ABS( tsd2d(ji,jj) ) / MAX( ABS( 5.97_wp*ztransp ), 0.0000001_wp )
+         END_2D
+         DO_2D_10_10
+            zk_u(ji,jj) = 0.5_wp * ( zk_t(ji,jj) + zk_t(ji+1,jj) )
+            zk_v(ji,jj) = 0.5_wp * ( zk_t(ji,jj) + zk_t(ji,jj+1) )
+            !
+            zu0_sd(ji,jj) = 0.5_wp * ( ut0sd(ji,jj) + ut0sd(ji+1,jj) )
+            zv0_sd(ji,jj) = 0.5_wp * ( vt0sd(ji,jj) + vt0sd(ji,jj+1) )
+         END_2D
       ELSE IF( ll_st_peakfr ) THEN    ! peak wave number calculated from the peak frequency received by the wave model
-         DO jj = 1, jpj
-            DO ji = 1, jpi
-               zk_t(ji,jj) = ( 2.0_wp * rpi * wfreq(ji,jj) ) * ( 2.0_wp * rpi * wfreq(ji,jj) ) / grav
-            END DO
-         END DO
-         DO jj = 1, jpjm1
-            DO ji = 1, jpim1
-               zk_u(ji,jj) = 0.5_wp * ( zk_t(ji,jj) + zk_t(ji+1,jj) )
-               zk_v(ji,jj) = 0.5_wp * ( zk_t(ji,jj) + zk_t(ji,jj+1) )
-               !
-               zu0_sd(ji,jj) = 0.5_wp * ( ut0sd(ji,jj) + ut0sd(ji+1,jj) )
-               zv0_sd(ji,jj) = 0.5_wp * ( vt0sd(ji,jj) + vt0sd(ji,jj+1) )
-            END DO
-         END DO
+         DO_2D_11_11
+            zk_t(ji,jj) = ( 2.0_wp * rpi * wfreq(ji,jj) ) * ( 2.0_wp * rpi * wfreq(ji,jj) ) / grav
+         END_2D
+         DO_2D_10_10
+            zk_u(ji,jj) = 0.5_wp * ( zk_t(ji,jj) + zk_t(ji+1,jj) )
+            zk_v(ji,jj) = 0.5_wp * ( zk_t(ji,jj) + zk_t(ji,jj+1) )
+            !
+            zu0_sd(ji,jj) = 0.5_wp * ( ut0sd(ji,jj) + ut0sd(ji+1,jj) )
+            zv0_sd(ji,jj) = 0.5_wp * ( vt0sd(ji,jj) + vt0sd(ji,jj+1) )
+         END_2D
       ENDIF
       !
       !                       !==  horizontal Stokes Drift 3D velocity  ==!
       IF( ll_st_bv2014 ) THEN
-         DO jk = 1, jpkm1
-            DO jj = 2, jpjm1
-               DO ji = 2, jpim1
-                  zdep_u = 0.5_wp * ( gdept_n(ji,jj,jk) + gdept_n(ji+1,jj,jk) )
-                  zdep_v = 0.5_wp * ( gdept_n(ji,jj,jk) + gdept_n(ji,jj+1,jk) )
-                  !                          
-                  zkh_u = zk_u(ji,jj) * zdep_u     ! k * depth
-                  zkh_v = zk_v(ji,jj) * zdep_v
-                  !                                ! Depth attenuation
-                  zda_u = EXP( -2.0_wp*zkh_u ) / ( 1.0_wp + 8.0_wp*zkh_u )
-                  zda_v = EXP( -2.0_wp*zkh_v ) / ( 1.0_wp + 8.0_wp*zkh_v )
-                  !
-                  usd(ji,jj,jk) = zda_u * zu0_sd(ji,jj) * umask(ji,jj,jk)
-                  vsd(ji,jj,jk) = zda_v * zv0_sd(ji,jj) * vmask(ji,jj,jk)
-               END DO
-            END DO
-         END DO
+         DO_3D_00_00( 1, jpkm1 )
+            zdep_u = 0.5_wp * ( gdept(ji,jj,jk,Kmm) + gdept(ji+1,jj,jk,Kmm) )
+            zdep_v = 0.5_wp * ( gdept(ji,jj,jk,Kmm) + gdept(ji,jj+1,jk,Kmm) )
+            !                          
+            zkh_u = zk_u(ji,jj) * zdep_u     ! k * depth
+            zkh_v = zk_v(ji,jj) * zdep_v
+            !                                ! Depth attenuation
+            zda_u = EXP( -2.0_wp*zkh_u ) / ( 1.0_wp + 8.0_wp*zkh_u )
+            zda_v = EXP( -2.0_wp*zkh_v ) / ( 1.0_wp + 8.0_wp*zkh_v )
+            !
+            usd(ji,jj,jk) = zda_u * zu0_sd(ji,jj) * umask(ji,jj,jk)
+            vsd(ji,jj,jk) = zda_v * zv0_sd(ji,jj) * vmask(ji,jj,jk)
+         END_3D
       ELSE IF( ll_st_li2017 .OR. ll_st_peakfr ) THEN
          ALLOCATE( zstokes_psi_u_top(jpi,jpj), zstokes_psi_v_top(jpi,jpj) )
-         DO jj = 1, jpjm1              ! exp. wave number & Stokes drift velocity at u- & v-points
-            DO ji = 1, jpim1
-               zstokes_psi_u_top(ji,jj) = 0._wp
-               zstokes_psi_v_top(ji,jj) = 0._wp
-            END DO
-         END DO
+         DO_2D_10_10
+            zstokes_psi_u_top(ji,jj) = 0._wp
+            zstokes_psi_v_top(ji,jj) = 0._wp
+         END_2D
          zsqrtpi = SQRT(rpi)
          z_two_thirds = 2.0_wp / 3.0_wp
-         DO jk = 1, jpkm1
-            DO jj = 2, jpjm1
-               DO ji = 2, jpim1
-                  zbot_u = ( gdepw_n(ji,jj,jk+1) + gdepw_n(ji+1,jj,jk+1) )  ! 2 * bottom depth
-                  zbot_v = ( gdepw_n(ji,jj,jk+1) + gdepw_n(ji,jj+1,jk+1) )  ! 2 * bottom depth
-                  zkb_u  = zk_u(ji,jj) * zbot_u                             ! 2 * k * bottom depth
-                  zkb_v  = zk_v(ji,jj) * zbot_v                             ! 2 * k * bottom depth
-                  !
-                  zke3_u = MAX(1.e-8_wp, 2.0_wp * zk_u(ji,jj) * e3u_n(ji,jj,jk))     ! 2k * thickness
-                  zke3_v = MAX(1.e-8_wp, 2.0_wp * zk_v(ji,jj) * e3v_n(ji,jj,jk))     ! 2k * thickness
+         DO_3D_00_00( 1, jpkm1 )
+            zbot_u = ( gdepw(ji,jj,jk+1,Kmm) + gdepw(ji+1,jj,jk+1,Kmm) )  ! 2 * bottom depth
+            zbot_v = ( gdepw(ji,jj,jk+1,Kmm) + gdepw(ji,jj+1,jk+1,Kmm) )  ! 2 * bottom depth
+            zkb_u  = zk_u(ji,jj) * zbot_u                             ! 2 * k * bottom depth
+            zkb_v  = zk_v(ji,jj) * zbot_v                             ! 2 * k * bottom depth
+            !
+            zke3_u = MAX(1.e-8_wp, 2.0_wp * zk_u(ji,jj) * e3u(ji,jj,jk,Kmm))     ! 2k * thickness
+            zke3_v = MAX(1.e-8_wp, 2.0_wp * zk_v(ji,jj) * e3v(ji,jj,jk,Kmm))     ! 2k * thickness
 
-                  ! Depth attenuation .... do u component first..
-                  zdepth      = zkb_u
-                  zsqrt_depth = SQRT(zdepth)
-                  zexp_depth  = EXP(-zdepth)
-                  zstokes_psi_u_bot = 1.0_wp - zexp_depth  &
-                       &              - z_two_thirds * ( zsqrtpi*zsqrt_depth*zdepth*ERFC(zsqrt_depth) &
-                       &              + 1.0_wp - (1.0_wp + zdepth)*zexp_depth )
-                  zda_u                    = ( zstokes_psi_u_bot - zstokes_psi_u_top(ji,jj) ) / zke3_u
-                  zstokes_psi_u_top(ji,jj) =   zstokes_psi_u_bot
+            ! Depth attenuation .... do u component first..
+            zdepth      = zkb_u
+            zsqrt_depth = SQRT(zdepth)
+            zexp_depth  = EXP(-zdepth)
+            zstokes_psi_u_bot = 1.0_wp - zexp_depth  &
+                 &              - z_two_thirds * ( zsqrtpi*zsqrt_depth*zdepth*ERFC(zsqrt_depth) &
+                 &              + 1.0_wp - (1.0_wp + zdepth)*zexp_depth )
+            zda_u                    = ( zstokes_psi_u_bot - zstokes_psi_u_top(ji,jj) ) / zke3_u
+            zstokes_psi_u_top(ji,jj) =   zstokes_psi_u_bot
 
-                  !         ... and then v component
-                  zdepth      =zkb_v
-                  zsqrt_depth = SQRT(zdepth)
-                  zexp_depth  = EXP(-zdepth)
-                  zstokes_psi_v_bot = 1.0_wp - zexp_depth  &
-                       &              - z_two_thirds * ( zsqrtpi*zsqrt_depth*zdepth*ERFC(zsqrt_depth) &
-                       &              + 1.0_wp - (1.0_wp + zdepth)*zexp_depth )
-                  zda_v                    = ( zstokes_psi_v_bot - zstokes_psi_v_top(ji,jj) ) / zke3_v
-                  zstokes_psi_v_top(ji,jj) =   zstokes_psi_v_bot
-                  !
-                  usd(ji,jj,jk) = zda_u * zu0_sd(ji,jj) * umask(ji,jj,jk)
-                  vsd(ji,jj,jk) = zda_v * zv0_sd(ji,jj) * vmask(ji,jj,jk)
-               END DO
-            END DO
-         END DO
+            !         ... and then v component
+            zdepth      =zkb_v
+            zsqrt_depth = SQRT(zdepth)
+            zexp_depth  = EXP(-zdepth)
+            zstokes_psi_v_bot = 1.0_wp - zexp_depth  &
+                 &              - z_two_thirds * ( zsqrtpi*zsqrt_depth*zdepth*ERFC(zsqrt_depth) &
+                 &              + 1.0_wp - (1.0_wp + zdepth)*zexp_depth )
+            zda_v                    = ( zstokes_psi_v_bot - zstokes_psi_v_top(ji,jj) ) / zke3_v
+            zstokes_psi_v_top(ji,jj) =   zstokes_psi_v_bot
+            !
+            usd(ji,jj,jk) = zda_u * zu0_sd(ji,jj) * umask(ji,jj,jk)
+            vsd(ji,jj,jk) = zda_v * zv0_sd(ji,jj) * vmask(ji,jj,jk)
+         END_3D
          DEALLOCATE( zstokes_psi_u_top, zstokes_psi_v_top )
       ENDIF
 
@@ -219,16 +202,12 @@ CONTAINS
       !
       !                       !==  vertical Stokes Drift 3D velocity  ==!
       !
-      DO jk = 1, jpkm1               ! Horizontal e3*divergence
-         DO jj = 2, jpj
-            DO ji = fs_2, jpi
-               ze3divh(ji,jj,jk) = (  e2u(ji  ,jj) * e3u_n(ji  ,jj,jk) * usd(ji  ,jj,jk)    &
-                  &                 - e2u(ji-1,jj) * e3u_n(ji-1,jj,jk) * usd(ji-1,jj,jk)    &
-                  &                 + e1v(ji,jj  ) * e3v_n(ji,jj  ,jk) * vsd(ji,jj  ,jk)    &
-                  &                 - e1v(ji,jj-1) * e3v_n(ji,jj-1,jk) * vsd(ji,jj-1,jk)  ) * r1_e1e2t(ji,jj)
-            END DO
-         END DO
-      END DO
+      DO_3D_01_01( 1, jpkm1 )
+         ze3divh(ji,jj,jk) = (  e2u(ji  ,jj) * e3u(ji  ,jj,jk,Kmm) * usd(ji  ,jj,jk)    &
+            &                 - e2u(ji-1,jj) * e3u(ji-1,jj,jk,Kmm) * usd(ji-1,jj,jk)    &
+            &                 + e1v(ji,jj  ) * e3v(ji,jj  ,jk,Kmm) * vsd(ji,jj  ,jk)    &
+            &                 - e1v(ji,jj-1) * e3v(ji,jj-1,jk,Kmm) * vsd(ji,jj-1,jk)  ) * r1_e1e2t(ji,jj)
+      END_3D
       !
 #if defined key_agrif
       IF( .NOT. Agrif_Root() ) THEN
@@ -290,23 +269,21 @@ CONTAINS
       ENDIF
       !
       IF( ln_tauw ) THEN
-         DO jj = 1, jpjm1
-            DO ji = 1, jpim1
-               ! Stress components at u- & v-points
-               utau(ji,jj) = 0.5_wp * ( tauw_x(ji,jj) + tauw_x(ji+1,jj) )
-               vtau(ji,jj) = 0.5_wp * ( tauw_y(ji,jj) + tauw_y(ji,jj+1) )
-               !
-               ! Stress module at t points
-               taum(ji,jj) = SQRT( tauw_x(ji,jj)*tauw_x(ji,jj) + tauw_y(ji,jj)*tauw_y(ji,jj) )
-            END DO
-         END DO
+         DO_2D_10_10
+            ! Stress components at u- & v-points
+            utau(ji,jj) = 0.5_wp * ( tauw_x(ji,jj) + tauw_x(ji+1,jj) )
+            vtau(ji,jj) = 0.5_wp * ( tauw_y(ji,jj) + tauw_y(ji,jj+1) )
+            !
+            ! Stress module at t points
+            taum(ji,jj) = SQRT( tauw_x(ji,jj)*tauw_x(ji,jj) + tauw_y(ji,jj)*tauw_y(ji,jj) )
+         END_2D
          CALL lbc_lnk_multi( 'sbcwave', utau(:,:), 'U', -1. , vtau(:,:), 'V', -1. , taum(:,:) , 'T', -1. )
       ENDIF
       !
    END SUBROUTINE sbc_wstress
 
 
-   SUBROUTINE sbc_wave( kt )
+   SUBROUTINE sbc_wave( kt, Kmm )
       !!---------------------------------------------------------------------
       !!                     ***  ROUTINE sbc_wave  ***
       !!
@@ -321,6 +298,7 @@ CONTAINS
       !! ** action  
       !!---------------------------------------------------------------------
       INTEGER, INTENT(in   ) ::   kt   ! ocean time step
+      INTEGER, INTENT(in   ) ::   Kmm  ! ocean time index
       !!---------------------------------------------------------------------
       !
       IF( ln_cdgw .AND. .NOT. cpl_wdrag ) THEN     !==  Neutral drag coefficient  ==!
@@ -360,7 +338,7 @@ CONTAINS
          ! In coupled wave model-NEMO case the call is done after coupling
          !
          IF( ( ll_st_bv_li   .AND. jp_hsw>0 .AND. jp_wmp>0 .AND. jp_usd>0 .AND. jp_vsd>0 ) .OR. &
-           & ( ll_st_peakfr  .AND. jp_wfr>0 .AND. jp_usd>0 .AND. jp_vsd>0                ) ) CALL sbc_stokes()
+           & ( ll_st_peakfr  .AND. jp_wfr>0 .AND. jp_usd>0 .AND. jp_vsd>0                ) ) CALL sbc_stokes( Kmm )
          !
       ENDIF
       !
@@ -394,13 +372,11 @@ CONTAINS
                              sn_wnum, sn_tauwoc, sn_tauwx, sn_tauwy
       !!---------------------------------------------------------------------
       !
-      REWIND( numnam_ref )              ! Namelist namsbc_wave in reference namelist : File for drag coeff. from wave model
       READ  ( numnam_ref, namsbc_wave, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namsbc_wave in reference namelist', lwp )
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namsbc_wave in reference namelist' )
          
-      REWIND( numnam_cfg )              ! Namelist namsbc_wave in configuration namelist : File for drag coeff. from wave model
       READ  ( numnam_cfg, namsbc_wave, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namsbc_wave in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namsbc_wave in configuration namelist' )
       IF(lwm) WRITE ( numond, namsbc_wave )
       !
       IF( ln_cdgw ) THEN

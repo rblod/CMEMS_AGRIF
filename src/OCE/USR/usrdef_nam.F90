@@ -31,12 +31,12 @@ MODULE usrdef_nam
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: usrdef_nam.F90 10069 2018-08-28 14:12:24Z nicolasmartin $ 
+   !! $Id: usrdef_nam.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE usr_def_nam( ldtxt, ldnam, cd_cfg, kk_cfg, kpi, kpj, kpk, kperio )
+   SUBROUTINE usr_def_nam( cd_cfg, kk_cfg, kpi, kpj, kpk, kperio )
       !!----------------------------------------------------------------------
       !!                     ***  ROUTINE dom_nam  ***
       !!                    
@@ -48,24 +48,20 @@ CONTAINS
       !!
       !! ** input   : - namusr_def namelist found in namelist_cfg
       !!----------------------------------------------------------------------
-      CHARACTER(len=*), DIMENSION(:), INTENT(out) ::   ldtxt, ldnam    ! stored print information
-      CHARACTER(len=*)              , INTENT(out) ::   cd_cfg          ! configuration name
-      INTEGER                       , INTENT(out) ::   kk_cfg          ! configuration resolution
-      INTEGER                       , INTENT(out) ::   kpi, kpj, kpk   ! global domain sizes 
-      INTEGER                       , INTENT(out) ::   kperio          ! lateral global domain b.c. 
+      CHARACTER(len=*), INTENT(out) ::   cd_cfg          ! configuration name
+      INTEGER         , INTENT(out) ::   kk_cfg          ! configuration resolution
+      INTEGER         , INTENT(out) ::   kpi, kpj, kpk   ! global domain sizes 
+      INTEGER         , INTENT(out) ::   kperio          ! lateral global domain b.c. 
       !
-      INTEGER ::   ios, ii   ! Local integer
+      INTEGER ::   ios   ! Local integer
       !!
       NAMELIST/namusr_def/ nn_GYRE, ln_bench, jpkglo
       !!----------------------------------------------------------------------
       !
-      ii = 1
-      !
-      REWIND( numnam_cfg )          ! Namelist namusr_def (exist in namelist_cfg only)
       READ  ( numnam_cfg, namusr_def, IOSTAT = ios, ERR = 902 )
-902   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namusr_def in configuration namelist', .TRUE. )
+902   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namusr_def in configuration namelist' )
       !
-      WRITE( ldnam(:), namusr_def )
+      IF(lwm)   WRITE( numond, namusr_def )
       !
       cd_cfg = 'GYRE'               ! name & resolution (not used)
 #if defined key_agrif
@@ -82,29 +78,29 @@ CONTAINS
       ENDIF
 #endif
       kpk = jpkglo
-      !
-      !                             ! control print
-      WRITE(ldtxt(ii),*) '   '                                                                            ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) 'usr_def_nam  : read the user defined namelist (namusr_def) in namelist_cfg'     ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '~~~~~~~~~~~ '                                                                   ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '   Namelist namusr_def : GYRE case'                                             ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '      GYRE used as Benchmark (=T)                      ln_bench  = ', ln_bench  ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '      inverse resolution & implied domain size         nn_GYRE   = ', nn_GYRE   ;   ii = ii + 1
-#if defined key_agrif
-      IF( Agrif_Root() ) THEN
-#endif
-      WRITE(ldtxt(ii),*) '         jpiglo = 30*nn_GYRE+2                            jpiglo = ', kpi       ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '         jpjglo = 20*nn_GYRE+2                            jpjglo = ', kpj       ;   ii = ii + 1
-#if defined key_agrif
-      ENDIF
-#endif
-      WRITE(ldtxt(ii),*) '      number of model levels                              jpkglo = ', kpk       ;   ii = ii + 1
-      !
       !                             ! Set the lateral boundary condition of the global domain
       kperio = 0                    ! GYRE configuration : closed domain
       !
-      WRITE(ldtxt(ii),*) '   '                                                                            ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '   Lateral b.c. of the global domain set to closed     jperio = ', kperio       ;   ii = ii + 1
+      !                             ! control print
+      IF(lwp) THEN
+         WRITE(numout,*) '   '
+         WRITE(numout,*) 'usr_def_nam  : read the user defined namelist (namusr_def) in namelist_cfg'
+         WRITE(numout,*) '~~~~~~~~~~~ '
+         WRITE(numout,*) '   Namelist namusr_def : GYRE case'
+         WRITE(numout,*) '      GYRE used as Benchmark (=T)                      ln_bench  = ', ln_bench
+         WRITE(numout,*) '      inverse resolution & implied domain size         nn_GYRE   = ', nn_GYRE
+#if defined key_agrif
+         IF( Agrif_Root() ) THEN
+#endif
+         WRITE(numout,*) '         jpiglo = 30*nn_GYRE+2                            jpiglo = ', kpi
+         WRITE(numout,*) '         jpjglo = 20*nn_GYRE+2                            jpjglo = ', kpj
+#if defined key_agrif
+         ENDIF
+#endif
+         WRITE(numout,*) '      number of model levels                              jpkglo = ', kpk
+         WRITE(numout,*) '   '
+         WRITE(numout,*) '   Lateral b.c. of the global domain set to closed        jperio = ', kperio
+      ENDIF
       !
    END SUBROUTINE usr_def_nam
 

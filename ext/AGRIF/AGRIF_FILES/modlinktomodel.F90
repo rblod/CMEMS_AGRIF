@@ -49,14 +49,14 @@ module Agrif_Link
             type(Agrif_Grid), pointer :: Agrif_Gr   !< Pointer on the current grid
         end subroutine alloc_proc
 !
-        subroutine typedef_proc ( )
+        subroutine typdef_proc ( )
             implicit none
-        end subroutine typedef_proc
+        end subroutine typdef_proc
 !
     end interface
     
     procedure(alloc_proc)   :: Agrif_Allocationcalls
-    procedure(typedef_proc) :: Agrif_probdim_modtype_def
+    procedure(typdef_proc) :: Agrif_probdim_modtype_def
 !
 end module Agrif_Link
 !

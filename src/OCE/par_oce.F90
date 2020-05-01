@@ -26,6 +26,7 @@ MODULE par_oce
    !                                   !  attribute defined. This is designed to enable input files associated 
    !                                   !  with the extended grids used in the under ice shelf configurations to 
    !                                   !  be used without redundant rows when the ice shelves are not in use.
+   LOGICAL       ::   ln_closea        !: (=T) special treatment of closed sea
    ! 
 
    !!---------------------------------------------------------------------
@@ -34,6 +35,9 @@ MODULE par_oce
    ! configuration name & resolution   (required only in ORCA family case)
    CHARACTER(lc) ::   cn_cfg           !: name of the configuration
    INTEGER       ::   nn_cfg           !: resolution of the configuration 
+
+   ! time dimension
+   INTEGER, PUBLIC, PARAMETER :: jpt = 3    !: time dimension
 
    ! global domain size               !!! * total computational domain *
    INTEGER       ::   jpiglo           !: 1st dimension of global domain --> i-direction
@@ -77,7 +81,7 @@ MODULE par_oce
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: par_oce.F90 10068 2018-08-28 14:09:04Z nicolasmartin $ 
+   !! $Id: par_oce.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!======================================================================
 END MODULE par_oce

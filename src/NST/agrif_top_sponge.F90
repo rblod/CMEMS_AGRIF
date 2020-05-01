@@ -19,6 +19,7 @@ MODULE agrif_top_sponge
    USE dom_oce
    USE agrif_oce
    USE agrif_oce_sponge
+   USE vremap
    !
    USE in_out_manager
    USE lib_mpp
@@ -30,7 +31,7 @@ MODULE agrif_top_sponge
 
    !!----------------------------------------------------------------------
    !! NEMO/NST 4.0 , NEMO Consortium (2018)
-   !! $Id: agrif_top_sponge.F90 10068 2018-08-28 14:09:04Z nicolasmartin $
+   !! $Id: agrif_top_sponge.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -65,12 +66,12 @@ CONTAINS
       LOGICAL                                     , INTENT(in   ) ::   before
       !
       INTEGER  ::   ji, jj, jk, jn   ! dummy loop indices
-      REAL(wp) ::   zabe1, zabe2
-      REAL(wp), DIMENSION(i1:i2,j1:j2)             ::   ztu, ztv
-      REAL(wp), DIMENSION(i1:i2,j1:j2,k1:k2,n1:n2) ::   trbdiff
+      REAL(wp) ::   zabe1, zabe2, ztrelax
+      REAL(wp), DIMENSION(i1:i2,j1:j2)               ::   ztu, ztv
+      REAL(wp), DIMENSION(i1:i2,j1:j2,k1:k2,1:jptra) ::   trbdiff
       ! vertical interpolation:
-      REAL(wp), DIMENSION(i1:i2,j1:j2,jpk,n1:n2) ::tabres_child
-      REAL(wp), DIMENSION(k1:k2,n1:n2-1) :: tabin
+      REAL(wp), DIMENSION(i1:i2,j1:j2,jpk,1:jptra) ::tabres_child
+      REAL(wp), DIMENSION(k1:k2,1:jptra) :: tabin
       REAL(wp), DIMENSION(k1:k2) :: h_in
       REAL(wp), DIMENSION(1:jpk) :: h_out
       INTEGER :: N_in, N_out
@@ -82,7 +83,7 @@ CONTAINS
             DO jk=k1,k2
                DO jj=j1,j2
                   DO ji=i1,i2
-                     tabres(ji,jj,jk,jn) = trb(ji,jj,jk,jn)
+                     tabres(ji,jj,jk,jn) = tr(ji,jj,jk,jn,Kbb_a)
                   END DO
                END DO
             END DO
@@ -92,7 +93,7 @@ CONTAINS
          DO jk=k1,k2
             DO jj=j1,j2
                DO ji=i1,i2
-                  tabres(ji,jj,jk,jpts+1) = tmask(ji,jj,jk) * e3t_n(ji,jj,jk) 
+                  tabres(ji,jj,jk,jpts+1) = tmask(ji,jj,jk) * e3t(ji,jj,jk,Kbb_a) 
                END DO
             END DO
          END DO
@@ -113,14 +114,10 @@ CONTAINS
                DO jk=1,jpk ! jpk of child grid
                   IF (tmask(ji,jj,jk) == 0) EXIT 
                   N_out = N_out + 1
-                  h_out(jk) = e3t_n(ji,jj,jk) !Child grid scale factors. Could multiply by e1e2t here instead of division above
+                  h_out(jk) = e3t(ji,jj,jk,Kbb_a) !Child grid scale factors. Could multiply by e1e2t here instead of division above
                ENDDO
                IF (N_in > 0) THEN
-                  h_diff = sum(h_out(1:N_out))-sum(h_in(1:N_in))
-                  tabres(ji,jj,k2,:) = tabres(ji,jj,k2-1,:) !what is this line for?????
-                  DO jn=1,jptra
-                     call reconstructandremap(tabin(1:N_in,jn),h_in,tabres_child(ji,jj,1:N_out,jn),h_out,N_in,N_out)
-                  ENDDO
+                  CALL reconstructandremap(tabin(1:N_in,1:jptra),h_in,tabres_child(ji,jj,1:N_out,1:jptra),h_out,N_in,N_out,jptra)
                ENDIF
             ENDDO
          ENDDO
@@ -130,20 +127,25 @@ CONTAINS
             DO ji=i1,i2
                DO jk=1,jpkm1
 # if defined key_vertical
-                  trbdiff(ji,jj,jk,1:jptra) = trb(ji,jj,jk,1:jptra) - tabres_child(ji,jj,jk,1:jptra)
+                  trbdiff(ji,jj,jk,1:jptra) = tr(ji,jj,jk,1:jptra,Kbb_a) - tabres_child(ji,jj,jk,1:jptra)
 # else
-                  trbdiff(ji,jj,jk,1:jptra) = trb(ji,jj,jk,1:jptra) - tabres(ji,jj,jk,1:jptra)
+                  trbdiff(ji,jj,jk,1:jptra) = tr(ji,jj,jk,1:jptra,Kbb_a) - tabres(ji,jj,jk,1:jptra)
 # endif
                ENDDO
             ENDDO
          ENDDO
 
+         !* set relaxation time scale
+         IF( l_1st_euler .AND. lk_agrif_fstep ) THEN   ;   ztrelax =   rn_trelax_tra  / (        rn_Dt )
+         ELSE                                          ;   ztrelax =   rn_trelax_tra  / (2._wp * rn_Dt )
+         ENDIF
+
          DO jn = 1, jptra
             DO jk = 1, jpkm1
                DO jj = j1,j2-1
                   DO ji = i1,i2-1
-                     zabe1 = fsaht_spu(ji,jj) * e2_e1u(ji,jj) * e3u_n(ji,jj,jk) * umask(ji,jj,jk)
-                     zabe2 = fsaht_spv(ji,jj) * e1_e2v(ji,jj) * e3v_n(ji,jj,jk) * vmask(ji,jj,jk)
+                     zabe1 = rn_sponge_tra * fspu(ji,jj) * e2_e1u(ji,jj) * e3u(ji,jj,jk,Kmm_a) * umask(ji,jj,jk)
+                     zabe2 = rn_sponge_tra * fspv(ji,jj) * e1_e2v(ji,jj) * e3v(ji,jj,jk,Kmm_a) * vmask(ji,jj,jk)
                      ztu(ji,jj) = zabe1 * ( trbdiff(ji+1,jj  ,jk,jn) - trbdiff(ji,jj,jk,jn) )
                      ztv(ji,jj) = zabe2 * ( trbdiff(ji  ,jj+1,jk,jn) - trbdiff(ji,jj,jk,jn) )
                   END DO
@@ -152,9 +154,10 @@ CONTAINS
                DO jj = j1+1,j2-1
                   DO ji = i1+1,i2-1
                      IF( .NOT. tabspongedone_trn(ji,jj) ) THEN 
-                        tra(ji,jj,jk,jn) = tra(ji,jj,jk,jn) + (  ztu(ji,jj) - ztu(ji-1,jj  )     &
+                        tr(ji,jj,jk,jn,Krhs_a) = tr(ji,jj,jk,jn,Krhs_a) + (  ztu(ji,jj) - ztu(ji-1,jj  )     &
                            &                                   + ztv(ji,jj) - ztv(ji  ,jj-1)  )  &
-                           &                                * r1_e1e2t(ji,jj) / e3t_n(ji,jj,jk)
+                           &                                * r1_e1e2t(ji,jj) / e3t(ji,jj,jk,Kmm_a)  &
+                           &                                - ztrelax * fspt(ji,jj) * trbdiff(ji,jj,jk,jn)
                      ENDIF
                   END DO
                END DO

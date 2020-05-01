@@ -2,21 +2,24 @@
 ! NEMO system team, System and Interface for oceanic RElocable Nesting
 !----------------------------------------------------------------------
 !
-! MODULE: global
-!
 ! DESCRIPTION:
 !> @brief This module defines global variables and parameters.
-!
+!>
 !> @author
 !> J.paul
-! REVISION HISTORY:
+!>
 !> @date November, 2013 - Initial Version
 !> @date September, 2015
 !> - define fill value for each variable type
-!
-!> @note Software governed by the CeCILL licence     (./LICENSE)
+!> @date January, 2019
+!> - define svn URL variable
+!> @date October, 2019
+!> - define svn Revision, Date, and Author variable
+!>
+!> @note Software governed by the CeCILL licence     (NEMOGCM/NEMO_CeCILL.txt)
 !----------------------------------------------------------------------
 MODULE global
+
    USE kind                         ! F90 kind parameter
    USE netcdf
 
@@ -62,6 +65,10 @@ MODULE global
    PUBLIC :: jp_south        !< indice for south boundary
    PUBLIC :: jp_east         !< indice for east  boundary
    PUBLIC :: jp_west         !< indice for west  boundary
+
+   PUBLIC :: ip_maxdimcfg    !< maximum dimension in configuration file
+   PUBLIC :: ip_maxdumcfg    !< maximum dummy variable in configuration file
+   PUBLIC :: cp_url          !< svn url
 
    ! NOTE_avoid_public_variables_if_possible
 
@@ -111,7 +118,7 @@ MODULE global
    &  (/ 'T', 'U', 'V', 'F' /)
 
 
-   INTEGER(i4)                             , PARAMETER :: ip_maxdimcfg=10 !< maximum allowed dimension in configuration file
+   INTEGER(i4)                             , PARAMETER :: ip_maxdimcfg=10 !< maximum dimension in configuration file
    INTEGER(i4)                             , PARAMETER :: ip_maxdim=4
    INTEGER(i4)                             , PARAMETER :: jp_I=1
    INTEGER(i4)                             , PARAMETER :: jp_J=2
@@ -119,20 +126,25 @@ MODULE global
    INTEGER(i4)                             , PARAMETER :: jp_L=4
    CHARACTER(LEN=ip_maxdim)                , PARAMETER :: cp_dimorder = 'xyzt' !< dimension order to output
 
-   INTEGER(i4), PARAMETER :: ip_ncard=4
-   CHARACTER(LEN=lc), DIMENSION(ip_ncard), PARAMETER :: cp_card = &
+   INTEGER(i4)                             , PARAMETER :: ip_ncard=4
+   CHARACTER(LEN=lc), DIMENSION(ip_ncard)  , PARAMETER :: cp_card = &
    &  (/ 'north', &
    &     'south', &
    &     'east ', &
    &     'west ' /)
 
-   INTEGER(i4), PARAMETER :: jp_north=1
-   INTEGER(i4), PARAMETER :: jp_south=2
-   INTEGER(i4), PARAMETER :: jp_east =3
-   INTEGER(i4), PARAMETER :: jp_west =4
+   INTEGER(i4)                             , PARAMETER :: jp_north=1
+   INTEGER(i4)                             , PARAMETER :: jp_south=2
+   INTEGER(i4)                             , PARAMETER :: jp_east =3
+   INTEGER(i4)                             , PARAMETER :: jp_west =4
 
    INTEGER(i4)                             , PARAMETER :: ip_maxdumcfg = 10 !< maximum dummy variable, dimension, or attribute 
                                                                             !< in configuration file
+
+   CHARACTER(LEN=lc)                       , PARAMETER :: cp_url="$URL: svn+ssh://rblod@forge.ipsl.jussieu.fr/ipsl/forge/projets/nemo/svn/utils/tools/SIREN/src/global.f90 $"    !< svn url
+   CHARACTER(LEN=lc)                       , PARAMETER :: cp_version = "$Revision: 12080 $"
+   CHARACTER(LEN=lc)                       , PARAMETER :: cp_author = "$Author: jpaul $"
+   CHARACTER(LEN=lc)                       , PARAMETER :: cp_date = "$Date: 2019-12-06 10:30:14 +0100 (Ven, 06 déc 2019) $"
 
 END MODULE global
 

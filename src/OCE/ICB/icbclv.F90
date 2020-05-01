@@ -23,6 +23,7 @@ MODULE icbclv
    USE icb_oce        ! iceberg variables
    USE icbdia         ! iceberg diagnostics
    USE icbutl         ! iceberg utility routines
+   USE icb_oce        ! iceberg parameters 
 
    IMPLICIT NONE
    PRIVATE
@@ -30,9 +31,11 @@ MODULE icbclv
    PUBLIC   icb_clv_flx  ! routine called in icbstp.F90 module
    PUBLIC   icb_clv      ! routine called in icbstp.F90 module
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: icbclv.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: icbclv.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -56,39 +59,35 @@ CONTAINS
       ! Use interior mask: so no bergs in overlap areas and convert from km^3/year to kg/s
       ! this assumes that input is given as equivalent water flux so that pure water density is appropriate
 
-      zfact = ( (1000._wp)**3 / ( NINT(rday) * nyear_len(1) ) ) * 850._wp
-      berg_grid%calving(:,:) = src_calving(:,:) * tmask_i(:,:) * zfact
+      zfact = ( (1000._wp)**3 / ( NINT(rday) * nyear_len(1) ) ) * rn_rho_bergs
+      berg_grid%calving(:,:) = src_calving(:,:) * zfact * tmask_i(:,:) * tmask(:,:,1)
 
       ! Heat in units of W/m2, and mask (just in case)
-      berg_grid%calving_hflx(:,:) = src_calving_hflx(:,:) * tmask_i(:,:)
+      berg_grid%calving_hflx(:,:) = src_calving_hflx(:,:) * tmask_i(:,:) * tmask(:,:,1)
 
       IF( ll_first_call .AND. .NOT. l_restarted_bergs ) THEN      ! This is a hack to simplify initialization
          ll_first_call = .FALSE.
          !do jn=1, nclasses
          !  where (berg_grid%calving==0.) berg_grid%stored_ice(:,:,jn)=0.
          !end do
-         DO jj = 2, jpjm1
-            DO ji = 2, jpim1
-               IF( berg_grid%calving(ji,jj) /= 0._wp )                                          &    ! Need units of J
-                  berg_grid%stored_heat(ji,jj) = SUM( berg_grid%stored_ice(ji,jj,:) ) *         &    ! initial stored ice in kg
-                     &                   berg_grid%calving_hflx(ji,jj) * e1e2t(ji,jj) / berg_grid%calving(ji,jj)   ! J/s/m2 x m^2 
-                     !                                                                                             ! = J/s/calving in kg/s
-            END DO
-         END DO
+         DO_2D_00_00
+            IF( berg_grid%calving(ji,jj) /= 0._wp )                                          &    ! Need units of J
+               berg_grid%stored_heat(ji,jj) = SUM( berg_grid%stored_ice(ji,jj,:) ) *         &    ! initial stored ice in kg
+                  &                   berg_grid%calving_hflx(ji,jj) * e1e2t(ji,jj) / berg_grid%calving(ji,jj)   ! J/s/m2 x m^2 
+                  !                                                                                             ! = J/s/calving in kg/s
+         END_2D
       ENDIF
 
       ! assume that all calving flux must be distributed even if distribution array does not sum
       ! to one - this may not be what is intended, but it's what you've got
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-            imx = berg_grid%maxclass(ji,jj)
-            zdist = SUM( rn_distribution(1:nclasses) ) / SUM( rn_distribution(1:imx) )
-            DO jn = 1, imx
-               berg_grid%stored_ice(ji,jj,jn) = berg_grid%stored_ice(ji,jj,jn)     &
-                  &                           + berg_dt * berg_grid%calving(ji,jj) * rn_distribution(jn) * zdist
-            END DO
+      DO_2D_11_11
+         imx = berg_grid%maxclass(ji,jj)
+         zdist = SUM( rn_distribution(1:nclasses) ) / SUM( rn_distribution(1:imx) )
+         DO jn = 1, imx
+            berg_grid%stored_ice(ji,jj,jn) = berg_grid%stored_ice(ji,jj,jn)     &
+               &                           + berg_dt * berg_grid%calving(ji,jj) * rn_distribution(jn) * zdist
          END DO
-      END DO
+      END_2D
 
       ! before changing the calving, save the amount we're about to use and do budget
       zcalving_used = SUM( berg_grid%calving(:,:) )

@@ -16,10 +16,10 @@ MODULE sbcfwb
    USE oce            ! ocean dynamics and tracers
    USE dom_oce        ! ocean space and time domain
    USE sbc_oce        ! surface ocean boundary condition
+   USE isf_oce , ONLY : fwfisf_cav, fwfisf_par                    ! ice shelf melting contribution
    USE sbc_ice , ONLY : snwice_mass, snwice_mass_b, snwice_fmass
    USE phycst         ! physical constants
    USE sbcrnf         ! ocean runoffs
-   USE sbcisf         ! ice shelf melting contribution
    USE sbcssr         ! Sea-Surface damping terms
    !
    USE in_out_manager ! I/O manager
@@ -38,16 +38,14 @@ MODULE sbcfwb
    REAL(wp) ::   fwfold    ! fwfold to be suppressed
    REAL(wp) ::   area      ! global mean ocean surface (interior domain)
 
-   !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: sbcfwb.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: sbcfwb.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE sbc_fwb( kt, kn_fwb, kn_fsbc )
+   SUBROUTINE sbc_fwb( kt, kn_fwb, kn_fsbc, Kmm )
       !!---------------------------------------------------------------------
       !!                  ***  ROUTINE sbc_fwb  ***
       !!
@@ -64,6 +62,7 @@ CONTAINS
       INTEGER, INTENT( in ) ::   kt       ! ocean time-step index
       INTEGER, INTENT( in ) ::   kn_fsbc  ! 
       INTEGER, INTENT( in ) ::   kn_fwb   ! ocean time-step index
+      INTEGER, INTENT( in ) ::   Kmm      ! ocean time level index
       !
       INTEGER  ::   inum, ikty, iyear     ! local integers
       REAL(wp) ::   z_fwf, z_fwf_nsrf, zsum_fwf, zsum_erp                ! local scalars
@@ -103,7 +102,7 @@ CONTAINS
       CASE ( 1 )                             !==  global mean fwf set to zero  ==!
          !
          IF( MOD( kt-1, kn_fsbc ) == 0 ) THEN
-            y_fwfnow(1) = local_sum( e1e2t(:,:) * ( emp(:,:) - rnf(:,:) + fwfisf(:,:) - snwice_fmass(:,:) ) )
+            y_fwfnow(1) = local_sum( e1e2t(:,:) * ( emp(:,:) - rnf(:,:) + fwfisf_cav(:,:) + fwfisf_par(:,:) - snwice_fmass(:,:) ) )
             CALL mpp_delay_sum( 'sbcfwb', 'fwb', y_fwfnow(:), z_fwfprv(:), kt == nitend - nn_fsbc + 1 )
             z_fwfprv(1) = z_fwfprv(1) / area
             zcoef = z_fwfprv(1) * rcp
@@ -126,11 +125,11 @@ CONTAINS
             IF(lwp)WRITE(numout,*)'          year = ',iyear-2, ' freshwater budget read       = ', a_fwb_b
          ENDIF   
          !                                         ! Update fwfold if new year start
-         ikty = 365 * 86400 / rdt                  !!bug  use of 365 days leap year or 360d year !!!!!!!
+         ikty = 365 * 86400 / rn_Dt                  !!bug  use of 365 days leap year or 360d year !!!!!!!
          IF( MOD( kt, ikty ) == 0 ) THEN
             a_fwb_b = a_fwb                           ! mean sea level taking into account the ice+snow
                                                       ! sum over the global domain
-            a_fwb   = glob_sum( 'sbcfwb', e1e2t(:,:) * ( sshn(:,:) + snwice_mass(:,:) * r1_rau0 ) )
+            a_fwb   = glob_sum( 'sbcfwb', e1e2t(:,:) * ( ssh(:,:,Kmm) + snwice_mass(:,:) * r1_rho0 ) )
             a_fwb   = a_fwb * 1.e+3 / ( area * rday * 365. )     ! convert in Kg/m3/s = mm/s
 !!gm        !                                                      !!bug 365d year 
             fwfold =  a_fwb                           ! current year freshwater budget correction
@@ -143,7 +142,7 @@ CONTAINS
             qns(:,:) = qns(:,:) - zcoef * sst_m(:,:) * tmask(:,:,1) ! account for change to the heat budget due to fw correction
          ENDIF
          !
-         IF( kt == nitend .AND. lwp ) THEN            ! save fwfold value in a file
+         IF( kt == nitend .AND. lwm ) THEN            ! save fwfold value in a file (only one required)
             CALL ctl_opn( inum, 'EMPave.dat', 'REPLACE', 'FORMATTED', 'SEQUENTIAL', -1, numout, .FALSE., narea )
             WRITE( inum, "(24X,I8,2ES24.16)" ) nyear, a_fwb_b, a_fwb
             CLOSE( inum )
@@ -158,7 +157,7 @@ CONTAINS
             WHERE( erp < 0._wp )   ztmsk_pos = 0._wp
             ztmsk_neg(:,:) = tmask_i(:,:) - ztmsk_pos(:,:)
             !                                                  ! fwf global mean (excluding ocean to ice/snow exchanges) 
-            z_fwf     = glob_sum( 'sbcfwb', e1e2t(:,:) * ( emp(:,:) - rnf(:,:) + fwfisf(:,:) - snwice_fmass(:,:) ) ) / area
+            z_fwf     = glob_sum( 'sbcfwb', e1e2t(:,:) * ( emp(:,:) - rnf(:,:) + fwfisf_cav(:,:) + fwfisf_par(:,:) - snwice_fmass(:,:) ) ) / area
             !            
             IF( z_fwf < 0._wp ) THEN         ! spread out over >0 erp area to increase evaporation
                zsurf_pos = glob_sum( 'sbcfwb', e1e2t(:,:)*ztmsk_pos(:,:) )

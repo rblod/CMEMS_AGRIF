@@ -43,10 +43,10 @@ MODULE trcdmp
    INTEGER, DIMENSION(npncts) ::   nctsi2, nctsj2   ! north-east closed sea limits (i,j)
 
    !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/TOP 4.0 , NEMO Consortium (2018)
-   !! $Id: trcdmp.F90 10351 2018-11-21 14:19:04Z mathiot $ 
+   !! $Id: trcdmp.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -62,7 +62,7 @@ CONTAINS
    END FUNCTION trc_dmp_alloc
 
 
-   SUBROUTINE trc_dmp( kt )
+   SUBROUTINE trc_dmp( kt, Kbb, Kmm, ptr, Krhs )
       !!----------------------------------------------------------------------
       !!                   ***  ROUTINE trc_dmp  ***
       !!                  
@@ -72,16 +72,18 @@ CONTAINS
       !!
       !! ** Method  :   Newtonian damping towards trdta computed 
       !!      and add to the general tracer trends:
-      !!                     trn = tra + restotr * (trdta - trb)
+      !!                     tr(Kmm) = tr(Krhs) + restotr * (trdta - tr(Kbb))
       !!         The trend is computed either throughout the water column
       !!      (nlmdmptr=0) or in area of weak vertical mixing (nlmdmptr=1) or
       !!      below the well mixed layer (nlmdmptr=2)
       !!
-      !! ** Action  : - update the tracer trends tra with the newtonian 
+      !! ** Action  : - update the tracer trends tr(:,:,:,:,Krhs) with the newtonian 
       !!                damping trends.
       !!              - save the trends ('key_trdmxl_trc')
       !!----------------------------------------------------------------------
-      INTEGER, INTENT(in) ::   kt   ! ocean time-step index
+      INTEGER,                                    INTENT(in   ) :: kt              ! ocean time-step index
+      INTEGER,                                    INTENT(in   ) :: Kbb, Kmm, Krhs  ! time level indices
+      REAL(wp), DIMENSION(jpi,jpj,jpk,jptra,jpt), INTENT(inout) :: ptr             ! passive tracers and RHS of tracer equation
       !
       INTEGER ::   ji, jj, jk, jn, jl   ! dummy loop indices
       CHARACTER (len=22) ::   charout
@@ -99,53 +101,41 @@ CONTAINS
          !                                                          ! ===========
          DO jn = 1, jptra                                           ! tracer loop
             !                                                       ! ===========
-            IF( l_trdtrc ) ztrtrd(:,:,:) = tra(:,:,:,jn)    ! save trends 
+            IF( l_trdtrc ) ztrtrd(:,:,:) = ptr(:,:,:,jn,Krhs)    ! save trends 
             !
             IF( ln_trc_ini(jn) ) THEN      ! update passive tracers arrays with input data read from file
                !
                jl = n_trc_index(jn) 
-               CALL trc_dta( kt, sf_trcdta(jl), rf_trfac(jl), ztrcdta )   ! read tracer data at nit000
+               CALL trc_dta( kt, Kmm, sf_trcdta(jl), rf_trfac(jl), ztrcdta )   ! read tracer data at nit000
                !
                SELECT CASE ( nn_zdmp_tr )
                !
                CASE( 0 )                !==  newtonian damping throughout the water column  ==!
-                  DO jk = 1, jpkm1
-                     DO jj = 2, jpjm1
-                        DO ji = fs_2, fs_jpim1   ! vector opt.
-                           tra(ji,jj,jk,jn) = tra(ji,jj,jk,jn) + restotr(ji,jj,jk) * ( ztrcdta(ji,jj,jk) - trb(ji,jj,jk,jn) )
-                        END DO
-                     END DO
-                  END DO
+                  DO_3D_00_00( 1, jpkm1 )
+                     ptr(ji,jj,jk,jn,Krhs) = ptr(ji,jj,jk,jn,Krhs) + restotr(ji,jj,jk) * ( ztrcdta(ji,jj,jk) - ptr(ji,jj,jk,jn,Kbb) )
+                  END_3D
                   !
                CASE ( 1 )                !==  no damping in the turbocline (avt > 5 cm2/s)  ==!
-                  DO jk = 1, jpkm1
-                     DO jj = 2, jpjm1
-                        DO ji = fs_2, fs_jpim1   ! vector opt.
-                           IF( avt(ji,jj,jk) <= avt_c )  THEN 
-                              tra(ji,jj,jk,jn) = tra(ji,jj,jk,jn) + restotr(ji,jj,jk) * ( ztrcdta(ji,jj,jk) - trb(ji,jj,jk,jn) )
-                           ENDIF
-                        END DO
-                     END DO
-                  END DO
+                  DO_3D_00_00( 1, jpkm1 )
+                     IF( avt(ji,jj,jk) <= avt_c )  THEN 
+                        ptr(ji,jj,jk,jn,Krhs) = ptr(ji,jj,jk,jn,Krhs) + restotr(ji,jj,jk) * ( ztrcdta(ji,jj,jk) - ptr(ji,jj,jk,jn,Kbb) )
+                     ENDIF
+                  END_3D
                   !
                CASE ( 2 )               !==  no damping in the mixed layer   ==! 
-                  DO jk = 1, jpkm1
-                     DO jj = 2, jpjm1
-                        DO ji = fs_2, fs_jpim1   ! vector opt.
-                           IF( gdept_n(ji,jj,jk) >= hmlp (ji,jj) ) THEN
-                              tra(ji,jj,jk,jn) = tra(ji,jj,jk,jn) + restotr(ji,jj,jk) * ( ztrcdta(ji,jj,jk) - trb(ji,jj,jk,jn) )
-                           END IF
-                        END DO
-                     END DO
-                  END DO
+                  DO_3D_00_00( 1, jpkm1 )
+                     IF( gdept(ji,jj,jk,Kmm) >= hmlp (ji,jj) ) THEN
+                        ptr(ji,jj,jk,jn,Krhs) = ptr(ji,jj,jk,jn,Krhs) + restotr(ji,jj,jk) * ( ztrcdta(ji,jj,jk) - ptr(ji,jj,jk,jn,Kbb) )
+                     END IF
+                  END_3D
                   !  
                END SELECT
                ! 
             ENDIF
             !
             IF( l_trdtrc ) THEN
-               ztrtrd(:,:,:) = tra(:,:,:,jn) -  ztrtrd(:,:,:)
-               CALL trd_tra( kt, 'TRC', jn, jptra_dmp, ztrtrd )
+               ztrtrd(:,:,:) = ptr(:,:,:,jn,Krhs) -  ztrtrd(:,:,:)
+               CALL trd_tra( kt, Kmm, Krhs, 'TRC', jn, jptra_dmp, ztrtrd )
             END IF
             !                                                       ! ===========
          END DO                                                     ! tracer loop
@@ -155,10 +145,10 @@ CONTAINS
       !
       IF( l_trdtrc )  DEALLOCATE( ztrtrd )
       !                                          ! print mean trends (used for debugging)
-      IF( ln_ctl ) THEN
+      IF( sn_cfctl%l_prttrc ) THEN
          WRITE(charout, FMT="('dmp ')")
          CALL prt_ctl_trc_info(charout)
-         CALL prt_ctl_trc( tab4d=tra, mask=tmask, clinfo=ctrcnm, clinfo2='trd' )
+         CALL prt_ctl_trc( tab4d=ptr(:,:,:,:,Krhs), mask=tmask, clinfo=ctrcnm, clinfo2='trd' )
       ENDIF
       !
       IF( ln_timing )   CALL timing_stop('trc_dmp')
@@ -180,12 +170,10 @@ CONTAINS
       NAMELIST/namtrc_dmp/ nn_zdmp_tr , cn_resto_tr
       !!----------------------------------------------------------------------
       !
-      REWIND( numnat_ref )              ! Namelist namtrc_dmp in reference namelist : Passive tracers newtonian damping
       READ  ( numnat_ref, namtrc_dmp, IOSTAT = ios, ERR = 909)
-909   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namtrc_dmp in reference namelist', lwp )
-      REWIND( numnat_cfg )              ! Namelist namtrc_dmp in configuration namelist : Passive tracers newtonian damping
+909   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namtrc_dmp in reference namelist' )
       READ  ( numnat_cfg, namtrc_dmp, IOSTAT = ios, ERR = 910)
-910   IF( ios >  0 )   CALL ctl_nam ( ios , 'namtrc_dmp in configuration namelist', lwp )
+910   IF( ios >  0 )   CALL ctl_nam ( ios , 'namtrc_dmp in configuration namelist' )
       IF(lwm) WRITE ( numont, namtrc_dmp )
 
       IF(lwp) THEN                       ! Namelist print
@@ -223,7 +211,7 @@ CONTAINS
    END SUBROUTINE trc_dmp_ini
 
 
-   SUBROUTINE trc_dmp_clo( kt )
+   SUBROUTINE trc_dmp_clo( kt, Kbb, Kmm )
       !!---------------------------------------------------------------------
       !!                  ***  ROUTINE trc_dmp_clo  ***
       !!
@@ -235,7 +223,8 @@ CONTAINS
       !! ** Action  :   nctsi1(), nctsj1() : south-west closed sea limits (i,j)
       !!                nctsi2(), nctsj2() : north-east Closed sea limits (i,j)
       !!----------------------------------------------------------------------
-      INTEGER, INTENT( in ) ::   kt      ! ocean time-step index
+      INTEGER, INTENT( in ) ::   kt           ! ocean time-step index
+      INTEGER, INTENT( in ) ::   Kbb, Kmm     ! time level indices
       !
       INTEGER :: ji , jj, jk, jn, jl, jc                    ! dummy loop indicesa
       INTEGER :: isrow                                      ! local index
@@ -353,13 +342,13 @@ CONTAINS
          DO jn = 1, jptra
             IF( ln_trc_ini(jn) ) THEN      ! update passive tracers arrays with input data read from file
                 jl = n_trc_index(jn)
-                CALL trc_dta( kt, sf_trcdta(jl), rf_trfac(jl), ztrcdta )   ! read tracer data at nit000
+                CALL trc_dta( kt, Kmm, sf_trcdta(jl), rf_trfac(jl), ztrcdta )   ! read tracer data at nit000
                 DO jc = 1, npncts
                    DO jk = 1, jpkm1
                       DO jj = nctsj1(jc), nctsj2(jc)
                          DO ji = nctsi1(jc), nctsi2(jc)
-                            trn(ji,jj,jk,jn) = ztrcdta(ji,jj,jk)
-                            trb(ji,jj,jk,jn) = trn(ji,jj,jk,jn)
+                            tr(ji,jj,jk,jn,Kmm) = ztrcdta(ji,jj,jk)
+                            tr(ji,jj,jk,jn,Kbb) = tr(ji,jj,jk,jn,Kmm)
                          END DO
                       END DO
                    END DO

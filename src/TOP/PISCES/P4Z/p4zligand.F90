@@ -25,78 +25,71 @@ MODULE p4zligand
    REAL(wp), PUBLIC ::  rlig     !: Remin ligand production
    REAL(wp), PUBLIC ::  prlgw    !: Photochemical of weak ligand
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/TOP 4.0 , NEMO Consortium (2018)
-   !! $Id: p4zligand.F90 10416 2018-12-19 11:45:43Z aumont $ 
+   !! $Id: p4zligand.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE p4z_ligand( kt, knt )
+   SUBROUTINE p4z_ligand( kt, knt, Kbb, Krhs )
       !!---------------------------------------------------------------------
       !!                     ***  ROUTINE p4z_ligand  ***
       !!
       !! ** Purpose :   Compute remineralization/scavenging of organic ligands
       !!---------------------------------------------------------------------
-      INTEGER, INTENT(in) ::   kt, knt ! ocean time step
+      INTEGER, INTENT(in) ::   kt, knt   ! ocean time step
+      INTEGER, INTENT(in)  ::  Kbb, Krhs ! time level indices
       !
       INTEGER  ::   ji, jj, jk
       REAL(wp) ::   zlgwp, zlgwpr, zlgwr, zlablgw
-      REAL(wp), DIMENSION(jpi,jpj,jpk) :: zligrem, zligpr, zrligprod
-      REAL(wp), ALLOCATABLE, DIMENSION(:,:,:) ::   zw3d
+      REAL(wp), DIMENSION(jpi,jpj,jpk) :: zligrem, zligpr, zligprod
       CHARACTER (len=25) ::   charout
       !!---------------------------------------------------------------------
       !
       IF( ln_timing )   CALL timing_start('p4z_ligand')
       !
-      DO jk = 1, jpkm1
-         DO jj = 1, jpj
-            DO ji = 1, jpi
-               !
-               ! ------------------------------------------------------------------
-               ! Remineralization of iron ligands
-               ! ------------------------------------------------------------------
-               ! production from remineralisation of organic matter
-               zlgwp = orem(ji,jj,jk) * rlig
-               ! decay of weak ligand
-               ! This is based on the idea that as LGW is lower
-               ! there is a larger fraction of refractory OM
-               zlgwr = max( rlgs , rlgw * exp( -2 * (trb(ji,jj,jk,jplgw)*1e9) ) ) ! years
-               zlgwr = 1. / zlgwr * tgfunc(ji,jj,jk) * ( xstep / nyear_len(1) ) * blim(ji,jj,jk) * trb(ji,jj,jk,jplgw)
-               ! photochem loss of weak ligand
-               zlgwpr = prlgw * xstep * etot(ji,jj,jk) * trb(ji,jj,jk,jplgw) * (1. - fr_i(ji,jj))
-               tra(ji,jj,jk,jplgw) = tra(ji,jj,jk,jplgw) + zlgwp - zlgwr - zlgwpr
-               zligrem(ji,jj,jk)   = zlgwr
-               zligpr(ji,jj,jk)    = zlgwpr
-               zrligprod(ji,jj,jk) = zlgwp
-               !
-            END DO
-         END DO
-      END DO
+      DO_3D_11_11( 1, jpkm1 )
+         !
+         ! ------------------------------------------------------------------
+         ! Remineralization of iron ligands
+         ! ------------------------------------------------------------------
+         ! production from remineralisation of organic matter
+         zlgwp = orem(ji,jj,jk) * rlig
+         ! decay of weak ligand
+         ! This is based on the idea that as LGW is lower
+         ! there is a larger fraction of refractory OM
+         zlgwr = max( rlgs , rlgw * exp( -2 * (tr(ji,jj,jk,jplgw,Kbb)*1e9) ) ) ! years
+         zlgwr = 1. / zlgwr * tgfunc(ji,jj,jk) * ( xstep / nyear_len(1) ) * blim(ji,jj,jk) * tr(ji,jj,jk,jplgw,Kbb)
+         ! photochem loss of weak ligand
+         zlgwpr = prlgw * xstep * etot(ji,jj,jk) * tr(ji,jj,jk,jplgw,Kbb) * (1. - fr_i(ji,jj))
+         tr(ji,jj,jk,jplgw,Krhs) = tr(ji,jj,jk,jplgw,Krhs) + zlgwp - zlgwr - zlgwpr
+         zligrem(ji,jj,jk)   = zlgwr
+         zligpr(ji,jj,jk)    = zlgwpr
+         zligprod(ji,jj,jk) = zlgwp
+         !
+      END_3D
       !
       !  Output of some diagnostics variables
       !     ---------------------------------
       IF( lk_iomput .AND. knt == nrdttrc ) THEN
-         ALLOCATE( zw3d(jpi,jpj,jpk) )
          IF( iom_use( "LIGREM" ) ) THEN
-            zw3d(:,:,:) = zligrem(:,:,:) * 1e9 * 1.e+3 * rfact2r * tmask(:,:,:)
-            CALL iom_put( "LIGREM", zw3d )
+           zligrem(:,:,jpk) = 0.  ; CALL iom_put( "LIGREM", zligrem(:,:,:) * 1e9 * 1.e+3 * rfact2r * tmask(:,:,:) )
          ENDIF
          IF( iom_use( "LIGPR" ) ) THEN
-            zw3d(:,:,:) = zligpr(:,:,:) * 1e9 * 1.e+3 * rfact2r * tmask(:,:,:) 
-            CALL iom_put( "LIGPR", zw3d )
+           zligpr(:,:,jpk) = 0.   ; CALL iom_put( "LIGPR" , zligpr(:,:,:) * 1e9 * 1.e+3 * rfact2r * tmask(:,:,:) )
          ENDIF
          IF( iom_use( "LPRODR" ) ) THEN
-            zw3d(:,:,:) = zrligprod(:,:,:) * 1e9 * 1.e+3 * rfact2r * tmask(:,:,:) 
-            CALL iom_put( "LPRODR", zw3d )
+           zligprod(:,:,jpk) = 0. ; CALL iom_put( "LPRODR", zligprod(:,:,:) * 1e9 * 1.e+3 * rfact2r * tmask(:,:,:) )
          ENDIF
-         DEALLOCATE( zw3d )
       ENDIF
       !
-      IF(ln_ctl)   THEN  ! print mean trends (used for debugging)
+      IF(sn_cfctl%l_prttrc)   THEN  ! print mean trends (used for debugging)
          WRITE(charout, FMT="('ligand1')")
          CALL prt_ctl_trc_info(charout)
-         CALL prt_ctl_trc(tab4d=tra, mask=tmask, clinfo=ctrcnm)
+         CALL prt_ctl_trc(tab4d=tr(:,:,:,:,Krhs), mask=tmask, clinfo=ctrcnm)
       ENDIF
       !
       IF( ln_timing )   CALL timing_stop('p4z_ligand')
@@ -124,12 +117,10 @@ CONTAINS
          WRITE(numout,*) 'p4z_ligand_init : remineralization/scavenging of organic ligands'
          WRITE(numout,*) '~~~~~~~~~~~~~~~'
       ENDIF
-      REWIND( numnatp_ref )              ! Namelist nampislig in reference namelist : Pisces remineralization
       READ  ( numnatp_ref, nampislig, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'nampislig in reference namelist', lwp )
-      REWIND( numnatp_cfg )              ! Namelist nampislig in configuration namelist : Pisces remineralization
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'nampislig in reference namelist' )
       READ  ( numnatp_cfg, nampislig, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'nampislig in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'nampislig in configuration namelist' )
       IF(lwm) WRITE ( numonp, nampislig )
       !
       IF(lwp) THEN                         ! control print

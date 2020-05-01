@@ -19,6 +19,7 @@ MODULE icbthm
    USE lib_mpp        ! NEMO MPI routines, ctl_stop in particular
    USE phycst         ! NEMO physical constants
    USE sbc_oce
+   USE lib_fortran, ONLY : DDPDD
 
    USE icb_oce        ! define iceberg arrays
    USE icbutl         ! iceberg utility routines
@@ -31,7 +32,7 @@ MODULE icbthm
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: icbthm.F90 10068 2018-08-28 14:09:04Z nicolasmartin $
+   !! $Id: icbthm.F90 12291 2019-12-30 16:43:47Z mathiot $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -54,7 +55,13 @@ CONTAINS
       REAL(wp) ::   zxi, zyj, zff, z1_rday, z1_e1e2, zdt, z1_dt, z1_dt_e1e2
       TYPE(iceberg), POINTER ::   this, next
       TYPE(point)  , POINTER ::   pt
+      !
+      COMPLEX(wp), DIMENSION(jpi,jpj) :: cicb_melt, cicb_hflx
       !!----------------------------------------------------------------------
+      !
+      !! initialiaze cicb_melt and cicb_heat
+      cicb_melt = CMPLX( 0.e0, 0.e0, wp ) 
+      cicb_hflx = CMPLX( 0.e0, 0.e0, wp ) 
       !
       z1_rday = 1._wp / rday
       z1_12   = 1._wp / 12._wp
@@ -164,14 +171,22 @@ CONTAINS
          IF( tmask(ii,ij,1) /= 0._wp ) THEN    ! Add melting to the grid and field diagnostics
             z1_e1e2    = r1_e1e2t(ii,ij) * this%mass_scaling
             z1_dt_e1e2 = z1_dt * z1_e1e2
+            !
+            ! iceberg melt
+            !! the use of DDPDD function for the cumulative sum is needed for reproducibility
             zmelt    = ( zdM - ( zdMbitsE - zdMbitsM ) ) * z1_dt   ! kg/s
-            berg_grid%floating_melt(ii,ij) = berg_grid%floating_melt(ii,ij) + zmelt    * z1_e1e2    ! kg/m2/s
+            CALL DDPDD( CMPLX( zmelt * z1_e1e2, 0.e0, wp ), cicb_melt(ii,ij) )
+            !
+            ! iceberg heat flux
+            !! the use of DDPDD function for the cumulative sum is needed for reproducibility
             !! NB. The src_calving_hflx field is currently hardwired to zero in icb_stp, which means that the
             !!     heat density of the icebergs is zero and the heat content flux to the ocean from iceberg
             !!     melting is always zero. Leaving the term in the code until such a time as this is fixed. DS.
             zheat_hcflux = zmelt * pt%heat_density       ! heat content flux : kg/s x J/kg = J/s
             zheat_latent = - zmelt * rLfus               ! latent heat flux:  kg/s x J/kg = J/s
-            berg_grid%calving_hflx (ii,ij) = berg_grid%calving_hflx (ii,ij) + ( zheat_hcflux + zheat_latent ) * z1_e1e2    ! W/m2
+            CALL DDPDD( CMPLX( ( zheat_hcflux + zheat_latent ) * z1_e1e2, 0.e0, wp ), cicb_hflx(ii,ij) )
+            !
+            ! diagnostics
             CALL icb_dia_melt( ii, ij, zMnew, zheat_hcflux, zheat_latent, this%mass_scaling,       &
                &                       zdM, zdMbitsE, zdMbitsM, zdMb, zdMe,   &
                &                       zdMv, z1_dt_e1e2 )
@@ -213,7 +228,10 @@ CONTAINS
          this=>next
          !
       END DO
-
+      !
+      berg_grid%floating_melt = REAL(cicb_melt,wp)    ! kg/m2/s
+      berg_grid%calving_hflx  = REAL(cicb_hflx,wp)
+      !
       ! now use melt and associated heat flux in ocean (or not)
       !
       IF(.NOT. ln_passive_mode ) THEN

@@ -2,8 +2,6 @@
 ! NEMO system team, System and Interface for oceanic RElocable Nesting
 !----------------------------------------------------------------------
 !
-! MODULE: logger
-!
 ! DESCRIPTION:
 !> @brief This module manage log file.
 !> @details
@@ -127,10 +125,10 @@
 !>   CALL logger_close()
 !>   CALL logger_clean()
 !> @endcode
-!
+!>
 !> @author
 !> J.Paul
-! REVISION HISTORY:
+!>
 !> @date November, 2013 - Initial Version
 !> @date February, 2015
 !> - check verbosity validity
@@ -138,9 +136,10 @@
 !> @date January, 2016
 !> - add logger_clean subroutine
 !>
-!> @note Software governed by the CeCILL licence     (./LICENSE)
+!> @note Software governed by the CeCILL licence     (NEMOGCM/NEMO_CeCILL.txt)
 !----------------------------------------------------------------------
 MODULE logger
+
    USE kind                            ! F90 kind parameter
    USE fct                             ! basic useful function
    IMPLICIT NONE
@@ -195,6 +194,8 @@ MODULE logger
    TYPE(TLOGGER), SAVE :: tm_logger      !< logger structure
                                                  
 CONTAINS
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE logger_open(cd_file, cd_verbosity, id_maxerror, id_logid)
    !-------------------------------------------------------------------
    !> @brief This subroutine create a log file with default verbosity
    !> ('warning').
@@ -205,14 +206,15 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] cd_file      log file name
    !> @param[in] cd_verbosity log file verbosity
    !> @param[in] id_maxerror  maximum number of error
    !> @param[in] id_logid     log file id (use to flush)
    !-------------------------------------------------------------------
-   SUBROUTINE logger_open(cd_file, cd_verbosity, id_maxerror, id_logid)
+      
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(len=*), INTENT(IN) :: cd_file                ! log file name
       CHARACTER(len=*), INTENT(IN), OPTIONAL :: cd_verbosity ! log file verbosity
@@ -277,17 +279,21 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE logger_open
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE logger_close()
    !-------------------------------------------------------------------
    !> @brief This subroutine close a log file.
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !-------------------------------------------------------------------
-   SUBROUTINE logger_close()
+      
       IMPLICIT NONE
+
       ! local variable
       INTEGER(i4)   :: il_status
       !----------------------------------------------------------------
+
       IF( tm_logger%l_use )THEN
          IF( tm_logger%i_id /= 0 )THEN
             !tm_logger%i_id = 0
@@ -302,20 +308,25 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE logger_close
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE logger_clean()
    !-------------------------------------------------------------------
    !> @brief This subroutine clean a log structure.
    !>
    !> @author J.Paul
    !> @date January, 2016 - Initial Version
    !-------------------------------------------------------------------
-   SUBROUTINE logger_clean()
+      
       IMPLICIT NONE
+
       ! local variable
       TYPE(TLOGGER) :: tl_logger
       !----------------------------------------------------------------
+
       tm_logger = tl_logger
 
    END SUBROUTINE logger_clean
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    !-------------------------------------------------------------------
    !> @brief This subroutine flushing output into log file.
    !>
@@ -323,8 +334,11 @@ CONTAINS
    !> @date November, 2013 - Initial Version
    !-------------------------------------------------------------------
    SUBROUTINE logger_flush()
+
       IMPLICIT NONE
+      
       !----------------------------------------------------------------
+
       IF( tm_logger%l_use )THEN
          IF( tm_logger%i_id /= 0 )THEN
             CALL logger_close()
@@ -338,17 +352,21 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE logger_flush
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   RECURSIVE SUBROUTINE logger_header()
    !-------------------------------------------------------------------
    !> @brief This subroutine write header on log file.
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !-------------------------------------------------------------------
-   RECURSIVE SUBROUTINE logger_header()
+      
       IMPLICIT NONE
+
       ! local variable
       INTEGER(i4)       :: il_status
       !----------------------------------------------------------------
+
       IF( tm_logger%l_use )THEN
          IF( tm_logger%i_id /= 0 )THEN
             WRITE( tm_logger%i_id,    &
@@ -367,17 +385,21 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE logger_header
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE logger_footer()
    !-------------------------------------------------------------------
    !> @brief This subroutine write footer on log file.
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !-------------------------------------------------------------------
-   SUBROUTINE logger_footer()
+
       IMPLICIT NONE
+
       ! local variable
       INTEGER(i4)       :: il_status
       !----------------------------------------------------------------
+
       IF( tm_logger%l_use )THEN
          IF( tm_logger%i_id /= 0 )THEN
             WRITE( tm_logger%i_id,    &
@@ -397,7 +419,10 @@ CONTAINS
              CALL logger_fatal('you must have create logger to use logger_footer')
          ENDIF
       ENDIF
+
    END SUBROUTINE logger_footer
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE logger_trace(cd_msg, ld_flush)
    !-------------------------------------------------------------------
    !> @brief This subroutine write trace message on log file.
    !> @details
@@ -405,16 +430,18 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] cd_msg    message to write
    !> @param[in] ld_flush  flushing ouput
    !-------------------------------------------------------------------
-   SUBROUTINE logger_trace(cd_msg, ld_flush)
+      
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*), INTENT(IN)  :: cd_msg
       LOGICAL,          INTENT(IN), OPTIONAL :: ld_flush
       !----------------------------------------------------------------
+
       IF( tm_logger%l_use )THEN
          IF( tm_logger%i_id /= 0 )THEN
             IF( INDEX(TRIM(tm_logger%c_verb),'trace')/=0 )THEN
@@ -433,7 +460,10 @@ CONTAINS
              CALL logger_fatal('you must have create logger to use logger_trace')
          ENDIF
       ENDIF
+
    END SUBROUTINE logger_trace
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE logger_debug(cd_msg, ld_flush)
    !-------------------------------------------------------------------
    !> @brief This subroutine write debug message on log file.
    !> @details
@@ -441,16 +471,18 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] cd_msg    message to write
    !> @param[in] ld_flush  flushing ouput
    !-------------------------------------------------------------------
-   SUBROUTINE logger_debug(cd_msg, ld_flush)
+      
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*), INTENT(IN)  :: cd_msg
       LOGICAL,          INTENT(IN), OPTIONAL :: ld_flush
       !----------------------------------------------------------------
+
       IF( tm_logger%l_use )THEN
          IF( tm_logger%i_id /= 0 )THEN
             IF( INDEX(TRIM(tm_logger%c_verb),'debug')/=0 )THEN
@@ -469,7 +501,10 @@ CONTAINS
              CALL logger_fatal('you must have create logger to use logger_debug')
          ENDIF
       ENDIF
+
    END SUBROUTINE logger_debug
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE logger_info(cd_msg, ld_flush)
    !-------------------------------------------------------------------
    !> @brief This subroutine write info message on log file.
    !> @details
@@ -477,16 +512,18 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] cd_msg    message to write
    !> @param[in] ld_flush  flushing ouput
    !-------------------------------------------------------------------
-   SUBROUTINE logger_info(cd_msg, ld_flush)
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*), INTENT(IN)  :: cd_msg
       LOGICAL,          INTENT(IN), OPTIONAL :: ld_flush
       !----------------------------------------------------------------
+
       IF( tm_logger%l_use )THEN
          IF( tm_logger%i_id /= 0 )THEN
             IF( INDEX(TRIM(tm_logger%c_verb),'info')/=0 )THEN
@@ -506,6 +543,8 @@ CONTAINS
          ENDIF
       ENDIF
    END SUBROUTINE logger_info
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE logger_warn(cd_msg, ld_flush)
    !-------------------------------------------------------------------
    !> @brief This subroutine write warning message on log file.
    !> @details
@@ -513,16 +552,18 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] cd_msg    message to write
    !> @param[in] ld_flush  flushing ouput
    !-------------------------------------------------------------------
-   SUBROUTINE logger_warn(cd_msg, ld_flush)
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*), INTENT(IN)  :: cd_msg
       LOGICAL,          INTENT(IN), OPTIONAL :: ld_flush
       !----------------------------------------------------------------
+
       IF( tm_logger%l_use )THEN
          IF( tm_logger%i_id /= 0 )THEN
             IF( INDEX(TRIM(tm_logger%c_verb),'warn')/=0 )THEN
@@ -541,7 +582,10 @@ CONTAINS
              CALL logger_fatal('you must have create logger to use logger_warn')
          ENDIF
       ENDIF
+
    END SUBROUTINE logger_warn
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE logger_error(cd_msg, ld_flush)
    !-------------------------------------------------------------------
    !> @brief This subroutine write error message on log file.
    !> @details
@@ -549,12 +593,13 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] cd_msg    message to write
    !> @param[in] ld_flush  flushing ouput
    !-------------------------------------------------------------------
-   SUBROUTINE logger_error(cd_msg, ld_flush)
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*), INTENT(IN)  :: cd_msg
       LOGICAL,          INTENT(IN), OPTIONAL :: ld_flush
@@ -562,6 +607,7 @@ CONTAINS
       ! local variable
       CHARACTER(LEN=lc) :: cl_nerror
       !----------------------------------------------------------------
+
       IF( tm_logger%l_use )THEN
          IF( tm_logger%i_id /= 0 )THEN
             ! increment the error number
@@ -589,7 +635,10 @@ CONTAINS
              CALL logger_fatal('you must have create logger to use logger_error')
          ENDIF
       ENDIF
+
    END SUBROUTINE logger_error
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   RECURSIVE SUBROUTINE logger_fatal(cd_msg)
    !-------------------------------------------------------------------
    !> @brief This subroutine write fatal error message on log file, 
    !> close log file and stop process.
@@ -598,14 +647,16 @@ CONTAINS
    !> @date November, 2013 - Initial Version
    !> @date September, 2015
    !> - stop program for FATAL ERROR if verbosity is none
-   !
+   !>
    !> @param[in] cd_msg message to write
    !-------------------------------------------------------------------
-   RECURSIVE SUBROUTINE logger_fatal(cd_msg)
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),           INTENT(IN) :: cd_msg
       !----------------------------------------------------------------
+
       IF( tm_logger%l_use )THEN
          IF( tm_logger%i_id /= 0 )THEN
             IF( INDEX(TRIM(tm_logger%c_verb),'fatal')/=0 )THEN
@@ -617,7 +668,7 @@ CONTAINS
                CALL logger_footer()
                CALL logger_close()
 
-               WRITE(*,*) 'FATAL ERROR'
+               WRITE(*,*) 'FATAL ERROR, see ',TRIM(tm_logger%c_name)
                STOP
             ENDIF
          ELSE
@@ -629,19 +680,23 @@ CONTAINS
          PRINT *,"FATAL ERROR :"//TRIM(cd_msg)
          STOP
       ENDIF
+
    END SUBROUTINE logger_fatal
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE logger__write(cd_verb, cd_msg)
    !-------------------------------------------------------------------
    !> @brief This subroutine cut message to get maximum of 80 character 
    !> by line in log file.
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] cd_verb   verbosity of the message to write
    !> @param[in] cd_msg    message to write
    !-------------------------------------------------------------------
-   SUBROUTINE logger__write(cd_verb, cd_msg)
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),           INTENT(IN) :: cd_verb
       CHARACTER(LEN=*),           INTENT(IN) :: cd_msg
@@ -653,8 +708,8 @@ CONTAINS
       CHARACTER(LEN=lc) :: cl_verb
       CHARACTER(LEN=lc) :: cl_msg
       CHARACTER(LEN=lc) :: cl_tmp
-
       !----------------------------------------------------------------
+
       cl_verb=TRIM(ADJUSTL(cd_verb))
       cl_msg=TRIM(ADJUSTL(cd_msg))
 
@@ -685,44 +740,50 @@ CONTAINS
       CALL fct_err(il_status)
 
    END SUBROUTINE logger__write
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION logger__check_verb(cd_verb) &
+         & RESULT (lf_show)
    !-------------------------------------------------------------------
    !> @brief This function check validity of verbosity.
    !>
    !> @author J.Paul
    !> @date February, 2015 - Initial Version
-   !
+   !>
    !> @param[in] cd_verb   verbosity of the message to write
    !> @return verbosity is valid or not
    !-------------------------------------------------------------------
-   FUNCTION logger__check_verb(cd_verb)
+
       IMPLICIT NONE
+
       ! Argument
-      CHARACTER(LEN=*),           INTENT(IN) :: cd_verb
+      CHARACTER(LEN=*), INTENT(IN) :: cd_verb
 
       !function
-      LOGICAL           :: logger__check_verb
+      LOGICAL                      :: lf_show
 
       ! local variable
       ! loop indices
       INTEGER(i4) :: ji
-
       !----------------------------------------------------------------
-      logger__check_verb=.FALSE.
+
+      lf_show=.FALSE.
 
       DO ji=1,im_nverbosity
          IF( TRIM(cd_verb) == TRIM(cm_verbosity(ji)) )THEN
-            logger__check_verb=.TRUE.
+            lf_show=.TRUE.
             EXIT
          ENDIF
       ENDDO
 
-      IF( .NOT. logger__check_verb )THEN
+      IF( .NOT. lf_show )THEN
          CALL logger_open('logger.log')
          CALL logger_header()
          CALL logger_fatal('LOGGER : invalid verbosity, check namelist.'//&
          &                 ' default one will be used.')
          CALL logger_footer()
       ENDIF
+
    END FUNCTION logger__check_verb
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 END MODULE logger
 

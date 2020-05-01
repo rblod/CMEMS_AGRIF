@@ -30,14 +30,16 @@ MODULE zdfevd
 
    PUBLIC   zdf_evd    ! called by step.F90
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: zdfevd.F90 10068 2018-08-28 14:09:04Z nicolasmartin $
+   !! $Id: zdfevd.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE zdf_evd( kt, p_avm, p_avt )
+   SUBROUTINE zdf_evd( kt, Kmm, Krhs, p_avm, p_avt )
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE zdf_evd  ***
       !!                   
@@ -55,6 +57,7 @@ CONTAINS
       !! ** Action  :   avt, avm   enhanced where static instability occurs
       !!----------------------------------------------------------------------
       INTEGER                    , INTENT(in   ) ::   kt             ! ocean time-step indexocean time step
+      INTEGER                    , INTENT(in   ) ::   Kmm, Krhs      ! time level indices
       REAL(wp), DIMENSION(:,:,:) , INTENT(inout) ::   p_avm, p_avt   !  momentum and tracer Kz (w-points)
       !
       INTEGER ::   ji, jj, jk   ! dummy loop indices
@@ -83,16 +86,12 @@ CONTAINS
 !            p_avm(2:jpi,2:jpj,2:jpkm1) = rn_evd * wmask(2:jpi,2:jpj,2:jpkm1)
 !         END WHERE
          !
-         DO jk = 1, jpkm1 
-            DO jj = 2, jpjm1
-               DO ji = 2, jpim1
-                  IF(  MIN( rn2(ji,jj,jk), rn2b(ji,jj,jk) ) <= -1.e-12 ) THEN
-                     p_avt(ji,jj,jk) = rn_evd * wmask(ji,jj,jk)
-                     p_avm(ji,jj,jk) = rn_evd * wmask(ji,jj,jk)
-                  ENDIF
-               END DO
-            END DO
-         END DO 
+         DO_3D_00_00( 1, jpkm1 )
+            IF(  MIN( rn2(ji,jj,jk), rn2b(ji,jj,jk) ) <= -1.e-12 ) THEN
+               p_avt(ji,jj,jk) = rn_evd * wmask(ji,jj,jk)
+               p_avm(ji,jj,jk) = rn_evd * wmask(ji,jj,jk)
+            ENDIF
+         END_3D
          !
          zavm_evd(:,:,:) = p_avm(:,:,:) - zavm_evd(:,:,:)   ! change in avm due to evd
          CALL iom_put( "avm_evd", zavm_evd )                ! output this change
@@ -103,20 +102,16 @@ CONTAINS
 !            p_avt(2:jpi,2:jpj,2:jpkm1) = rn_evd * wmask(2:jpi,2:jpj,2:jpkm1)
 !         END WHERE
 
-         DO jk = 1, jpkm1
-            DO jj = 2, jpjm1
-               DO ji = 2, jpim1
-                  IF(  MIN( rn2(ji,jj,jk), rn2b(ji,jj,jk) ) <= -1.e-12 )   &
-                     p_avt(ji,jj,jk) = rn_evd * wmask(ji,jj,jk)
-               END DO
-            END DO
-         END DO
+         DO_3D_00_00( 1, jpkm1 )
+            IF(  MIN( rn2(ji,jj,jk), rn2b(ji,jj,jk) ) <= -1.e-12 )   &
+               p_avt(ji,jj,jk) = rn_evd * wmask(ji,jj,jk)
+         END_3D
          !
       END SELECT 
       !
       zavt_evd(:,:,:) = p_avt(:,:,:) - zavt_evd(:,:,:)   ! change in avt due to evd
       CALL iom_put( "avt_evd", zavt_evd )              ! output this change
-      IF( l_trdtra ) CALL trd_tra( kt, 'TRA', jp_tem, jptra_evd, zavt_evd )
+      IF( l_trdtra ) CALL trd_tra( kt, Kmm, Krhs, 'TRA', jp_tem, jptra_evd, zavt_evd )
       !
    END SUBROUTINE zdf_evd
 
