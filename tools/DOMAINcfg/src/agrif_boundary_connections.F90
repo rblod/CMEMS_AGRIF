@@ -12,17 +12,20 @@ call Agrif_Bc_variable(bottom_level_id, procname = connect_bottom_level)
 
 call Agrif_Bc_variable(e3t_copy_id, procname = connect_e3t_copy)
 
-! Agrif_UseSpecialValue = .TRUE.
-! Agrif_SpecialValue = 0.
-! call Agrif_Bc_variable(e3t_connect_id, procname = connect_e3t_connect)
-! Agrif_UseSpecialValue = .FALSE.
+Allocate(e3t_interp(jpi,jpj,jpk))
+e3t_interp = -10.
+Agrif_UseSpecialValue = .TRUE.
+Agrif_SpecialValue = 0.
+call Agrif_Bc_variable(e3t_connect_id, procname = connect_e3t_connect)
+Agrif_UseSpecialValue = .FALSE.
 
+! Call Agrif_make_connection()
 
       Agrif_SpecialValue    = 0.
       Agrif_UseSpecialValue = ln_spc_dyn
       !
-      CALL Agrif_Bc_variable( e3u_id, procname=connect_e3u )
-      CALL Agrif_Bc_variable( e3v_id, procname=connect_e3v )
+!      CALL Agrif_Bc_variable( e3u_id, procname=connect_e3u )
+!      CALL Agrif_Bc_variable( e3v_id, procname=connect_e3v )
       !
       Agrif_UseSpecialValue = .FALSE.
       
@@ -82,9 +85,10 @@ end subroutine agrif_boundary_connections
          ptab(i1:i2,j1:j2) = mbkt(i1:i2,j1:j2)*ssmask(i1:i2,j1:j2)
       ELSE
          mbkt(i1:i2,j1:j2) = nint(ptab(i1:i2,j1:j2))
-         
          WHERE (mbkt(i1:i2,j1:j2)==0)
            ssmask(i1:i2,j1:j2) = 0.
+         ELSEWHERE
+           ssmask(i1:i2,j1:j2) = 1.
          END WHERE
            
       ENDIF
@@ -135,18 +139,20 @@ end subroutine agrif_boundary_connections
          do jj=j1,j2
          do ji=i1,i2
            bathy_local (ji,jj) = SUM ( e3t_0(ji,jj, 1:mbkt(ji,jj) ) ) * ssmask(ji,jj)
-           print *,'ji = ',ji,jj,bathy_local(ji,jj),ptab(ji,jj,jpk+1)
          enddo
          enddo
          
-         ! DO jk=1,jpk
-           ! DO jj=j1,j2
-             ! DO ji=i1,i2
-                 ! e3t_0(ji,jj,jk) = MAX(ptab(ji,jj,jk),MIN(e3zps_min, e3t_1d(jk)*e3zps_rat ))
-                 ! e3t_0(ji,jj,jk) = MIN(e3t_0(ji,jj,jk),e3t_1d(jk))
-             ! ENDDO
-           ! ENDDO
-         ! ENDDO
+         DO jk=1,jpk
+           DO jj=j1,j2
+             DO ji=i1,i2
+             if (e3t_interp(ji,jj,jk) == -10) then ! the connection has not yet been done
+                 e3t_interp(ji,jj,jk) = MAX(ptab(ji,jj,jk),MIN(e3zps_min, e3t_1d(jk)*e3zps_rat ))
+                 e3t_interp(ji,jj,jk) = MIN(e3t_interp(ji,jj,jk),e3t_1d(jk))
+                 e3t_0(ji,jj,jk) = ztabramp(ji,jj)*e3t_0(ji,jj,jk)+(1.-ztabramp(ji,jj))*e3t_interp(ji,jj,jk)
+             endif
+             ENDDO
+           ENDDO
+         ENDDO
       ENDIF
       !
    END SUBROUTINE connect_e3t_connect

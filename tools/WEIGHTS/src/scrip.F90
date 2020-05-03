@@ -89,20 +89,13 @@
                                  iunit   ! unit number for namelist file
 
       character (char_len) :: nm_in
-#if defined ARGC
-      integer :: iargc
-      external iargc
 
-      if (iargc() == 1) then
-        call getarg(1, nm_in)
-      else
-        write(6,*) 'need name of namelist file'
-        stop
-      endif
-#else
-      write(6,*) 'enter name for namelist file'
-      read(5,*) nm_in
-#endif
+  if (COMMAND_ARGUMENT_COUNT() == 1) then
+    CALL GET_COMMAND_ARGUMENT(1, nm_in)
+  else
+  write(6,*) 'enter name of namelist file'
+  read(5,*) nm_in
+  endif
 
 !-----------------------------------------------------------------------
 !

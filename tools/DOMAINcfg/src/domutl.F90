@@ -53,11 +53,11 @@ CONTAINS
       INTEGER :: iip1, ijp1, ikp1                       ! working integer
       INTEGER :: iim1, ijm1, ikm1                       ! working integer
       INTEGER :: nseed                                  ! size of the stack
-      TYPE (idx), POINTER :: seed
+      TYPE (idx), POINTER :: seed => NULL()
       !!---------------------------------------------------------------------- 
       !
       ! initialisation seed
-      NULLIFY(seed)
+  !    NULLIFY(seed)
       !
       ! create the first seed and update nseed for all processors
       nseed = 0
@@ -149,11 +149,11 @@ CONTAINS
       INTEGER :: iip1, ijp1                   ! working integer
       INTEGER :: iim1, ijm1                   ! working integer
       INTEGER :: nseed                        ! size of the stack
-      TYPE (idx), POINTER :: seed
+      TYPE (idx), POINTER :: seed => NULL()
       !!----------------------------------------------------------------------
       !
       ! initialisation seed
-      NULLIFY(seed)
+      !NULLIFY(seed)
       !
       ! create the first seed and update nseed for all processors
       nseed = 0
@@ -258,10 +258,12 @@ CONTAINS
       IF (ASSOCIATED(pt_idx%next)) THEN
          zpt_tmp => pt_idx%next
          DEALLOCATE(pt_idx)
-         NULLIFY(pt_idx)
+         !NULLIFY(pt_idx)
+         pt_idx => NULL()
          pt_idx => zpt_tmp
       ELSE
-         NULLIFY(pt_idx)
+         !NULLIFY(pt_idx)
+         pt_idx => NULL()
       ENDIF
    END SUBROUTINE del_head_idx
    !

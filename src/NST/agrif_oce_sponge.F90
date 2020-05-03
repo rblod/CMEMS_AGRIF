@@ -79,6 +79,8 @@ CONTAINS
 
       Agrif_SpecialValue=0.
       Agrif_UseSpecialValue = ln_spc_dyn
+      use_sign_north = .TRUE.
+      sign_north = -1.
       !
       tabspongedone_u = .FALSE.
       tabspongedone_v = .FALSE.         
@@ -89,6 +91,7 @@ CONTAINS
       CALL Agrif_Bc_Variable( vn_sponge_id, calledweight=zcoef, procname=interpvn_sponge )
       !
       Agrif_UseSpecialValue = .FALSE.
+      use_sign_north = .FALSE.
 #endif
       !
       CALL iom_put( 'agrif_spt', fspt(:,:))

@@ -1,6 +1,5 @@
 SHELL = /bin/bash
-MPI = NO
-AGRIF=NO
+AGRIF=YES
 
 include make.inc
 
@@ -16,11 +15,16 @@ DIR_LIB=lib
 
 FILENAMES =$(notdir $(basename $(wildcard src/*.F90))) $(notdir $(basename $(wildcard src/*.F))) $(notdir $(basename $(wildcard src/*.c))) $(notdir $(basename $(wildcard src/*.f))) $(notdir $(basename $(wildcard src/*.f90)))
 FILES=src/*
-OBJS_CREATE_BATHY=$(addsuffix .o,$(addprefix $(DIR_OBJS)/,$(FILENAMES)))
+ifeq ($(AGRIF),YES)
 OBJS_AGRIF=obj/agrif2model.o
+else
+OBJS_AGRIF=
+endif	
 
+OBJS_CREATE_DOMCFG=$(addsuffix .o,$(addprefix $(DIR_OBJS)/,$(FILENAMES)))
+OBJS_CREATE_DOMCFG := $(filter-out $(OBJS_AGRIF),$(OBJS_CREATE_DOMCFG))
 
-all: depend conv prepagrif AGRIF_LIB $(OBJS_CREATE_COORDINATES) $(PROGS)
+all: depend conv prepagrif AGRIF_LIB $(OBJS_CREATE_DOMCFG) $(PROGS)
 		@echo
 		@echo ===================================================
 		@echo   Nesting is ok
@@ -28,9 +32,15 @@ all: depend conv prepagrif AGRIF_LIB $(OBJS_CREATE_COORDINATES) $(PROGS)
 		@echo
 
 
-make_domain_cfg.exe: $(DIR_LIB)/libdomcfg.a $(DIR_FILES)/nemogcm.f90 $(OBJS_CREATE_COORDINATES) $(OBJS_AGRIF)
-		$(FC) $(LINKFLAGS) $(FFLAGS) -o agrif_create_coordinates $(OBJS_CREATE_COORDINATES) $(OBJS_AGRIF) $(LIBS) -I$(DIR_OBJS) $(FFLAGS_SPEC) -I../../ext/AGRIF
+ifeq ($(AGRIF),YES)
+make_domain_cfg.exe: $(DIR_LIB)/libdomcfg.a $(DIR_FILES)/nemogcm.F90 $(OBJS_AGRIF) $(OBJS_CREATE_DOMCFG) 
+		$(FC) $(LINKFLAGS) $(FFLAGS) -o $(PROGS) $(OBJS_AGRIF) $(DIR_LIB)/libdomcfg.a $(LIBS) -I$(DIR_OBJS) $(FFLAGS_SPEC) -I../../ext/AGRIF -L../../ext/AGRIF -lagrif
+else
+make_domain_cfg.exe: $(DIR_LIB)/libdomcfg.a $(DIR_FILES)/nemogcm.F90 $(OBJS_CREATE_DOMCFG) 
+		$(FC) $(LINKFLAGS) $(FFLAGS) -o $(PROGS)  $(DIR_LIB)/libdomcfg.a $(LIBS) -I$(DIR_OBJS) $(FFLAGS_SPEC)
+endif	
 
+ifeq ($(AGRIF),YES)
 prepagrif:
 		@echo
 		@echo ===================================================
@@ -45,56 +55,77 @@ prepagrif:
 		mkdir -p $(DIR_PPSRC)/AGRIF_INC
 		\cp ../../ext/AGRIF/conv $(DIR_PPSRC)
 		\cp ../../ext/AGRIF/agrif_oce.in $(DIR_PPSRC)
+		echo $(OBJS_CREATE_DOMCFG)
 		@echo
 
 conv:
 		$(MAKE) -C ../../ext/AGRIF/LIB
 
 AGRIF_LIB: 
-		$(MAKE) -C ../../ext/AGRIF FC=$(FC) CPP=$(CPP) FFLAGS="$(FFLAGS)"
+		$(MAKE) -C ../../ext/AGRIF FC=$(FC) CPP=$(CPP) CPPFLAGS="-DAGRIF_MPI" FFLAGS="$(FFLAGS)"
+else
 
-$(DIR_LIB)/libdomcfg.a: $(OBJS)
+prepagrif:
 		@echo
 		@echo ===================================================
-		@echo   Compile Nesting library...
+		@echo   Create working directories  ...
 		@echo ===================================================
-		$(AR) -r $@ $(OBJS)
+		mkdir -p obj
+		mkdir -p $(DIR_PPSRC_2)
+		mkdir -p $(DIR_LIB)
+		mkdir -p $(DIR_OBJS)
+		@echo
+conv:
+AGRIF_LIB: 
+
+endif	
+
+$(DIR_LIB)/libdomcfg.a: $(OBJS_CREATE_DOMCFG)
+		@echo
+		@echo ===================================================
+		@echo   Compile domcfg library...
+		@echo ===================================================
+		$(AR) -r $@ $(OBJS_CREATE_DOMCFG)
 		ranlib $@
 		@echo
 
 
 
-$(DIR_OBJS)/%.o: $(DIR_FILES)/%.F90 Makefile  MODEL.CPP 
+ifeq ($(AGRIF),YES)
+
+$(OBJS_AGRIF):src/agrif2model.F90  $(OBJS_CREATE_DOMCFG) MODEL.CPP 
+		$(CPP) -I$(DIR_PPSRC)/AGRIF_INC -include MODEL.CPP $(CPPFLAGS) src/agrif2model.F90 > $(DIR_PPSRC_2)/$(*F).f90	
+		$(FC) $(FFLAGS) -c $(DIR_PPSRC_2)/$(*F).f90 -o $(DIR_OBJS)/$(*F).o -I../../ext/AGRIF -I$(DIR_OBJS)  $(FFLAGS_SPEC)
+
+$(DIR_OBJS)/%.o: $(DIR_FILES)/%.F90 make.inc MODEL.CPP 
 		$(CPP) -include MODEL.CPP $(CPPFLAGS) $(DIR_FILES)/$(*F).F90 > $(DIR_PPSRC)/$(*F).f90
-			@(cd NEMOFILES ; ./conv ./agrif_oce.in -rm \
-		-comdirin ./ -comdirout AGRIF_MODELFILES/. -convfile $(*F).f90)
+		cd NEMOFILES ; ./conv ./agrif_oce.in -rm \
+		-comdirin ./ -comdirout AGRIF_MODELFILES/. -convfile $(*F).f90
 		$(CPP) -I$(DIR_PPSRC)/AGRIF_INC -include MODEL.CPP $(CPPFLAGS)  $(DIR_PPSRC)/AGRIF_MODELFILES/$(*F).f90 >$(DIR_PPSRC_2)/$(*F).f90	
 		$(FC) $(FFLAGS) -c $(DIR_PPSRC_2)/$(*F).f90 -o $(DIR_OBJS)/$(*F).o -I../../ext/AGRIF -I$(DIR_OBJS)  $(FFLAGS_SPEC) 
 
-obj/nemogcm.o:src_agrif/nemogcm.F90 Makefile  MODEL.CPP 
-		$(CPP) -I$(DIR_PPSRC)/AGRIF_INC -include MODEL.CPP $(CPPFLAGS) src_agrif/agrif2model.F90 > $(DIR_PPSRC_2)/$(*F).f90	
-		$(FC) $(FFLAGS) -c $(DIR_PPSRC_2)/$(*F).f90 -o $(DIR_OBJS)/$(*F).o -I../../ext/AGRIF -I$(DIR_OBJS)  $(FFLAGS_SPEC) 
 
-$(DIR_OBJS)/%.o: $(DIR_FILES)/%.f90 Makefile MODEL.CPP 
+$(DIR_OBJS)/%.o: $(DIR_FILES)/%.f90 make.inc MODEL.CPP 
 		$(CPP) -include MODEL.CPP $(CPPFLAGS) $(DIR_FILES)/$(*F).f90 > $(DIR_PPSRC)/$(*F).f90
-			@(cd NEMOFILES ; ./conv agrif_oce.in -rm \
-		-comdirin ./ -comdirout AGRIF_MODELFILES/. -convfile $(*F).f90)
+		cd NEMOFILES ; ./conv agrif_oce.in -rm \
+		-comdirin ./ -comdirout AGRIF_MODELFILES/. -convfile $(*F).f90
 		$(CPP) -I$(DIR_PPSRC)/AGRIF_INC -include MODEL.CPP $(CPPFLAGS)  $(DIR_PPSRC)/AGRIF_MODELFILES/$(*F).f90 >$(DIR_PPSRC_2)/$(*F).f90	
 		$(FC) $(FFLAGS) -c $(DIR_PPSRC_2)/$(*F).f90 -o $(DIR_OBJS)/$(*F).o -I../../ext/AGRIF -I$(DIR_OBJS)  $(FFLAGS_SPEC) 
 
-#$(DIR_OBJS)/%.o: $(DIR_FILES)/%.F Makefile MODEL.CPP
-#		$(CPP) -include MODEL.CPP $(CPPFLAGS) $(DIR_FILES)/$(*F).F > $(DIR_PPSRC)/$(*F).f
-#		$(FC) $(FFLAGS) $(F77FLG) -c $(DIR_PPSRC)/$(*F).f -o $(DIR_OBJS)/$(*F).o
+else
 
-#$(DIR_OBJS)/%.o: $(DIR_FILES)/%.f90 Makefile MODEL.CPP
-#		$(FC) $(FFLAGS) -c $(DIR_PPSRC)/$(*F).f90 -o $(DIR_OBJS)/$(*F).o
+$(DIR_OBJS)/%.o: $(DIR_FILES)/%.F90 make.inc MODEL.CPP
+		$(CPP) -include MODEL.CPP $(CPPFLAGS) $(DIR_FILES)/$(*F).F90 > $(DIR_PPSRC_2)/$(*F).f90
+		$(FC) $(FFLAGS) -c $(DIR_PPSRC_2)/$(*F).f90 -o $(DIR_OBJS)/$(*F).o -I$(DIR_OBJS)  $(FFLAGS_SPEC) 
 
-#$(DIR_OBJS)/par_oce.o: $(DIR_FILES)/par_oce.f90
-#		echo $(OBJS) $(DIR_FILES)/
+$(DIR_OBJS)/%.o: $(DIR_FILES)/%.f90 make.inc MODEL.CPP
+		$(FC) $(FFLAGS) -c $(DIR_FILES)/$(*F).f90 -o $(DIR_OBJS)/$(*F).o -I$(DIR_OBJS)  $(FFLAGS_SPEC) 
 
-#$(DIR_OBJS)/%.o: $(DIR_FILES)/%.c Makefile MODEL.CPP
-#	$(CC) -c $(CFLAGS) -c $(DIR_FILES)/$(*F).c -o $(DIR_OBJS)/$(*F).o
 
+$(DIR_OBJS)/%.o: $(DIR_FILES)/%.c make.inc MODEL.CPP
+	$(CC) -c $(CFLAGS) -c $(DIR_FILES)/$(*F).c -o $(DIR_OBJS)/$(*F).o -I$(DIR_OBJS)  $(FFLAGS_SPEC) 
+
+endif
 #--------------------------------------------------------------------------
 #  Target to create dependeanies.
 #--------------------------------------------------------------------------

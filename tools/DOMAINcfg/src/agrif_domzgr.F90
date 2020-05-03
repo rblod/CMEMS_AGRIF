@@ -22,6 +22,7 @@ end subroutine agrif_create_bathy_meter
       LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
       !
       !!----------------------------------------------------------------------  
+      INTEGER :: ji,jj
       !
          western_side  = (nb == 1).AND.(ndir == 1)
          eastern_side  = (nb == 1).AND.(ndir == 2)
@@ -29,6 +30,12 @@ end subroutine agrif_create_bathy_meter
          northern_side = (nb == 2).AND.(ndir == 2)
       IF( before) THEN
          ptab(i1:i2,j1:j2) = bathy(i1:i2,j1:j2)
+
+         do jj=j1,j2
+            do ji=i1,i2
+         ptab(ji,jj) = SUM ( e3t_0(ji,jj, 1:mbkt(ji,jj) ) ) * ssmask(ji,jj)
+      enddo
+      enddo
       ELSE
          bathy(i1:i2,j1:j2)=ptab
       ENDIF

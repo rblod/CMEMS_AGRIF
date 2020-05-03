@@ -46,6 +46,8 @@ MODULE agrif_oce_interp
 #if defined key_vertical
    PUBLIC   interpht0, interpmbkt
 # endif
+   PUBLIC   agrif_initts
+
    INTEGER ::   bdy_tinterp = 0
 
    !!----------------------------------------------------------------------
@@ -88,8 +90,11 @@ CONTAINS
       Agrif_SpecialValue    = 0._wp
       Agrif_UseSpecialValue = ln_spc_dyn
       !
+      use_sign_north = .TRUE.
+      sign_north = -1.
       CALL Agrif_Bc_variable( un_interp_id, procname=interpun )
       CALL Agrif_Bc_variable( vn_interp_id, procname=interpvn )
+      use_sign_north = .FALSE.
       !
       Agrif_UseSpecialValue = .FALSE.
       !
@@ -493,6 +498,10 @@ CONTAINS
       ! Interpolate barotropic fluxes
       Agrif_SpecialValue = 0._wp
       Agrif_UseSpecialValue = ln_spc_dyn
+
+      use_sign_north = .TRUE.
+      sign_north = -1.
+
       !
       ! Set bdy time interpolation stage to 0 (latter incremented locally do deal with corners)
       utint_stage(:,:) = 0
@@ -517,6 +526,7 @@ CONTAINS
          CALL Agrif_Bc_variable( vnb_id, procname=interpvnb )
       ENDIF
       Agrif_UseSpecialValue = .FALSE.
+      use_sign_north = .FALSE.
       ! 
    END SUBROUTINE Agrif_dta_ts
 
@@ -1162,7 +1172,6 @@ CONTAINS
       ! 
    END SUBROUTINE interpe3t
 
-
    SUBROUTINE interpavm( ptab, i1, i2, j1, j2, k1, k2, m1, m2, before )
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE interavm  ***
@@ -1283,6 +1292,24 @@ CONTAINS
    END SUBROUTINE interpht0
 #endif
 
+   SUBROUTINE agrif_initts(tabres,i1,i2,j1,j2,k1,k2,m1,m2,before)
+       INTEGER :: i1, i2, j1, j2, k1, k2, m1, m2
+       REAL(wp):: tabres(i1:i2,j1:j2,k1:k2,m1:m2)
+       LOGICAL :: before
+
+       INTEGER :: jm
+
+       IF (before) THEN
+         DO jm=m1,m2
+             tabres(i1:i2,j1:j2,k1:k2,jm) = ts(i1:i2,j1:j2,k1:k2,jm,Kbb_a)
+         END DO
+       ELSE
+         DO jm=m1,m2
+             ts(i1:i2,j1:j2,k1:k2,jm,Kbb_a)=tabres(i1:i2,j1:j2,k1:k2,jm)
+         END DO
+       ENDIF
+   END SUBROUTINE agrif_initts 
+   
 #else
    !!----------------------------------------------------------------------
    !!   Empty module                                          no AGRIF zoom

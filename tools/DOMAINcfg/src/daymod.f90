@@ -1,7 +1,7 @@
 MODULE daymod
    !!======================================================================
    !!                       ***  MODULE  daymod  ***
-   !! Ocean        :  calendar
+   !! Ocean :   management of the model calendar
    !!=====================================================================
    !! History :  OPA  ! 1994-09  (M. Pontaud M. Imbard)  Original code
    !!                 ! 1997-03  (O. Marti)
@@ -15,23 +15,20 @@ MODULE daymod
 
    !!----------------------------------------------------------------------
    !!   day        : calendar
-   !!
-   !!           -------------------------------
-   !!           ----------- WARNING -----------
-   !!
-   !!   we suppose that the time step is deviding the number of second of in a day
-   !!             ---> MOD( rday, rdt ) == 0
-   !!
-   !!           ----------- WARNING -----------
-   !!           -------------------------------
-   !!
+   !!----------------------------------------------------------------------
+   !!                    ----------- WARNING -----------
+   !!                    -------------------------------
+   !!   sbcmod assume that the time step is dividing the number of second of 
+   !!   in a day, i.e. ===> MOD( rday, rdt ) == 0 
+   !!   except when user defined forcing is used (see sbcmod.F90)
    !!----------------------------------------------------------------------
    USE dom_oce        ! ocean space and time domain
    USE phycst         ! physical constants
+   USE ioipsl  , ONLY :   ymds2ju      ! for calendar
+   !
    USE in_out_manager ! I/O manager
-   USE iom            !
-   USE ioipsl  , ONLY :   ymds2ju   ! for calendar
    USE prtctl         ! Print control
+   USE iom            !
    USE timing         ! Timing
 
    IMPLICIT NONE
@@ -45,8 +42,8 @@ MODULE daymod
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: daymod.F90 6140 2015-12-21 11:35:23Z timgraham $
-   !! Software governed by the CeCILL licence     (./LICENSE)
+   !! $Id: daymod.F90 10068 2018-08-28 14:09:04Z nicolasmartin $
+   !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
@@ -67,8 +64,8 @@ CONTAINS
       !!              - nsec1jan000  : second since Jan. 1st 00h of nit000 year and Jan. 1st 00h of the current year
       !!              - nmonth_len, nyear_len, nmonth_half, nmonth_end through day_mth
       !!----------------------------------------------------------------------
-      INTEGER  ::   inbday, idweek
-      REAL(wp) ::   zjul
+      INTEGER  ::   inbday, idweek   ! local integers
+      REAL(wp) ::   zjul             ! local scalar
       !!----------------------------------------------------------------------
       !
       ! max number of seconds between each restart
@@ -76,18 +73,13 @@ CONTAINS
          CALL ctl_stop( 'The number of seconds between each restart exceeds the integer 4 max value: 2^31-1. ',   &
             &           'You must do a restart at higher frequency (or remove this stop and recompile the code in I8)' )
       ENDIF
-      ! all calendar staff is based on the fact that MOD( rday, rdt ) == 0
-      IF( MOD( rday     , rdt   ) /= 0. )   CALL ctl_stop( 'the time step must devide the number of second of in a day' )
-      IF( MOD( rday     , 2.    ) /= 0. )   CALL ctl_stop( 'the number of second of in a day must be an even number'    )
-      IF( MOD( rdt      , 2.    ) /= 0. )   CALL ctl_stop( 'the time step (in second) must be an even number'           )
-      nsecd   = NINT(rday       )
-      nsecd05 = NINT(0.5 * rday )
-      ndt     = NINT(      rdt  )
-      ndt05   = NINT(0.5 * rdt  )
+      nsecd   = NINT( rday       )
+      nsecd05 = NINT( 0.5 * rday )
+      ndt     = NINT(       rdt  )
+      ndt05   = NINT( 0.5 * rdt  )
 
 
       ! set the calandar from ndastp (read in restart file and namelist)
-
       nyear   =   ndastp / 10000
       nmonth  = ( ndastp - (nyear * 10000) ) / 100
       nday    =   ndastp - (nyear * 10000) - ( nmonth * 100 )
@@ -138,7 +130,8 @@ CONTAINS
       IF( nsec_week .lt. 0 ) nsec_week = nsec_week + nsecd*7
 
       ! control print
-      IF(lwp) WRITE(numout,'(a,i6,a,i2,a,i2,a,i8,a,i8,a,i8,a,i8)')' =======>> 1/2 time step before the start of the run DATE Y/M/D = ',   &
+      IF(lwp) WRITE(numout,'(a,i6,a,i2,a,i2,a,i8,a,i8,a,i8,a,i8)')   &
+           &                   ' =======>> 1/2 time step before the start of the run DATE Y/M/D = ',   &
            &                   nyear, '/', nmonth, '/', nday, '  nsec_day:', nsec_day, '  nsec_week:', nsec_week, '  &
            &                   nsec_month:', nsec_month , '  nsec_year:' , nsec_year
 
@@ -146,6 +139,14 @@ CONTAINS
       ! call day to set the calendar parameters at the begining of the current simulaton. needed by iom_init
       CALL day( nit000 )
       !
+      IF( lwxios ) THEN
+! define variables in restart file when writing with XIOS
+          CALL iom_set_rstw_var_active('kt')
+          CALL iom_set_rstw_var_active('ndastp')
+          CALL iom_set_rstw_var_active('adatrj')
+          CALL iom_set_rstw_var_active('ntime')
+      ENDIF
+
    END SUBROUTINE day_init
 
 
@@ -226,7 +227,7 @@ CONTAINS
       REAL(wp)           ::   zprec      ! fraction of day corresponding to 0.1 second
       !!----------------------------------------------------------------------
       !
-      IF( nn_timing == 1 )  CALL timing_start('day')
+      IF( ln_timing )   CALL timing_start('day')
       !
       zprec = 0.1 / rday
       !                                                 ! New time-step
@@ -277,11 +278,140 @@ CONTAINS
          CALL prt_ctl_info(charout)
       ENDIF
 
+      IF( lrst_oce         ) CALL day_rst( kt, 'WRITE' )      ! write day restart information
       !
-      IF( nn_timing == 1 )  CALL timing_stop('day')
+      IF( ln_timing )   CALL timing_stop('day')
       !
    END SUBROUTINE day
 
+
+   SUBROUTINE day_rst( kt, cdrw )
+      !!---------------------------------------------------------------------
+      !!                   ***  ROUTINE day_rst  ***
+      !!
+      !!  ** Purpose : Read or write calendar in restart file:
+      !!
+      !!  WRITE(READ) mode:
+      !!       kt        : number of time step since the begining of the experiment at the
+      !!                   end of the current(previous) run
+      !!       adatrj(0) : number of elapsed days since the begining of the experiment at the
+      !!                   end of the current(previous) run (REAL -> keep fractions of day)
+      !!       ndastp    : date at the end of the current(previous) run (coded as yyyymmdd integer)
+      !!
+      !!   According to namelist parameter nrstdt,
+      !!       nrstdt = 0  no control on the date (nit000 is  arbitrary).
+      !!       nrstdt = 1  we verify that nit000 is equal to the last
+      !!                   time step of previous run + 1.
+      !!       In both those options, the  exact duration of the experiment
+      !!       since the beginning (cumulated duration of all previous restart runs)
+      !!       is not stored in the restart and is assumed to be (nit000-1)*rdt.
+      !!       This is valid is the time step has remained constant.
+      !!
+      !!       nrstdt = 2  the duration of the experiment in days (adatrj)
+      !!                    has been stored in the restart file.
+      !!----------------------------------------------------------------------
+      INTEGER         , INTENT(in) ::   kt         ! ocean time-step
+      CHARACTER(len=*), INTENT(in) ::   cdrw       ! "READ"/"WRITE" flag
+      !
+      REAL(wp) ::   zkt, zndastp, zdayfrac, ksecs, ktime
+      INTEGER  ::   ihour, iminute
+      !!----------------------------------------------------------------------
+
+      IF( TRIM(cdrw) == 'READ' ) THEN
+
+         IF( iom_varid( numror, 'kt', ldstop = .FALSE. ) > 0 ) THEN
+            ! Get Calendar informations
+            CALL iom_get( numror, 'kt', zkt, ldxios = lrxios )   ! last time-step of previous run
+            IF(lwp) THEN
+               WRITE(numout,*) ' *** Info read in restart : '
+               WRITE(numout,*) '   previous time-step                               : ', NINT( zkt )
+               WRITE(numout,*) ' *** restart option'
+               SELECT CASE ( nrstdt )
+               CASE ( 0 )   ;   WRITE(numout,*) ' nrstdt = 0 : no control of nit000'
+               CASE ( 1 )   ;   WRITE(numout,*) ' nrstdt = 1 : no control the date at nit000 (use ndate0 read in the namelist)'
+               CASE ( 2 )   ;   WRITE(numout,*) ' nrstdt = 2 : calendar parameters read in restart'
+               END SELECT
+               WRITE(numout,*)
+            ENDIF
+            ! Control of date
+            IF( nit000 - NINT( zkt ) /= 1 .AND. nrstdt /= 0 )                                         &
+                 &   CALL ctl_stop( ' ===>>>> : problem with nit000 for the restart',                 &
+                 &                  ' verify the restart file or rerun with nrstdt = 0 (namelist)' )
+            ! define ndastp and adatrj
+            IF ( nrstdt == 2 ) THEN
+               ! read the parameters corresponding to nit000 - 1 (last time step of previous run)
+               CALL iom_get( numror, 'ndastp', zndastp, ldxios = lrxios )
+               ndastp = NINT( zndastp )
+               CALL iom_get( numror, 'adatrj', adatrj , ldxios = lrxios )
+	       CALL iom_get( numror, 'ntime' , ktime  , ldxios = lrxios )
+	       nn_time0=INT(ktime)
+               ! calculate start time in hours and minutes
+	       zdayfrac=adatrj-INT(adatrj)
+	       ksecs = NINT(zdayfrac*86400)	       ! Nearest second to catch rounding errors in adatrj	       
+	       ihour = INT(ksecs/3600)
+	       iminute = ksecs/60-ihour*60
+ 	        
+               ! Add to nn_time0
+               nhour   =   nn_time0 / 100
+               nminute = ( nn_time0 - nhour * 100 )
+	       nminute=nminute+iminute
+	       
+	       IF( nminute >= 60 ) THEN
+	          nminute=nminute-60
+		  nhour=nhour+1
+	       ENDIF
+	       nhour=nhour+ihour
+	       IF( nhour >= 24 ) THEN
+		  nhour=nhour-24
+	          adatrj=adatrj+1
+	       ENDIF	       
+	       nn_time0 = nhour * 100 + nminute
+	       adatrj = INT(adatrj)                    ! adatrj set to integer as nn_time0 updated	       
+            ELSE
+               ! parameters corresponding to nit000 - 1 (as we start the step loop with a call to day)
+               ndastp = ndate0        ! ndate0 read in the namelist in dom_nam
+               nhour   =   nn_time0 / 100
+               nminute = ( nn_time0 - nhour * 100 )
+               IF( nhour*3600+nminute*60-ndt05 .lt. 0 )  ndastp=ndastp-1      ! Start hour is specified in the namelist (default 0)
+               adatrj = ( REAL( nit000-1, wp ) * rdt ) / rday
+               ! note this is wrong if time step has changed during run
+            ENDIF
+         ELSE
+            ! parameters corresponding to nit000 - 1 (as we start the step loop with a call to day)
+            ndastp = ndate0           ! ndate0 read in the namelist in dom_nam
+            nhour   =   nn_time0 / 100
+	    nminute = ( nn_time0 - nhour * 100 )
+            IF( nhour*3600+nminute*60-ndt05 .lt. 0 )  ndastp=ndastp-1      ! Start hour is specified in the namelist (default 0)
+            adatrj = ( REAL( nit000-1, wp ) * rdt ) / rday
+         ENDIF
+         IF( ABS(adatrj  - REAL(NINT(adatrj),wp)) < 0.1 / rday )   adatrj = REAL(NINT(adatrj),wp)   ! avoid truncation error
+         !
+         IF(lwp) THEN
+            WRITE(numout,*) ' *** Info used values : '
+            WRITE(numout,*) '   date ndastp                                      : ', ndastp
+            WRITE(numout,*) '   number of elapsed days since the begining of run : ', adatrj
+	    WRITE(numout,*) '   nn_time0                                         : ',nn_time0
+            WRITE(numout,*)
+         ENDIF
+         !
+      ELSEIF( TRIM(cdrw) == 'WRITE' ) THEN
+         !
+         IF( kt == nitrst ) THEN
+            IF(lwp) WRITE(numout,*)
+            IF(lwp) WRITE(numout,*) 'rst_write : write oce restart file  kt =', kt
+            IF(lwp) WRITE(numout,*) '~~~~~~~'
+         ENDIF
+         ! calendar control
+         IF( lwxios ) CALL iom_swap(      cwxios_context          )
+         CALL iom_rstput( kt, nitrst, numrow, 'kt'     , REAL( kt    , wp)  , ldxios = lwxios )   ! time-step
+         CALL iom_rstput( kt, nitrst, numrow, 'ndastp' , REAL( ndastp, wp)  , ldxios = lwxios )   ! date
+         CALL iom_rstput( kt, nitrst, numrow, 'adatrj' , adatrj             , ldxios = lwxios            )   ! number of elapsed days since
+         !                                                                                                   ! the begining of the run [s]
+         CALL iom_rstput( kt, nitrst, numrow, 'ntime'  , REAL( nn_time0, wp), ldxios = lwxios ) ! time
+         IF( lwxios ) CALL iom_swap(      cxios_context          )
+      ENDIF
+      !
+   END SUBROUTINE day_rst
 
    !!======================================================================
 END MODULE daymod

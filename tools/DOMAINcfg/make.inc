@@ -1,8 +1,8 @@
-FC=gfortran
-FFLAGS=  -O0 -fdefault-real-8  -ffree-line-length-none -I$(NCDF_ROOT)/include
-FFLAGS_SPEC= -J$(DIR_OBJS) -fbounds-check  -fbacktrace -g 
+FC=mpif90
+FFLAGS=  -O0 -g -fdefault-real-8  -ffree-line-length-none -I$(NCDF_ROOT)/include -fbacktrace 
+FFLAGS_SPEC= -J$(DIR_OBJS) 
 #-fbounds-check  -fbacktrace -g -fcheck=all -Wall
-CPP=/opt/local/bin/cpp
+CPP=cpp
 CPPFLAGS=-P -traditional 
 CPPARCH = 
 CPPFLAGS += $(CPPARCH) 
@@ -10,7 +10,7 @@ CPPFLAGS += $(CPPARCH)
 CC=mpicc
 CFLAGS = -Df2cFortran 
 
-NCDF_ROOT=/usr/local
+NCDF_ROOT:=$(shell nc-config --prefix)
 INC_NETCDF = -I$(NCDF_ROOT)/include
 LIB_NETCDF= -L$(NCDF_ROOT)/lib/ -lnetcdf -lnetcdff
 
@@ -21,6 +21,4 @@ LIBS =$(LIB_NETCDF)
 #
 F77FLG =  -ffixed-form # -Mfixed
 F90FLG =  -ffree-form -ffree-line-length-0 # -Mfree
-
-MPI = NO
 

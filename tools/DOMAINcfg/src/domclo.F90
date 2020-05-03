@@ -81,6 +81,8 @@ CONTAINS
 
       LOGICAL :: lskip     ! flag in case lake seed on land or already filled (...)
 
+      NAMELIST/namclo/ rn_lon_opnsea, rn_lat_opnsea, nn_closea, sn_lake
+
       !!----------------------------------------------------------------------
       !! 0 : Read namelist for closed sea definition
       !!----------------------------------------------------------------------
@@ -88,7 +90,6 @@ CONTAINS
       IF(lwp) WRITE(numout,*)'dom_clo : closed seas '
       IF(lwp) WRITE(numout,*)'~~~~~~~'
 
-      NAMELIST/namclo/ rn_lon_opnsea, rn_lat_opnsea, nn_closea, sn_lake
       !!---------------------------------------------------------------------
       
       REWIND( numnam_ref )              ! Namelist namlbc in reference namelist : Lateral momentum boundary condition

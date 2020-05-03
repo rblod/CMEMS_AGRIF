@@ -23,10 +23,6 @@
       REAL(KIND=8), ALLOCATABLE :: wgt(:,:)
       REAL(KIND=8), ALLOCATABLE :: src1(:,:),dst1(:,:),wgt1(:,:)
       LOGICAL  :: around, verbose
-#if defined ARGC
-      INTEGER(KIND=4) :: iargc
-      EXTERNAL :: iargc
-#endif
 
       CHARACTER(LEN=256) :: interp_file, output_file, name_file
       INTEGER            :: ew_wrap
@@ -44,17 +40,14 @@
 !     output_file = 'weights_bilin.nc'
 !     ew_wrap     = 2
 !
-#if defined ARGC
-      IF (iargc() == 1) THEN
-        CALL getarg(1, name_file)
-      ELSE
-        WRITE(*,*) 'Usage: scripshape namelist_file'
-        STOP
-      ENDIF
-#else
-      WRITE(6,*) 'enter name of namelist file'
-      READ(5,*) name_file
-#endif
+
+  if (COMMAND_ARGUMENT_COUNT() == 1) then
+    CALL GET_COMMAND_ARGUMENT(1, name_file)
+  else
+  write(6,*) 'enter name of namelist file'
+  read(5,*) name_file
+  endif
+
       interp_file = 'none'
       output_file = 'none'
       ew_wrap = 0

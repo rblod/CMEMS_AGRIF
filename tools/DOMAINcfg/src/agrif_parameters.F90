@@ -12,6 +12,8 @@ INTEGER :: npt_connect
 
 REAL(wp), PUBLIC, ALLOCATABLE, SAVE        , DIMENSION(:,:) ::   ztabramp
 
+REAL(wp), PUBLIC, ALLOCATABLE, SAVE        , DIMENSION(:,:,:) ::   e3t_interp
+
 end module agrif_parameters
 #else
 subroutine agrif_parameters_empty

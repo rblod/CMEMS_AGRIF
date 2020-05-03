@@ -24,7 +24,7 @@
       !!----------------------------------------------------------------------
       !
       CALL nemo_init       !* Initializations of each fine grid
-      Kbb_a = Nbb; Kmm_a = Nnn; Krhs_a = Nrhs   ! agrif_oce module copies of time level indices
+     ! Kbb_a = Nbb; Kmm_a = Nnn; Krhs_a = Nrhs   ! agrif_oce module copies of time level indices
       !
       !                    !* Agrif initialization
       CALL agrif_nemo_init
@@ -43,20 +43,24 @@
       !!----------------------------------------------------------------------
       !!                 *** ROUTINE Agrif_InitValues_cont_dom ***
       !!----------------------------------------------------------------------
-      !
-      CALL agrif_declare_var_dom
-      !
+   !
+  ! CALL agrif_declare_var_dom
+   !
    END SUBROUTINE Agrif_InitValues_cont_dom
+
 
    SUBROUTINE agrif_declare_var_dom
       !!----------------------------------------------------------------------
       !!                 *** ROUTINE agrif_declare_var_dom ***
       !!----------------------------------------------------------------------
-      USE par_oce, ONLY:  nbghostcells      
-      !
-      IMPLICIT NONE
-      !
-      INTEGER :: ind1, ind2, ind3
+   USE agrif_util
+   USE par_oce       
+   USE oce
+   !
+   IMPLICIT NONE
+   !
+   INTEGER :: ind1, ind2, ind3
+   External :: nemo_mapping
       !!----------------------------------------------------------------------
 
       ! 1. Declaration of the type of variable which have to be interpolated
@@ -87,36 +91,42 @@
       CALL Agrif_Set_Updatetype(e2v_id,update1 = Agrif_Update_Average, update2=Agrif_Update_Copy)
 #endif
 
+      CALL Agrif_Set_ExternalMapping(nemo_mapping)
+
    END SUBROUTINE agrif_declare_var_dom
 
-   SUBROUTINE Agrif_InitValues_cont
+SUBROUTINE Agrif_InitValues_cont
       !!----------------------------------------------------------------------
       !!                 *** ROUTINE Agrif_InitValues_cont ***
+      !!
+      !! ** Purpose ::   Declaration of variables to be interpolated
       !!----------------------------------------------------------------------
-      USE agrif_oce
-      USE agrif_oce_interp
-      USE agrif_oce_sponge
-      USE dom_oce
-      USE oce
-      USE lib_mpp
-      USE lbclnk
-      !
-      IMPLICIT NONE
-      !
-      INTEGER :: ji, jj
-      LOGICAL :: check_namelist
-      CHARACTER(len=15) :: cl_check1, cl_check2, cl_check3, cl_check4 
+   USE agrif_oce_update
+   USE agrif_oce_interp
+   USE agrif_oce_sponge
+   USE Agrif_Util
+   USE oce 
+   USE dom_oce
+   USE zdf_oce
+   USE nemogcm
+   USE agrif_oce
+   !
+   USE lib_mpp
+   USE in_out_manager
+   !
+   IMPLICIT NONE
+   !
+   LOGICAL :: check_namelist
+   CHARACTER(len=15) :: cl_check1, cl_check2, cl_check3, cl_check4 
 #if defined key_vertical
       REAL(wp), DIMENSION(jpi,jpj) ::   zk   ! workspace
 #endif
+
       !!----------------------------------------------------------------------
 
-      ! 1. Declaration of the type of variable which have to be interpolated
-      !---------------------------------------------------------------------
-      CALL agrif_declare_var
-
-      ! 2. First interpolations of potentially non zero fields
-      !-------------------------------------------------------
+   ! 1. Declaration of the type of variable which have to be interpolated
+   !---------------------------------------------------------------------
+  ! CALL agrif_declare_var
 
 #if defined key_vertical
       ! Build consistent parent bathymetry and number of levels
@@ -156,45 +166,54 @@
       mbkv_parent(:,:) = MAX( NINT( zk(:,:) ), 1 )   
 #endif
 
-      Agrif_SpecialValue    = 0._wp
-      Agrif_UseSpecialValue = .TRUE.
-      CALL Agrif_Bc_variable(tsn_id,calledweight=1.,procname=interptsn)
-      CALL Agrif_Sponge
-      tabspongedone_tsn = .FALSE.
-      CALL Agrif_Bc_variable(tsn_sponge_id,calledweight=1.,procname=interptsn_sponge)
-      ! reset ts(:,:,:,:,Krhs_a) to zero
-      ts(:,:,:,:,Krhs_a) = 0._wp
 
-      Agrif_UseSpecialValue = ln_spc_dyn
-      CALL Agrif_Bc_variable(un_interp_id,calledweight=1.,procname=interpun)
-      CALL Agrif_Bc_variable(vn_interp_id,calledweight=1.,procname=interpvn)
-      tabspongedone_u = .FALSE.
-      tabspongedone_v = .FALSE.
-      CALL Agrif_Bc_variable(un_sponge_id,calledweight=1.,procname=interpun_sponge)
-      tabspongedone_u = .FALSE.
-      tabspongedone_v = .FALSE.
-      CALL Agrif_Bc_variable(vn_sponge_id,calledweight=1.,procname=interpvn_sponge)
+
+   ! 2. First interpolations of potentially non zero fields
+   !-------------------------------------------------------
+   Agrif_SpecialValue    = 0._wp
+   Agrif_UseSpecialValue = .TRUE.
+   CALL Agrif_Bc_variable(tsn_id,calledweight=1.,procname=interptsn)
+   CALL Agrif_Sponge
+   tabspongedone_tsn = .FALSE.
+   CALL Agrif_Bc_variable(tsn_sponge_id,calledweight=1.,procname=interptsn_sponge)
+   ! reset tsa to zero
+      ts(:,:,:,:,Krhs_a) = 0._wp
+   Agrif_UseSpecialValue = ln_spc_dyn
+   use_sign_north = .TRUE.
+   sign_north = -1.
+   CALL Agrif_Bc_variable(un_interp_id,calledweight=1.,procname=interpun)
+   CALL Agrif_Bc_variable(vn_interp_id,calledweight=1.,procname=interpvn)
+   tabspongedone_u = .FALSE.
+   tabspongedone_v = .FALSE.
+   CALL Agrif_Bc_variable(un_sponge_id,calledweight=1.,procname=interpun_sponge)
+   tabspongedone_u = .FALSE.
+   tabspongedone_v = .FALSE.
+   CALL Agrif_Bc_variable(vn_sponge_id,calledweight=1.,procname=interpvn_sponge)
+   use_sign_north = .FALSE.
       uu(:,:,:,Krhs_a) = 0._wp
       vv(:,:,:,Krhs_a) = 0._wp
 
-      Agrif_UseSpecialValue = .TRUE.
-      CALL Agrif_Bc_variable(sshn_id,calledweight=1., procname=interpsshn )
+   Agrif_UseSpecialValue = .TRUE.
+   CALL Agrif_Bc_variable(sshn_id,calledweight=1., procname=interpsshn )
       hbdy(:,:) = 0._wp
       ssh(:,:,Krhs_a) = 0._wp
 
-      IF ( ln_dynspg_ts ) THEN
-         Agrif_UseSpecialValue = ln_spc_dyn
-         CALL Agrif_Bc_variable(unb_id,calledweight=1.,procname=interpunb)
-         CALL Agrif_Bc_variable(vnb_id,calledweight=1.,procname=interpvnb)
-         CALL Agrif_Bc_variable(ub2b_interp_id,calledweight=1.,procname=interpub2b)
-         CALL Agrif_Bc_variable(vb2b_interp_id,calledweight=1.,procname=interpvb2b)
+   IF ( ln_dynspg_ts ) THEN
+      Agrif_UseSpecialValue = ln_spc_dyn
+      use_sign_north = .TRUE.
+      sign_north = -1.
+      CALL Agrif_Bc_variable(unb_id,calledweight=1.,procname=interpunb)
+      CALL Agrif_Bc_variable(vnb_id,calledweight=1.,procname=interpvnb)
+      CALL Agrif_Bc_variable(ub2b_interp_id,calledweight=1.,procname=interpub2b)
+      CALL Agrif_Bc_variable(vb2b_interp_id,calledweight=1.,procname=interpvb2b)
+      use_sign_north = .FALSE.
          ubdy(:,:) = 0._wp
          vbdy(:,:) = 0._wp
-      ENDIF
+   ENDIF
 
-      Agrif_UseSpecialValue = .FALSE.
+   Agrif_UseSpecialValue = .FALSE. 
+   ! reset velocities to zero
 
-      ! 3. Some controls
       !-----------------
       check_namelist = .TRUE.
 
@@ -290,11 +309,11 @@
 # if defined key_vertical
       ! Additional constrain that should be removed someday:
       IF ( Agrif_Parent(jpk).GT.jpk ) THEN
-	 CALL ctl_stop( ' With key_vertical, child grids must have jpk greater or equal to the parent value' )
+    CALL ctl_stop( ' With key_vertical, child grids must have jpk greater or equal to the parent value' )
       ENDIF
 # endif
-      ! 
-   END SUBROUTINE Agrif_InitValues_cont
+
+END SUBROUTINE Agrif_InitValues_cont
 
    SUBROUTINE agrif_declare_var
       !!----------------------------------------------------------------------
@@ -340,10 +359,25 @@
 
       CALL agrif_declare_variable((/2,2,0/),(/ind3,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nlci,nlcj,jpk/),e3t_id)
 
+
 # if defined key_vertical
       CALL agrif_declare_variable((/2,2/),(/ind3,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),mbkt_id)
       CALL agrif_declare_variable((/2,2/),(/ind3,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),ht0_id)
 # endif
+!   ENDIF
+
+   
+   ! Initial or restart velues
+   ! Here we don't have the knwoledge of all the options so we
+   ! declare profile with dimension max number of variables
+   CALL Agrif_Set_MaskMaxSearch(25)
+   !
+   CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts/),tsini_id)
+   !  
+   CALL Agrif_Set_MaskMaxSearch(5)
+
+
+
 
       CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,3/),scales_t_id)
 
@@ -356,7 +390,7 @@
 
       CALL agrif_declare_variable((/2,2/),(/ind3,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),sshn_id)
 
-      IF( ln_zdftke.OR.ln_zdfgls ) THEN
+!      IF( ln_zdftke.OR.ln_zdfgls ) THEN  ! logical not known at this point
 !         CALL agrif_declare_variable((/2,2,0/),(/ind3,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nlci,nlcj,jpk/), en_id)
 !         CALL agrif_declare_variable((/2,2,0/),(/ind3,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nlci,nlcj,jpk/),avt_id)
 # if defined key_vertical
@@ -364,8 +398,8 @@
 # else
          CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),avm_id)
 # endif
-      ENDIF
-
+ !     ENDIF
+     
       ! 2. Type of interpolation
       !-------------------------
       CALL Agrif_Set_bcinterp(tsn_id,interp=AGRIF_linear)
@@ -399,9 +433,14 @@
       CALL Agrif_Set_bcinterp(ht0_id ,interp=AGRIF_constant)
 # endif
 
-      IF( ln_zdftke.OR.ln_zdfgls )   CALL Agrif_Set_bcinterp( avm_id, interp=AGRIF_linear )
+     ! IF( ln_zdftke.OR.ln_zdfgls )  
+       CALL Agrif_Set_bcinterp( avm_id, interp=AGRIF_linear )
+   ! Initial fields
+   CALL Agrif_Set_bcinterp(tsini_id,interp=AGRIF_linear)
+   CALL Agrif_Set_interp  (tsini_id,interp=AGRIF_linear)
 
-      ! 3. Location of interpolation
+
+       ! 3. Location of interpolation
       !-----------------------------
       CALL Agrif_Set_bc(       tsn_id, (/0,ind1-1/) ) ! if west,  rhox=3 and nbghost=3: columns 2 to 4
       CALL Agrif_Set_bc( un_interp_id, (/0,ind1-1/) ) 
@@ -427,7 +466,8 @@
       CALL Agrif_Set_bc(  ht0_id,  (/-nn_sponge_len*Agrif_irhox()-2,ind1/) )
 # endif
 
-      IF( ln_zdftke.OR.ln_zdfgls )   CALL Agrif_Set_bc( avm_id, (/0,ind1/) )
+      !IF( ln_zdftke.OR.ln_zdfgls )   
+      CALL Agrif_Set_bc( avm_id, (/0,ind1/) )
 
       ! 4. Update type
       !--------------- 
@@ -443,11 +483,11 @@
       CALL Agrif_Set_Updatetype(sshn_id,update = Agrif_Update_Full_Weighting)
       CALL Agrif_Set_Updatetype(e3t_id, update = Agrif_Update_Full_Weighting)
 
-      IF( ln_zdftke.OR.ln_zdfgls ) THEN
+  !    IF( ln_zdftke.OR.ln_zdfgls ) THEN
 !         CALL Agrif_Set_Updatetype( en_id, update = AGRIF_Update_Full_Weighting)
 !         CALL Agrif_Set_Updatetype(avt_id, update = AGRIF_Update_Full_Weighting)
 !         CALL Agrif_Set_Updatetype(avm_id, update = AGRIF_Update_Full_Weighting)
-      ENDIF
+   !   ENDIF
 
 #else
       CALL Agrif_Set_Updatetype(tsn_id, update = AGRIF_Update_Average)
@@ -459,11 +499,11 @@
       CALL Agrif_Set_Updatetype(sshn_id,update = AGRIF_Update_Average)
       CALL Agrif_Set_Updatetype(e3t_id, update = AGRIF_Update_Average)
 
-      IF( ln_zdftke.OR.ln_zdfgls ) THEN
+ !     IF( ln_zdftke.OR.ln_zdfgls ) THEN
 !         CALL Agrif_Set_Updatetype( en_id, update = AGRIF_Update_Average)
 !         CALL Agrif_Set_Updatetype(avt_id, update = AGRIF_Update_Average)
 !         CALL Agrif_Set_Updatetype(avm_id, update = AGRIF_Update_Average)
-      ENDIF
+ !     ENDIF
 
 #endif
       !
@@ -471,9 +511,6 @@
 
 #if defined key_si3
 SUBROUTINE Agrif_InitValues_cont_ice
-      !!----------------------------------------------------------------------
-      !!                 *** ROUTINE Agrif_InitValues_cont_ice ***
-      !!----------------------------------------------------------------------
       USE Agrif_Util
       USE sbc_oce, ONLY : nn_fsbc  ! clem: necessary otherwise Agrif_Parent(nn_fsbc) = nn_fsbc
       USE ice
@@ -481,13 +518,9 @@ SUBROUTINE Agrif_InitValues_cont_ice
       USE in_out_manager
       USE agrif_ice_interp
       USE lib_mpp
-      !
-      IMPLICIT NONE
       !!----------------------------------------------------------------------
-      !
-      ! Declaration of the type of variable which have to be interpolated (parent=>child)
-      !----------------------------------------------------------------------------------
-      CALL agrif_declare_var_ice
+      !!                 *** ROUTINE Agrif_InitValues_cont_ice ***
+      !!----------------------------------------------------------------------
 
       ! Controls
 
@@ -584,38 +617,53 @@ SUBROUTINE Agrif_InitValues_cont_ice
       USE agrif_top_interp
       USE agrif_top_sponge
       !!
-      IMPLICIT NONE
-      !
-      CHARACTER(len=10) :: cl_check1, cl_check2, cl_check3
-      LOGICAL :: check_namelist
+   USE Agrif_Util
+   USE oce 
+   USE dom_oce
+   USE nemogcm
+   USE par_trc
+   USE lib_mpp
+   USE trc
+   USE in_out_manager
+   USE agrif_oce_sponge
+   USE agrif_top_update
+   USE agrif_top_interp
+   USE agrif_top_sponge
+   !!
+   IMPLICIT NONE
+   !
+   CHARACTER(len=10) :: cl_check1, cl_check2, cl_check3
+   LOGICAL :: check_namelist
       !!----------------------------------------------------------------------
 
-      ! 1. Declaration of the type of variable which have to be interpolated
-      !---------------------------------------------------------------------
-      CALL agrif_declare_var_top
 
-      ! 2. First interpolations of potentially non zero fields
-      !-------------------------------------------------------
-      Agrif_SpecialValue=0._wp
-      Agrif_UseSpecialValue = .TRUE.
-      CALL Agrif_Bc_variable(trn_id,calledweight=1.,procname=interptrn)
-      Agrif_UseSpecialValue = .FALSE.
-      CALL Agrif_Sponge
-      tabspongedone_trn = .FALSE.
-      CALL Agrif_Bc_variable(trn_sponge_id,calledweight=1.,procname=interptrn_sponge)
-      ! reset ts(:,:,:,:,Krhs_a) to zero
-      tr(:,:,:,:,Krhs_a) = 0._wp
+   ! 1. Declaration of the type of variable which have to be interpolated
+   !---------------------------------------------------------------------
+  ! CALL agrif_declare_var_top
 
-      ! 3. Some controls
-      !-----------------
-      check_namelist = .TRUE.
+   ! 2. First interpolations of potentially non zero fields
+   !-------------------------------------------------------
+   Agrif_SpecialValue=0.
+   Agrif_UseSpecialValue = .TRUE.
+   CALL Agrif_Bc_variable(trn_id,calledweight=1.,procname=interptrn)
+   Agrif_UseSpecialValue = .FALSE.
+   CALL Agrif_Sponge
+   tabspongedone_trn = .FALSE.
+   CALL Agrif_Bc_variable(trn_sponge_id,calledweight=1.,procname=interptrn_sponge)
+   ! reset tsa to zero
+   tra(:,:,:,:) = 0.
 
-      IF( check_namelist ) THEN
-         ! Check time steps
-      IF( NINT(Agrif_Rhot()) * NINT(rn_Dt) .NE. Agrif_Parent(rn_Dt) ) THEN
-         WRITE(cl_check1,*)  Agrif_Parent(rn_Dt)
-         WRITE(cl_check2,*)  rn_Dt
-         WRITE(cl_check3,*)  rn_Dt*Agrif_Rhot()
+
+   ! 3. Some controls
+   !-----------------
+   check_namelist = .TRUE.
+
+   IF( check_namelist ) THEN
+      ! Check time steps
+      IF( NINT(Agrif_Rhot()) * NINT(rdt) .NE. Agrif_Parent(rdt) ) THEN
+         WRITE(cl_check1,*)  Agrif_Parent(rdt)
+         WRITE(cl_check2,*)  rdt
+         WRITE(cl_check3,*)  rdt*Agrif_Rhot()
          CALL ctl_stop( 'incompatible time step between grids',   &
                &               'parent grid value : '//cl_check1    ,   & 
                &               'child  grid value : '//cl_check2    ,   & 
@@ -801,6 +849,210 @@ SUBROUTINE Agrif_InitValues_cont_ice
    END SUBROUTINE Agrif_estimate_parallel_cost
 
 # endif
+
+      !!----------------------------------------------------------------------
+      !!                   *** ROUTINE Nemo_mapping ***
+      !!----------------------------------------------------------------------
+subroutine nemo_mapping(ndim,ptx,pty,bounds,bounds_chunks,correction_required,nb_chunks)
+use dom_oce
+integer :: ndim
+integer :: ptx, pty
+integer,dimension(ndim,2,2) :: bounds
+integer,dimension(:,:,:,:),allocatable :: bounds_chunks
+logical,dimension(:),allocatable :: correction_required
+integer :: nb_chunks
+integer :: i
+
+if (agrif_debug_interp) then
+do i=1,ndim
+ print *,'direction = ',i,bounds(i,1,2),bounds(i,2,2)
+enddo
+endif
+
+  if (bounds(2,2,2) > jpjglo) then
+   if (bounds(2,1,2) <=jpjglo) then
+    nb_chunks = 2
+    allocate(bounds_chunks(nb_chunks,ndim,2,2))
+    allocate(correction_required(nb_chunks))
+         do i=1,nb_chunks
+          bounds_chunks(i,:,:,:) = bounds
+        enddo
+  
+! FIRST CHUNCK (for j<=jpjglo)   
+
+! Original indices
+    bounds_chunks(1,1,1,1) = bounds(1,1,2)
+    bounds_chunks(1,1,2,1) = bounds(1,2,2)
+    bounds_chunks(1,2,1,1) = bounds(2,1,2)
+    bounds_chunks(1,2,2,1) = jpjglo
+
+
+    bounds_chunks(1,1,1,2) = bounds(1,1,2)
+    bounds_chunks(1,1,2,2) = bounds(1,2,2)
+    bounds_chunks(1,2,1,2) = bounds(2,1,2)
+    bounds_chunks(1,2,2,2) = jpjglo
+
+! Correction required or not
+    correction_required(1)=.FALSE.
+ 
+! SECOND CHUNCK (for j>jpjglo)
+
+! Original indices
+    bounds_chunks(2,1,1,1) = bounds(1,1,2)
+    bounds_chunks(2,1,2,1) = bounds(1,2,2)
+    bounds_chunks(2,2,1,1) = jpjglo-2
+    bounds_chunks(2,2,2,1) = bounds(2,2,2)
+
+! Where to find them
+! We use the relation TAB(ji,jj)=TAB(jpiglo-ji+2,jpjglo-2-(jj-jpjglo))
+
+    if (ptx == 2) then ! T, V points
+      bounds_chunks(2,1,1,2) = jpiglo-bounds(1,2,2)+2
+      bounds_chunks(2,1,2,2) = jpiglo-bounds(1,1,2)+2
+    else ! U, F points
+      bounds_chunks(2,1,1,2) = jpiglo-bounds(1,2,2)+1
+      bounds_chunks(2,1,2,2) = jpiglo-bounds(1,1,2)+1       
+    endif
+
+    if (pty == 2) then ! T, U points
+      bounds_chunks(2,2,1,2) = jpjglo-2-(bounds(2,2,2) -jpjglo)
+      bounds_chunks(2,2,2,2) = jpjglo-2-(jpjglo-2      -jpjglo)
+    else ! V, F points
+      bounds_chunks(2,2,1,2) = jpjglo-3-(bounds(2,2,2) -jpjglo)
+      bounds_chunks(2,2,2,2) = jpjglo-3-(jpjglo-2      -jpjglo)
+    endif
+! Correction required or not
+    correction_required(2)=.TRUE.
+
+   else
+    nb_chunks = 1
+    allocate(bounds_chunks(nb_chunks,ndim,2,2))
+    allocate(correction_required(nb_chunks))
+         do i=1,nb_chunks
+          bounds_chunks(i,:,:,:) = bounds
+        enddo
+
+    bounds_chunks(1,1,1,1) = bounds(1,1,2)
+    bounds_chunks(1,1,2,1) = bounds(1,2,2)
+    bounds_chunks(1,2,1,1) = bounds(2,1,2)
+    bounds_chunks(1,2,2,1) = bounds(2,2,2)
+
+    bounds_chunks(1,1,1,2) = jpiglo-bounds(1,2,2)+2
+    bounds_chunks(1,1,2,2) = jpiglo-bounds(1,1,2)+2
+
+    bounds_chunks(1,2,1,2) = jpjglo-2-(bounds(2,2,2)-jpjglo)
+    bounds_chunks(1,2,2,2) = jpjglo-2-(bounds(2,1,2)-jpjglo)
+
+    if (ptx == 2) then ! T, V points
+      bounds_chunks(1,1,1,2) = jpiglo-bounds(1,2,2)+2
+      bounds_chunks(1,1,2,2) = jpiglo-bounds(1,1,2)+2
+    else ! U, F points
+      bounds_chunks(1,1,1,2) = jpiglo-bounds(1,2,2)+1
+      bounds_chunks(1,1,2,2) = jpiglo-bounds(1,1,2)+1    	
+    endif
+
+    if (pty == 2) then ! T, U points
+      bounds_chunks(1,2,1,2) = jpjglo-2-(bounds(2,2,2) -jpjglo)
+      bounds_chunks(1,2,2,2) = jpjglo-2-(bounds(2,1,2) -jpjglo)
+    else ! V, F points
+      bounds_chunks(1,2,1,2) = jpjglo-3-(bounds(2,2,2) -jpjglo)
+      bounds_chunks(1,2,2,2) = jpjglo-3-(bounds(2,1,2) -jpjglo)
+    endif
+
+    correction_required(1)=.TRUE.
+    
+
+   endif
+  elseif (bounds(1,1,2) < 1) then
+   if (bounds(1,2,2) > 0) then
+    nb_chunks = 2
+    allocate(correction_required(nb_chunks))
+    correction_required=.FALSE.
+    allocate(bounds_chunks(nb_chunks,ndim,2,2))
+         do i=1,nb_chunks
+          bounds_chunks(i,:,:,:) = bounds
+        enddo
+        
+    bounds_chunks(1,1,1,2) = bounds(1,1,2)+jpiglo-2
+    bounds_chunks(1,1,2,2) = 1+jpiglo-2
+    
+    bounds_chunks(1,1,1,1) = bounds(1,1,2)
+    bounds_chunks(1,1,2,1) = 1
+ 
+    bounds_chunks(2,1,1,2) = 2
+    bounds_chunks(2,1,2,2) = bounds(1,2,2)
+    
+    bounds_chunks(2,1,1,1) = 2
+    bounds_chunks(2,1,2,1) = bounds(1,2,2)
+
+   else
+    nb_chunks = 1
+    allocate(correction_required(nb_chunks))
+    correction_required=.FALSE.
+    allocate(bounds_chunks(nb_chunks,ndim,2,2))
+         do i=1,nb_chunks
+          bounds_chunks(i,:,:,:) = bounds
+        enddo    
+    bounds_chunks(1,1,1,2) = bounds(1,1,2)+jpiglo-2
+    bounds_chunks(1,1,2,2) = bounds(1,2,2)+jpiglo-2
+    
+    bounds_chunks(1,1,1,1) = bounds(1,1,2)
+    bounds_chunks(1,1,2,1) = bounds(1,2,2)
+   endif
+  else
+    nb_chunks=1  
+    allocate(correction_required(nb_chunks))
+    correction_required=.FALSE.
+    allocate(bounds_chunks(nb_chunks,ndim,2,2))
+         do i=1,nb_chunks
+          bounds_chunks(i,:,:,:) = bounds
+        enddo
+    bounds_chunks(1,1,1,2) = bounds(1,1,2)
+    bounds_chunks(1,1,2,2) = bounds(1,2,2)
+    bounds_chunks(1,2,1,2) = bounds(2,1,2)
+    bounds_chunks(1,2,2,2) = bounds(2,2,2)
+    
+    bounds_chunks(1,1,1,1) = bounds(1,1,2)
+    bounds_chunks(1,1,2,1) = bounds(1,2,2)
+    bounds_chunks(1,2,1,1) = bounds(2,1,2)
+    bounds_chunks(1,2,2,1) = bounds(2,2,2)    
+    
+  endif
+  
+  
+  
+end subroutine nemo_mapping
+
+      !!----------------------------------------------------------------------
+      !!                   *** ROUTINE Correct_field ***
+      !!----------------------------------------------------------------------
+subroutine Correct_field(tab2d,i1,i2,j1,j2)
+use dom_oce
+use agrif_oce
+integer :: i1,i2,j1,j2
+real,dimension(i1:i2,j1:j2) :: tab2d
+
+integer :: i,j
+real,dimension(i1:i2,j1:j2) :: tab2dtemp
+
+tab2dtemp = tab2d
+
+if (.not.use_sign_north) then
+  do j=j1,j2
+    do i=i1,i2
+      tab2d(i,j)=tab2dtemp(i2-(i-i1),j2-(j-j1))
+    enddo
+  enddo
+else
+  do j=j1,j2
+    do i=i1,i2
+      tab2d(i,j)=sign_north * tab2dtemp(i2-(i-i1),j2-(j-j1))
+    enddo
+  enddo
+endif
+
+
+end subroutine Correct_field
 
 #else
    SUBROUTINE Subcalledbyagrif

@@ -1,5 +1,5 @@
 !
-! $Id: modbc.F90 5656 2015-07-31 08:55:56Z timgraham $
+! $Id: modbc.F 779 2007-12-22 17:04:17Z rblod $
 !
 !     AGRIF (Adaptive Grid Refinement In Fortran)
 !

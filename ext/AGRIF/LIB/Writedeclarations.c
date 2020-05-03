@@ -65,6 +65,7 @@ void WriteBeginDeclaration(variable *v, char line[LONG_M], int visibility)
 
   /* We should give the precision of the variable if it has been given        */
   precision_given = 0;
+  
   if ( strcasecmp(v->v_precision,"") )
   {
      sprintf(tmpligne, "(%s)", v->v_precision);
@@ -127,7 +128,7 @@ void WriteScalarDeclaration( variable *v, char line[LONG_M])
     if ( v->v_VariableIsParameter )
     {
         strcat(line," = ");
-        strcat(line, v->v_initialvalue);
+        strcat(line, v->v_initialvalue->n_name);
     }
     Save_Length(line, 45);
 }
@@ -172,7 +173,7 @@ void WriteTableDeclaration(variable * v,char ligne[LONG_M],int tmpok)
     if ( v->v_VariableIsParameter == 1 )
     {
         strcat(ligne," = ");
-        strcat(ligne,v->v_initialvalue);
+        strcat(ligne,v->v_initialvalue->n_name);
     }
     Save_Length(ligne,45);
 }
@@ -205,10 +206,10 @@ void WriteVarDeclaration( variable *v, FILE *fileout, int value, int visibility 
      else
         WriteTableDeclaration(v, ligne, value);
 
-     if ( v->v_VariableIsParameter != 1 && strcasecmp(v->v_initialvalue,"") )
+     if ( v->v_VariableIsParameter != 1 && v->v_initialvalue)
      {
         strcat(ligne," = ");
-        strcat(ligne,v->v_initialvalue);
+        strcat(ligne,v->v_initialvalue->n_name);
      }
      tofich(filecommon, ligne, 1);
   }
@@ -240,6 +241,13 @@ void WriteFunctionDeclaration(FILE* tofile, int value)
     parcours = List_FunctionType_Var;
     while ( parcours )
     {
+    if (!strcmp(parcours->var->v_typevar, ""))
+    {
+     /* Default type*/
+          if ( IsVariableReal(parcours->var->v_nomvar) == 1 )
+                                         strcpy(parcours->var->v_typevar,"REAL");
+          else strcpy(parcours->var->v_typevar,"INTEGER");
+     }
         if ( !strcasecmp(parcours->var->v_subroutinename, subroutinename) &&
               strcasecmp(parcours->var->v_typevar, "") )
         {
@@ -260,7 +268,6 @@ void WriteSubroutineDeclaration(int value)
         v = parcours->var;
         if ( !strcasecmp(v->v_subroutinename, subroutinename)   &&
              (v->v_save == 0)                                   &&
-             (v->v_pointerdeclare == 0)                         &&
              (v->v_VariableIsParameter == 0)                    &&
              (v->v_common == 0) )
         {
@@ -284,8 +291,17 @@ void WriteArgumentDeclaration_beforecall()
     FILE *paramtoamr;
     listvar *parcours;
     variable *v;
-    char ligne[LONG_M];
+    char *ligne;
+    size_t line_length;
+    int res;
+    int global_check;
 
+    ligne = (char*) calloc(LONG_M, sizeof(char));
+    line_length = LONG_M;
+    
+    global_check = 0;
+   
+   
     fprintf(fortran_out,"#include \"Param_BeforeCall_%s.h\"\n",subroutinename);
 
     sprintf(ligne,"Param_BeforeCall_%s.h",subroutinename);
@@ -302,13 +318,12 @@ void WriteArgumentDeclaration_beforecall()
         {
             position++;
             WriteVarDeclaration(v, fortran_out, 0, 1);
-            neededparameter = writedeclarationintoamr(List_Parameter_Var, paramtoamr,
-                                    v, v->v_subroutinename, neededparameter, subroutinename);
+            res = writedeclarationintoamr(List_Parameter_Var, paramtoamr,
+                                    v, v->v_subroutinename, &neededparameter, subroutinename, global_check);
             parcours = List_SubroutineArgument_Var;
         }
         else parcours = parcours -> suiv;
     }
-    Save_Length(ligne,45);
 
     // Write interface for 'Sub_Loop_machin' in 'Param_BeforeCall_machin.h' when outside a module
     if ( IsTabvarsUseInArgument_0() && (inmodulemeet == 0) && (inprogramdeclare == 0) )
@@ -316,10 +331,10 @@ void WriteArgumentDeclaration_beforecall()
         fprintf(paramtoamr, "      interface\n");
         if (isrecursive) sprintf(ligne,"  recursive subroutine Sub_Loop_%s(", subroutinename);
         else             sprintf(ligne,"  subroutine Sub_Loop_%s(", subroutinename);
-        WriteVariablelist_subloop(ligne);
-        WriteVariablelist_subloop_Def(ligne);
+        WriteVariablelist_subloop(&ligne,&line_length);
+        WriteVariablelist_subloop_Def(&ligne,&line_length);
         strcat(ligne,")");
-        Save_Length(ligne,45);
+
         tofich(paramtoamr,ligne,1);
 
         listusemodule *parcours_mod;
@@ -352,6 +367,7 @@ void WriteArgumentDeclaration_Sort(FILE* tofile)
     listvar *parcours;
 
     parcours = List_SubroutineArgument_Var;
+    
     while ( parcours )
     {
         if ( !strcasecmp(parcours->var->v_subroutinename, subroutinename) &&
@@ -398,9 +414,9 @@ void WriteArgumentDeclaration_Sort(FILE* tofile)
 /*                                                                            */
 /*                                                                            */
 /******************************************************************************/
-listnom *writedeclarationintoamr (listvar * deb_common, FILE *fileout,
+int writedeclarationintoamr (listvar * deb_common, FILE *fileout,
                               variable *var , const char *commonname,
-                           listnom *neededparameter, const char *name_common)
+                           listnom **neededparameter, const char *name_common, int global_check)
 {
   listvar *newvar;
   variable *v;
@@ -409,12 +425,27 @@ listnom *writedeclarationintoamr (listvar * deb_common, FILE *fileout,
   int out;
   int writeit;
   listnom *parcours;
+  listname *parcours_name_array;
+  int res;
+  
+  res = 0;
 
   /* we should list the needed parameter                                      */
+
   if ( !strcasecmp(name_common,commonname) )
-     neededparameter = DecomposeTheNameinlistnom(var->v_readedlistdimension,neededparameter);
+     {
+     *neededparameter = DecomposeTheNameinlistnom(var->v_readedlistdimension,*neededparameter);
+     parcours_name_array = var->v_initialvalue_array;
+     while (parcours_name_array)
+     {
+     *neededparameter = DecomposeTheNameinlistnom(parcours_name_array->n_name,*neededparameter);
+     parcours_name_array=parcours_name_array->suiv;
+     }
+     }
+
   /*                                                                          */
-  parcours = neededparameter;
+  parcours = *neededparameter;
+
   while (parcours)
   {
      newvar = deb_common;
@@ -422,48 +453,70 @@ listnom *writedeclarationintoamr (listvar * deb_common, FILE *fileout,
      out = 0 ;
      while ( newvar && out == 0 )
      {
-
-        if ( !strcasecmp(parcours->o_nom,newvar->var->v_nomvar) && !strcasecmp(var->v_subroutinename,newvar->var->v_subroutinename))
+        if ( (global_check == 0) && !strcasecmp(parcours->o_nom,newvar->var->v_nomvar) && !strcasecmp(var->v_subroutinename,newvar->var->v_subroutinename))
         {
            out=1;
         /* add the name to the list of needed parameter                       */
-           neededparameter = DecomposeTheNameinlistnom(
-                 newvar->var->v_initialvalue,
-                 neededparameter );
+           *neededparameter = DecomposeTheNameinlistnom(
+                 newvar->var->v_initialvalue->n_name,
+                 *neededparameter );
+        }
+        else if ( (global_check == 1) && !strcasecmp(parcours->o_nom,newvar->var->v_nomvar) && !strcasecmp(var->v_modulename,newvar->var->v_modulename))
+        {
+           out=1;
+        /* add the name to the list of needed parameter                       */
+           *neededparameter = DecomposeTheNameinlistnom(
+                 newvar->var->v_initialvalue->n_name,
+                 *neededparameter );
         }
         else newvar=newvar->suiv;
      }
      parcours=parcours->suiv;
    }
   /*                                                                          */
-  parcours = neededparameter;
+  parcours = *neededparameter;
+  
   while (parcours)
   {
      newvar = deb_common;
      out = 0 ;
      while ( newvar && out == 0 )
      {
-        if ( !strcasecmp(parcours->o_nom,newvar->var->v_nomvar) && !strcasecmp(var->v_subroutinename,newvar->var->v_subroutinename))
+        if ( (global_check == 0) && !strcasecmp(parcours->o_nom,newvar->var->v_nomvar) && !strcasecmp(var->v_subroutinename,newvar->var->v_subroutinename))
         {
            out=1;
         /* add the name to the list of needed parameter                       */
-           neededparameter = DecomposeTheNameinlistnom(
-                 newvar->var->v_initialvalue,
-                 neededparameter );
+           *neededparameter = DecomposeTheNameinlistnom(
+                 newvar->var->v_initialvalue->n_name,
+                 *neededparameter );
+        }
+        else if ( (global_check == 1) && !strcasecmp(parcours->o_nom,newvar->var->v_nomvar) && !strcasecmp(var->v_modulename,newvar->var->v_modulename))
+        {
+           out=1;
+        /* add the name to the list of needed parameter                       */
+           *neededparameter = DecomposeTheNameinlistnom(
+                 newvar->var->v_initialvalue->n_name,
+                 *neededparameter );
         }
         else newvar=newvar->suiv;
      }
      parcours=parcours->suiv;
    }
-  parcours = neededparameter;
+  parcours = *neededparameter;
   while (parcours)
   {
      writeit = 0;
      newvar = deb_common;
      while ( newvar && writeit == 0 )
      {
-        if ( !strcasecmp(parcours->o_nom,newvar->var->v_nomvar) &&
+        if ( (global_check == 0) && !strcasecmp(parcours->o_nom,newvar->var->v_nomvar) &&
             !strcasecmp(var->v_subroutinename,newvar->var->v_subroutinename) && parcours->o_val == 0 )
+        {
+           writeit=1;
+           parcours->o_val = 1;
+        }
+        else if ( (global_check == 1) && !strcasecmp(parcours->o_nom,newvar->var->v_nomvar) &&
+            !strcasecmp(var->v_modulename,newvar->var->v_modulename) && parcours->o_val == 0 )
         {
            writeit=1;
            parcours->o_val = 1;
@@ -489,6 +542,7 @@ listnom *writedeclarationintoamr (listvar * deb_common, FILE *fileout,
         {
            v->v_allocatable = 1;
         }
+        res = 1;
      }
      else
      {
@@ -502,7 +556,7 @@ listnom *writedeclarationintoamr (listvar * deb_common, FILE *fileout,
      parcours=parcours->suiv;
   }
   Save_Length(ligne,45);
-  return neededparameter;
+  return res;
 }
 
 
@@ -531,10 +585,9 @@ void writesub_loopdeclaration_scalar (listvar * deb_common, FILE *fileout)
   {
      if ( newvar->var->v_nbdim == 0 &&
           !strcasecmp(newvar->var->v_subroutinename,subroutinename)  &&
-           (newvar->var->v_pointerdeclare == 0 || !strcasecmp(newvar->var->v_typevar,"type")) )
+           (newvar->var->v_pointerdeclare >= 0 || !strcasecmp(newvar->var->v_typevar,"type")) )
      {
         v = newvar->var;
-
         WriteBeginDeclaration(v,ligne,1);
         WriteScalarDeclaration(v,ligne);
         tofich (fileout, ligne,1);
@@ -569,7 +622,7 @@ void writesub_loopdeclaration_tab (listvar * deb_common, FILE *fileout)
       v = newvar->var;
 //  printf("newvar = %s %d %s\n",newvar->var->v_nomvar,newvar->var->v_pointerdeclare,newvar->var->v_typevar);
      if ( (v->v_nbdim != 0)  && !strcasecmp(v->v_subroutinename, subroutinename) &&
-          (v->v_pointerdeclare == 0 || !strcasecmp(v->v_typevar,"type")) )
+          (v->v_pointerdeclare >= 0 || !strcasecmp(v->v_typevar,"type")) )
      {
         changeval = 0;
         if ( v->v_allocatable == 1)
@@ -595,6 +648,7 @@ void writesub_loopdeclaration_tab (listvar * deb_common, FILE *fileout)
      }
      newvar = newvar->suiv;
   }
+
   Save_Length(ligne,45);
 }
 
@@ -618,6 +672,17 @@ void ReWriteDeclarationAndAddTosubroutine_01(listvar *listdecl)
 
             if (firstpass == 0 && out == 0 && VariableIsParameter == 0 && SaveDeclare == 0)
             {
+            
+            /* The type may has not been given if the variable was only declared with dimension */
+
+            if ( !strcasecmp(v->v_typevar,"") )
+            {
+                  if ( IsVariableReal(v->v_nomvar) == 1 )
+                                        strcpy(v->v_typevar,"REAL");
+                  else strcpy(v->v_typevar,"INTEGER");
+                  v->v_catvar = get_cat_var(v);
+             }
+             
                 WriteVarDeclaration(v, fortran_out, 1, 1);
             }
             if (firstpass == 1)
@@ -638,7 +703,8 @@ void ReWriteDataStatement_0(FILE * filout)
     int out;
     char ligne[LONG_M];
     char initialvalue[LONG_M];
-
+    listname *parcours_name;
+    
     if (insubroutinedeclare == 1)
     {
         parcours = List_Data_Var_Cur ;
@@ -650,18 +716,30 @@ void ReWriteDataStatement_0(FILE * filout)
             out = LookingForVariableInListGlobal(List_Global_Var,parcours->var);
             if (out)   break;
 
-            if (strncasecmp(parcours->var->v_initialvalue,"(/",2))
+            strcpy(initialvalue,"");
+            parcours_name = parcours->var->v_initialvalue;
+            while (parcours_name)
             {
-                strcpy(initialvalue,parcours->var->v_initialvalue);
+            if (strncasecmp(parcours_name->n_name,"(/",2))
+            {
+                strcat(initialvalue,parcours_name->n_name);
+                if (parcours_name->suiv)
+                {
+                strcat(initialvalue,",");
+                }
             }
             else
             {
-                strncpy(initialvalue,&parcours->var->v_initialvalue[2],strlen(parcours->var->v_initialvalue)-4);
-                strcpy(&initialvalue[strlen(parcours->var->v_initialvalue)-4],"\0");
+            printf("A TRAITER DANS REWRITEDATA STATEMETN ");
+            exit(1);
+                strncpy(initialvalue,&parcours_name->n_name[2],strlen(parcours_name->n_name)-4);
+                strcpy(&initialvalue[strlen(parcours_name->n_name)-4],"\0");
+            }
+            parcours_name=parcours_name->suiv;
             }
             sprintf(ligne,"data %s/%s/",parcours->var->v_nomvar,initialvalue);
             tofich(filout,ligne,1);
-
+            
             parcours = parcours->suiv;
         }
     }

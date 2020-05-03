@@ -1,5 +1,5 @@
 !
-! $Id: modutil.F90 12420 2020-02-20 12:42:35Z smueller $
+! $Id: modutil.F 662 2007-05-25 15:58:52Z opalod $
 !
 !     Agrif (Adaptive Grid Refinement In Fortran)
 !
@@ -107,6 +107,48 @@ subroutine Agrif_Step_Child ( procname )
     if ( Agrif_Mygrid%child_list%nitems > 0 ) call Agrif_Instance(Agrif_Mygrid)
 !---------------------------------------------------------------------------------------------------
 end subroutine Agrif_Step_Child
+!===================================================================================================
+!
+!===================================================================================================
+!  subroutine Agrif_Step_Childs
+!
+!> Apply 'procname' to each child grids of the current grid
+!---------------------------------------------------------------------------------------------------
+!     **************************************************************************
+!!!   Subroutine Agrif_Step_Childs
+!     **************************************************************************
+!
+      Subroutine Agrif_Step_Childs(procname)
+!
+    procedure(step_proc)    :: procname     !< subroutine to call on each grid
+!     Pointer argument
+      Type(Agrif_Grid),pointer   :: g        ! Pointer on the current grid
+!
+
+!
+!     Local pointer
+      Type(Agrif_pgrid),pointer  :: parcours ! Pointer for the recursive
+                                             ! procedure
+!
+      g => Agrif_Curgrid
+      
+      parcours => g % child_list % first
+!
+!     Recursive procedure for the time integration of the grid hierarchy      
+      Do while (associated(parcours))
+!
+!       Instanciation of the variables of the current grid
+        Call Agrif_Instance(parcours % gr)
+
+!     One step on the current grid
+
+         Call procname ()
+        parcours => parcours % next
+      enddo
+   
+      If (associated(g % child_list % first)) Call Agrif_Instance (g)
+      Return
+      End Subroutine Agrif_Step_Childs
 !===================================================================================================
 !
 !===================================================================================================
@@ -537,6 +579,8 @@ recursive subroutine Agrif_Integrate_Parallel ( g, procname )
 end subroutine Agrif_Integrate_Parallel
 !===================================================================================================
 !
+!===================================================================================================
+!
 !
 !===================================================================================================
 !  subroutine Agrif_Integrate_ChildGrids
@@ -586,7 +630,6 @@ recursive subroutine Agrif_Integrate_ChildGrids ( procname )
 
 #ifdef AGRIF_MPI
     else
-#endif    
 ! Continue only if the grid has defined sequences of child integrations.
     if ( .not. associated(save_grid % child_seq) ) return
 !
@@ -609,7 +652,6 @@ recursive subroutine Agrif_Integrate_ChildGrids ( procname )
         enddo
 !
     enddo
-#ifdef AGRIF_MPI
     endif
 #endif 
 
@@ -699,7 +741,7 @@ end subroutine Agrif_Integrate_Child_Parallel
 !---------------------------------------------------------------------------------------------------
 subroutine Agrif_Init_Grids ( procname1, procname2 )
 !---------------------------------------------------------------------------------------------------
-    procedure(typdef_proc), optional   :: procname1 !< (Default: Agrif_probdim_modtype_def)
+    procedure(typedef_proc), optional   :: procname1 !< (Default: Agrif_probdim_modtype_def)
     procedure(alloc_proc),   optional   :: procname2 !< (Default: Agrif_Allocationcalls)
 !
     integer :: i, ierr_allocate, nunit

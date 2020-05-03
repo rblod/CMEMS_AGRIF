@@ -1,5 +1,5 @@
 !
-! $Id: modinterpbasic.F90 5656 2015-07-31 08:55:56Z timgraham $
+! $Id: modinterpbasic.F 779 2007-12-22 17:04:17Z rblod $
 !
 !     AGRIF (Adaptive Grid Refinement In Fortran)
 !
@@ -219,10 +219,17 @@ subroutine Linear1dAfterCompute ( x, y, np, nc, dir )
 !
 !CDIR ALTCODE
 !CDIR NODEP
+    if (associated(agrif_external_linear_interp)) then
+    do i = 1,nc
+        y(i)=agrif_external_linear_interp(x(MAX(indparent(i,dir),1)), &
+              x(indparent(i,dir)+1),coeffparent(i,dir))
+    enddo
+    else
     do i = 1,nc
         y(i) = coeffparent(i,dir)  * x(MAX(indparent(i,dir),1)) + &
            (1.-coeffparent(i,dir)) * x(indparent(i,dir)+1)
     enddo
+    endif
 !---------------------------------------------------------------------------------------------------
 end subroutine Linear1dAfterCompute
 !===================================================================================================

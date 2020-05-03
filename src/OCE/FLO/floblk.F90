@@ -40,6 +40,10 @@ CONTAINS
       INTEGER, INTENT( in  ) ::   kt       ! ocean time step
       INTEGER, INTENT( in  ) ::   Kbb, Kmm ! ocean time level indices
       !!
+#ifndef key_agrif
+
+!RB super quick fix to compile with agrif
+
       INTEGER :: jfl              ! dummy loop arguments
       INTEGER :: ind, ifin, iloop
       REAL(wp)   ::       &
@@ -363,6 +367,7 @@ CONTAINS
          iloop = iloop + 1 
          GO TO 222
       ENDIF
+#endif
       !
       !
    END SUBROUTINE flo_blk

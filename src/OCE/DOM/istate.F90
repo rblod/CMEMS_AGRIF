@@ -34,6 +34,7 @@ MODULE istate
    USE iom             ! I/O library
    USE lib_mpp         ! MPP library
    USE restart         ! restart
+   USE agrif_oce_interp
 
    IMPLICIT NONE
    PRIVATE
@@ -96,7 +97,16 @@ CONTAINS
          !                                    ! Initialization of ocean to zero
          !
          IF( ln_tsd_init ) THEN               
-            CALL dta_tsd( nit000, ts(:,:,:,:,Kbb) )       ! read 3D T and S data at nit000
+            IF( Agrif_Root() ) THEN
+               CALL dta_tsd( nit000, ts(:,:,:,:,Kbb) )       ! read 3D T and S data at nit000
+#ifdef key_agrif
+            ELSE
+               Agrif_SpecialValue    = 0._wp
+               Agrif_UseSpecialValue = .TRUE.
+               CALL Agrif_Init_Variable(tsini_id, procname=agrif_initts)
+               Agrif_UseSpecialValue = .FALSE.            !
+#endif
+          ENDIF
             !
             ssh(:,:,Kbb)   = 0._wp               ! set the ocean at rest
             IF( ll_wd ) THEN

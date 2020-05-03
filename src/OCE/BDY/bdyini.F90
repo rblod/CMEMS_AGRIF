@@ -71,6 +71,7 @@ CONTAINS
       INTEGER  ::   ios                 ! Local integer output status for namelist read
       !!----------------------------------------------------------------------
 
+      cn_coords_file = ''
       ! ------------------------
       ! Read namelist parameters
       ! ------------------------

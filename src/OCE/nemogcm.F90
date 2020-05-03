@@ -140,17 +140,6 @@ CONTAINS
       !                            !-----------------------!
       CALL nemo_init               !==  Initialisations  ==!
       !                            !-----------------------!
-#if defined key_agrif
-      Kbb_a = Nbb; Kmm_a = Nnn; Krhs_a = Nrhs   ! agrif_oce module copies of time level indices
-      CALL Agrif_Declare_Var_dom   ! AGRIF: set the meshes for DOM
-      CALL Agrif_Declare_Var       !  "      "   "   "      "  DYN/TRA 
-# if defined key_top
-      CALL Agrif_Declare_Var_top   !  "      "   "   "      "  TOP
-# endif
-# if defined key_si3
-      CALL Agrif_Declare_Var_ice   !  "      "   "   "      "  Sea ice
-# endif
-#endif
       ! check that all process are still there... If some process have an error,
       ! they will never enter in step and other processes will wait until the end of the cpu time!
       CALL mpp_max( 'nemogcm', nstop )
@@ -449,12 +438,30 @@ CONTAINS
       ENDIF
       !
       
+         ! AGRIF variables declared here for interpolation of
+         ! initial state just after        
+#if defined key_agrif
+         Kbb_a = Nbb; Kmm_a = Nnn; Krhs_a = Nrhs   ! agrif_oce module copies of time level indices
+
+                          CALL Agrif_Declare_Var_dom   ! AGRIF: set the meshes for DOM
+                          CALL Agrif_Declare_Var       !  "      "   "   "      "  DYN/TRA 
+# if defined key_top
+                          CALL Agrif_Declare_Var_top   !  "      "   "   "      "  TOP
+# endif
+              !             CALL Agrif_Declare_Var_ice
+#endif
+
                            CALL  istate_init( Nbb, Nnn, Naa )    ! ocean initial state (Dynamics and tracers)
 
       !                                      ! external forcing 
-                           CALL    tide_init                     ! tidal harmonics
+                           CALL    tide_init    ! tidal harmonics
                            CALL     sbc_init( Nbb, Nnn, Naa )    ! surface boundary conditions (including sea-ice)
-                           CALL     bdy_init                     ! Open boundaries initialisation
+#if defined key_agrif
+# if defined key_si3
+                           CALL Agrif_Declare_Var_ice  !  "      "   "   "      "  Sea ice
+# endif
+#endif
+                           CALL     bdy_init    ! Open boundaries initialisation
 
       !                                      ! Ocean physics
                            CALL zdf_phy_init( Nnn )    ! Vertical physics
