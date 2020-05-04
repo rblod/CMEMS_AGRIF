@@ -37,6 +37,9 @@ module Agrif_CurgridFunctions
                          Agrif_Parent_Character, &
                          Agrif_Parent_Logical
     end interface
+    interface Agrif_Child
+        module procedure Agrif_Child_Logical
+    end interface
     
 contains
 !
@@ -953,6 +956,27 @@ if (.NOT.i_found) STOP 'Agrif_Parent : Variable not found'
 
 end function Agrif_Parent_Logical
 
+function Agrif_Child_Logical(logical_variable) result(logical_variable_child)
+logical :: logical_variable
+logical :: logical_variable_child
+
+integer :: i
+logical :: i_found
+
+i_found = .FALSE.
+
+do i=1,Agrif_NbVariables(3)
+  if (LOC(logical_variable) == LOC(agrif_curgrid%tabvars_l(i)%larray0)) then
+     logical_variable_child = Agrif_CurChildgrid%tabvars_l(i)%larray0
+     i_found = .TRUE.
+     EXIT
+  endif
+enddo
+
+if (.NOT.i_found) STOP 'Agrif_Child : Variable not found'
+
+end function Agrif_Child_Logical
+
 function Agrif_Irhox() result(i_val)
 integer :: i_val
 i_val = agrif_curgrid%spaceref(1)
@@ -973,30 +997,60 @@ logical :: l_val
 l_val = agrif_curgrid%nearRootBorder(1)
 end function Agrif_NearCommonBorderX
 
+subroutine Agrif_Set_NearCommonBorderX(l_val)
+logical,intent(in) :: l_val
+agrif_curgrid%nearRootBorder(1)=l_val
+end subroutine Agrif_Set_NearCommonBorderX
+
 function Agrif_NearCommonBorderY() result(l_val)
 logical :: l_val
 l_val = agrif_curgrid%nearRootBorder(2)
 end function Agrif_NearCommonBorderY
+
+subroutine Agrif_Set_NearCommonBorderY(l_val)
+logical,intent(in) :: l_val
+agrif_curgrid%nearRootBorder(2)=l_val
+end subroutine Agrif_Set_NearCommonBorderY
 
 function Agrif_NearCommonBorderZ() result(l_val)
 logical :: l_val
 l_val = agrif_curgrid%nearRootBorder(3)
 end function Agrif_NearCommonBorderZ
 
+subroutine Agrif_Set_NearCommonBorderZ(l_val)
+logical,intent(in) :: l_val
+agrif_curgrid%nearRootBorder(3)=l_val
+end subroutine Agrif_Set_NearCommonBorderZ
+
 function Agrif_DistantCommonBorderX() result(l_val)
 logical :: l_val
 l_val = agrif_curgrid%DistantRootBorder(1)
 end function Agrif_DistantCommonBorderX
+
+subroutine Agrif_Set_DistantCommonBorderX(l_val)
+logical,intent(in) :: l_val
+agrif_curgrid%DistantRootBorder(1)=l_val
+end subroutine Agrif_Set_DistantCommonBorderX
 
 function Agrif_DistantCommonBorderY() result(l_val)
 logical :: l_val
 l_val = agrif_curgrid%DistantRootBorder(2)
 end function Agrif_DistantCommonBorderY
 
+subroutine Agrif_Set_DistantCommonBorderY(l_val)
+logical,intent(in) :: l_val
+agrif_curgrid%DistantRootBorder(2)=l_val
+end subroutine Agrif_Set_DistantCommonBorderY
+
 function Agrif_DistantCommonBorderZ() result(l_val)
 logical :: l_val
 l_val = agrif_curgrid%DistantRootBorder(3)
 end function Agrif_DistantCommonBorderZ
+
+subroutine Agrif_Set_DistantCommonBorderZ(l_val)
+logical,intent(in) :: l_val
+agrif_curgrid%DistantRootBorder(3)=l_val
+end subroutine Agrif_Set_DistantCommonBorderZ
 
 function Agrif_Ix() result(i_val)
 integer :: i_val

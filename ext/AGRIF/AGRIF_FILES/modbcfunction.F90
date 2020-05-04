@@ -389,6 +389,7 @@ subroutine Agrif_Bc_variable ( tabvarsindic, procname, calledweight )
     allocate(child_tmp)
 !
     child_tmp % root_var => root_var
+    child_tmp % parent_var => parent_var
     child_tmp % oldvalues2D => child_var % oldvalues2D
 !
 !   Index indicating if a space interpolation is necessary
@@ -461,6 +462,7 @@ subroutine Agrif_Interp_variable ( tabvarsindic, procname )
     allocate(child_tmp)
 !
     child_tmp % root_var => root_var
+    child_tmp % parent_var => parent_var
     child_tmp % nbdim = root_var % nbdim
     child_tmp % point = child_var % point
     child_tmp % lb = child_var % lb

@@ -694,13 +694,15 @@ subroutine PreProcessToInterpOrUpdate ( parent, child,              &
 !
         case('x')
 !
-            lb_child(n)  = root_var % point(n)
-            lb_parent(n) = root_var % point(n)
+            lb_child(n)  = child%point(n)
+            lb_parent(n) = child%parent_var%point(n)
             nb_child(n)  = Agrif_Child_Gr % nb(1)
             s_child(n)   = Agrif_Child_Gr  % Agrif_x(1)
             s_parent(n)  = Agrif_Parent_Gr % Agrif_x(1)
             ds_child(n)  = Agrif_Child_Gr  % Agrif_dx(1)
             ds_parent(n) = Agrif_Parent_Gr % Agrif_dx(1)
+            ! Take into account potential difference of first points
+            s_parent(n) = s_parent(n) + (lb_parent(n)-lb_child(n))*ds_parent(n)
 !
             if ( root_var % posvar(n) == 1 ) then
                 ub_child(n) = lb_child(n) + Agrif_Child_Gr % nb(1)
@@ -712,13 +714,15 @@ subroutine PreProcessToInterpOrUpdate ( parent, child,              &
 !
         case('y')
 !
-            lb_child(n)  = root_var % point(n)
-            lb_parent(n) = root_var % point(n)
+            lb_child(n)  = child%point(n)
+            lb_parent(n) = child%parent_var%point(n)
             nb_child(n)  = Agrif_Child_Gr % nb(2)
             s_child(n)   = Agrif_Child_Gr  % Agrif_x(2)
             s_parent(n)  = Agrif_Parent_Gr % Agrif_x(2)
             ds_child(n)  = Agrif_Child_Gr  % Agrif_dx(2)
             ds_parent(n) = Agrif_Parent_Gr % Agrif_dx(2)
+            ! Take into account potential difference of first points
+            s_parent(n) = s_parent(n) + (lb_parent(n)-lb_child(n))*ds_parent(n)
 !
             if (root_var % posvar(n)==1) then
                 ub_child(n) = lb_child(n) + Agrif_Child_Gr % nb(2)
@@ -730,13 +734,15 @@ subroutine PreProcessToInterpOrUpdate ( parent, child,              &
 !
         case('z')
 !
-            lb_child(n)  = root_var % point(n)
-            lb_parent(n) = root_var % point(n)
+            lb_child(n)  = child%point(n)
+            lb_parent(n) = child%parent_var%point(n)
             nb_child(n)  = Agrif_Child_Gr % nb(3)
             s_child(n)   = Agrif_Child_Gr  % Agrif_x(3)
             s_parent(n)  = Agrif_Parent_Gr % Agrif_x(3)
             ds_child(n)  = Agrif_Child_Gr  % Agrif_dx(3)
             ds_parent(n) = Agrif_Parent_Gr % Agrif_dx(3)
+            ! Take into account potential difference of first points
+            s_parent(n) = s_parent(n) + (lb_parent(n)-lb_child(n))*ds_parent(n)
 !
             if (root_var % posvar(n)==1) then
                 ub_child(n) = lb_child(n) + Agrif_Child_Gr % nb(3)
