@@ -542,9 +542,14 @@ CONTAINS
          determinant, &     ! matrix determinant
          sum_wgts          ! sum of weights for normalization
 
-    INTEGER lastsrc_add     
+    INTEGER lastsrc_add  
+    REAL*8,DIMENSION(:),ALLOCATABLE :: cos_grid1_center_lat   
+    REAL*8,DIMENSION(:),ALLOCATABLE :: cos_grid1_center_lon
+    REAL*8,DIMENSION(:),ALLOCATABLE :: sin_grid1_center_lat
+    REAL*8,DIMENSION(:),ALLOCATABLE :: sin_grid1_center_lon
+    INTEGER :: i
     !      
-    grid2_mask = .TRUE.     
+    grid2_mask = .TRUE.
     !      
     !      
     nmap = 1
@@ -556,6 +561,21 @@ CONTAINS
     !      
     lastsrc_add=1
     !
+    Allocate(cos_grid1_center_lat(size(grid1_center_lat)))
+    Allocate(sin_grid1_center_lat(size(grid1_center_lat)))
+    Allocate(cos_grid1_center_lon(size(grid1_center_lon)))
+    Allocate(sin_grid1_center_lon(size(grid1_center_lon)))
+
+    do i=1,size(grid1_center_lat)
+        cos_grid1_center_lat(i)=cos(grid1_center_lat(i))
+        sin_grid1_center_lat(i)=sin(grid1_center_lat(i))
+    ENDDO
+
+    do i=1,size(grid1_center_lon)
+        cos_grid1_center_lon(i)=cos(grid1_center_lon(i))
+        sin_grid1_center_lon(i)=sin(grid1_center_lon(i))
+    ENDDO
+
     grid_loop1: DO dst_add = 1, grid2_size
 
        IF (.NOT. grid2_mask(dst_add)) CYCLE grid_loop1
@@ -567,7 +587,8 @@ CONTAINS
        !***
        CALL grid_search_bilin(src_add, src_lats, src_lons,          &
             plat, plon, grid1_dims,               &
-            grid1_center_lat, grid1_center_lon,   & 
+            grid1_center_lat, cos_grid1_center_lat, sin_grid1_center_lat, &
+            grid1_center_lon, cos_grid1_center_lon, sin_grid1_center_lon,  & 
             grid1_bound_box, bin_addr1, bin_addr2,lastsrc_add)		       
        !***
        !*** check to see if points are land points
@@ -706,6 +727,10 @@ CONTAINS
     !
     !-----------------------------------------------------------------------
 
+    deallocate(cos_grid1_center_lat)
+    deallocate(cos_grid1_center_lon)
+    deallocate(sin_grid1_center_lat)
+    deallocate(sin_grid1_center_lon)
   END SUBROUTINE remap_bilin
 
 
@@ -734,7 +759,8 @@ CONTAINS
   !
   SUBROUTINE grid_search_bilin(src_add, src_lats, src_lons,   &
        plat, plon, src_grid_dims,      &
-       src_center_lat, src_center_lon, & 
+       src_center_lat, cos_src_center_lat, sin_src_center_lat, &
+       src_center_lon, cos_src_center_lon, sin_src_center_lon,& 
        src_grid_bound_box,             &
        src_bin_add, dst_bin_add,lastsrc_add)
 
@@ -770,6 +796,10 @@ CONTAINS
     ! latitude, longitude of each src grid center
     !
     REAL*8, DIMENSION(:), INTENT(in) :: src_center_lat,src_center_lon  
+    REAL*8, DIMENSION(:), INTENT(in) :: cos_src_center_lat
+    REAL*8, DIMENSION(:), INTENT(in) :: sin_src_center_lat
+    REAL*8, DIMENSION(:), INTENT(in) :: cos_src_center_lon
+    REAL*8, DIMENSION(:), INTENT(in) :: sin_src_center_lon
     !
     ! bound box for source grid
     !
@@ -967,10 +997,15 @@ CONTAINS
     dist_min = bignum
     src_lats = bignum
     DO srch_add = min_add,max_add
-       distance = ACOS(coslat_dst*COS(src_center_lat(srch_add))*   &
-            (coslon_dst*COS(src_center_lon(srch_add)) +   &
-            sinlon_dst*SIN(src_center_lon(srch_add)))+   &
-            sinlat_dst*SIN(src_center_lat(srch_add)))
+       ! distance = ACOS(coslat_dst*COS(src_center_lat(srch_add))*   &
+       !      (coslon_dst*COS(src_center_lon(srch_add)) +   &
+       !      sinlon_dst*SIN(src_center_lon(srch_add)))+   &
+       !      sinlat_dst*SIN(src_center_lat(srch_add)))
+
+       distance = ACOS(coslat_dst*cos_src_center_lat(srch_add)*   &
+            (coslon_dst*cos_src_center_lon(srch_add) +   &
+            sinlon_dst*sin_src_center_lon(srch_add))+   &
+            sinlat_dst*sin_src_center_lat(srch_add))
 
        IF (distance < dist_min) THEN
           sort_loop: DO n=1,4
