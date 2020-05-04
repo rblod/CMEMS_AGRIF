@@ -111,7 +111,7 @@ CONTAINS
          ztabramp(:,:) = 0._wp
 
          ! --- West --- !
-         IF( (nbondi == -1) .OR. (nbondi == 2) ) THEN
+         IF(lk_west) THEN
             ind1 = 1+nbghostcells
             ind2 = 1+nbghostcells + ispongearea 
             DO jj = 1, jpj
@@ -122,7 +122,7 @@ CONTAINS
          ENDIF
 
          ! --- East --- !
-         IF( (nbondi == 1) .OR. (nbondi == 2) ) THEN
+         IF(lk_east) THEN
             ind1 = nlci - nbghostcells - ispongearea
             ind2 = nlci - nbghostcells
             DO jj = 1, jpj
@@ -133,7 +133,7 @@ CONTAINS
          ENDIF
 
          ! --- South --- !
-         IF( (nbondj == -1) .OR. (nbondj == 2) ) THEN
+         IF(lk_south) THEN
             ind1 = 1+nbghostcells
             ind2 = 1+nbghostcells + ispongearea
             DO jj = ind1, ind2 
@@ -144,7 +144,7 @@ CONTAINS
          ENDIF
 
          ! --- North --- !
-         IF( (nbondj == 1) .OR. (nbondj == 2) ) THEN
+         IF(lk_north) THEN
             ind1 = nlcj - nbghostcells - ispongearea
             ind2 = nlcj - nbghostcells
             DO jj = ind1, ind2
@@ -456,7 +456,7 @@ CONTAINS
          tabspongedone_u(i1+1:i2-1,j1+1:j2-1) = .TRUE.
 
          jmax = j2-1
-         IF ((nbondj == 1).OR.(nbondj == 2)) jmax = MIN(jmax,nlcj-nbghostcells-2)   ! North
+         IF (lk_north) jmax = MIN(jmax,nlcj-nbghostcells-2)   ! North
 
          DO jj = j1+1, jmax
             DO ji = i1+1, i2   ! vector opt.
@@ -582,7 +582,7 @@ CONTAINS
          !                                                
 
          imax = i2 - 1
-         IF ((nbondi == 1).OR.(nbondi == 2))   imax = MIN(imax,nlci-nbghostcells-2)   ! East
+         IF(lk_east) imax = MIN(imax,nlci-nbghostcells-2)   ! East
 
          DO jj = j1+1, j2
             DO ji = i1+1, imax   ! vector opt.

@@ -32,6 +32,7 @@ MODULE agrif_oce_interp
    USE in_out_manager
    USE agrif_oce_sponge
    USE lib_mpp
+   USE lbclnk
  
    IMPLICIT NONE
    PRIVATE
@@ -42,7 +43,7 @@ MODULE agrif_oce_interp
    PUBLIC   interptsn, interpsshn, interpavm
    PUBLIC   interpunb, interpvnb , interpub2b, interpvb2b
    PUBLIC   interpe3t, interpumsk, interpvmsk
-   PUBLIC   agrif_initts
+   PUBLIC   Agrif_Init_traceurs
 
    INTEGER ::   bdy_tinterp = 0
 
@@ -69,6 +70,19 @@ CONTAINS
       Agrif_UseSpecialValue = .FALSE.
       !
    END SUBROUTINE Agrif_tra
+
+   SUBROUTINE Agrif_Init_traceurs
+   	INTEGER :: jn
+      Agrif_SpecialValue    = 0._wp
+      Agrif_UseSpecialValue = .TRUE.
+      tsb(:,:,:,:) = 0.
+      CALL Agrif_Init_Variable(tsini_id, procname=agrif_initts)
+      Agrif_UseSpecialValue = .FALSE.
+            !    ! local domain boundaries  (T-point, unchanged sign)
+      DO jn=1,jpts
+        CALL lbc_lnk( 'traceur', tsb(:,:,:,jn), 'T', 1.)
+      ENDDO
+   END SUBROUTINE Agrif_Init_traceurs
 
 
    SUBROUTINE Agrif_dyn( kt )
@@ -99,13 +113,13 @@ CONTAINS
       ! prevent smoothing in ghost cells
       i1 =  1   ;   i2 = nlci
       j1 =  1   ;   j2 = nlcj
-      IF( nbondj == -1 .OR. nbondj == 2 )   j1 = 2 + nbghostcells
-      IF( nbondj == +1 .OR. nbondj == 2 )   j2 = nlcj - nbghostcells - 1
-      IF( nbondi == -1 .OR. nbondi == 2 )   i1 = 2 + nbghostcells 
-      IF( nbondi == +1 .OR. nbondi == 2 )   i2 = nlci - nbghostcells - 1
+      IF(lk_south)   j1 = 2 + nbghostcells
+      IF(lk_north)   j2 = nlcj - nbghostcells - 1
+      IF(lk_west)    i1 = 2 + nbghostcells 
+      IF(lk_east)    i2 = nlci - nbghostcells - 1
 
       ! --- West --- !
-      IF( nbondi == -1 .OR. nbondi == 2 ) THEN
+      IF(lk_west) THEN
          ibdy1 = 2
          ibdy2 = 1+nbghostcells 
          !
@@ -176,7 +190,7 @@ CONTAINS
       ENDIF
 
       ! --- East --- !
-      IF( nbondi ==  1 .OR. nbondi == 2 ) THEN
+      IF(lk_east) THEN
          ibdy1 = nlci-1-nbghostcells
          ibdy2 = nlci-2 
          !
@@ -249,7 +263,7 @@ CONTAINS
       ENDIF
 
       ! --- South --- !
-      IF( nbondj == -1 .OR. nbondj == 2 ) THEN
+      IF(lk_south) THEN
          jbdy1 = 2
          jbdy2 = 1+nbghostcells 
          !
@@ -321,7 +335,7 @@ CONTAINS
       ENDIF
 
       ! --- North --- !
-      IF( nbondj ==  1 .OR. nbondj == 2 ) THEN
+      IF(lk_north) THEN
          jbdy1 = nlcj-1-nbghostcells
          jbdy2 = nlcj-2 
          !
@@ -408,7 +422,7 @@ CONTAINS
       !
       IF( Agrif_Root() )   RETURN
       !
-      IF((nbondi == -1).OR.(nbondi == 2)) THEN
+      IF(lk_west) THEN
          DO jj=1,jpj
             va_e(2:nbghostcells+1,jj) = vbdy_w(1:nbghostcells,jj) * hvr_e(2:nbghostcells+1,jj)
             ! Specified fluxes:
@@ -419,7 +433,7 @@ CONTAINS
          END DO
       ENDIF
       !
-      IF((nbondi == 1).OR.(nbondi == 2)) THEN
+      IF(lk_east) THEN
          DO jj=1,jpj
             va_e(nlci-nbghostcells:nlci-1,jj)   = vbdy_e(1:nbghostcells,jj) * hvr_e(nlci-nbghostcells:nlci-1,jj)
             ! Specified fluxes:
@@ -430,7 +444,7 @@ CONTAINS
          END DO
       ENDIF
       !
-      IF((nbondj == -1).OR.(nbondj == 2)) THEN
+      IF(lk_south) THEN
          DO ji=1,jpi
             ua_e(ji,2:nbghostcells+1) = ubdy_s(ji,1:nbghostcells) * hur_e(ji,2:nbghostcells+1)
             ! Specified fluxes:
@@ -441,7 +455,7 @@ CONTAINS
          END DO
       ENDIF
       !
-      IF((nbondj == 1).OR.(nbondj == 2)) THEN
+      IF(lk_north) THEN
          DO ji=1,jpi
             ua_e(ji,nlcj-nbghostcells:nlcj-1)   = ubdy_n(ji,1:nbghostcells) * hur_e(ji,nlcj-nbghostcells:nlcj-1)
             ! Specified fluxes:
@@ -524,7 +538,7 @@ CONTAINS
       Agrif_UseSpecialValue = .FALSE.
       !
       ! --- West --- !
-      IF((nbondi == -1).OR.(nbondi == 2)) THEN
+      IF(lk_west) THEN
          indx = 1+nbghostcells
          DO jj = 1, jpj
             DO ji = 2, indx
@@ -534,7 +548,7 @@ CONTAINS
       ENDIF
       !
       ! --- East --- !
-      IF((nbondi == 1).OR.(nbondi == 2)) THEN
+      IF(lk_east) THEN
          indx = nlci-nbghostcells
          DO jj = 1, jpj
             DO ji = indx, nlci-1
@@ -544,7 +558,7 @@ CONTAINS
       ENDIF
       !
       ! --- South --- !
-      IF((nbondj == -1).OR.(nbondj == 2)) THEN
+      IF(lk_south) THEN
          indy = 1+nbghostcells
          DO jj = 2, indy
             DO ji = 1, jpi
@@ -554,7 +568,7 @@ CONTAINS
       ENDIF
       !
       ! --- North --- !
-      IF((nbondj == 1).OR.(nbondj == 2)) THEN
+      IF(lk_north) THEN
          indy = nlcj-nbghostcells
          DO jj = indy, nlcj-1
             DO ji = 1, jpi
@@ -579,7 +593,7 @@ CONTAINS
       IF( Agrif_Root() )   RETURN
       !
       ! --- West --- !
-      IF((nbondi == -1).OR.(nbondi == 2)) THEN
+      IF(lk_west) THEN
          indx = 1+nbghostcells
          DO jj = 1, jpj
             DO ji = 2, indx
@@ -589,7 +603,7 @@ CONTAINS
       ENDIF
       !
       ! --- East --- !
-      IF((nbondi == 1).OR.(nbondi == 2)) THEN
+      IF(lk_east) THEN
          indx = nlci-nbghostcells
          DO jj = 1, jpj
             DO ji = indx, nlci-1
@@ -599,7 +613,7 @@ CONTAINS
       ENDIF
       !
       ! --- South --- !
-      IF((nbondj == -1).OR.(nbondj == 2)) THEN
+      IF(lk_south) THEN
          indy = 1+nbghostcells
          DO jj = 2, indy
             DO ji = 1, jpi
@@ -609,7 +623,7 @@ CONTAINS
       ENDIF
       !
       ! --- North --- !
-      IF((nbondj == 1).OR.(nbondj == 2)) THEN
+      IF(lk_north) THEN
          indy = nlcj-nbghostcells
          DO jj = indy, nlcj-1
             DO ji = 1, jpi
@@ -730,10 +744,10 @@ CONTAINS
             jmin = j1 ; jmax = j2
             ! 
             ! Remove CORNERS
-            IF((nbondj == -1).OR.(nbondj == 2)) jmin = 2 + nbghostcells
-            IF((nbondj == +1).OR.(nbondj == 2)) jmax = nlcj - nbghostcells - 1
-            IF((nbondi == -1).OR.(nbondi == 2)) imin = 2 + nbghostcells
-            IF((nbondi == +1).OR.(nbondi == 2)) imax = nlci - nbghostcells - 1      
+            IF(lk_south) jmin = 2 + nbghostcells
+            IF(lk_north) jmax = nlcj - nbghostcells - 1
+            IF(lk_west)  imin = 2 + nbghostcells
+            IF(lk_east)  imax = nlci - nbghostcells - 1
             !
             IF( eastern_side ) THEN
                zrho = Agrif_Rhox()
@@ -1067,7 +1081,7 @@ CONTAINS
       LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
       !!----------------------------------------------------------------------  
       !
-      IF( before ) THEN 
+      IF( before ) THEN
          ptab(i1:i2,j1:j2) = e2u(i1:i2,j1:j2) * hu_n(i1:i2,j1:j2) * un_b(i1:i2,j1:j2)
       ELSE
          western_side  = (nb == 1).AND.(ndir == 1)

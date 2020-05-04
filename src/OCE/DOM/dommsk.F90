@@ -272,10 +272,10 @@ CONTAINS
             END DO
 #if defined key_agrif 
             IF( .NOT. AGRIF_Root() ) THEN 
-               IF ((nbondi ==  1).OR.(nbondi == 2)) fmask(nlci-1 , :     ,jk) = 0.e0      ! east 
-               IF ((nbondi == -1).OR.(nbondi == 2)) fmask(1      , :     ,jk) = 0.e0      ! west 
-               IF ((nbondj ==  1).OR.(nbondj == 2)) fmask(:      ,nlcj-1 ,jk) = 0.e0      ! north 
-               IF ((nbondj == -1).OR.(nbondj == 2)) fmask(:      ,1      ,jk) = 0.e0      ! south 
+               IF(lk_east)  fmask(nlci-1 , :     ,jk) = 0.e0      ! east 
+               IF(lk_west)  fmask(1      , :     ,jk) = 0.e0      ! west 
+               IF(lk_north) fmask(:      ,nlcj-1 ,jk) = 0.e0      ! north 
+               IF(lk_south) fmask(:      ,1      ,jk) = 0.e0      ! south 
             ENDIF 
 #endif 
          END DO

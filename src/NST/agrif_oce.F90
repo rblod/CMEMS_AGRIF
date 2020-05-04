@@ -26,6 +26,7 @@ MODULE agrif_oce
    REAL(wp), PUBLIC ::   rn_sponge_dyn = 2800.     !: sponge coeff. for dynamics
    LOGICAL , PUBLIC ::   ln_chk_bathy  = .FALSE.   !: check of parent bathymetry 
    LOGICAL , PUBLIC ::   lk_agrif_clp  = .FALSE.   !: Force clamped bcs
+   LOGICAL , PUBLIC ::   south_boundary_open  = .TRUE. !: Is the South boundary open ?
    !                                              !!! OLD namelist names
    REAL(wp), PUBLIC ::   visc_tra                  !: sponge coeff. for tracers
    REAL(wp), PUBLIC ::   visc_dyn                  !: sponge coeff. for dynamics

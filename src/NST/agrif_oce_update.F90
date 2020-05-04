@@ -810,7 +810,7 @@ CONTAINS
 
    SUBROUTINE correct_v_bdy( tabres, i1, i2, j1, j2, k1, k2, n1, n2, before, nb, ndir )
       !!---------------------------------------------
-      !!           *** ROUTINE correct_u_bdy ***
+      !!           *** ROUTINE correct_v_bdy ***
       !!---------------------------------------------
       INTEGER                                     , INTENT(in   ) :: i1, i2, j1, j2, k1, k2, n1, n2
       REAL(wp), DIMENSION(i1:i2,j1:j2,k1:k2,n1:n2), INTENT(inout) :: tabres

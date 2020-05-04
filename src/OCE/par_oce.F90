@@ -42,9 +42,12 @@ MODULE par_oce
 
    ! global domain size for AGRIF     !!! * total AGRIF computational domain *
    INTEGER, PUBLIC            ::   nbug_in_agrif_conv_do_not_remove_or_modify = 1 - 1
-   INTEGER, PUBLIC, PARAMETER ::   nbghostcells = 3                             !: number of ghost cells
-   INTEGER, PUBLIC            ::   nbcellsx   ! = jpiglo - 2 - 2*nbghostcells   !: number of cells in i-direction
-   INTEGER, PUBLIC            ::   nbcellsy   ! = jpjglo - 2 - 2*nbghostcells   !: number of cells in j-direction
+   INTEGER, PUBLIC, PARAMETER ::   nbghostcells = 3 !: number of ghost cells: default value
+   INTEGER, PUBLIC            ::   nbghostcells_x   !: number of ghost cells in i-direction
+   INTEGER, PUBLIC            ::   nbghostcells_y_s   !: number of ghost cells in j-direction at south
+   INTEGER, PUBLIC            ::   nbghostcells_y_n   !: number of ghost cells in j-direction at north                       !: number of ghost cells
+   INTEGER, PUBLIC            ::   nbcellsx   ! = jpiglo - 2 - 2*nbghostcells_x   !: number of cells in i-direction
+   INTEGER, PUBLIC            ::   nbcellsy   ! = jpjglo - 2 - 2*nbghostcells-y   !: number of cells in j-direction
 
    ! local domain size                !!! * local computational domain *
    INTEGER, PUBLIC ::   jpi   !                                                    !: first  dimension

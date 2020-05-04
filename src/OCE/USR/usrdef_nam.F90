@@ -77,8 +77,8 @@ CONTAINS
       kpj = 20 * nn_GYRE + 2
 #if defined key_agrif
       IF( .NOT. Agrif_Root() ) THEN
-         kpi  = nbcellsx + 2 + 2*nbghostcells
-         kpj  = nbcellsy + 2 + 2*nbghostcells
+         kpi  = nbcellsx + 2 + 2*nbghostcells_x
+         kpj  = nbcellsy + 2 + 2*nbghostcells_y_s
       ENDIF
 #endif
       kpk = jpkglo

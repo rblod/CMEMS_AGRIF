@@ -58,7 +58,7 @@ SUBROUTINE Agrif_InitValues
 
 
    !                    !* Agrif initialization
-   CALL agrif_nemo_init
+   CALL agrif_nemo_init_part2 !* End of Agrif initialization (when domain periodicity and array's sizes are known)
    ! 
    CALL Agrif_InitValues_cont_dom
    CALL Agrif_InitValues_cont
@@ -111,15 +111,28 @@ SUBROUTINE agrif_declare_var_dom
    !
    INTEGER :: ind1, ind2, ind3
    External :: nemo_mapping
+
+! In case of East-West periodicity, prevent AGRIF interpolation at east and west boundaries
+! The procnames will not be called at these boundaries
+   IF (jperio == 1) THEN
+     CALL Agrif_Set_NearCommonBorderX(.TRUE.)
+     CALL Agrif_Set_DistantCommonBorderX(.TRUE.)
+   ENDIF
+
+   IF (.not.south_boundary_open) THEN
+     CALL Agrif_Set_NearCommonBorderY(.TRUE.)
+   ENDIF
+
       !!----------------------------------------------------------------------
 
       ! 1. Declaration of the type of variable which have to be interpolated
       !---------------------------------------------------------------------
    ind1 =     nbghostcells
-   ind2 = 1 + nbghostcells
-   ind3 = 2 + nbghostcells
-   CALL agrif_declare_variable((/1,2/),(/ind2,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),e1u_id)
-   CALL agrif_declare_variable((/2,1/),(/ind3,ind2/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),e2v_id)
+   ind2 = 2 + nbghostcells_x
+   ind3 = 2 + nbghostcells_y_s
+
+   CALL agrif_declare_variable((/1,2/),(/ind2-1,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),e1u_id)
+   CALL agrif_declare_variable((/2,1/),(/ind2,ind3-1/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),e2v_id)
 
       ! 2. Type of interpolation
       !-------------------------
@@ -287,7 +300,11 @@ SUBROUTINE Agrif_InitValues_cont
          !
          kindic_agr = 0
          ! check if umask agree with parent along western and eastern boundaries:
+         if (agrif_fixed()==2) then
+          !  agrif_debug_interp=.true.
+         endif
          CALL Agrif_Bc_variable(umsk_id,calledweight=1.,procname=interpumsk)
+         !if (agrif_fixed()==2) stop
          ! check if vmask agree with parent along northern and southern boundaries:
          CALL Agrif_Bc_variable(vmsk_id,calledweight=1.,procname=interpvmsk)
          ! check if tmask and vertical scale factors agree with parent over first two coarse grid points:
@@ -325,52 +342,53 @@ SUBROUTINE agrif_declare_var
    ! 1. Declaration of the type of variable which have to be interpolated
    !---------------------------------------------------------------------
    ind1 =     nbghostcells
-   ind2 = 1 + nbghostcells
-   ind3 = 2 + nbghostcells
+
+   ind2 = 2 + nbghostcells_x
+   ind3 = 2 + nbghostcells_y_s
 # if defined key_vertical
-   CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts+1/),tsn_id)
-   CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts+1/),tsn_sponge_id)
+   CALL agrif_declare_variable((/2,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts+1/),tsn_id)
+   CALL agrif_declare_variable((/2,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts+1/),tsn_sponge_id)
 
-   CALL agrif_declare_variable((/1,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),un_interp_id)
-   CALL agrif_declare_variable((/2,1,0,0/),(/ind3,ind2,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),vn_interp_id)
-   CALL agrif_declare_variable((/1,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),un_update_id)
-   CALL agrif_declare_variable((/2,1,0,0/),(/ind3,ind2,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),vn_update_id)
-   CALL agrif_declare_variable((/1,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),un_sponge_id)
-   CALL agrif_declare_variable((/2,1,0,0/),(/ind3,ind2,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),vn_sponge_id)
+   CALL agrif_declare_variable((/1,2,0,0/),(/ind2-1,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),un_interp_id)
+   CALL agrif_declare_variable((/2,1,0,0/),(/ind2,ind3-1,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),vn_interp_id)
+   CALL agrif_declare_variable((/1,2,0,0/),(/ind2-1,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),un_update_id)
+   CALL agrif_declare_variable((/2,1,0,0/),(/ind2,ind3-1,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),vn_update_id)
+   CALL agrif_declare_variable((/1,2,0,0/),(/ind2-1,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),un_sponge_id)
+   CALL agrif_declare_variable((/2,1,0,0/),(/ind2,ind3-1,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),vn_sponge_id)
 # else
-   CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts/),tsn_id)
-   CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts/),tsn_sponge_id)
+   CALL agrif_declare_variable((/2,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts/),tsn_id)
+   CALL agrif_declare_variable((/2,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts/),tsn_sponge_id)
 
-   CALL agrif_declare_variable((/1,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),un_interp_id)
-   CALL agrif_declare_variable((/2,1,0,0/),(/ind3,ind2,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),vn_interp_id)
-   CALL agrif_declare_variable((/1,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),un_update_id)
-   CALL agrif_declare_variable((/2,1,0,0/),(/ind3,ind2,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),vn_update_id)
-   CALL agrif_declare_variable((/1,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),un_sponge_id)
-   CALL agrif_declare_variable((/2,1,0,0/),(/ind3,ind2,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),vn_sponge_id)
+   CALL agrif_declare_variable((/1,2,0,0/),(/ind2-1,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),un_interp_id)
+   CALL agrif_declare_variable((/2,1,0,0/),(/ind2,ind3-1,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),vn_interp_id)
+   CALL agrif_declare_variable((/1,2,0,0/),(/ind2-1,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),un_update_id)
+   CALL agrif_declare_variable((/2,1,0,0/),(/ind2,ind3-1,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),vn_update_id)
+   CALL agrif_declare_variable((/1,2,0,0/),(/ind2-1,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),un_sponge_id)
+   CALL agrif_declare_variable((/2,1,0,0/),(/ind2,ind3-1,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),vn_sponge_id)
 # endif
 
-   CALL agrif_declare_variable((/2,2,0/),(/ind3,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nlci,nlcj,jpk/),e3t_id)
-   CALL agrif_declare_variable((/1,2,0/),(/ind2,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nlci,nlcj,jpk/),umsk_id)
-   CALL agrif_declare_variable((/2,1,0/),(/ind3,ind2,0/),(/'x','y','N'/),(/1,1,1/),(/nlci,nlcj,jpk/),vmsk_id)
+   CALL agrif_declare_variable((/2,2,0/),(/ind2,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nlci,nlcj,jpk/),e3t_id)
+   CALL agrif_declare_variable((/1,2,0/),(/ind2-1,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nlci,nlcj,jpk/),umsk_id)
+   CALL agrif_declare_variable((/2,1,0/),(/ind2,ind3-1,0/),(/'x','y','N'/),(/1,1,1/),(/nlci,nlcj,jpk/),vmsk_id)
 
-   CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,3/),scales_t_id)
+   CALL agrif_declare_variable((/2,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,3/),scales_t_id)
 
-   CALL agrif_declare_variable((/1,2/),(/ind2,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),unb_id)
-   CALL agrif_declare_variable((/2,1/),(/ind3,ind2/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),vnb_id)
-   CALL agrif_declare_variable((/1,2/),(/ind2,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),ub2b_interp_id)
-   CALL agrif_declare_variable((/2,1/),(/ind3,ind2/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),vb2b_interp_id)
-   CALL agrif_declare_variable((/1,2/),(/ind2,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),ub2b_update_id)
-   CALL agrif_declare_variable((/2,1/),(/ind3,ind2/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),vb2b_update_id)
+   CALL agrif_declare_variable((/1,2/),(/ind2-1,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),unb_id)
+   CALL agrif_declare_variable((/2,1/),(/ind2,ind3-1/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),vnb_id)
+   CALL agrif_declare_variable((/1,2/),(/ind2-1,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),ub2b_interp_id)
+   CALL agrif_declare_variable((/2,1/),(/ind2,ind3-1/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),vb2b_interp_id)
+   CALL agrif_declare_variable((/1,2/),(/ind2-1,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),ub2b_update_id)
+   CALL agrif_declare_variable((/2,1/),(/ind2,ind3-1/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),vb2b_update_id)
 
-   CALL agrif_declare_variable((/2,2/),(/ind3,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),sshn_id)
+   CALL agrif_declare_variable((/2,2/),(/ind2,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),sshn_id)
 
 !   IF( ln_zdftke.OR.ln_zdfgls ) THEN
-!      CALL agrif_declare_variable((/2,2,0/),(/ind3,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nlci,nlcj,jpk/), en_id)
-!      CALL agrif_declare_variable((/2,2,0/),(/ind3,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nlci,nlcj,jpk/),avt_id)
+!      CALL agrif_declare_variable((/2,2,0/),(/ind2,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nlci,nlcj,jpk/), en_id)
+!      CALL agrif_declare_variable((/2,2,0/),(/ind2,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nlci,nlcj,jpk/),avt_id)
 # if defined key_vertical
-      CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),avm_id)
+      CALL agrif_declare_variable((/2,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),avm_id)
 # else
-      CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),avm_id)
+      CALL agrif_declare_variable((/2,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),avm_id)
 # endif
 !   ENDIF
 
@@ -380,7 +398,7 @@ SUBROUTINE agrif_declare_var
    ! declare profile with dimension max number of variables
    CALL Agrif_Set_MaskMaxSearch(25)
    !
-   CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts/),tsini_id)
+   CALL agrif_declare_variable((/2,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts/),tsini_id)
    !  
    CALL Agrif_Set_MaskMaxSearch(5)
 
@@ -435,7 +453,7 @@ SUBROUTINE agrif_declare_var
    CALL Agrif_Set_bc( ub2b_interp_id, (/0,ind1-1/) )
    CALL Agrif_Set_bc( vb2b_interp_id, (/0,ind1-1/) )
 
-   CALL Agrif_Set_bc(  e3t_id, (/-nn_sponge_len*Agrif_irhox(),ind1-1/) )   ! if west and rhox=3 and ghost=1: column 2 to 6 
+   CALL Agrif_Set_bc(  e3t_id, (/-(nn_sponge_len-1)*Agrif_irhox(),ind1-1/) )   ! if west and rhox=3 and ghost=1: column 2 to 6 
    CALL Agrif_Set_bc( umsk_id, (/0,0/) )
    CALL Agrif_Set_bc( vmsk_id, (/0,0/) )
 
@@ -536,7 +554,7 @@ SUBROUTINE agrif_declare_var_ice
       !!----------------------------------------------------------------------
    USE Agrif_Util
    USE ice
-   USE par_oce, ONLY : nbghostcells
+   USE par_oce, ONLY : nbghostcells, nbghostcells_x, nbghostcells_y_s
    !
    IMPLICIT NONE
    !
@@ -551,11 +569,11 @@ SUBROUTINE agrif_declare_var_ice
    !                            2,2 = two ghost lines
    !-------------------------------------------------------------------------------------
    ind1 =     nbghostcells
-   ind2 = 1 + nbghostcells
-   ind3 = 2 + nbghostcells
-   CALL agrif_declare_variable((/2,2,0/),(/ind3,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nlci,nlcj,jpl*(8+nlay_s+nlay_i)/),tra_ice_id)
-   CALL agrif_declare_variable((/1,2/)  ,(/ind2,ind3/)  ,(/'x','y'/)    ,(/1,1/)  ,(/nlci,nlcj/)                      ,u_ice_id  )
-   CALL agrif_declare_variable((/2,1/)  ,(/ind3,ind2/)  ,(/'x','y'/)    ,(/1,1/)  ,(/nlci,nlcj/)                      ,v_ice_id  )
+   ind2 = 2 + nbghostcells_x
+   ind3 = 2 + nbghostcells_y_s
+   CALL agrif_declare_variable((/2,2,0/),(/ind2,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nlci,nlcj,jpl*(8+nlay_s+nlay_i)/),tra_ice_id)
+   CALL agrif_declare_variable((/1,2/)  ,(/ind2-1,ind3/)  ,(/'x','y'/)    ,(/1,1/)  ,(/nlci,nlcj/)                      ,u_ice_id  )
+   CALL agrif_declare_variable((/2,1/)  ,(/ind2,ind3-1/)  ,(/'x','y'/)    ,(/1,1/)  ,(/nlci,nlcj/)                      ,v_ice_id  )
 
    ! 2. Set interpolations (normal & tangent to the grid cell for velocities)
    !-----------------------------------
@@ -686,12 +704,13 @@ SUBROUTINE agrif_declare_var_top
    ! 1. Declaration of the type of variable which have to be interpolated
    !---------------------------------------------------------------------
    ind1 =     nbghostcells
-   ind2 = 1 + nbghostcells
-   ind3 = 2 + nbghostcells
+   ind2 = 2 + nbghostcells_x
+   ind3 = 2 + nbghostcells_y_s
 # if defined key_vertical
-   CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jptra+1/),trn_id)
-   CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jptra+1/),trn_sponge_id)
+   CALL agrif_declare_variable((/2,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jptra+1/),trn_id)
+   CALL agrif_declare_variable((/2,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jptra+1/),trn_sponge_id)
 # else
+! LAURENT: STRANGE why (3,3) here ?
    CALL agrif_declare_variable((/2,2,0,0/),(/3,3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jptra/),trn_id)
    CALL agrif_declare_variable((/2,2,0,0/),(/3,3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jptra/),trn_sponge_id)
 # endif
@@ -736,6 +755,7 @@ SUBROUTINE agrif_nemo_init
       !!----------------------------------------------------------------------
    USE agrif_oce 
    USE agrif_ice
+   USE dom_oce
    USE in_out_manager
    USE lib_mpp
    !!
@@ -743,7 +763,7 @@ SUBROUTINE agrif_nemo_init
    !
    INTEGER  ::   ios                 ! Local integer output status for namelist read
    INTEGER  ::   iminspon
-   NAMELIST/namagrif/ rn_sponge_tra, rn_sponge_dyn, ln_spc_dyn, ln_chk_bathy
+   NAMELIST/namagrif/ rn_sponge_tra, rn_sponge_dyn, ln_spc_dyn, ln_chk_bathy, south_boundary_open
       !!--------------------------------------------------------------------------------------
    !
    REWIND( numnam_ref )              ! Namelist namagrif in reference namelist : AGRIF zoom
@@ -764,6 +784,50 @@ SUBROUTINE agrif_nemo_init
       WRITE(numout,*) '      use special values for dynamics   ln_spc_dyn    = ', ln_spc_dyn
       WRITE(numout,*) '      check bathymetry                  ln_chk_bathy  = ', ln_chk_bathy
    ENDIF
+
+   !
+
+   ! Set the number of ghost cells according to periodicity
+
+      nbghostcells_x = nbghostcells
+      nbghostcells_y_s = nbghostcells
+      nbghostcells_y_n = nbghostcells
+
+      IF (.not.agrif_root()) THEN
+        IF (jperio == 1) THEN
+          nbghostcells_x = 0
+        ENDIF
+        IF (.NOT.south_boundary_open) THEN
+          nbghostcells_y_s = 0
+        ENDIF
+      ENDIF
+   !
+END SUBROUTINE agrif_nemo_init
+
+SUBROUTINE agrif_nemo_init_part2
+      !!----------------------------------------------------------------------
+      !!                     *** ROUTINE agrif_init ***
+      !!----------------------------------------------------------------------
+   USE agrif_oce 
+   USE agrif_ice
+   USE dom_oce
+   USE in_out_manager
+   USE lib_mpp
+   !!
+   IMPLICIT NONE
+   !
+   INTEGER  ::   ios                 ! Local integer output status for namelist read
+   INTEGER  ::   iminspon
+   NAMELIST/namagrif/ rn_sponge_tra, rn_sponge_dyn, ln_spc_dyn, ln_chk_bathy, south_boundary_open
+      !!--------------------------------------------------------------------------------------
+   !
+   REWIND( numnam_ref )              ! Namelist namagrif in reference namelist : AGRIF zoom
+   READ  ( numnam_ref, namagrif, IOSTAT = ios, ERR = 901)
+901 IF( ios /= 0 )   CALL ctl_nam ( ios , 'namagrif in reference namelist', lwp )
+   REWIND( numnam_cfg )              ! Namelist namagrif in configuration namelist : AGRIF zoom
+   READ  ( numnam_cfg, namagrif, IOSTAT = ios, ERR = 902 )
+902 IF( ios >  0 )   CALL ctl_nam ( ios , 'namagrif in configuration namelist', lwp )
+
    !
    ! convert DOCTOR namelist name into OLD names
    visc_tra      = rn_sponge_tra
@@ -775,8 +839,13 @@ SUBROUTINE agrif_nemo_init
    IF (nn_sponge_len > iminspon)  CALL ctl_stop('agrif sponge length is too large')
    !
    IF( agrif_oce_alloc()  > 0 )   CALL ctl_warn('agrif agrif_oce_alloc: allocation of arrays failed')
-   !
-END SUBROUTINE agrif_nemo_init
+
+   lk_west  = ( ((nbondi == -1) .OR. (nbondi == 2) ).AND. .NOT. (jperio == 1 .OR. jperio == 4 .OR. jperio == 6))
+   lk_east  = ( ((nbondi ==  1) .OR. (nbondi == 2) ).AND. .NOT. (jperio == 1 .OR. jperio == 4 .OR. jperio == 6))
+   lk_south = ( ((nbondj == -1) .OR. (nbondj == 2) ).AND. south_boundary_open)
+   lk_north = ( ((nbondj ==  1) .OR. (nbondj == 2) ))
+
+END SUBROUTINE agrif_nemo_init_part2
 
 # if defined key_mpp_mpi
 
@@ -1014,6 +1083,26 @@ endif
   
 end subroutine nemo_mapping
 
+function agrif_external_switch_index(ptx,pty,i1,isens)
+use dom_oce
+integer :: ptx, pty, i1, isens
+integer :: agrif_external_switch_index
+
+ if (isens == 1) then
+    if (ptx == 2) then ! T, V points
+      agrif_external_switch_index = jpiglo-i1+2
+    else ! U, F points
+      agrif_external_switch_index = jpiglo-i1+1      
+    endif
+elseif (isens ==2) then
+    if (pty == 2) then ! T, U points
+      agrif_external_switch_index = jpjglo-2-(i1 -jpjglo)
+    else ! V, F points
+      agrif_external_switch_index = jpjglo-3-(i1 -jpjglo)
+    endif
+endif
+
+end function agrif_external_switch_index
       !!----------------------------------------------------------------------
       !!                   *** ROUTINE Correct_field ***
       !!----------------------------------------------------------------------

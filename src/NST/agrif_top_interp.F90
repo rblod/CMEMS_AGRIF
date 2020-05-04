@@ -135,10 +135,10 @@ CONTAINS
             jmin = j1 ; jmax = j2
             ! 
             ! Remove CORNERS
-            IF((nbondj == -1).OR.(nbondj == 2)) jmin = 2 + nbghostcells
-            IF((nbondj == +1).OR.(nbondj == 2)) jmax = nlcj - nbghostcells - 1
-            IF((nbondi == -1).OR.(nbondi == 2)) imin = 2 + nbghostcells
-            IF((nbondi == +1).OR.(nbondi == 2)) imax = nlci - nbghostcells - 1      
+            IF(lk_south) jmin = 2 + nbghostcells
+            IF(lk_north) jmax = nlcj - nbghostcells - 1
+            IF(lk_west)  imin = 2 + nbghostcells
+            IF(lk_east)  imax = nlci - nbghostcells - 1      
             !
             IF( eastern_side ) THEN
                zrho = Agrif_Rhox()

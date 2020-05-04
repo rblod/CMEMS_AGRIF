@@ -86,10 +86,10 @@ CONTAINS
       END DO
 #if defined key_agrif
       IF( .NOT. Agrif_Root() ) THEN
-         IF( nbondi == -1 .OR. nbondi == 2 )   hdivn(   2   ,  :   ,:) = 0._wp      ! west
-         IF( nbondi ==  1 .OR. nbondi == 2 )   hdivn( nlci-1,  :   ,:) = 0._wp      ! east
-         IF( nbondj == -1 .OR. nbondj == 2 )   hdivn(   :   ,  2   ,:) = 0._wp      ! south
-         IF( nbondj ==  1 .OR. nbondj == 2 )   hdivn(   :   ,nlcj-1,:) = 0._wp      ! north
+         IF(lk_west)  hdivn(   2   ,  :   ,:) = 0._wp      ! west
+         IF(lk_east)  hdivn( nlci-1,  :   ,:) = 0._wp      ! east
+         IF(lk_south) hdivn(   :   ,  2   ,:) = 0._wp      ! south
+         IF(lk_north) hdivn(   :   ,nlcj-1,:) = 0._wp      ! north
       ENDIF
 #endif
       !

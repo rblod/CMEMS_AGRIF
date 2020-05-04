@@ -100,10 +100,7 @@ CONTAINS
             IF( Agrif_Root() ) THEN
                CALL dta_tsd( nit000, tsb )       ! read 3D T and S data at nit000
             ELSE
-               Agrif_SpecialValue    = 0._wp
-               Agrif_UseSpecialValue = .TRUE.
-               CALL Agrif_Init_Variable(tsini_id, procname=agrif_initts)
-               Agrif_UseSpecialValue = .FALSE.
+               CALL Agrif_Init_traceurs()
           ENDIF
             !
             sshb(:,:)   = 0._wp               ! set the ocean at rest

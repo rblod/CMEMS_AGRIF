@@ -232,10 +232,10 @@ CONTAINS
       !
 #if defined key_agrif
       IF( .NOT. Agrif_Root() ) THEN
-         IF( nbondi == -1 .OR. nbondi == 2 )   ze3divh( 2:nbghostcells+1,:        ,:) = 0._wp      ! west
-         IF( nbondi ==  1 .OR. nbondi == 2 )   ze3divh( nlci-nbghostcells:nlci-1,:,:) = 0._wp      ! east
-         IF( nbondj == -1 .OR. nbondj == 2 )   ze3divh( :,2:nbghostcells+1        ,:) = 0._wp      ! south
-         IF( nbondj ==  1 .OR. nbondj == 2 )   ze3divh( :,nlcj-nbghostcells:nlcj-1,:) = 0._wp      ! north
+         IF(lk_west)  ze3divh( 2:nbghostcells+1,:        ,:) = 0._wp      ! west
+         IF(lk_east)  ze3divh( nlci-nbghostcells:nlci-1,:,:) = 0._wp      ! east
+         IF(lk_south) ze3divh( :,2:nbghostcells+1        ,:) = 0._wp      ! south
+         IF(lk_north) ze3divh( :,nlcj-nbghostcells:nlcj-1,:) = 0._wp      ! north
       ENDIF
 #endif
       !
