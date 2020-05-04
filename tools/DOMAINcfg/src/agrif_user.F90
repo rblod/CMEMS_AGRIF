@@ -11,7 +11,7 @@ SUBROUTINE Agrif_InitValues
       !! ** Purpose :: Declaration of variables to be interpolated
       !!----------------------------------------------------------------------
    USE Agrif_Util
-   USE oce 
+   USE oce
    USE dom_oce
    USE nemogcm
    USE domain
@@ -25,7 +25,7 @@ SUBROUTINE Agrif_InitValues
 
    CALL dom_nam
    CALL cfg_write         ! create the configuration file
-   
+
 END SUBROUTINE Agrif_InitValues
 
 SUBROUTINE Agrif_InitValues_cont
@@ -47,7 +47,7 @@ nx=nlci ; ny=nlcj
    !          nbghostcellsfine_tot_x= nbghostcellsfine_x +1
    !          nbghostcellsfine_tot_y= nbghostcellsfine_y +1
    !       ELSE
-   !         nx = (nbcellsx)+2*nbghostcellsfine_x 
+   !         nx = (nbcellsx)+2*nbghostcellsfine_x
    !         ny = (nbcellsy)+2*nbghostcellsfine+2
    !         nbghostcellsfine_tot_x= 1
    !         nbghostcellsfine_tot_y= nbghostcellsfine_y +1
@@ -56,13 +56,13 @@ nx=nlci ; ny=nlcj
    !       nbghostcellsfine = 0
    !       nx = nbcellsx+irafx
    !       ny = nbcellsy+irafy
-       
+
   WRITE(*,*) ' '
   WRITE(*,*)'Size of the High resolution grid: ',nx,' x ',ny
   WRITE(*,*) ' '
-       
+
        call agrif_init_lonlat()
-       ln_perio=.FALSE. 
+       ln_perio=.FALSE.
        if( jperio ==1 .OR. jperio==2 .OR. jperio==4) ln_perio=.TRUE.
 
        where (glamt < -180) glamt = glamt +360.
@@ -71,7 +71,7 @@ nx=nlci ; ny=nlcj
        CALL lbc_lnk( 'glamt', glamt, 'T', 1._wp)
        CALL lbc_lnk( 'gphit', gphit, 'T', 1._wp)
 
- 
+
        where (glamu < -180) glamu = glamu +360.
        where (glamu > +180) glamu = glamu -360.
        CALL lbc_lnk( 'glamu', glamu, 'U', 1._wp)
@@ -126,7 +126,7 @@ nx=nlci ; ny=nlcj
          gphiv(jpi,:)=gphiv(jpi-1,:)
          glamf(jpi,:)=glamf(jpi-1,:)
          gphif(jpi,:)=gphif(jpi-1,:)
-       ENDIF        
+       ENDIF
        ENDIF
 
        call agrif_init_scales()
@@ -173,7 +173,7 @@ nx=nlci ; ny=nlcj
        ENDIF
        ENDIF
 
-END SUBROUTINE Agrif_InitValues_cont  
+END SUBROUTINE Agrif_InitValues_cont
 
 
 subroutine agrif_declare_var()
@@ -183,7 +183,7 @@ use agrif_profiles
 use agrif_parameters
 
    IMPLICIT NONE
-   
+
 integer :: ind1, ind2, ind3
 integer nx,ny
 integer nbghostcellsfine_tot_x, nbghostcellsfine_tot_y
@@ -345,7 +345,7 @@ CALL Agrif_Set_bcinterp(e3v_id,interp1=AGRIF_ppm, interp2=Agrif_linear)
 CALL Agrif_Set_interp(e3v_id, interp1=AGRIF_ppm, interp2=Agrif_linear)
 CALL Agrif_Set_bc( e3v_id, (/0,max(nbghostcellsfine_tot_x,nbghostcellsfine_tot_y)-1/) )
 CALL Agrif_Set_Updatetype(e3v_id,update1 = Agrif_Update_Average, update2 = Agrif_Update_Copy)
-   
+
 ! Bottom level
 CALL Agrif_Set_bcinterp(bottom_level_id,interp=AGRIF_constant)
 CALL Agrif_Set_interp(bottom_level_id,interp=AGRIF_constant)
@@ -380,8 +380,8 @@ endif
          do i=1,nb_chunks
           bounds_chunks(i,:,:,:) = bounds
         enddo
-  
-! FIRST CHUNCK (for j<=jpjglo)   
+
+! FIRST CHUNCK (for j<=jpjglo)
 
 ! Original indices
     bounds_chunks(1,1,1,1) = bounds(1,1,2)
@@ -397,7 +397,7 @@ endif
 
 ! Correction required or not
     correction_required(1)=.FALSE.
- 
+
 ! SECOND CHUNCK (for j>jpjglo)
 
 ! Original indices
@@ -414,7 +414,7 @@ endif
       bounds_chunks(2,1,2,2) = jpiglo-bounds(1,1,2)+2
     else ! U, F points
       bounds_chunks(2,1,1,2) = jpiglo-bounds(1,2,2)+1
-      bounds_chunks(2,1,2,2) = jpiglo-bounds(1,1,2)+1    	
+      bounds_chunks(2,1,2,2) = jpiglo-bounds(1,1,2)+1
     endif
 
     if (pty == 2) then ! T, U points
@@ -451,7 +451,7 @@ endif
       bounds_chunks(1,1,2,2) = jpiglo-bounds(1,1,2)+2
     else ! U, F points
       bounds_chunks(1,1,1,2) = jpiglo-bounds(1,2,2)+1
-      bounds_chunks(1,1,2,2) = jpiglo-bounds(1,1,2)+1    	
+      bounds_chunks(1,1,2,2) = jpiglo-bounds(1,1,2)+1
     endif
 
     if (pty == 2) then ! T, U points
@@ -463,7 +463,7 @@ endif
     endif
 
     correction_required(1)=.TRUE.
-    
+
 
    endif
   elseif (bounds(1,1,2) < 1) then
@@ -475,16 +475,16 @@ endif
          do i=1,nb_chunks
           bounds_chunks(i,:,:,:) = bounds
         enddo
-        
+
     bounds_chunks(1,1,1,2) = bounds(1,1,2)+jpiglo-2
     bounds_chunks(1,1,2,2) = 1+jpiglo-2
-    
+
     bounds_chunks(1,1,1,1) = bounds(1,1,2)
     bounds_chunks(1,1,2,1) = 1
- 
+
     bounds_chunks(2,1,1,2) = 2
     bounds_chunks(2,1,2,2) = bounds(1,2,2)
-    
+
     bounds_chunks(2,1,1,1) = 2
     bounds_chunks(2,1,2,1) = bounds(1,2,2)
 
@@ -495,15 +495,15 @@ endif
     allocate(bounds_chunks(nb_chunks,ndim,2,2))
          do i=1,nb_chunks
           bounds_chunks(i,:,:,:) = bounds
-        enddo    
+        enddo
     bounds_chunks(1,1,1,2) = bounds(1,1,2)+jpiglo-2
     bounds_chunks(1,1,2,2) = bounds(1,2,2)+jpiglo-2
-    
+
     bounds_chunks(1,1,1,1) = bounds(1,1,2)
     bounds_chunks(1,1,2,1) = bounds(1,2,2)
    endif
   else
-    nb_chunks=1  
+    nb_chunks=1
     allocate(correction_required(nb_chunks))
     correction_required=.FALSE.
     allocate(bounds_chunks(nb_chunks,ndim,2,2))
@@ -514,17 +514,36 @@ endif
     bounds_chunks(1,1,2,2) = bounds(1,2,2)
     bounds_chunks(1,2,1,2) = bounds(2,1,2)
     bounds_chunks(1,2,2,2) = bounds(2,2,2)
-    
+
     bounds_chunks(1,1,1,1) = bounds(1,1,2)
     bounds_chunks(1,1,2,1) = bounds(1,2,2)
     bounds_chunks(1,2,1,1) = bounds(2,1,2)
-    bounds_chunks(1,2,2,1) = bounds(2,2,2)    
-    
+    bounds_chunks(1,2,2,1) = bounds(2,2,2)
+
   endif
-  
-  
-  
+
 end subroutine nemo_mapping
+
+function agrif_external_switch_index(ptx,pty,i1,isens)
+use dom_oce
+integer :: ptx, pty, i1, isens
+integer :: agrif_external_switch_index
+
+ if (isens == 1) then
+    if (ptx == 2) then ! T, V points
+      agrif_external_switch_index = jpiglo-i1+2
+    else ! U, F points
+      agrif_external_switch_index = jpiglo-i1+1
+    endif
+elseif (isens ==2) then
+    if (pty == 2) then ! T, U points
+      agrif_external_switch_index = jpjglo-2-(i1 -jpjglo)
+    else ! V, F points
+      agrif_external_switch_index = jpjglo-3-(i1 -jpjglo)
+    endif
+endif
+
+end function agrif_external_switch_index
 
 subroutine correct_field(tab2d,i1,i2,j1,j2)
 use dom_oce
@@ -604,7 +623,7 @@ external :: init_e2t, init_e2u, init_e2v, init_e2f
 
 nx=nlci ; ny=nlcj
 
-ln_perio=.FALSE. 
+ln_perio=.FALSE.
 if( jperio ==1 .OR. jperio==2 .OR. jperio==4) ln_perio=.TRUE.
 
 call Agrif_Init_variable(e1t_id, procname = init_e1t)
@@ -632,7 +651,7 @@ end subroutine agrif_init_scales
    use dom_oce
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE interpsshn  ***
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2
       REAL, DIMENSION(i1:i2,j1:j2), INTENT(inout) ::   ptab
       LOGICAL                         , INTENT(in   ) ::   before
@@ -640,7 +659,7 @@ end subroutine agrif_init_scales
       LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
 
       !
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       !
 
          western_side  = (nb == 1).AND.(ndir == 1)
@@ -660,14 +679,14 @@ end subroutine agrif_init_scales
     use dom_oce
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE interpsshn  ***
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2
       REAL, DIMENSION(i1:i2,j1:j2), INTENT(inout) ::   ptab
       LOGICAL                         , INTENT(in   ) ::   before
       INTEGER                         , INTENT(in   ) ::   nb , ndir
       LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
       !
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       !
       IF( before) THEN
          ptab(i1:i2,j1:j2) = glamu(i1:i2,j1:j2)
@@ -681,14 +700,14 @@ end subroutine agrif_init_scales
     use dom_oce
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE interpsshn  ***
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2
       REAL, DIMENSION(i1:i2,j1:j2), INTENT(inout) ::   ptab
       LOGICAL                         , INTENT(in   ) ::   before
       INTEGER                         , INTENT(in   ) ::   nb , ndir
       LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
       !
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       !
       IF( before) THEN
          ptab(i1:i2,j1:j2) = glamv(i1:i2,j1:j2)
@@ -702,14 +721,14 @@ end subroutine agrif_init_scales
     use dom_oce
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE interpsshn  ***
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2
       REAL, DIMENSION(i1:i2,j1:j2), INTENT(inout) ::   ptab
       LOGICAL                         , INTENT(in   ) ::   before
       INTEGER                         , INTENT(in   ) ::   nb , ndir
       LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
       !
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       !
       IF( before) THEN
          ptab(i1:i2,j1:j2) = glamf(i1:i2,j1:j2)
@@ -723,14 +742,14 @@ end subroutine agrif_init_scales
    use dom_oce
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE interpsshn  ***
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2
       REAL, DIMENSION(i1:i2,j1:j2), INTENT(inout) ::   ptab
       LOGICAL                         , INTENT(in   ) ::   before
       INTEGER                         , INTENT(in   ) ::   nb , ndir
       LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
       !
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       !
       IF( before) THEN
          ptab(i1:i2,j1:j2) = gphit(i1:i2,j1:j2)
@@ -744,14 +763,14 @@ end subroutine agrif_init_scales
     use dom_oce
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE interpsshn  ***
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2
       REAL, DIMENSION(i1:i2,j1:j2), INTENT(inout) ::   ptab
       LOGICAL                         , INTENT(in   ) ::   before
       INTEGER                         , INTENT(in   ) ::   nb , ndir
       LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
       !
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       !
          western_side  = (nb == 1).AND.(ndir == 1)
          eastern_side  = (nb == 1).AND.(ndir == 2)
@@ -769,14 +788,14 @@ end subroutine agrif_init_scales
     use dom_oce
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE interpsshn  ***
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2
       REAL, DIMENSION(i1:i2,j1:j2), INTENT(inout) ::   ptab
       LOGICAL                         , INTENT(in   ) ::   before
       INTEGER                         , INTENT(in   ) ::   nb , ndir
       LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
       !
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       !
          western_side  = (nb == 1).AND.(ndir == 1)
          eastern_side  = (nb == 1).AND.(ndir == 2)
@@ -795,14 +814,14 @@ end subroutine agrif_init_scales
    use dom_oce
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE interpsshn  ***
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2
       REAL, DIMENSION(i1:i2,j1:j2), INTENT(inout) ::   ptab
       LOGICAL                         , INTENT(in   ) ::   before
       INTEGER                         , INTENT(in   ) ::   nb , ndir
       LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
       !
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       !
          western_side  = (nb == 1).AND.(ndir == 1)
          eastern_side  = (nb == 1).AND.(ndir == 2)
@@ -822,14 +841,14 @@ end subroutine agrif_init_scales
    use agrif_parameters
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE interpsshn  ***
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2
       REAL, DIMENSION(i1:i2,j1:j2), INTENT(inout) ::   ptab
       LOGICAL                         , INTENT(in   ) ::   before
       INTEGER                         , INTENT(in   ) ::   nb , ndir
       LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
       !
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       !
       INTEGER :: ji,jj
 
@@ -867,14 +886,14 @@ end subroutine agrif_init_scales
    use agrif_parameters
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE interpsshn  ***
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2
       REAL, DIMENSION(i1:i2,j1:j2), INTENT(inout) ::   ptab
       LOGICAL                         , INTENT(in   ) ::   before
       INTEGER                         , INTENT(in   ) ::   nb , ndir
       LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
       !
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       !
          western_side  = (nb == 1).AND.(ndir == 1)
          eastern_side  = (nb == 1).AND.(ndir == 2)
@@ -907,14 +926,14 @@ end subroutine agrif_init_scales
    use dom_oce
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE interpsshn  ***
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2
       REAL, DIMENSION(i1:i2,j1:j2), INTENT(inout) ::   ptab
       LOGICAL                         , INTENT(in   ) ::   before
       INTEGER                         , INTENT(in   ) ::   nb , ndir
       LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
       !
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       !
          western_side  = (nb == 1).AND.(ndir == 1)
          eastern_side  = (nb == 1).AND.(ndir == 2)
@@ -932,14 +951,14 @@ end subroutine agrif_init_scales
    use dom_oce
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE interpsshn  ***
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2
       REAL, DIMENSION(i1:i2,j1:j2), INTENT(inout) ::   ptab
       LOGICAL                         , INTENT(in   ) ::   before
       INTEGER                         , INTENT(in   ) ::   nb , ndir
       LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
       !
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       !
          western_side  = (nb == 1).AND.(ndir == 1)
          eastern_side  = (nb == 1).AND.(ndir == 2)
@@ -958,14 +977,14 @@ end subroutine agrif_init_scales
    use agrif_parameters
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE interpsshn  ***
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2
       REAL, DIMENSION(i1:i2,j1:j2), INTENT(inout) ::   ptab
       LOGICAL                         , INTENT(in   ) ::   before
       INTEGER                         , INTENT(in   ) ::   nb , ndir
       LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
       !
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       !
          western_side  = (nb == 1).AND.(ndir == 1)
          eastern_side  = (nb == 1).AND.(ndir == 2)
@@ -999,14 +1018,14 @@ end subroutine agrif_init_scales
    use agrif_parameters
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE interpsshn  ***
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2
       REAL, DIMENSION(i1:i2,j1:j2), INTENT(inout) ::   ptab
       LOGICAL                         , INTENT(in   ) ::   before
       INTEGER                         , INTENT(in   ) ::   nb , ndir
       LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
       !
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       !
          western_side  = (nb == 1).AND.(ndir == 1)
          eastern_side  = (nb == 1).AND.(ndir == 2)
@@ -1039,14 +1058,14 @@ end subroutine agrif_init_scales
    use dom_oce
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE interpsshn  ***
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2
       REAL, DIMENSION(i1:i2,j1:j2), INTENT(inout) ::   ptab
       LOGICAL                         , INTENT(in   ) ::   before
       INTEGER                         , INTENT(in   ) ::   nb , ndir
       LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
       !
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       !
          western_side  = (nb == 1).AND.(ndir == 1)
          eastern_side  = (nb == 1).AND.(ndir == 2)
@@ -1064,14 +1083,14 @@ end subroutine agrif_init_scales
    use dom_oce
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE interpsshn  ***
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2
       REAL, DIMENSION(i1:i2,j1:j2), INTENT(inout) ::   ptab
       LOGICAL                         , INTENT(in   ) ::   before
       INTEGER                         , INTENT(in   ) ::   nb , ndir
       LOGICAL  ::   western_side, eastern_side,northern_side,southern_side
       !
-      !!----------------------------------------------------------------------  
+      !!----------------------------------------------------------------------
       !
          western_side  = (nb == 1).AND.(ndir == 1)
          eastern_side  = (nb == 1).AND.(ndir == 2)
@@ -1092,12 +1111,12 @@ USE dom_oce
 USE in_out_manager
 USE lib_mpp
 
-   
+
    !!
    IMPLICIT NONE
-   
+
    INTEGER ::   ios
-   
+
    NAMELIST/namagrif/ nn_cln_update,ln_spc_dyn,rn_sponge_tra,rn_sponge_dyn,ln_chk_bathy,npt_connect, npt_copy, south_boundary_open
 
       REWIND( numnam_ref )              ! Namelist namagrif in reference namelist : nesting parameters
@@ -1137,14 +1156,14 @@ USE lib_mpp
       ENDIF
 
 END SUBROUTINE agrif_nemo_init
-   
+
 
 SUBROUTINE Agrif_detect( kg, ksizex )
       !!----------------------------------------------------------------------
       !!                      *** ROUTINE Agrif_detect ***
       !!----------------------------------------------------------------------
    INTEGER, DIMENSION(2) :: ksizex
-   INTEGER, DIMENSION(ksizex(1),ksizex(2)) :: kg 
+   INTEGER, DIMENSION(ksizex(1),ksizex(2)) :: kg
       !!----------------------------------------------------------------------
    !
    RETURN
@@ -1178,7 +1197,7 @@ SUBROUTINE Agrif_get_proc_info( imin, imax, jmin, jmax )
       !!                 *** ROUTINE Agrif_get_proc_info ***
       !!----------------------------------------------------------------------
    USE par_oce
-   USE dom_oce 
+   USE dom_oce
    !!
    IMPLICIT NONE
    !
@@ -1190,7 +1209,7 @@ SUBROUTINE Agrif_get_proc_info( imin, imax, jmin, jmax )
    jmin = njmppt(Agrif_Procrank+1)  ! ?????
    imax = imin + jpi - 1
    jmax = jmin + jpj - 1
-   ! 
+   !
 END SUBROUTINE Agrif_get_proc_info
 
 SUBROUTINE Agrif_estimate_parallel_cost(imin, imax,jmin, jmax, nbprocs, grid_cost)

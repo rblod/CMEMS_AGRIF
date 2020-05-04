@@ -511,7 +511,7 @@ subroutine Agrif_InterpnD ( type_interp, parent, child, pttab, petab, pttab_Chil
             allocate(correction_required(nb_chunks))
             correction_required=.FALSE.
             allocate(parentarray_chunk(nb_chunks,nbdim,2,2))
-            parentarray_chunk(1,:,:,:)=parentarrayf
+            parentarray_chunk(1,:,:,:)=parentarray
         endif
         if (agrif_debug_interp) then
         print *,'AVANT PARENTCHILDBOUNDS'
