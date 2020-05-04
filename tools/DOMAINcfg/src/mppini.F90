@@ -100,20 +100,27 @@ CONTAINS
             &           'the domain is lay out for distributed memory computing!' )
 
 #if defined key_agrif
+     IF (.not.agrif_root()) THEN
+        CALL agrif_nemo_init
+     ENDIF
+
       IF( .NOT. Agrif_Root() ) THEN       ! AGRIF children: specific setting (cf. agrif_user.F90)
-         IF( jpiglo /= nbcellsx + 2 + 2*nbghostcells ) THEN
+         print *,'nbcellsx = ',nbcellsx,nbghostcells_x
+         print *,'nbcellsy = ',nbcellsy,nbghostcells_y_s,nbghostcells_y_n
+         IF( jpiglo /= nbcellsx + 2 + 2*nbghostcells_x ) THEN
             IF(lwp) THEN
                WRITE(numout,*)
-               WRITE(numout,*) 'jpiglo should be: ', nbcellsx + 2 + 2*nbghostcells
+               WRITE(numout,*) 'jpiglo should be: ', nbcellsx + 2 + 2*nbghostcells_x
             ENDIF        
-            CALL ctl_stop( 'STOP', 'mpp_init: Agrif children requires jpiglo == nbcellsx + 2 + 2*nbghostcells' )
+            CALL ctl_stop( 'STOP', 'mpp_init: Agrif children requires jpiglo == nbcellsx + 2 + 2*nbghostcells_x' )
          ENDIF   
-         IF( jpjglo /= nbcellsy + 2 + 2*nbghostcells ) THEN
+         IF( jpjglo /= nbcellsy + 2 + nbghostcells_y_s + nbghostcells_y_n ) THEN
             IF(lwp) THEN
                WRITE(numout,*)
-               WRITE(numout,*) 'jpjglo shoud be: ', nbcellsy + 2 + 2*nbghostcells
+               WRITE(numout,*) 'jpjglo shoud be: ', nbcellsy + 2 + nbghostcells_y_s + nbghostcells_y_n
             ENDIF        
-            CALL ctl_stop( 'STOP', 'mpp_init: Agrif children requires jpjglo == nbcellsy + 2 + 2*nbghostcells' )
+            CALL ctl_stop( 'STOP', &
+                'mpp_init: Agrif children requires jpjglo == nbcellsy + 2 + nbghostcells_y_s + nbghostcells_y_n' )
          ENDIF   
          IF( ln_use_jattr )   CALL ctl_stop( 'STOP', 'mpp_init:Agrif children requires ln_use_jattr = .false. ' )
       ENDIF

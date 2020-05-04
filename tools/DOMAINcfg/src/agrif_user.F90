@@ -29,8 +29,9 @@ SUBROUTINE Agrif_InitValues
 END SUBROUTINE Agrif_InitValues
 
 SUBROUTINE Agrif_InitValues_cont
-
 use dom_oce
+use lbclnk
+
     integer :: irafx, irafy
     logical :: ln_perio
     integer nx,ny
@@ -66,35 +67,112 @@ nx=nlci ; ny=nlcj
 
        where (glamt < -180) glamt = glamt +360.
        where (glamt > +180) glamt = glamt -360.
-       if (ln_perio) then
-         glamt(1,:)=glamt(nx-1,:)
-         glamt(nx,:)=glamt(2,:)
-       endif
+
+       CALL lbc_lnk( 'glamt', glamt, 'T', 1._wp)
+       CALL lbc_lnk( 'gphit', gphit, 'T', 1._wp)
+
  
        where (glamu < -180) glamu = glamu +360.
        where (glamu > +180) glamu = glamu -360.
-       if (ln_perio) then
-         glamu(1,:)=glamu(nx-1,:)
-         glamu(nx,:)=glamu(2,:)
-       endif
+       CALL lbc_lnk( 'glamu', glamu, 'U', 1._wp)
+       CALL lbc_lnk( 'gphiu', gphiu, 'U', 1._wp)
 
-      where (glamv < -180) glamv = glamv +360.
-      where (glamv > +180) glamv = glamv -360.
-       if (ln_perio) then
-         glamv(1,:)=glamv(nx-1,:)
-         glamv(nx,:)=glamv(2,:)
-       endif
+       where (glamv < -180) glamv = glamv +360.
+       where (glamv > +180) glamv = glamv -360.
+       CALL lbc_lnk( 'glamv', glamv, 'V', 1._wp)
+       CALL lbc_lnk( 'gphiv', gphiv, 'V', 1._wp)
 
-      where (glamf < -180) glamf = glamf +360.
-      where (glamf > +180) glamf = glamf -360.
-       if (ln_perio) then
-         glamf(1,:)=glamf(nx-1,:)
-         glamf(nx,:)=glamf(2,:)
-       endif
+       where (glamf < -180) glamf = glamf +360.
+       where (glamf > +180) glamf = glamf -360.
+       CALL lbc_lnk( 'glamf', glamf, 'F', 1._wp)
+       CALL lbc_lnk( 'gphif', gphif, 'F', 1._wp)
+
+       ! Correct South and North
+       IF ((nbondj == -1).OR.(nbondj == 2)) THEN
+         glamt(:,1)=glamt(:,2)
+         gphit(:,1)=gphit(:,2)
+         glamu(:,1)=glamu(:,2)
+         gphiu(:,1)=gphiu(:,2)
+         glamv(:,1)=glamv(:,2)
+         gphiv(:,1)=gphiv(:,2)
+       ENDIF
+       IF ((nbondj == 1).OR.(nbondj == 2)) THEN
+         glamt(:,jpj)=glamt(:,jpj-1)
+         gphit(:,jpj)=gphit(:,jpj-1)
+         glamu(:,jpj)=glamu(:,jpj-1)
+         gphiu(:,jpj)=gphiu(:,jpj-1)
+         glamv(:,jpj)=glamv(:,jpj-1)
+         gphiv(:,jpj)=gphiv(:,jpj-1)
+         glamf(:,jpj)=glamf(:,jpj-1)
+         gphif(:,jpj)=gphif(:,jpj-1)
+       ENDIF
+
+       ! Correct West and East
+       IF (jperio /=1) THEN
+       IF ((nbondi == -1).OR.(nbondi == 2)) THEN
+         glamt(1,:)=glamt(2,:)
+         gphit(1,:)=gphit(2,:)
+         glamu(1,:)=glamu(2,:)
+         gphiu(1,:)=gphiu(2,:)
+         glamv(1,:)=glamv(2,:)
+         gphiv(1,:)=gphiv(2,:)
+       ENDIF
+       IF ((nbondi == 1).OR.(nbondi == 2)) THEN
+         glamt(jpi,:)=glamt(jpi-1,:)
+         gphit(jpi,:)=gphit(jpi-1,:)
+         glamu(jpi,:)=glamu(jpi-1,:)
+         gphiu(jpi,:)=gphiu(jpi-1,:)
+         glamv(jpi,:)=glamv(jpi-1,:)
+         gphiv(jpi,:)=gphiv(jpi-1,:)
+         glamf(jpi,:)=glamf(jpi-1,:)
+         gphif(jpi,:)=gphif(jpi-1,:)
+       ENDIF        
+       ENDIF
 
        call agrif_init_scales()
 
-        
+       ! Correct South and North
+       IF ((nbondj == -1).OR.(nbondj == 2)) THEN
+         e1t(:,1)=e1t(:,2)
+         e2t(:,1)=e2t(:,2)
+         e1u(:,1)=e1u(:,2)
+         e2u(:,1)=e2u(:,2)
+         e1v(:,1)=e1v(:,2)
+         e2v(:,1)=e2v(:,2)
+       ENDIF
+       IF ((nbondj == 1).OR.(nbondj == 2)) THEN
+         e1t(:,jpj)=e1t(:,jpj-1)
+         e2t(:,jpj)=e2t(:,jpj-1)
+         e1u(:,jpj)=e1u(:,jpj-1)
+         e2u(:,jpj)=e2u(:,jpj-1)
+         e1v(:,jpj)=e1v(:,jpj-1)
+         e2v(:,jpj)=e2v(:,jpj-1)
+         e1f(:,jpj)=e1f(:,jpj-1)
+         e2f(:,jpj)=e2f(:,jpj-1)
+       ENDIF
+
+       ! Correct West and East
+       IF (jperio /=1) THEN
+       IF ((nbondj == -1).OR.(nbondj == 2)) THEN
+         e1t(1,:)=e1t(2,:)
+         e2t(1,:)=e2t(2,:)
+         e1u(1,:)=e1u(2,:)
+         e2u(1,:)=e2u(2,:)
+         e1v(1,:)=e1v(2,:)
+         e2v(1,:)=e2v(2,:)
+       ENDIF
+       IF ((nbondj == 1).OR.(nbondj == 2)) THEN
+         e1t(jpi,:)=e1t(jpi-1,:)
+         e2t(jpi,:)=e2t(jpi-1,:)
+         e1u(jpi,:)=e1u(jpi-1,:)
+         e2u(jpi,:)=e2u(jpi-1,:)
+         e1v(jpi,:)=e1v(jpi-1,:)
+         e2v(jpi,:)=e2v(jpi-1,:)
+         e1f(jpi,:)=e1f(jpi-1,:)
+         e2f(jpi,:)=e2f(jpi-1,:)
+       ENDIF
+       ENDIF
+
 END SUBROUTINE Agrif_InitValues_cont  
 
 
@@ -116,22 +194,25 @@ External :: nemo_mapping
 
    ! 1. Declaration of the type of variable which have to be interpolated
    !---------------------------------------------------------------------
- nx=nlci ; ny=nlcj
 
-!ind2 = nbghostcellsfine_tot_x + 1
-!ind3 = nbghostcellsfine_tot_y + 1
-ind2 = 2 + nbghostcells
-ind3 = ind2
-nbghostcellsfine_tot_x=nbghostcells+1
-nbghostcellsfine_tot_y=nbghostcells+1
+nx=nlci ; ny=nlcj
+
+ind2 = 2 + nbghostcells_x
+ind3 = 2 + nbghostcells_y_s
+nbghostcellsfine_tot_x=nbghostcells_x+1
+nbghostcellsfine_tot_y=max(nbghostcells_y_s,nbghostcells_y_n)+1
 
 irafx = Agrif_irhox()
 
-if (agrif_root()) then
- !  call agrif_set_periodicity(1, jpiglo - 2)
+! In case of East-West periodicity, prevent AGRIF interpolation at east and west boundaries
+! The procnames will not be called at these boundaries
+if (jperio == 1) then
+  call Agrif_Set_NearCommonBorderX(.TRUE.)
+  call Agrif_Set_DistantCommonBorderX(.TRUE.)
 endif
-
-CALL agrif_nemo_init  ! specific namelist part if needed
+if (.not.south_boundary_open) then
+  call Agrif_Set_NearCommonBorderY(.TRUE.)
+endif
 
 CALL agrif_declare_variable((/2,2/),(/ind2,ind3/),(/'x','y'/),(/1,1/),(/nx,ny/),glamt_id)
 CALL agrif_declare_variable((/1,2/),(/ind2-1,ind3/),(/'x','y'/),(/1,1/),(/nx,ny/),glamu_id)
@@ -479,6 +560,7 @@ external :: longitude_linear_interp
 irhox = agrif_irhox()
 irhoy = agrif_irhoy()
 call Agrif_Set_external_linear_interp(longitude_linear_interp)
+
 call Agrif_Init_variable(glamt_id, procname = init_glamt)
 call Agrif_Init_variable(glamu_id, procname = init_glamu)
 call Agrif_Init_variable(glamv_id, procname = init_glamv)
@@ -512,8 +594,18 @@ end function longitude_linear_interp
 subroutine agrif_init_scales()
 use agrif_profiles
 use agrif_util
+use dom_oce
+use lbclnk
+logical :: ln_perio
+integer nx,ny
+
 external :: init_e1t, init_e1u, init_e1v, init_e1f
 external :: init_e2t, init_e2u, init_e2v, init_e2f
+
+nx=nlci ; ny=nlcj
+
+ln_perio=.FALSE. 
+if( jperio ==1 .OR. jperio==2 .OR. jperio==4) ln_perio=.TRUE.
 
 call Agrif_Init_variable(e1t_id, procname = init_e1t)
 call Agrif_Init_variable(e1u_id, procname = init_e1u)
@@ -524,6 +616,15 @@ call Agrif_Init_variable(e2t_id, procname = init_e2t)
 call Agrif_Init_variable(e2u_id, procname = init_e2u)
 call Agrif_Init_variable(e2v_id, procname = init_e2v)
 call Agrif_Init_variable(e2f_id, procname = init_e2f)
+
+CALL lbc_lnk( 'e1t', e1t, 'T', 1._wp)
+CALL lbc_lnk( 'e2t', e2t, 'T', 1._wp)
+CALL lbc_lnk( 'e1u', e1u, 'U', 1._wp)
+CALL lbc_lnk( 'e2u', e2u, 'U', 1._wp)
+CALL lbc_lnk( 'e1v', e1v, 'V', 1._wp)
+CALL lbc_lnk( 'e2v', e2v, 'V', 1._wp)
+CALL lbc_lnk( 'e1f', e1f, 'F', 1._wp)
+CALL lbc_lnk( 'e2f', e2f, 'F', 1._wp)
 
 end subroutine agrif_init_scales
 
@@ -541,6 +642,11 @@ end subroutine agrif_init_scales
       !
       !!----------------------------------------------------------------------  
       !
+
+         western_side  = (nb == 1).AND.(ndir == 1)
+         eastern_side  = (nb == 1).AND.(ndir == 2)
+         southern_side = (nb == 2).AND.(ndir == 1)
+         northern_side = (nb == 2).AND.(ndir == 2)
 
       IF( before) THEN
          ptab(i1:i2,j1:j2) = glamt(i1:i2,j1:j2)
@@ -626,10 +732,6 @@ end subroutine agrif_init_scales
       !
       !!----------------------------------------------------------------------  
       !
-         western_side  = (nb == 1).AND.(ndir == 1)
-         eastern_side  = (nb == 1).AND.(ndir == 2)
-         southern_side = (nb == 2).AND.(ndir == 1)
-         northern_side = (nb == 2).AND.(ndir == 2)
       IF( before) THEN
          ptab(i1:i2,j1:j2) = gphit(i1:i2,j1:j2)
       ELSE
@@ -717,6 +819,7 @@ end subroutine agrif_init_scales
 
    SUBROUTINE init_e1t( ptab, i1, i2, j1, j2, before, nb,ndir)
    use dom_oce
+   use agrif_parameters
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE interpsshn  ***
       !!----------------------------------------------------------------------  
@@ -728,12 +831,31 @@ end subroutine agrif_init_scales
       !
       !!----------------------------------------------------------------------  
       !
+      INTEGER :: ji,jj
+
          western_side  = (nb == 1).AND.(ndir == 1)
          eastern_side  = (nb == 1).AND.(ndir == 2)
          southern_side = (nb == 2).AND.(ndir == 1)
          northern_side = (nb == 2).AND.(ndir == 2)
+
       IF( before) THEN
-         ptab(i1:i2,j1:j2) = e1t(i1:i2,j1:j2)
+        ! May need to extend at south boundary
+          IF (j1<1) THEN
+            IF (.NOT.agrif_child(south_boundary_open)) THEN
+              IF ((nbondj == -1).OR.(nbondj == 2)) THEN
+                DO jj=1,j2
+                  ptab(i1:i2,jj)=e1t(i1:i2,jj)
+                ENDDO
+                DO jj=j1,0
+                  ptab(i1:i2,jj)=e1t(i1:i2,1)
+                ENDDO
+              ENDIF
+            ELSE
+              stop "OUT OF BOUNDS"
+            ENDIF
+          ELSE
+             ptab(i1:i2,j1:j2) = e1t(i1:i2,j1:j2)
+          ENDIF
       ELSE
          e1t(i1:i2,j1:j2)=ptab/Agrif_rhoy()
       ENDIF
@@ -742,6 +864,7 @@ end subroutine agrif_init_scales
 
    SUBROUTINE init_e1u( ptab, i1, i2, j1, j2, before, nb,ndir)
    use dom_oce
+   use agrif_parameters
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE interpsshn  ***
       !!----------------------------------------------------------------------  
@@ -758,7 +881,22 @@ end subroutine agrif_init_scales
          southern_side = (nb == 2).AND.(ndir == 1)
          northern_side = (nb == 2).AND.(ndir == 2)
       IF( before) THEN
-         ptab(i1:i2,j1:j2) = e1u(i1:i2,j1:j2)
+          IF (j1<1) THEN
+            IF (.NOT.agrif_child(south_boundary_open)) THEN
+              IF ((nbondj == -1).OR.(nbondj == 2)) THEN
+                DO jj=1,j2
+                  ptab(i1:i2,jj)=e1u(i1:i2,jj)
+                ENDDO
+                DO jj=j1,0
+                  ptab(i1:i2,jj)=e1u(i1:i2,1)
+                ENDDO
+              ENDIF
+            ELSE
+              stop "OUT OF BOUNDS"
+            ENDIF
+          ELSE
+             ptab(i1:i2,j1:j2) = e1u(i1:i2,j1:j2)
+          ENDIF
       ELSE
          e1u(i1:i2,j1:j2)=ptab/Agrif_rhoy()
       ENDIF
@@ -817,6 +955,7 @@ end subroutine agrif_init_scales
 
   SUBROUTINE init_e2t( ptab, i1, i2, j1, j2, before, nb,ndir)
    use dom_oce
+   use agrif_parameters
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE interpsshn  ***
       !!----------------------------------------------------------------------  
@@ -833,7 +972,22 @@ end subroutine agrif_init_scales
          southern_side = (nb == 2).AND.(ndir == 1)
          northern_side = (nb == 2).AND.(ndir == 2)
       IF( before) THEN
-         ptab(i1:i2,j1:j2) = e2t(i1:i2,j1:j2)
+          IF (j1<1) THEN
+            IF (.NOT.agrif_child(south_boundary_open)) THEN
+              IF ((nbondj == -1).OR.(nbondj == 2)) THEN
+                DO jj=1,j2
+                  ptab(i1:i2,jj)=e2t(i1:i2,jj)
+                ENDDO
+                DO jj=j1,0
+                  ptab(i1:i2,jj)=e2t(i1:i2,1)
+                ENDDO
+              ENDIF
+            ELSE
+              stop "OUT OF BOUNDS"
+            ENDIF
+          ELSE
+             ptab(i1:i2,j1:j2) = e2t(i1:i2,j1:j2)
+          ENDIF
       ELSE
          e2t(i1:i2,j1:j2)=ptab/Agrif_rhoy()
       ENDIF
@@ -842,6 +996,7 @@ end subroutine agrif_init_scales
 
    SUBROUTINE init_e2u( ptab, i1, i2, j1, j2, before, nb,ndir)
    use dom_oce
+   use agrif_parameters
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE interpsshn  ***
       !!----------------------------------------------------------------------  
@@ -858,7 +1013,22 @@ end subroutine agrif_init_scales
          southern_side = (nb == 2).AND.(ndir == 1)
          northern_side = (nb == 2).AND.(ndir == 2)
       IF( before) THEN
-         ptab(i1:i2,j1:j2) = e2u(i1:i2,j1:j2)
+          IF (j1<1) THEN
+            IF (.NOT.agrif_child(south_boundary_open)) THEN
+              IF ((nbondj == -1).OR.(nbondj == 2)) THEN
+                DO jj=1,j2
+                  ptab(i1:i2,jj)=e2u(i1:i2,jj)
+                ENDDO
+                DO jj=j1,0
+                  ptab(i1:i2,jj)=e2u(i1:i2,1)
+                ENDDO
+              ENDIF
+            ELSE
+              stop "OUT OF BOUNDS"
+            ENDIF
+          ELSE
+             ptab(i1:i2,j1:j2) = e2u(i1:i2,j1:j2)
+          ENDIF
       ELSE
          e2u(i1:i2,j1:j2)=ptab/Agrif_rhoy()
       ENDIF
@@ -918,6 +1088,7 @@ end subroutine agrif_init_scales
 
 SUBROUTINE agrif_nemo_init
 USE agrif_parameters
+USE dom_oce
 USE in_out_manager
 USE lib_mpp
 
@@ -927,7 +1098,7 @@ USE lib_mpp
    
    INTEGER ::   ios
    
-   NAMELIST/namagrif/ nn_cln_update,ln_spc_dyn,rn_sponge_tra,rn_sponge_dyn,ln_chk_bathy,npt_connect, npt_copy
+   NAMELIST/namagrif/ nn_cln_update,ln_spc_dyn,rn_sponge_tra,rn_sponge_dyn,ln_chk_bathy,npt_connect, npt_copy, south_boundary_open
 
       REWIND( numnam_ref )              ! Namelist namagrif in reference namelist : nesting parameters
       READ  ( numnam_ref, namagrif, IOSTAT = ios, ERR = 901 )
@@ -943,10 +1114,28 @@ USE lib_mpp
          WRITE(numout,*) 'agrif_nemo_init : nesting'
          WRITE(numout,*) '~~~~~~~'
          WRITE(numout,*) '   Namelist namagrif : set nesting parameters'
-         WRITE(numout,*) '      npt_copy     = ', npt_copy
-         WRITE(numout,*) '      npt_connect  = ', npt_connect
+         WRITE(numout,*) '      npt_copy             = ', npt_copy
+         WRITE(numout,*) '      npt_connect          = ', npt_connect
+         WRITE(numout,*) '      south_boundary_open  = ', south_boundary_open
       ENDIF
-      
+
+      print *,'soutyhubar = ',south_boundary_open
+
+   ! Set the number of ghost cells according to periodicity
+
+      nbghostcells_x = nbghostcells
+      nbghostcells_y_s = nbghostcells
+      nbghostcells_y_n = nbghostcells
+
+      IF (.not.agrif_root()) THEN
+        IF (jperio == 1) THEN
+          nbghostcells_x = 0
+        ENDIF
+        IF (.NOT.south_boundary_open) THEN
+          nbghostcells_y_s = 0
+        ENDIF
+      ENDIF
+
 END SUBROUTINE agrif_nemo_init
    
 

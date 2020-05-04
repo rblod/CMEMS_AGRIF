@@ -9,9 +9,8 @@ REAL(wp) :: rn_sponge_dyn
 LOGICAL :: ln_chk_bathy
 INTEGER :: npt_copy
 INTEGER :: npt_connect
-
+LOGICAL :: south_boundary_open
 REAL(wp), PUBLIC, ALLOCATABLE, SAVE        , DIMENSION(:,:) ::   ztabramp
-
 REAL(wp), PUBLIC, ALLOCATABLE, SAVE        , DIMENSION(:,:,:) ::   e3t_interp
 
 end module agrif_parameters
