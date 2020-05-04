@@ -46,7 +46,7 @@ type Agrif_Grid
     real   , dimension(3)              :: Agrif_x   !< global x, y and z position
     real   , dimension(3)              :: Agrif_dx  !< global space step in the x, y and z direction
     real   , dimension(3)              :: Agrif_dt  !< global time  step in the x, y and z direction
-    integer, dimension(3)              :: nb        !< number of cells in the x, y and z direction
+    integer, dimension(3)              :: nb = 1    !< number of cells in the x, y and z direction
     integer, dimension(3)              :: ix        !< minimal position in the x, y and z direction
     integer, dimension(3)              :: spaceref  !< space refinement factor in the x, y and z direction
     integer, dimension(3)              :: timeref   !< Time refinement factor in the x, y and z direction
@@ -105,6 +105,9 @@ type(Agrif_Grid_List), pointer :: Agrif_oldmygrid => NULL()
 
 !> Pointer to the current grid (the link is done by using the Agrif_Instance procedure (\see module Agrif_Init))
 type(Agrif_Grid) , pointer :: Agrif_Curgrid => NULL()
+
+!> Pointer to the current child grid (the link is done before calls to procname)
+type(Agrif_Grid) , pointer :: Agrif_CurChildgrid => NULL()
 !
 !===================================================================================================
 type Agrif_Sequence

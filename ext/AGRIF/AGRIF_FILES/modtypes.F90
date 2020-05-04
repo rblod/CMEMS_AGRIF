@@ -19,7 +19,7 @@
 !
 !
 !
-!
+! 
 !> Definition of data types used in AGRIF, of several variables and parameters
 !
 module Agrif_Types
@@ -325,6 +325,7 @@ type Agrif_Interp_Loc
 #endif
     integer                           :: nb_chunks
     integer, dimension(:,:,:,:), allocatable :: parentarray_chunk
+    integer, dimension(:,:,:,:), allocatable :: parentarray_chunk_decal
     integer, dimension(:,:),allocatable :: decal_chunks
     logical, dimension(:),allocatable :: correction_required
     logical, dimension(:),allocatable :: member_chuncks 
