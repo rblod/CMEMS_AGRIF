@@ -22,7 +22,7 @@ CONTAINS
 
    SUBROUTINE dom_bat
 
-      INTEGER :: inum, id, ji, jj
+      INTEGER :: inum, id, ji, jj,ji1,jj1
       INTEGER :: iimin,iimax,jjmin,jjmax
       INTEGER :: tabdim1, tabdim2, nxhr, nyhr, nxyhr
       INTEGER, DIMENSION(2) :: ddims
@@ -281,16 +281,19 @@ zshift = 0.
          !  POINT DETECTION
          !
          !                       
-         DO jj = 2,jpj-1
-            DO ji = 2,jpi-1
+         DO jj = 1,jpj
+            DO ji = 1,jpi
               write(*,*) jj, ji
                !     
-               ! FINE GRID CELLS DEFINITION               
+               ! FINE GRID CELLS DEFINITION  
+               ji1=max(ji-1,1)
+               jj1=max(jj-1,1)             
+             
                !
-               Cell_lonmin(ji,jj) = MIN(zglamf(ji-1,jj-1),zglamf(ji,jj-1),zglamf(ji,jj),zglamf(ji-1,jj))
-               Cell_lonmax(ji,jj) = MAX(zglamf(ji-1,jj-1),zglamf(ji,jj-1),zglamf(ji,jj),zglamf(ji-1,jj))
-               Cell_latmin(ji,jj) = MIN(gphif(ji-1,jj-1),gphif(ji,jj-1),gphif(ji,jj),gphif(ji-1,jj))
-               Cell_latmax(ji,jj) = MAX(gphif(ji-1,jj-1),gphif(ji,jj-1),gphif(ji,jj),gphif(ji-1,jj))
+               Cell_lonmin(ji,jj) = MIN(zglamf(ji1,jj1),zglamf(ji,jj1),zglamf(ji,jj),zglamf(ji1,jj))
+               Cell_lonmax(ji,jj) = MAX(zglamf(ji1,jj1),zglamf(ji,jj1),zglamf(ji,jj),zglamf(ji1,jj))
+               Cell_latmin(ji,jj) = MIN(gphif(ji1,jj1),gphif(ji,jj1),gphif(ji,jj),gphif(ji1,jj))
+               Cell_latmax(ji,jj) = MAX(gphif(ji1,jj1),gphif(ji,jj1),gphif(ji,jj),gphif(ji1,jj))
                IF( ABS(Cell_lonmax(ji,jj) - Cell_lonmin(ji,jj) ) > 180 ) THEN
                     zdel = Cell_lonmax(ji,jj)
                     Cell_lonmax(ji,jj) = Cell_lonmin(ji,jj)
@@ -497,7 +500,7 @@ zshift = 0.
          ENDIF
         !            
       ENDIF
-      CALL lbc_lnk( 'dom_bat', bathy, 'T', 1. )
+  !    CALL lbc_lnk( 'dom_bat', bathy, 'T', 1. )
 
    END SUBROUTINE dom_bat
 

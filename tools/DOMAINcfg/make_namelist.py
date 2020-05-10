@@ -61,6 +61,8 @@ for g in range(len(grid)) :
         cnt1 = 1
         while line :
            line = fp.readline()
+           if line.strip().startswith('jperio'):
+               line = "   jperio = 0\n"
            if line.strip().startswith('nn_bathy'):
            	   line = "   nn_bathy = 2\n"
            if line.strip().startswith('nn_interp'):
