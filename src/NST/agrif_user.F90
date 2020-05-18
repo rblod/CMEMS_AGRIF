@@ -27,17 +27,84 @@
      ! Kbb_a = Nbb; Kmm_a = Nnn; Krhs_a = Nrhs   ! agrif_oce module copies of time level indices
       !
       !                    !* Agrif initialization
-      CALL agrif_nemo_init
+    !  CALL agrif_nemo_init
       CALL Agrif_InitValues_cont_dom
-      CALL Agrif_InitValues_cont
+   !   CALL Agrif_InitValues_cont
 # if defined key_top
       CALL Agrif_InitValues_cont_top
 # endif
-# if defined key_si3
-      CALL Agrif_InitValues_cont_ice
-# endif
       !    
    END SUBROUTINE Agrif_initvalues
+
+
+   SUBROUTINE agrif_istate( Kbb, Kmm, Kaa )
+
+       USE domvvl
+       USE domain
+       USE par_oce
+       USE agrif_oce
+       USE agrif_oce_interp
+       USE oce
+       USE lib_mpp
+       USe lbclnk
+
+
+      INTEGER, INTENT(in)  :: Kbb, Kmm, Kaa
+      INTEGER :: jn
+
+
+
+     ! IF (.NOT. ln_linssh)  THEN 
+     !    CALL dom_vvl_init( Kbb, Kmm, Kaa )
+     ! ELSE   
+     !    CALL Agrif_Init_Variable(sshini_id, procname=agrif_initssh)
+     ! ENDIF
+
+     ! IF( ln_meshmask    )   CALL dom_wri       ! Create a domain file
+     ! IF( .NOT.ln_rstart )   CALL dom_ctl       ! Domain control
+      !
+     ! IF( ln_write_cfg   )   CALL cfg_write     ! create the configuration file
+      !
+     ! IF(lwp) THEN
+      !   WRITE(numout,*)
+       !  WRITE(numout,*) 'dom_init :   ==>>>   END of domain initialization'
+        ! WRITE(numout,*) '~~~~~~~~'
+       !  WRITE(numout,*) 
+     ! ENDIF
+
+      l_ini_child = .TRUE.
+      Agrif_SpecialValue    = 0._wp
+      Agrif_UseSpecialValue = .TRUE.
+      uu=0 ; vv=0
+       
+      Krhs_a = Kbb ; Kmm_a = Kbb
+
+      ! Brutal fix to pas 1x1 refinment. 
+      IF(Agrif_Fixed() == 0) THEN
+        CALL Agrif_Init_Variable(tsini_id, procname=interptsn) 
+      ELSE
+        CALL Agrif_Init_Variable(tsini_id, procname=agrif_initts) 
+      ENDIF
+      Agrif_UseSpecialValue = ln_spc_dyn
+      use_sign_north = .TRUE.
+      sign_north = -1.
+      CALL Agrif_Init_Variable(uini_id , procname=interpun )
+      CALL Agrif_Init_Variable(vini_id , procname=interpvn )
+      use_sign_north = .FALSE.
+      Agrif_UseSpecialValue = .FALSE.            !
+      l_ini_child = .FALSE.
+      Krhs_a = Kaa ; Kmm_a = Kmm
+
+      DO jn = 1, jpts
+         ts(:,:,:,jn,Kbb) = ts(:,:,:,jn,Kbb)*tmask(:,:,:)
+      END DO
+      uu(:,:,:,Kbb) =  uu(:,:,:,Kbb) * umask(:,:,:)     
+      vv(:,:,:,Kbb) =  vv(:,:,:,Kbb) * umask(:,:,:)     
+
+      CALL lbc_lnk_multi( 'agrif_istate', uu(:,:,:,Kbb), 'U', -1. , vv(:,:,:,Kbb), 'V', -1. )
+      CALL lbc_lnk( 'agrif_istate', ts(:,:,:,:,Kbb), 'T', 1. )
+
+   END SUBROUTINE agrif_istate   
 
    SUBROUTINE Agrif_InitValues_cont_dom
       !!----------------------------------------------------------------------
@@ -111,6 +178,7 @@ SUBROUTINE Agrif_InitValues_cont
    USE nemogcm
    USE agrif_oce
    !
+   USE lbclnk
    USE lib_mpp
    USE in_out_manager
    !
@@ -118,25 +186,27 @@ SUBROUTINE Agrif_InitValues_cont
    !
    LOGICAL :: check_namelist
    CHARACTER(len=15) :: cl_check1, cl_check2, cl_check3, cl_check4 
-#if defined key_vertical
-      REAL(wp), DIMENSION(jpi,jpj) ::   zk   ! workspace
-#endif
+   REAL(wp), DIMENSION(jpi,jpj) ::   zk   ! workspace
+   INTEGER :: ji, jj
 
       !!----------------------------------------------------------------------
 
    ! 1. Declaration of the type of variable which have to be interpolated
    !---------------------------------------------------------------------
   ! CALL agrif_declare_var
+      IF( agrif_oce_alloc()  > 0 )   CALL ctl_warn('agrif agrif_oce_alloc: allocation of arrays failed')
 
-#if defined key_vertical
+
       ! Build consistent parent bathymetry and number of levels
       ! on the child grid 
       Agrif_UseSpecialValue = .FALSE.
       ht0_parent(:,:) = 0._wp
       mbkt_parent(:,:) = 0
       !
-      CALL Agrif_Bc_variable(ht0_id ,calledweight=1.,procname=interpht0 )
-      CALL Agrif_Bc_variable(mbkt_id,calledweight=1.,procname=interpmbkt)
+  !    CALL Agrif_Bc_variable(ht0_id ,calledweight=1.,procname=interpht0 )
+  !    CALL Agrif_Bc_variable(mbkt_id,calledweight=1.,procname=interpmbkt)
+      CALL Agrif_Init_Variable(ht0_id , procname=interpht0 )
+      CALL Agrif_Init_Variable(mbkt_id, procname=interpmbkt)
       !
       ! Assume step wise change of bathymetry near interface
       ! TODO: Switch to linear interpolation of bathymetry in the s-coordinate case
@@ -161,10 +231,9 @@ SUBROUTINE Agrif_InitValues_cont
       CALL lbc_lnk( 'Agrif_InitValues_cont', hu0_parent, 'U', 1. )
       CALL lbc_lnk( 'Agrif_InitValues_cont', hv0_parent, 'V', 1. )
       zk(:,:) = REAL( mbku_parent(:,:), wp )   ;   CALL lbc_lnk( 'Agrif_InitValues_cont', zk, 'U', 1. )
-      mbku_parent(:,:) = MAX( NINT( zk(:,:) ), 1 )
+      mbku_parent(:,:) = MAX( NINT( zk(:,:) ), 1 ) ;
       zk(:,:) = REAL( mbkv_parent(:,:), wp )   ;   CALL lbc_lnk( 'Agrif_InitValues_cont', zk, 'V', 1. )
       mbkv_parent(:,:) = MAX( NINT( zk(:,:) ), 1 )   
-#endif
 
 
 
@@ -230,18 +299,6 @@ SUBROUTINE Agrif_InitValues_cont
                   &               'value on child grid should be changed to : '//cl_check3 )
          ENDIF
 
-         ! Check run length
-         IF( Agrif_IRhot() * (Agrif_Parent(nitend)- &
-               Agrif_Parent(nit000)+1) .NE. (nitend-nit000+1) ) THEN
-            WRITE(cl_check1,*)  (Agrif_Parent(nit000)-1)*Agrif_IRhot() + 1
-            WRITE(cl_check2,*)   Agrif_Parent(nitend)   *Agrif_IRhot()
-            CALL ctl_warn( 'Incompatible run length between grids'                      ,   &
-                  &               'nit000 on fine grid will be changed to : '//cl_check1,   &
-                  &               'nitend on fine grid will be changed to : '//cl_check2    )
-            nit000 = (Agrif_Parent(nit000)-1)*Agrif_IRhot() + 1
-            nitend =  Agrif_Parent(nitend)   *Agrif_IRhot()
-         ENDIF
-
          ! Check free surface scheme
          IF ( ( Agrif_Parent(ln_dynspg_ts ).AND.ln_dynspg_exp ).OR.&
             & ( Agrif_Parent(ln_dynspg_exp).AND.ln_dynspg_ts ) ) THEN
@@ -280,22 +337,23 @@ SUBROUTINE Agrif_InitValues_cont
          IF(lwp) WRITE(numout,*) 'AGRIF: Check Bathymetry and masks near bdys. Level: ', Agrif_Level()
          !
          kindic_agr = 0
-# if ! defined key_vertical
-         !
-         ! check if tmask and vertical scale factors agree with parent in sponge area:
-         CALL Agrif_Bc_variable(e3t_id,calledweight=1.,procname=interpe3t)
-         !
-# else
-         !
-         ! In case of vertical interpolation, check only that total depths agree between child and parent:
-         DO ji = 1, jpi
-            DO jj = 1, jpj
-               IF ((mbkt_parent(ji,jj)/=0).AND.(ABS(ht0_parent(ji,jj)-ht_0(ji,jj))>1.e-3)) kindic_agr = kindic_agr + 1
-               IF ((mbku_parent(ji,jj)/=0).AND.(ABS(hu0_parent(ji,jj)-hu_0(ji,jj))>1.e-3)) kindic_agr = kindic_agr + 1
-               IF ((mbkv_parent(ji,jj)/=0).AND.(ABS(hv0_parent(ji,jj)-hv_0(ji,jj))>1.e-3)) kindic_agr = kindic_agr + 1
+            IF( .NOT. l_vremap ) THEN
+            !
+            ! check if tmask and vertical scale factors agree with parent in sponge area:
+            CALL Agrif_Bc_variable(e3t_id,calledweight=1.,procname=interpe3t)
+            !
+            ELSE
+            !
+            ! In case of vertical interpolation, check only that total depths agree between child and parent:
+            DO ji = 1, jpi
+               DO jj = 1, jpj
+                  IF ((mbkt_parent(ji,jj)/=0).AND.(ABS(ht0_parent(ji,jj)-ht_0(ji,jj))>1.e-3)) kindic_agr = kindic_agr + 1
+                  IF ((mbku_parent(ji,jj)/=0).AND.(ABS(hu0_parent(ji,jj)-hu_0(ji,jj))>1.e-3)) kindic_agr = kindic_agr + 1
+                  IF ((mbkv_parent(ji,jj)/=0).AND.(ABS(hv0_parent(ji,jj)-hv_0(ji,jj))>1.e-3)) kindic_agr = kindic_agr + 1
+               END DO
             END DO
-         END DO
-# endif
+         ENDIF
+
          CALL mpp_sum( 'agrif_user', kindic_agr )
          IF( kindic_agr /= 0 ) THEN
             CALL ctl_stop('==> Child Bathymetry is NOT correct near boundaries.')
@@ -306,12 +364,12 @@ SUBROUTINE Agrif_InitValues_cont
          !    
       ENDIF
 
-# if defined key_vertical
+      IF( l_vremap ) THEN
       ! Additional constrain that should be removed someday:
-      IF ( Agrif_Parent(jpk).GT.jpk ) THEN
-    CALL ctl_stop( ' With key_vertical, child grids must have jpk greater or equal to the parent value' )
+         IF ( Agrif_Parent(jpk).GT.jpk ) THEN
+            CALL ctl_stop( ' With l_vremap, child grids must have jpk greater or equal to the parent value' )
+         ENDIF
       ENDIF
-# endif
 
 END SUBROUTINE Agrif_InitValues_cont
 
@@ -335,48 +393,48 @@ END SUBROUTINE Agrif_InitValues_cont
       ind1 =     nbghostcells
       ind2 = 1 + nbghostcells
       ind3 = 2 + nbghostcells
-# if defined key_vertical
-      CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts+1/),tsn_id)
-      CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts+1/),tsn_sponge_id)
+      IF( l_vremap ) THEN 
+         CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts+1/),tsn_id)
+         CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts+1/),tsn_sponge_id)
 
-      CALL agrif_declare_variable((/1,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),un_interp_id)
-      CALL agrif_declare_variable((/2,1,0,0/),(/ind3,ind2,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),vn_interp_id)
-      CALL agrif_declare_variable((/1,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),un_update_id)
-      CALL agrif_declare_variable((/2,1,0,0/),(/ind3,ind2,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),vn_update_id)
-      CALL agrif_declare_variable((/1,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),un_sponge_id)
-      CALL agrif_declare_variable((/2,1,0,0/),(/ind3,ind2,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),vn_sponge_id)
-# else
-      CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts/),tsn_id)
-      CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts/),tsn_sponge_id)
+         CALL agrif_declare_variable((/1,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),un_interp_id) !
+         CALL agrif_declare_variable((/2,1,0,0/),(/ind3,ind2,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),vn_interp_id)
+         CALL agrif_declare_variable((/1,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),un_update_id)
+         CALL agrif_declare_variable((/2,1,0,0/),(/ind3,ind2,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),vn_update_id)
+         CALL agrif_declare_variable((/1,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),un_sponge_id)
+         CALL agrif_declare_variable((/2,1,0,0/),(/ind3,ind2,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),vn_sponge_id)
+      ELSE    
+         CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts/),tsn_id)
+         CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts/),tsn_sponge_id)
 
-      CALL agrif_declare_variable((/1,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),un_interp_id)
-      CALL agrif_declare_variable((/2,1,0,0/),(/ind3,ind2,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),vn_interp_id)
-      CALL agrif_declare_variable((/1,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),un_update_id)
-      CALL agrif_declare_variable((/2,1,0,0/),(/ind3,ind2,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),vn_update_id)
-      CALL agrif_declare_variable((/1,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),un_sponge_id)
-      CALL agrif_declare_variable((/2,1,0,0/),(/ind3,ind2,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),vn_sponge_id)
-# endif
+         CALL agrif_declare_variable((/1,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),un_interp_id)
+         CALL agrif_declare_variable((/2,1,0,0/),(/ind3,ind2,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),vn_interp_id)
+         CALL agrif_declare_variable((/1,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),un_update_id)
+         CALL agrif_declare_variable((/2,1,0,0/),(/ind3,ind2,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),vn_update_id)
+         CALL agrif_declare_variable((/1,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),un_sponge_id)
+         CALL agrif_declare_variable((/2,1,0,0/),(/ind3,ind2,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),vn_sponge_id)
+      ENDIF 
 
       CALL agrif_declare_variable((/2,2,0/),(/ind3,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nlci,nlcj,jpk/),e3t_id)
 
 
-# if defined key_vertical
       CALL agrif_declare_variable((/2,2/),(/ind3,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),mbkt_id)
       CALL agrif_declare_variable((/2,2/),(/ind3,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),ht0_id)
-# endif
-!   ENDIF
 
    
-   ! Initial or restart velues
-   ! Here we don't have the knwoledge of all the options so we
-   ! declare profile with dimension max number of variables
-   CALL Agrif_Set_MaskMaxSearch(25)
-   !
-   CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts/),tsini_id)
-   !  
-   CALL Agrif_Set_MaskMaxSearch(5)
+      ! Initial or restart velues
+      CALL Agrif_Set_MaskMaxSearch(25)
+      !
+      CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts+1/),tsini_id)
+      CALL agrif_declare_variable((/1,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/)     ,uini_id ) 
+      CALL agrif_declare_variable((/2,1,0,0/),(/ind3,ind2,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/)     ,vini_id )
+      CALL agrif_declare_variable((/2,2/),(/ind3,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),sshini_id)
+      ! 
+ 
+      CALL Agrif_Set_MaskMaxSearch(5)
 
-
+      CALL agrif_declare_variable((/2,2/),(/ind3,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),mbkt_id)
+      CALL agrif_declare_variable((/2,2/),(/ind3,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),ht0_id)
 
 
       CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,3/),scales_t_id)
@@ -393,11 +451,11 @@ END SUBROUTINE Agrif_InitValues_cont
 !      IF( ln_zdftke.OR.ln_zdfgls ) THEN  ! logical not known at this point
 !         CALL agrif_declare_variable((/2,2,0/),(/ind3,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nlci,nlcj,jpk/), en_id)
 !         CALL agrif_declare_variable((/2,2,0/),(/ind3,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nlci,nlcj,jpk/),avt_id)
-# if defined key_vertical
+      IF( l_vremap ) THEN
          CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),avm_id)
-# else
+      ELSE
          CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),avm_id)
-# endif
+      ENDIF
  !     ENDIF
      
       ! 2. Type of interpolation
@@ -428,16 +486,23 @@ END SUBROUTINE Agrif_InitValues_cont
 
       CALL Agrif_Set_bcinterp(e3t_id,interp=AGRIF_constant)
 
-# if defined key_vertical
       CALL Agrif_Set_bcinterp(mbkt_id,interp=AGRIF_constant)
+      CALL Agrif_Set_interp  (mbkt_id,interp=AGRIF_constant)
       CALL Agrif_Set_bcinterp(ht0_id ,interp=AGRIF_constant)
-# endif
+      CALL Agrif_Set_interp  (ht0_id ,interp=AGRIF_constant)
 
      ! IF( ln_zdftke.OR.ln_zdfgls )  
        CALL Agrif_Set_bcinterp( avm_id, interp=AGRIF_linear )
-   ! Initial fields
-   CALL Agrif_Set_bcinterp(tsini_id,interp=AGRIF_linear)
-   CALL Agrif_Set_interp  (tsini_id,interp=AGRIF_linear)
+    
+     ! Initial fields
+      CALL Agrif_Set_bcinterp(tsini_id ,interp=AGRIF_linear)
+      CALL Agrif_Set_interp  (tsini_id ,interp=AGRIF_linear)
+      CALL Agrif_Set_bcinterp(uini_id  ,interp=AGRIF_linear)
+      CALL Agrif_Set_interp  (uini_id  ,interp=AGRIF_linear)
+      CALL Agrif_Set_bcinterp(vini_id  ,interp=AGRIF_linear)
+      CALL Agrif_Set_interp  (vini_id  ,interp=AGRIF_linear)
+      CALL Agrif_Set_bcinterp(sshini_id,interp=AGRIF_linear)
+      CALL Agrif_Set_interp  (sshini_id,interp=AGRIF_linear)
 
 
        ! 3. Location of interpolation
@@ -460,14 +525,17 @@ END SUBROUTINE Agrif_InitValues_cont
 ! JC: check near the boundary only until matching in sponge has been sorted out:
       CALL Agrif_Set_bc(  e3t_id, (/0,ind1-1/) )  
 
-# if defined key_vertical 
       ! extend the interpolation zone by 1 more point than necessary:
       CALL Agrif_Set_bc(  mbkt_id, (/-nn_sponge_len*Agrif_irhox()-2,ind1/) )
       CALL Agrif_Set_bc(  ht0_id,  (/-nn_sponge_len*Agrif_irhox()-2,ind1/) )
-# endif
 
       !IF( ln_zdftke.OR.ln_zdfgls )   
       CALL Agrif_Set_bc( avm_id, (/0,ind1/) )
+
+      CALL Agrif_Set_bc( tsini_id , (/0,ind1-1/) ) ! if west,  rhox=3 and nbghost=3: columns 2 to 4
+      CALL Agrif_Set_bc( uini_id  , (/0,ind1-1/) ) 
+      CALL Agrif_Set_bc( vini_id  , (/0,ind1-1/) )
+      CALL Agrif_Set_bc( sshini_id, (/0,ind1-1/) )
 
       ! 4. Update type
       !--------------- 
@@ -571,17 +639,35 @@ SUBROUTINE Agrif_InitValues_cont_ice
       CALL agrif_declare_variable((/1,2/)  ,(/ind2,ind3/)  ,(/'x','y'/)    ,(/1,1/)  ,(/nlci,nlcj/)                      ,u_ice_id  )
       CALL agrif_declare_variable((/2,1/)  ,(/ind3,ind2/)  ,(/'x','y'/)    ,(/1,1/)  ,(/nlci,nlcj/)                      ,v_ice_id  )
 
+      CALL Agrif_Set_MaskMaxSearch(25)
+      CALL agrif_declare_variable((/2,2,0/),(/ind3,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nlci,nlcj,jpl*(8+nlay_s+nlay_i)/),tra_iceini_id)
+      CALL agrif_declare_variable((/1,2/)  ,(/ind2,ind3/)  ,(/'x','y'/)    ,(/1,1/)  ,(/nlci,nlcj/)                      ,u_iceini_id  )
+      CALL agrif_declare_variable((/2,1/)  ,(/ind3,ind2/)  ,(/'x','y'/)    ,(/1,1/)  ,(/nlci,nlcj/)                      ,v_iceini_id  )
+      CALL Agrif_Set_MaskMaxSearch(5)
+
       ! 2. Set interpolations (normal & tangent to the grid cell for velocities)
       !-----------------------------------
       CALL Agrif_Set_bcinterp(tra_ice_id, interp  = AGRIF_linear)
       CALL Agrif_Set_bcinterp(u_ice_id  , interp1 = Agrif_linear,interp2 = AGRIF_ppm   )
       CALL Agrif_Set_bcinterp(v_ice_id  , interp1 = AGRIF_ppm   ,interp2 = Agrif_linear)
 
+
+      CALL Agrif_Set_bcinterp(tra_iceini_id, interp  = AGRIF_linear)
+      CALL Agrif_Set_interp  (tra_iceini_id, interp  = AGRIF_linear)
+      CALL Agrif_Set_bcinterp(u_iceini_id  , interp  = AGRIF_linear  )
+      CALL Agrif_Set_interp  (u_iceini_id  , interp  = AGRIF_linear   )
+      CALL Agrif_Set_bcinterp(v_iceini_id  , interp  = AGRIF_linear)
+      CALL Agrif_Set_interp  (v_iceini_id  , interp  = AGRIF_linear)
+
       ! 3. Set location of interpolations
       !----------------------------------
       CALL Agrif_Set_bc(tra_ice_id,(/0,ind1/))
       CALL Agrif_Set_bc(u_ice_id  ,(/0,ind1/))
       CALL Agrif_Set_bc(v_ice_id  ,(/0,ind1/))
+
+      CALL Agrif_Set_bc(tra_iceini_id,(/0,ind1/))
+      CALL Agrif_Set_bc(u_iceini_id  ,(/0,ind1/))
+      CALL Agrif_Set_bc(v_iceini_id  ,(/0,ind1/))
 
       ! 4. Set update type in case 2 ways (child=>parent) (normal & tangent to the grid cell for velocities)
       !--------------------------------------------------
@@ -707,13 +793,15 @@ SUBROUTINE Agrif_InitValues_cont_ice
       ind1 =     nbghostcells
       ind2 = 1 + nbghostcells
       ind3 = 2 + nbghostcells
-# if defined key_vertical
-      CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jptra+1/),trn_id)
-      CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jptra+1/),trn_sponge_id)
-# else
-      CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jptra/),trn_id)
-      CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jptra/),trn_sponge_id)
-# endif
+      IF( l_vremap ) THEN
+         CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jptra+1/),trn_id)
+         CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jptra+1/),trn_sponge_id)
+      ELSE
+         CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jptra/),trn_id)
+         CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jptra/),trn_sponge_id)
+      ENDIF
+
+!RB_CMEMS : declare here init for top      
 
       ! 2. Type of interpolation
       !-------------------------
@@ -785,7 +873,7 @@ SUBROUTINE Agrif_InitValues_cont_ice
       ENDIF
       !
       !
-      IF( agrif_oce_alloc()  > 0 )   CALL ctl_warn('agrif agrif_oce_alloc: allocation of arrays failed')
+      !IF( agrif_oce_alloc()  > 0 )   CALL ctl_warn('agrif agrif_oce_alloc: allocation of arrays failed')
       !
    END SUBROUTINE agrif_nemo_init
 

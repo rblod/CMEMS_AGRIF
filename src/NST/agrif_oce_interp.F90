@@ -43,10 +43,8 @@ MODULE agrif_oce_interp
    PUBLIC   interptsn, interpsshn, interpavm
    PUBLIC   interpunb, interpvnb , interpub2b, interpvb2b
    PUBLIC   interpe3t
-#if defined key_vertical
    PUBLIC   interpht0, interpmbkt
-# endif
-   PUBLIC   agrif_initts
+   PUBLIC   agrif_initts, agrif_initssh
 
    INTEGER ::   bdy_tinterp = 0
 
@@ -671,6 +669,7 @@ CONTAINS
       !
       INTEGER  ::   ji, jj, jk, jn  ! dummy loop indices
       INTEGER  ::   N_in, N_out
+      INTEGER  :: item
       ! vertical interpolation:
       REAL(wp) :: zhtot
       REAL(wp), DIMENSION(k1:k2,1:jpts) :: tabin
@@ -678,7 +677,11 @@ CONTAINS
       REAL(wp), DIMENSION(1:jpk) :: h_out
       !!----------------------------------------------------------------------
 
-      IF( before ) THEN         
+      IF( before ) THEN
+
+         item = Kmm_a
+         IF( l_ini_child )   Kmm_a = Kbb_a  
+
          DO jn = 1,jpts
             DO jk=k1,k2
                DO jj=j1,j2
@@ -687,73 +690,86 @@ CONTAINS
                  END DO
               END DO
            END DO
-        END DO
-
-# if defined key_vertical
-        ! Interpolate thicknesses
-        ! Warning: these are masked, hence extrapolated prior interpolation.
-        DO jk=k1,k2
-           DO jj=j1,j2
-              DO ji=i1,i2
-                  ptab(ji,jj,jk,jpts+1) = tmask(ji,jj,jk) * e3t(ji,jj,jk,Kmm_a)
-              END DO
-           END DO
-        END DO
-
-        ! Extrapolate thicknesses in partial bottom cells:
-        ! Set them to Agrif_SpecialValue (0.). Correct bottom thicknesses are retrieved later on
-        IF (ln_zps) THEN
-           DO jj=j1,j2
-              DO ji=i1,i2
-                  jk = mbkt(ji,jj)
-                  ptab(ji,jj,jk,jpts+1) = 0._wp
-              END DO
-           END DO           
-        END IF
-     
-        ! Save ssh at last level:
-        IF (.NOT.ln_linssh) THEN
-           ptab(i1:i2,j1:j2,k2,jpts+1) = ssh(i1:i2,j1:j2,Kmm_a)*tmask(i1:i2,j1:j2,1) 
-        ELSE
-           ptab(i1:i2,j1:j2,k2,jpts+1) = 0._wp
-        END IF      
-# endif
-      ELSE 
-
-# if defined key_vertical 
-         IF (ln_linssh) ptab(i1:i2,j1:j2,k2,n2) = 0._wp 
-            
-         DO jj=j1,j2
-            DO ji=i1,i2
-               ts(ji,jj,:,:,Krhs_a) = 0._wp
-               N_in = mbkt_parent(ji,jj)
-               zhtot = 0._wp
-               DO jk=1,N_in !k2 = jpk of parent grid
-                  IF (jk==N_in) THEN
-                     h_in(jk) = ht0_parent(ji,jj) + ptab(ji,jj,k2,n2) - zhtot
-                  ELSE
-                     h_in(jk) = ptab(ji,jj,jk,n2)
-                  ENDIF
-                  zhtot = zhtot + h_in(jk)
-                  tabin(jk,:) = ptab(ji,jj,jk,n1:n2-1)
-               END DO
-               N_out = 0
-               DO jk=1,jpk ! jpk of child grid
-                  IF (tmask(ji,jj,jk) == 0._wp) EXIT 
-                  N_out = N_out + 1
-                  h_out(jk) = e3t(ji,jj,jk,Krhs_a)
-               ENDDO
-               IF (N_in*N_out > 0) THEN
-                  CALL reconstructandremap(tabin(1:N_in,1:jpts),h_in(1:N_in),ts(ji,jj,1:N_out,1:jpts,Krhs_a),h_out(1:N_out),N_in,N_out,jpts)
-               ENDIF
-            ENDDO
-         ENDDO
-# else
-         !
-         DO jn=1, jpts
-            ts(i1:i2,j1:j2,1:jpk,jn,Krhs_a)=ptab(i1:i2,j1:j2,1:jpk,jn)*tmask(i1:i2,j1:j2,1:jpk) 
          END DO
-# endif
+
+         IF( l_vremap .OR. l_ini_child) THEN
+            ! Interpolate thicknesses
+            ! Warning: these are masked, hence extrapolated prior interpolation.
+            DO jk=k1,k2
+               DO jj=j1,j2
+                  DO ji=i1,i2
+                      ptab(ji,jj,jk,jpts+1) = tmask(ji,jj,jk) * e3t(ji,jj,jk,Kmm_a)
+                  END DO
+               END DO
+            END DO
+
+            ! Extrapolate thicknesses in partial bottom cells:
+            ! Set them to Agrif_SpecialValue (0.). Correct bottom thicknesses are retrieved later on
+            IF (ln_zps) THEN
+               DO jj=j1,j2
+                  DO ji=i1,i2
+                      jk = mbkt(ji,jj)
+                      ptab(ji,jj,jk,jpts+1) = 0._wp
+                  END DO
+               END DO           
+            END IF
+        
+            ! Save ssh at last level:
+            IF (.NOT.ln_linssh) THEN
+               ptab(i1:i2,j1:j2,k2,jpts+1) = ssh(i1:i2,j1:j2,Kmm_a)*tmask(i1:i2,j1:j2,1) 
+            ELSE
+               ptab(i1:i2,j1:j2,k2,jpts+1) = 0._wp
+            END IF      
+         ENDIF
+         Kmm_a = item
+
+      ELSE 
+         item = Krhs_a
+         IF( l_ini_child )   Krhs_a = Kbb_a  
+
+         IF( l_vremap .OR. l_ini_child ) THEN
+            IF (ln_linssh) ptab(i1:i2,j1:j2,k2,n2) = 0._wp 
+               
+            DO jj=j1,j2
+               DO ji=i1,i2
+                  ts(ji,jj,:,:,Krhs_a) = 0.                  
+               !   IF( l_ini_child) ts(ji,jj,:,:,Krhs_a) = ptab(ji,jj,:,1:jpts)
+                  N_in = mbkt_parent(ji,jj)
+                  zhtot = 0._wp
+                  DO jk=1,N_in !k2 = jpk of parent grid
+                     IF (jk==N_in) THEN
+                        h_in(jk) = ht0_parent(ji,jj) + ptab(ji,jj,k2,n2) - zhtot
+                     ELSE
+                        h_in(jk) = ptab(ji,jj,jk,n2)
+                     ENDIF
+                     zhtot = zhtot + h_in(jk)
+                     tabin(jk,:) = ptab(ji,jj,jk,n1:n2-1)
+                  END DO
+                  N_out = 0
+                  DO jk=1,jpk ! jpk of child grid
+                     IF (tmask(ji,jj,jk) == 0._wp) EXIT 
+                     N_out = N_out + 1
+                     h_out(jk) = e3t(ji,jj,jk,Krhs_a)
+                  ENDDO
+                  IF (N_in*N_out > 0) THEN
+                     IF( l_ini_child ) THEN
+                        CALL remap_linear(tabin(1:N_in,1:jpts),h_in(1:N_in),ts(ji,jj,1:N_out,1:jpts,Krhs_a),          &
+                                      &   h_out(1:N_out),N_in,N_out,jpts)  
+                     ELSE 
+                        CALL reconstructandremap(tabin(1:N_in,1:jpts),h_in(1:N_in),ts(ji,jj,1:N_out,1:jpts,Krhs_a),   &
+                                      &   h_out(1:N_out),N_in,N_out,jpts)  
+                     ENDIF
+                  ENDIF
+               ENDDO
+            ENDDO
+            Krhs_a = item
+ 
+         ELSE
+         
+            DO jn=1, jpts
+                ts(i1:i2,j1:j2,1:jpk,jn,Krhs_a)=ptab(i1:i2,j1:j2,1:jpk,jn)*tmask(i1:i2,j1:j2,1:jpk) 
+            END DO
+         ENDIF
 
       ENDIF
       !
@@ -791,85 +807,101 @@ CONTAINS
       ! vertical interpolation:
       REAL(wp), DIMENSION(k1:k2) :: tabin, h_in
       REAL(wp), DIMENSION(1:jpk) :: h_out
-      INTEGER  :: N_in, N_out
+      INTEGER  :: N_in, N_out,item
       REAL(wp) :: h_diff
       !!---------------------------------------------    
       !
       IF (before) THEN 
+
+         item = Kmm_a
+         IF( l_ini_child )   Kmm_a = Kbb_a     
+
          DO jk=1,jpk
             DO jj=j1,j2
                DO ji=i1,i2
                   ptab(ji,jj,jk,1) = (e2u(ji,jj) * e3u(ji,jj,jk,Kmm_a) * uu(ji,jj,jk,Kmm_a)*umask(ji,jj,jk)) 
-# if defined key_vertical
-                  ! Interpolate thicknesses (masked for subsequent extrapolation)
-                  ptab(ji,jj,jk,2) = umask(ji,jj,jk) * e2u(ji,jj) * e3u(ji,jj,jk,Kmm_a)
-# endif
+                  IF( l_vremap .OR. l_ini_child) THEN
+                     ! Interpolate thicknesses (masked for subsequent extrapolation)
+                     ptab(ji,jj,jk,2) = umask(ji,jj,jk) * e2u(ji,jj) * e3u(ji,jj,jk,Kmm_a)
+                  ENDIF
                END DO
             END DO
          END DO
-# if defined key_vertical
+
+        IF( l_vremap .OR. l_ini_child) THEN
          ! Extrapolate thicknesses in partial bottom cells:
          ! Set them to Agrif_SpecialValue (0.). Correct bottom thicknesses are retrieved later on
-         IF (ln_zps) THEN
-            DO jj=j1,j2
-               DO ji=i1,i2
-                  jk = mbku(ji,jj)
-                  ptab(ji,jj,jk,2) = 0._wp
-               END DO
-            END DO           
-         END IF
-        ! Save ssh at last level:
-        ptab(i1:i2,j1:j2,k2,2) = 0._wp
-        IF (.NOT.ln_linssh) THEN
-           ! This vertical sum below should be replaced by the sea-level at U-points (optimization):
-           DO jk=1,jpk
-              ptab(i1:i2,j1:j2,k2,2) = ptab(i1:i2,j1:j2,k2,2) + e3u(i1:i2,j1:j2,jk,Kmm_a) * umask(i1:i2,j1:j2,jk)
-           END DO
-           ptab(i1:i2,j1:j2,k2,2) = ptab(i1:i2,j1:j2,k2,2) - hu_0(i1:i2,j1:j2)
-        END IF 
-# endif
+            IF (ln_zps) THEN
+               DO jj=j1,j2
+                  DO ji=i1,i2
+                     jk = mbku(ji,jj)
+                     ptab(ji,jj,jk,2) = 0._wp
+                  END DO
+               END DO           
+            END IF
+
+           ! Save ssh at last level:
+           ptab(i1:i2,j1:j2,k2,2) = 0._wp
+           IF (.NOT.ln_linssh) THEN
+              ! This vertical sum below should be replaced by the sea-level at U-points (optimization):
+              DO jk=1,jpk
+                 ptab(i1:i2,j1:j2,k2,2) = ptab(i1:i2,j1:j2,k2,2) + e3u(i1:i2,j1:j2,jk,Kmm_a) * umask(i1:i2,j1:j2,jk)
+              END DO
+              ptab(i1:i2,j1:j2,k2,2) = ptab(i1:i2,j1:j2,k2,2) - hu_0(i1:i2,j1:j2)
+           END IF
+        ENDIF
+
+         Kmm_a = item
          !
       ELSE
          zrhoy = Agrif_rhoy()
-# if defined key_vertical
+
+        IF( l_vremap .OR. l_ini_child) THEN
 ! VERTICAL REFINEMENT BEGIN
 
-         IF (ln_linssh) ptab(i1:i2,j1:j2,k2,2) = 0._wp 
+            IF (ln_linssh) ptab(i1:i2,j1:j2,k2,2) = 0._wp 
 
-         DO ji=i1,i2
-            DO jj=j1,j2
-               uu(ji,jj,:,Krhs_a) = 0._wp
-               N_in = mbku_parent(ji,jj)
-               zhtot = 0._wp
-               DO jk=1,N_in
-                  IF (jk==N_in) THEN
-                     h_in(jk) = hu0_parent(ji,jj) + ptab(ji,jj,k2,2) - zhtot
-                  ELSE
-                     h_in(jk) = ptab(ji,jj,jk,2)/(e2u(ji,jj)*zrhoy) 
-                  ENDIF
-                  zhtot = zhtot + h_in(jk)
-                  tabin(jk) = ptab(ji,jj,jk,1)/(e2u(ji,jj)*zrhoy*h_in(jk))
-              ENDDO
-                  
-              N_out = 0
-              DO jk=1,jpk
-                 if (umask(ji,jj,jk) == 0) EXIT
-                 N_out = N_out + 1
-                 h_out(N_out) = e3u(ji,jj,jk,Krhs_a)
-              ENDDO
-              IF (N_in*N_out > 0) THEN
-                 CALL reconstructandremap(tabin(1:N_in),h_in(1:N_in),uu(ji,jj,1:N_out,Krhs_a),h_out(1:N_out),N_in,N_out,1)
-              ENDIF
+            DO ji=i1,i2
+               DO jj=j1,j2
+                  uu(ji,jj,:,Krhs_a) = 0._wp
+                  N_in = mbku_parent(ji,jj)
+                  zhtot = 0._wp
+                  DO jk=1,N_in
+                     IF (jk==N_in) THEN
+                        h_in(jk) = hu0_parent(ji,jj) + ptab(ji,jj,k2,2) - zhtot
+                     ELSE
+                        h_in(jk) = ptab(ji,jj,jk,2)/(e2u(ji,jj)*zrhoy) 
+                     ENDIF
+                     zhtot = zhtot + h_in(jk)
+                     IF( h_in(jk) .GT. 0. ) THEN
+                     tabin(jk) = ptab(ji,jj,jk,1)/(e2u(ji,jj)*zrhoy*h_in(jk))
+                     ELSE
+                     tabin(jk) = 0.
+                     ENDIF
+                 ENDDO
+                     
+                 N_out = 0
+                 DO jk=1,jpk
+                    IF (umask(ji,jj,jk) == 0) EXIT
+                    N_out = N_out + 1
+                    h_out(N_out) = e3u(ji,jj,jk,Krhs_a)
+                 ENDDO
+                 IF (N_in*N_out > 0) THEN
+                     IF( l_ini_child ) THEN
+                        CALL remap_linear       (tabin(1:N_in),h_in(1:N_in),uu(ji,jj,1:N_out,Krhs_a),h_out(1:N_out),N_in,N_out,1)
+                     ELSE
+                        CALL reconstructandremap(tabin(1:N_in),h_in(1:N_in),uu(ji,jj,1:N_out,Krhs_a),h_out(1:N_out),N_in,N_out,1)
+                     ENDIF   
+                 ENDIF
+               ENDDO
             ENDDO
-         ENDDO
-
-# else
-         DO jk = 1, jpkm1
-            DO jj=j1,j2
-               uu(i1:i2,jj,jk,Krhs_a) = ptab(i1:i2,jj,jk,1) / ( zrhoy * e2u(i1:i2,jj) * e3u(i1:i2,jj,jk,Krhs_a) )
+         ELSE
+            DO jk = 1, jpkm1
+               DO jj=j1,j2
+                  uu(i1:i2,jj,jk,Krhs_a) = ptab(i1:i2,jj,jk,1) / ( zrhoy * e2u(i1:i2,jj) * e3u(i1:i2,jj,jk,Krhs_a) )
+               END DO
             END DO
-         END DO
-# endif
+         ENDIF
 
       ENDIF
       ! 
@@ -889,80 +921,96 @@ CONTAINS
       ! vertical interpolation:
       REAL(wp), DIMENSION(k1:k2) :: tabin, h_in
       REAL(wp), DIMENSION(1:jpk) :: h_out
-      INTEGER  :: N_in, N_out
+      INTEGER  :: N_in, N_out, item
       REAL(wp) :: h_diff, zhtot
       !!---------------------------------------------    
       !      
-      IF (before) THEN          
+      IF (before) THEN   
+
+         item = Kmm_a
+         IF( l_ini_child )   Kmm_a = Kbb_a     
+       
          DO jk=k1,k2
             DO jj=j1,j2
                DO ji=i1,i2
                   ptab(ji,jj,jk,1) = (e1v(ji,jj) * e3v(ji,jj,jk,Kmm_a) * vv(ji,jj,jk,Kmm_a)*vmask(ji,jj,jk))
-# if defined key_vertical
-                  ! Interpolate thicknesses (masked for subsequent extrapolation)
-                  ptab(ji,jj,jk,2) = vmask(ji,jj,jk) * e1v(ji,jj) * e3v(ji,jj,jk,Kmm_a)
-# endif
+                  IF( l_vremap .OR. l_ini_child) THEN
+                     ! Interpolate thicknesses (masked for subsequent extrapolation)
+                     ptab(ji,jj,jk,2) = vmask(ji,jj,jk) * e1v(ji,jj) * e3v(ji,jj,jk,Kmm_a)
+                  ENDIF
                END DO
             END DO
          END DO
-# if defined key_vertical
+
+         IF( l_vremap .OR. l_ini_child) THEN
          ! Extrapolate thicknesses in partial bottom cells:
          ! Set them to Agrif_SpecialValue (0.). Correct bottom thicknesses are retrieved later on
-         IF (ln_zps) THEN
-            DO jj=j1,j2
-               DO ji=i1,i2
-                  jk = mbkv(ji,jj)
-                  ptab(ji,jj,jk,2) = 0._wp
+            IF (ln_zps) THEN
+               DO jj=j1,j2
+                  DO ji=i1,i2
+                     jk = mbkv(ji,jj)
+                     ptab(ji,jj,jk,2) = 0._wp
+                  END DO
+               END DO           
+            END IF
+            ! Save ssh at last level:
+            ptab(i1:i2,j1:j2,k2,2) = 0._wp
+            IF (.NOT.ln_linssh) THEN
+               ! This vertical sum below should be replaced by the sea-level at V-points (optimization):
+               DO jk=1,jpk
+                  ptab(i1:i2,j1:j2,k2,2) = ptab(i1:i2,j1:j2,k2,2) + e3v(i1:i2,j1:j2,jk,Kmm_a) * vmask(i1:i2,j1:j2,jk)
                END DO
-            END DO           
-         END IF
-        ! Save ssh at last level:
-        ptab(i1:i2,j1:j2,k2,2) = 0._wp
-        IF (.NOT.ln_linssh) THEN
-           ! This vertical sum below should be replaced by the sea-level at V-points (optimization):
-           DO jk=1,jpk
-              ptab(i1:i2,j1:j2,k2,2) = ptab(i1:i2,j1:j2,k2,2) + e3v(i1:i2,j1:j2,jk,Kmm_a) * vmask(i1:i2,j1:j2,jk)
-           END DO
-           ptab(i1:i2,j1:j2,k2,2) = ptab(i1:i2,j1:j2,k2,2) - hv_0(i1:i2,j1:j2)
-        END IF 
-# endif
+               ptab(i1:i2,j1:j2,k2,2) = ptab(i1:i2,j1:j2,k2,2) - hv_0(i1:i2,j1:j2)
+            END IF 
+         ENDIF
+         item = Kmm_a
+
       ELSE       
          zrhox = Agrif_rhox()
-# if defined key_vertical
 
-         IF (ln_linssh) ptab(i1:i2,j1:j2,k2,2) = 0._wp 
+         IF( l_vremap .OR. l_ini_child ) THEN
 
-         DO jj=j1,j2
-            DO ji=i1,i2
-               vv(ji,jj,:,Krhs_a) = 0._wp
-               N_in = mbkv_parent(ji,jj)
-               zhtot = 0._wp
-               DO jk=1,N_in
-                  IF (jk==N_in) THEN
-                     h_in(jk) = hv0_parent(ji,jj) + ptab(ji,jj,k2,2) - zhtot
-                  ELSE
-                     h_in(jk) = ptab(ji,jj,jk,2)/(e1v(ji,jj)*zrhox) 
+            IF (ln_linssh) ptab(i1:i2,j1:j2,k2,2) = 0._wp 
+
+            DO jj=j1,j2
+               DO ji=i1,i2
+                  vv(ji,jj,:,Krhs_a) = 0._wp
+                  N_in = mbkv_parent(ji,jj)
+                  zhtot = 0._wp
+                  DO jk=1,N_in
+                     IF (jk==N_in) THEN
+                        h_in(jk) = hv0_parent(ji,jj) + ptab(ji,jj,k2,2) - zhtot
+                     ELSE
+                        h_in(jk) = ptab(ji,jj,jk,2)/(e1v(ji,jj)*zrhox) 
+                     ENDIF
+                     zhtot = zhtot + h_in(jk)
+                    IF( h_in(jk) .GT. 0. ) THEN
+                     tabin(jk) = ptab(ji,jj,jk,1)/(e1v(ji,jj)*zrhox*h_in(jk))
+                    ELSE
+                     tabin(jk)  = 0.
+                    ENDIF 
+                 ENDDO
+            
+                  N_out = 0
+                  DO jk=1,jpk
+                     if (vmask(ji,jj,jk) == 0) EXIT
+                     N_out = N_out + 1
+                     h_out(N_out) = e3v(ji,jj,jk,Krhs_a)
+                  END DO
+                  IF (N_in*N_out > 0) THEN
+                     IF( l_ini_child ) THEN
+                        CALL remap_linear       (tabin(1:N_in),h_in(1:N_in),vv(ji,jj,1:N_out,Krhs_a),h_out(1:N_out),N_in,N_out,1)
+                     ELSE
+                        CALL reconstructandremap(tabin(1:N_in),h_in(1:N_in),vv(ji,jj,1:N_out,Krhs_a),h_out(1:N_out),N_in,N_out,1)
+                     ENDIF   
                   ENDIF
-                  zhtot = zhtot + h_in(jk)
-                  tabin(jk) = ptab(ji,jj,jk,1)/(e1v(ji,jj)*zrhox*h_in(jk))
-              ENDDO
-         
-               N_out = 0
-               DO jk=1,jpk
-                  if (vmask(ji,jj,jk) == 0) EXIT
-                  N_out = N_out + 1
-                  h_out(N_out) = e3v(ji,jj,jk,Krhs_a)
                END DO
-               IF (N_in*N_out > 0) THEN
-                  call reconstructandremap(tabin(1:N_in),h_in(1:N_in),vv(ji,jj,1:N_out,Krhs_a),h_out(1:N_out),N_in,N_out,1)
-               ENDIF
             END DO
-         END DO
-# else
-         DO jk = 1, jpkm1
-            vv(i1:i2,j1:j2,jk,Krhs_a) = ptab(i1:i2,j1:j2,jk,1) / ( zrhox * e1v(i1:i2,j1:j2) * e3v(i1:i2,j1:j2,jk,Krhs_a) )
-         END DO
-# endif
+         ELSE
+            DO jk = 1, jpkm1
+               vv(i1:i2,j1:j2,jk,Krhs_a) = ptab(i1:i2,j1:j2,jk,1) / ( zrhox * e1v(i1:i2,j1:j2) * e3v(i1:i2,j1:j2,jk,Krhs_a) )
+            END DO
+         ENDIF
       ENDIF
       !        
    END SUBROUTINE interpvn
@@ -1193,68 +1241,69 @@ CONTAINS
                     ptab(ji,jj,jk,1) = avm_k(ji,jj,jk)
               END DO
            END DO
-        END DO
+         END DO
 
-# if defined key_vertical
-        ! Interpolate thicknesses
-        ! Warning: these are masked, hence extrapolated prior interpolation.
-        DO jk=k1,k2
-           DO jj=j1,j2
-              DO ji=i1,i2
-                  ptab(ji,jj,jk,2) = tmask(ji,jj,jk) * e3t(ji,jj,jk,Kmm_a)
-              END DO
-           END DO
-        END DO
-
-        ! Extrapolate thicknesses in partial bottom cells:
-        ! Set them to Agrif_SpecialValue (0.). Correct bottom thicknesses are retrieved later on
-        IF (ln_zps) THEN
-           DO jj=j1,j2
-              DO ji=i1,i2
-                  jk = mbkt(ji,jj)
-                  ptab(ji,jj,jk,2) = 0._wp
-              END DO
-           END DO           
-        END IF
-     
-        ! Save ssh at last level:
-        IF (.NOT.ln_linssh) THEN
-           ptab(i1:i2,j1:j2,k2,2) = ssh(i1:i2,j1:j2,Kmm_a)*tmask(i1:i2,j1:j2,1) 
-        ELSE
-           ptab(i1:i2,j1:j2,k2,2) = 0._wp
-        END IF      
-# endif
-      ELSE 
-#ifdef key_vertical         
-         IF (ln_linssh) ptab(i1:i2,j1:j2,k2,2) = 0._wp 
-         avm_k(i1:i2,j1:j2,k1:k2) = 0._wp
-            
-         DO jj = j1, j2
-            DO ji =i1, i2
-               N_in = mbkt_parent(ji,jj)
-               IF ( tmask(ji,jj,1) == 0._wp) N_in = 0
-               z_in(N_in+1) = ht0_parent(ji,jj) + ptab(ji,jj,k2,2)
-               DO jk = N_in, 1, -1  ! Parent vertical grid               
-                     z_in(jk) = z_in(jk+1) - ptab(ji,jj,jk,2)
-                    tabin(jk) = ptab(ji,jj,jk,1)
+         IF( l_vremap ) THEN
+            ! Interpolate thicknesses
+            ! Warning: these are masked, hence extrapolated prior interpolation.
+            DO jk=k1,k2
+               DO jj=j1,j2
+                  DO ji=i1,i2
+                      ptab(ji,jj,jk,2) = tmask(ji,jj,jk) * e3t(ji,jj,jk,Kmm_a)
+                  END DO
                END DO
-               N_out = mbkt(ji,jj) 
-               DO jk = 1, N_out        ! Child vertical grid
-                  z_out(jk) = gdepw(ji,jj,jk,Kmm_a)
+            END DO
+
+            ! Extrapolate thicknesses in partial bottom cells:
+            ! Set them to Agrif_SpecialValue (0.). Correct bottom thicknesses are retrieved later on
+            IF (ln_zps) THEN
+               DO jj=j1,j2
+                  DO ji=i1,i2
+                      jk = mbkt(ji,jj)
+                      ptab(ji,jj,jk,2) = 0._wp
+                  END DO
+               END DO           
+            END IF
+        
+           ! Save ssh at last level:
+            IF (.NOT.ln_linssh) THEN
+               ptab(i1:i2,j1:j2,k2,2) = ssh(i1:i2,j1:j2,Kmm_a)*tmask(i1:i2,j1:j2,1) 
+            ELSE
+               ptab(i1:i2,j1:j2,k2,2) = 0._wp
+            END IF      
+          ENDIF
+
+      ELSE 
+
+         IF( l_vremap ) THEN
+            IF (ln_linssh) ptab(i1:i2,j1:j2,k2,2) = 0._wp 
+            avm_k(i1:i2,j1:j2,k1:k2) = 0._wp
+               
+            DO jj = j1, j2
+               DO ji =i1, i2
+                  N_in = mbkt_parent(ji,jj)
+                  IF ( tmask(ji,jj,1) == 0._wp) N_in = 0
+                  z_in(N_in+1) = ht0_parent(ji,jj) + ptab(ji,jj,k2,2)
+                  DO jk = N_in, 1, -1  ! Parent vertical grid               
+                        z_in(jk) = z_in(jk+1) - ptab(ji,jj,jk,2)
+                       tabin(jk) = ptab(ji,jj,jk,1)
+                  END DO
+                  N_out = mbkt(ji,jj) 
+                  DO jk = 1, N_out        ! Child vertical grid
+                     z_out(jk) = gdepw(ji,jj,jk,Kmm_a)
+                  ENDDO
+                  IF (N_in*N_out > 0) THEN
+                     CALL remap_linear(tabin(1:N_in),z_in(1:N_in),avm_k(ji,jj,1:N_out),z_out(1:N_out),N_in,N_out,1)
+                  ENDIF
                ENDDO
-               IF (N_in*N_out > 0) THEN
-                  CALL remap_linear(tabin(1:N_in),z_in(1:N_in),avm_k(ji,jj,1:N_out),z_out(1:N_out),N_in,N_out,1)
-               ENDIF
             ENDDO
-         ENDDO
-#else
-         avm_k(i1:i2,j1:j2,k1:k2) = ptab (i1:i2,j1:j2,k1:k2,1)
-#endif
+         ELSE
+            avm_k(i1:i2,j1:j2,k1:k2) = ptab (i1:i2,j1:j2,k1:k2,1)
+         ENDIF
       ENDIF
       !
    END SUBROUTINE interpavm
 
-# if defined key_vertical
    SUBROUTINE interpmbkt( ptab, i1, i2, j1, j2, before )
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE interpsshn  ***
@@ -1290,7 +1339,6 @@ CONTAINS
       ENDIF
       !
    END SUBROUTINE interpht0
-#endif
 
    SUBROUTINE agrif_initts(tabres,i1,i2,j1,j2,k1,k2,m1,m2,before)
        INTEGER :: i1, i2, j1, j2, k1, k2, m1, m2
@@ -1300,15 +1348,33 @@ CONTAINS
        INTEGER :: jm
 
        IF (before) THEN
-         DO jm=m1,m2
+         DO jm=m1,m2-1
              tabres(i1:i2,j1:j2,k1:k2,jm) = ts(i1:i2,j1:j2,k1:k2,jm,Kbb_a)
          END DO
        ELSE
-         DO jm=m1,m2
+         DO jm=m1,m2-1
              ts(i1:i2,j1:j2,k1:k2,jm,Kbb_a)=tabres(i1:i2,j1:j2,k1:k2,jm)
          END DO
        ENDIF
    END SUBROUTINE agrif_initts 
+
+   SUBROUTINE agrif_initssh( ptab, i1, i2, j1, j2, before )
+      !!----------------------------------------------------------------------
+      !!                  ***  ROUTINE interpsshn  ***
+      !!----------------------------------------------------------------------  
+      INTEGER                         , INTENT(in   ) ::   i1, i2, j1, j2
+      REAL(wp), DIMENSION(i1:i2,j1:j2), INTENT(inout) ::   ptab
+      LOGICAL                         , INTENT(in   ) ::   before
+      !
+      !!----------------------------------------------------------------------  
+      !
+      IF( before) THEN
+         ptab(i1:i2,j1:j2) = ssh(i1:i2,j1:j2,Kbb_a)
+      ELSE
+         ssh(i1:i2,j1:j2,Kbb_a) = ptab(i1:i2,j1:j2)*tmask(i1:i2,j1:j2,1)
+      ENDIF
+      !
+   END SUBROUTINE agrif_initssh
    
 #else
    !!----------------------------------------------------------------------

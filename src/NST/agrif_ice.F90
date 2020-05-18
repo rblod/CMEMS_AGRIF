@@ -15,6 +15,7 @@ MODULE agrif_ice
    PRIVATE 
 
    INTEGER, PUBLIC ::  u_ice_id, v_ice_id, tra_ice_id
+   INTEGER, PUBLIC ::  u_iceini_id, v_iceini_id, tra_iceini_id
    INTEGER, PUBLIC ::  nbstep_ice = 0    ! child time position in sea-ice model
 
    !!----------------------------------------------------------------------

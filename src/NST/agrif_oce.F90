@@ -31,7 +31,7 @@ MODULE agrif_oce
    LOGICAL , PUBLIC :: spongedoneT = .FALSE.       !: tracer   sponge layer indicator
    LOGICAL , PUBLIC :: spongedoneU = .FALSE.       !: dynamics sponge layer indicator
    LOGICAL , PUBLIC :: lk_agrif_fstep = .TRUE.     !: if true: first step
-   LOGICAL , PUBLIC :: lk_agrif_debug = .FALSE.    !: if true: print debugging info
+   LOGICAL , PUBLIC :: lk_agrif_debug = .TRUE.    !: if true: print debugging info
 
    LOGICAL , PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) :: tabspongedone_tsn
 # if defined key_top
@@ -48,16 +48,14 @@ MODULE agrif_oce
    REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) ::  ubdy, vbdy, hbdy
    INTEGER , PUBLIC,              SAVE                 ::  Kbb_a, Kmm_a, Krhs_a   !: AGRIF module-specific copies of time-level indices
 
-# if defined key_vertical
    REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) :: ht0_parent, hu0_parent, hv0_parent
    INTEGER,  PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) :: mbkt_parent, mbku_parent, mbkv_parent
-# endif
 
    INTEGER, PUBLIC :: tsn_id                                                  ! AGRIF profile for tracers interpolation and update
    INTEGER, PUBLIC :: un_interp_id, vn_interp_id                              ! AGRIF profiles for interpolations
    INTEGER, PUBLIC :: un_update_id, vn_update_id                              ! AGRIF profiles for udpates
    INTEGER, PUBLIC :: tsn_sponge_id, un_sponge_id, vn_sponge_id               ! AGRIF profiles for sponge layers
-   INTEGER, PUBLIC :: tsini_id                                                ! AGRIF profile for Levitus
+   INTEGER, PUBLIC :: tsini_id, uini_id, vini_id, sshini_id                   ! AGRIF profile for initialization
 # if defined key_top
    INTEGER, PUBLIC :: trn_id, trn_sponge_id
 # endif  
@@ -73,6 +71,8 @@ MODULE agrif_oce
 !$AGRIF_DO_NOT_TREAT
    LOGICAL, PUBLIC :: use_sign_north
    REAL, PUBLIC :: sign_north
+   LOGICAL, PUBLIC :: l_ini_child = .FALSE.
+   LOGICAL, PUBLIC :: l_vremap    = .FALSE.
 !$AGRIF_END_DO_NOT_TREAT
    
    !!----------------------------------------------------------------------
@@ -97,11 +97,9 @@ CONTAINS
 # if defined key_top         
          &      tabspongedone_trn(jpi,jpj),           &
 # endif   
-# if defined key_vertical
          &      ht0_parent(jpi,jpj), mbkt_parent(jpi,jpj),  &
          &      hu0_parent(jpi,jpj), mbku_parent(jpi,jpj),  &
          &      hv0_parent(jpi,jpj), mbkv_parent(jpi,jpj),  &
-# endif      
          &      tabspongedone_u  (jpi,jpj),           &
          &      tabspongedone_v  (jpi,jpj), STAT = ierr(1) )
 

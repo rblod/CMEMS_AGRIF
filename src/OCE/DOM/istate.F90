@@ -34,7 +34,10 @@ MODULE istate
    USE iom             ! I/O library
    USE lib_mpp         ! MPP library
    USE restart         ! restart
+#if defined key_agrif
    USE agrif_oce_interp
+   USE agrif_oce
+#endif   
 
    IMPLICIT NONE
    PRIVATE
@@ -70,7 +73,7 @@ CONTAINS
 
 !!gm  Why not include in the first call of dta_tsd ?  
 !!gm  probably associated with the use of internal damping...
-                     CALL dta_tsd_init        ! Initialisation of T & S input data
+       CALL dta_tsd_init        ! Initialisation of T & S input data
 !!gm to be moved in usrdef of C1D case
 !      IF( lk_c1d )   CALL dta_uvd_init        ! Initialization of U & V input data
 !!gm
@@ -97,32 +100,31 @@ CONTAINS
          !                                    ! Initialization of ocean to zero
          !
          IF( ln_tsd_init ) THEN               
-            IF( Agrif_Root() ) THEN
+            IF( Agrif_root() ) THEN
                CALL dta_tsd( nit000, ts(:,:,:,:,Kbb) )       ! read 3D T and S data at nit000
-#ifdef key_agrif
+               ssh(:,:,Kbb)   = 0._wp               ! set the ocean at rest
+               uu  (:,:,:,Kbb) = 0._wp
+               vv  (:,:,:,Kbb) = 0._wp  
             ELSE
-               Agrif_SpecialValue    = 0._wp
-               Agrif_UseSpecialValue = .TRUE.
-               CALL Agrif_Init_Variable(tsini_id, procname=agrif_initts)
-               Agrif_UseSpecialValue = .FALSE.            !
-#endif
-          ENDIF
+     
+              !  uu  (:,:,:,Kbb) = 0._wp
+              !  vv  (:,:,:,Kbb) = 0._wp  
+  
+               CALL agrif_istate( Kbb, Kmm, Kaa ) 
+            ENDIF
             !
-            ssh(:,:,Kbb)   = 0._wp               ! set the ocean at rest
-            IF( ll_wd ) THEN
-               ssh(:,:,Kbb) =  -ssh_ref  ! Added in 30 here for bathy that adds 30 as Iterative test CEOD 
-               !
+     !       IF( ll_wd ) THEN
+     !          ssh(:,:,Kbb) =  -ssh_ref  ! Added in 30 here for bathy that adds 30 as Iterative test CEOD 
+     !          !
                ! Apply minimum wetdepth criterion
                !
-               DO_2D_11_11
-                  IF( ht_0(ji,jj) + ssh(ji,jj,Kbb)  < rn_wdmin1 ) THEN
-                     ssh(ji,jj,Kbb) = tmask(ji,jj,1)*( rn_wdmin1 - (ht_0(ji,jj)) )
-                  ENDIF
-               END_2D
-            ENDIF 
-            uu  (:,:,:,Kbb) = 0._wp
-            vv  (:,:,:,Kbb) = 0._wp  
-            !
+     !          DO_2D_11_11
+     !             IF( ht_0(ji,jj) + ssh(ji,jj,Kbb)  < rn_wdmin1 ) THEN
+     !                ssh(ji,jj,Kbb) = tmask(ji,jj,1)*( rn_wdmin1 - (ht_0(ji,jj)) )
+     !             ENDIF
+     !          END_2D
+     !       ENDIF 
+             !
          ELSE                                 ! user defined initial T and S
             CALL usr_def_istate( gdept(:,:,:,Kbb), tmask, ts(:,:,:,:,Kbb), uu(:,:,:,Kbb), vv(:,:,:,Kbb), ssh(:,:,Kbb)  )         
          ENDIF

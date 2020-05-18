@@ -416,6 +416,11 @@ CONTAINS
                            CALL     eos_init        ! Equation of state
       IF( lk_c1d       )   CALL     c1d_init        ! 1D column configuration
                            CALL     wad_init        ! Wetting and drying options
+
+                          Kbb_a = Nbb; Kmm_a = Nnn; Krhs_a = Nrhs   ! agrif_oce module copies of time level indices
+                          CALL Agrif_Declare_Var       !  "      "   "   "      "  DYN/TRA 
+
+
                            CALL     dom_init( Nbb, Nnn, Naa, "OPA") ! Domain
       IF( ln_crs       )   CALL     crs_init(      Nnn )       ! coarsened grid: domain initialization 
       IF( sn_cfctl%l_prtctl )   &
@@ -441,10 +446,14 @@ CONTAINS
          ! AGRIF variables declared here for interpolation of
          ! initial state just after        
 #if defined key_agrif
-         Kbb_a = Nbb; Kmm_a = Nnn; Krhs_a = Nrhs   ! agrif_oce module copies of time level indices
+                !          Kbb_a = Nbb; Kmm_a = Nnn; Krhs_a = Nrhs   ! agrif_oce module copies of time level indices
 
                           CALL Agrif_Declare_Var_dom   ! AGRIF: set the meshes for DOM
-                          CALL Agrif_Declare_Var       !  "      "   "   "      "  DYN/TRA 
+                      !    CALL Agrif_Declare_Var       !  "      "   "   "      "  DYN/TRA 
+                          IF( .NOT. Agrif_Root() )   CALL agrif_nemo_init
+
+                          IF( .NOT. Agrif_Root() )  CALL Agrif_InitValues_cont
+
 # if defined key_top
                           CALL Agrif_Declare_Var_top   !  "      "   "   "      "  TOP
 # endif
@@ -455,10 +464,18 @@ CONTAINS
 
       !                                      ! external forcing 
                            CALL    tide_init    ! tidal harmonics
+!#if defined key_agrif
+!# if defined key_si3
+!                           CALL Agrif_Declare_Var_ice  !  "      "   "   "      "  Sea ice
+
+!# endif
+!#endif
+
                            CALL     sbc_init( Nbb, Nnn, Naa )    ! surface boundary conditions (including sea-ice)
 #if defined key_agrif
 # if defined key_si3
-                           CALL Agrif_Declare_Var_ice  !  "      "   "   "      "  Sea ice
+                           IF( .NOT. Agrif_Root() ) CALL Agrif_InitValues_cont_ice
+                           
 # endif
 #endif
                            CALL     bdy_init    ! Open boundaries initialisation

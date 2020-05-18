@@ -49,6 +49,9 @@ MODULE domain
 
    PUBLIC   dom_init     ! called by nemogcm.F90
    PUBLIC   domain_cfg   ! called by nemogcm.F90
+   PUBLIC   dom_ctl
+   PUBLIC   dom_wri
+   PUBLIC   cfg_write
 
    !!-------------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
@@ -182,23 +185,29 @@ CONTAINS
          !
       ELSE                       != time varying : initialize before/now/after variables
          !
-         IF( .NOT.l_offline )  CALL dom_vvl_init( Kbb, Kmm, Kaa )
+         IF( .NOT.l_offline  )  CALL dom_vvl_init( Kbb, Kmm, Kaa )
          !
       ENDIF
       !
+
       IF( lk_c1d         )   CALL cor_c1d       ! 1D configuration: Coriolis set at T-point
       !
-      IF( ln_meshmask    )   CALL dom_wri       ! Create a domain file
-      IF( .NOT.ln_rstart )   CALL dom_ctl       ! Domain control
-      !
-      IF( ln_write_cfg   )   CALL cfg_write     ! create the configuration file
-      !
-      IF(lwp) THEN
-         WRITE(numout,*)
-         WRITE(numout,*) 'dom_init :   ==>>>   END of domain initialization'
-         WRITE(numout,*) '~~~~~~~~'
-         WRITE(numout,*) 
-      ENDIF
+
+   !   IF( Agrif_Root() ) THEN
+
+         IF( ln_meshmask    )   CALL dom_wri       ! Create a domain file
+         IF( .NOT.ln_rstart )   CALL dom_ctl       ! Domain control
+         !
+         IF( ln_write_cfg   )   CALL cfg_write     ! create the configuration file
+         !
+         IF(lwp) THEN
+            WRITE(numout,*)
+            WRITE(numout,*) 'dom_init :   ==>>>   END of domain initialization'
+            WRITE(numout,*) '~~~~~~~~'
+            WRITE(numout,*) 
+         ENDIF
+
+    !  ENDIF
       !
    END SUBROUTINE dom_init
 
@@ -306,6 +315,12 @@ CONTAINS
       READ  ( numnam_cfg, namrun, IOSTAT = ios, ERR = 902 )
 902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namrun in configuration namelist' )
       IF(lwm) WRITE ( numond, namrun )
+
+      IF( .NOT. Agrif_Root() ) THEN
+            nn_it000 = (Agrif_Parent(nn_it000)-1)*Agrif_IRhot() + 1
+            nn_itend =  Agrif_Parent(nn_itend)   *Agrif_IRhot()
+      ENDIF
+
       !
       IF(lwp) THEN                  ! control print
          WRITE(numout,*) '   Namelist : namrun   ---   run parameters'

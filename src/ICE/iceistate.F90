@@ -32,6 +32,12 @@ MODULE iceistate
    USE lib_fortran    ! fortran utilities (glob_sum + no signed zero)
    USE fldread        ! read input fields
 
+# if defined key_agrif
+   USE agrif_oce
+   USE agrif_ice
+   USE agrif_ice_interp 
+# endif   
+
    IMPLICIT NONE
    PRIVATE
 
@@ -167,8 +173,13 @@ CONTAINS
       !------------------------------------------------------------------------
       ! 2) overwrite some of the fields with namelist parameters or netcdf file
       !------------------------------------------------------------------------
+
+
       IF( ln_iceini ) THEN
          !                             !---------------!
+         
+IF( Agrif_Root() ) THEN
+
          IF( ln_iceini_file )THEN      ! Read a file   !
             !                          !---------------!
             WHERE( ff_t(:,:) >= 0._wp )   ;   zswitch(:,:) = 1._wp
@@ -261,6 +272,8 @@ CONTAINS
             END WHERE
             !
          ENDIF
+
+
 
          ! make sure ponds = 0 if no ponds scheme
          IF ( .NOT.ln_pnd ) THEN
@@ -361,6 +374,41 @@ CONTAINS
          tn_ice(:,:,:) = t_su(:,:,:)
          t1_ice(:,:,:) = t_i (:,:,1,:)
          !
+      
+ELSE
+ 
+         Agrif_SpecialValue    = -9999.
+         Agrif_UseSpecialValue = .TRUE.
+         CALL Agrif_init_variable(tra_iceini_id,procname=interp_tra_ice)
+         use_sign_north = .TRUE.
+         sign_north = -1.
+         CALL Agrif_init_variable(u_iceini_id  ,procname=interp_u_ice)
+         CALL Agrif_init_variable(v_iceini_id  ,procname=interp_v_ice)
+         Agrif_SpecialValue    = 0._wp
+         use_sign_north = .FALSE.
+         Agrif_UseSpecialValue = .FALSE.
+     ! lbc ???? 
+! Here we know : a_i, v_i, v_s, sv_i, oa_i, a_ip, v_ip, t_su, e_s, e_i
+         CALL ice_var_glo2eqv
+         CALL ice_var_zapsmall
+         CALL ice_var_agg(2)
+
+         ! Melt ponds
+         WHERE( a_i > epsi10 )
+            a_ip_frac(:,:,:) = a_ip(:,:,:) / a_i(:,:,:)
+         ELSEWHERE
+            a_ip_frac(:,:,:) = 0._wp
+         END WHERE
+         WHERE( a_ip > 0._wp )       ! ???????    
+            h_ip(:,:,:) = v_ip(:,:,:) / a_ip(:,:,:)
+         ELSEWHERE
+            h_ip(:,:,:) = 0._wp
+         END WHERE   
+
+         tn_ice(:,:,:) = t_su(:,:,:)
+         t1_ice(:,:,:) = t_i (:,:,1,:)
+ENDIF
+
       ENDIF ! ln_iceini
       !
       at_i(:,:) = SUM( a_i, dim=3 )

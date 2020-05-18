@@ -13,9 +13,9 @@ MODULE agrif_ice_interp
    !!   'key_agrif'                                       AGRIF library
    !!----------------------------------------------------------------------
    !!  agrif_interp_ice    : interpolation of ice at "after" sea-ice time step
-   !!  agrif_interp_u_ice   : atomic routine to interpolate u_ice 
-   !!  agrif_interp_v_ice   : atomic routine to interpolate v_ice 
-   !!  agrif_interp_tra_ice : atomic routine to interpolate ice properties 
+   !!  interp_u_ice   : atomic routine to interpolate u_ice 
+   !!  interp_v_ice   : atomic routine to interpolate v_ice 
+   !!  interp_tra_ice : atomic routine to interpolate ice properties 
    !!----------------------------------------------------------------------
    USE par_oce
    USE dom_oce
@@ -29,6 +29,7 @@ MODULE agrif_ice_interp
    PRIVATE
 
    PUBLIC   agrif_interp_ice   ! called by agrif_user.F90
+   PUBLIC   interp_tra_ice, interp_u_ice, interp_v_ice  ! called by iceistate.F90
 
    !!----------------------------------------------------------------------
    !! NEMO/NST 4.0 , NEMO Consortium (2018)
@@ -163,7 +164,7 @@ CONTAINS
       ! tracers are not multiplied by grid cell here => before: * e1e2t ; after: * r1_e1e2t / rhox / rhoy
       ! and it is ok since we conserve tracers (same as in the ocean).
       ALLOCATE( ztab(SIZE(a_i,1),SIZE(a_i,2),SIZE(ptab,3)) )
-     
+
       IF( before ) THEN  ! parent grid
          jm = 1
          DO jl = 1, jpl
