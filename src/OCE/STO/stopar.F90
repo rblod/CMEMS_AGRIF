@@ -55,14 +55,14 @@ MODULE stopar
    INTEGER,          DIMENSION(:),       ALLOCATABLE :: sto2d_ord  ! order of autoregressive process
    INTEGER,          DIMENSION(:),       ALLOCATABLE :: sto3d_ord  ! order of autoregressive process
 
-   CHARACTER(len=1), DIMENSION(:),       ALLOCATABLE :: sto2d_typ  ! nature of grid point (T, U, V, W, F, I)
-   CHARACTER(len=1), DIMENSION(:),       ALLOCATABLE :: sto3d_typ  ! nature of grid point (T, U, V, W, F, I)
-   REAL(wp),         DIMENSION(:),       ALLOCATABLE :: sto2d_sgn  ! control of the sign accross the north fold
-   REAL(wp),         DIMENSION(:),       ALLOCATABLE :: sto3d_sgn  ! control of the sign accross the north fold
-   INTEGER,          DIMENSION(:),       ALLOCATABLE :: sto2d_flt  ! number of passes of Laplacian filter
-   INTEGER,          DIMENSION(:),       ALLOCATABLE :: sto3d_flt  ! number of passes of Laplacian filter
-   REAL(wp),         DIMENSION(:),       ALLOCATABLE :: sto2d_fac  ! factor to restore std after filtering
-   REAL(wp),         DIMENSION(:),       ALLOCATABLE :: sto3d_fac  ! factor to restore std after filtering
+   CHARACTER(len=lca), DIMENSION(:),       ALLOCATABLE :: sto2d_typ  ! nature of grid point (T, U, V, W, F, I)
+   CHARACTER(len=lca), DIMENSION(:),       ALLOCATABLE :: sto3d_typ  ! nature of grid point (T, U, V, W, F, I)
+   REAL(wp),           DIMENSION(:),       ALLOCATABLE :: sto2d_sgn  ! control of the sign accross the north fold
+   REAL(wp),           DIMENSION(:),       ALLOCATABLE :: sto3d_sgn  ! control of the sign accross the north fold
+   INTEGER,            DIMENSION(:),       ALLOCATABLE :: sto2d_flt  ! number of passes of Laplacian filter
+   INTEGER,            DIMENSION(:),       ALLOCATABLE :: sto3d_flt  ! number of passes of Laplacian filter
+   REAL(wp),           DIMENSION(:),       ALLOCATABLE :: sto2d_fac  ! factor to restore std after filtering
+   REAL(wp),           DIMENSION(:),       ALLOCATABLE :: sto3d_fac  ! factor to restore std after filtering
 
    LOGICAL, PUBLIC :: ln_sto_ldf = .FALSE.    ! stochastic lateral diffusion
    INTEGER, PUBLIC :: jsto_ldf                ! index of lateral diffusion stochastic parameter
