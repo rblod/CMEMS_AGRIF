@@ -194,77 +194,87 @@ CONTAINS
          IF ( nbcellsy <= 3 ) jspongearea = -1
 
          ! --- West --- !
-         ind1 = 1+nbghostcells
-         ind2 = 1+nbghostcells + ispongearea 
-         DO ji = mi0(ind1), mi1(ind2)   
-            DO jj = 1, jpj               
-               ztabramp(ji,jj) = REAL( ind2 - mig(ji) ) * z1_ispongearea * zmskwest(jj)
-            END DO
-         END DO
+         IF(lk_west) THEN
+            ind1 = 1+nbghostcells
+            ind2 = 1+nbghostcells + ispongearea 
+            DO ji = mi0(ind1), mi1(ind2)   
+               DO jj = 1, jpj               
+                  ztabramp(ji,jj) = REAL( ind2 - mig(ji) ) * z1_ispongearea * zmskwest(jj)
+               END DO
+            END DO         
 
-         ! ghost cells:
-         ind1 = 1
-         ind2 = nbghostcells + 1
-         DO ji = mi0(ind1), mi1(ind2)   
-            DO jj = 1, jpj               
-               ztabramp(ji,jj) = zmskwest(jj)
+            ! ghost cells:
+            ind1 = 1
+            ind2 = nbghostcells + 1
+            DO ji = mi0(ind1), mi1(ind2)   
+               DO jj = 1, jpj               
+                  ztabramp(ji,jj) = zmskwest(jj)
+               END DO
             END DO
-         END DO
+         ENDIF
 
          ! --- East --- !
-         ind1 = jpiglo - nbghostcells - ispongearea
-         ind2 = jpiglo - nbghostcells
-         DO ji = mi0(ind1), mi1(ind2)
-            DO jj = 1, jpj
-               ztabramp(ji,jj) = MAX( ztabramp(ji,jj), REAL( mig(ji) - ind1 ) * z1_ispongearea) * zmskeast(jj)
-            ENDDO
-         END DO
+         IF(lk_east) THEN
+            ind1 = jpiglo - nbghostcells - ispongearea
+            ind2 = jpiglo - nbghostcells
+            DO ji = mi0(ind1), mi1(ind2)
 
-         ! ghost cells:
-         ind1 = jpiglo - nbghostcells
-         ind2 = jpiglo
-         DO ji = mi0(ind1), mi1(ind2)
-            DO jj = 1, jpj
-               ztabramp(ji,jj) = zmskeast(jj)
-            ENDDO
-         END DO
+               DO jj = 1, jpj
+                  ztabramp(ji,jj) = MAX( ztabramp(ji,jj), REAL( mig(ji) - ind1 ) * z1_ispongearea) * zmskeast(jj)
+               ENDDO
+            END DO
+
+            ! ghost cells:
+            ind1 = jpiglo - nbghostcells
+            ind2 = jpiglo
+            DO ji = mi0(ind1), mi1(ind2)
+
+               DO jj = 1, jpj
+                  ztabramp(ji,jj) = zmskeast(jj)
+               ENDDO
+            END DO
+         ENDIF
 
          ! --- South --- !
-         ind1 = 1+nbghostcells
-         ind2 = 1+nbghostcells + jspongearea
-         DO jj = mj0(ind1), mj1(ind2) 
-            DO ji = 1, jpi
-               ztabramp(ji,jj) = MAX( ztabramp(ji,jj), REAL( ind2 - mjg(jj) ) * z1_jspongearea) * zmsksouth(ji)
+         IF( lk_south ) THEN 
+            ind1 = 1+nbghostcells
+            ind2 = 1+nbghostcells + jspongearea
+            DO jj = mj0(ind1), mj1(ind2) 
+               DO ji = 1, jpi
+                  ztabramp(ji,jj) = MAX( ztabramp(ji,jj), REAL( ind2 - mjg(jj) ) * z1_jspongearea) * zmsksouth(ji)
+               END DO
             END DO
-         END DO
 
-         ! ghost cells:
-         ind1 = 1
-         ind2 = nbghostcells + 1
-         DO jj = mj0(ind1), mj1(ind2) 
-            DO ji = 1, jpi
-               ztabramp(ji,jj) = zmsksouth(ji)
+            ! ghost cells:
+            ind1 = 1
+            ind2 = nbghostcells + 1
+            DO jj = mj0(ind1), mj1(ind2) 
+               DO ji = 1, jpi
+                  ztabramp(ji,jj) = zmsksouth(ji)
+               END DO
             END DO
-         END DO
+         ENDIF
 
          ! --- North --- !
-         ind1 = jpjglo - nbghostcells - jspongearea
-         ind2 = jpjglo - nbghostcells
-         DO jj = mj0(ind1), mj1(ind2)
-            DO ji = 1, jpi
-               ztabramp(ji,jj) = MAX( ztabramp(ji,jj), REAL( mjg(jj) - ind1 ) * z1_jspongearea) * zmsknorth(ji)
+         IF( lk_north ) THEN  
+            ind1 = jpjglo - nbghostcells - jspongearea
+            ind2 = jpjglo - nbghostcells
+            DO jj = mj0(ind1), mj1(ind2)
+               DO ji = 1, jpi
+                  ztabramp(ji,jj) = MAX( ztabramp(ji,jj), REAL( mjg(jj) - ind1 ) * z1_jspongearea) * zmsknorth(ji)
+               END DO
             END DO
-         END DO
 
-         ! ghost cells:
-         ind1 = jpjglo - nbghostcells
-         ind2 = jpjglo
-         DO jj = mj0(ind1), mj1(ind2)
-            DO ji = 1, jpi
-               ztabramp(ji,jj) = zmsknorth(ji)
+            ! ghost cells:
+            ind1 = jpjglo - nbghostcells
+            ind2 = jpjglo
+            DO jj = mj0(ind1), mj1(ind2)
+               DO ji = 1, jpi
+                  ztabramp(ji,jj) = zmsknorth(ji)
+               END DO
             END DO
-         END DO
-
+         ENDIF
+      
       ENDIF
 
       ! Tracers
@@ -648,7 +658,7 @@ CONTAINS
          tabspongedone_u(i1+1:i2-1,j1+1:j2-1) = .TRUE.
 
          jmax = j2-1
-         IF ((nbondj == 1).OR.(nbondj == 2)) jmax = MIN(jmax,nlcj-nbghostcells-2)   ! North
+         IF (lk_north) jmax = MIN(jmax,nlcj-nbghostcells-2)   ! North
 
          DO jj = j1+1, jmax
             DO ji = i1+1, i2   ! vector opt.
@@ -804,7 +814,7 @@ CONTAINS
          !                                                
 
          imax = i2 - 1
-         IF ((nbondi == 1).OR.(nbondi == 2))   imax = MIN(imax,nlci-nbghostcells-2)   ! East
+         IF(lk_east) imax = MIN(imax,nlci-nbghostcells-2)   ! East
 
          DO jj = j1+1, j2
             DO ji = i1+1, imax   ! vector opt.

@@ -85,10 +85,16 @@ CONTAINS
       !
 #if defined key_agrif
       IF( .NOT. Agrif_Root() ) THEN
+!RBCMEMS : check 
          IF( nbondi == -1 .OR. nbondi == 2 )   hdiv(   2   ,  :   ,:) = 0._wp      ! west
          IF( nbondi ==  1 .OR. nbondi == 2 )   hdiv( nlci-1,  :   ,:) = 0._wp      ! east
          IF( nbondj == -1 .OR. nbondj == 2 )   hdiv(   :   ,  2   ,:) = 0._wp      ! south
          IF( nbondj ==  1 .OR. nbondj == 2 )   hdiv(   :   ,nlcj-1,:) = 0._wp      ! north
+
+!         IF(lk_west)  hdivn(   2   ,  :   ,:) = 0._wp      ! west
+!         IF(lk_east)  hdivn( nlci-1,  :   ,:) = 0._wp      ! east
+!         IF(lk_south) hdivn(   :   ,  2   ,:) = 0._wp      ! south
+!         IF(lk_north) hdivn(   :   ,nlcj-1,:) = 0._wp      ! north
       ENDIF
 #endif
       !

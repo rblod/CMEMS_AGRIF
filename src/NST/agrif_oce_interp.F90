@@ -33,6 +33,7 @@ MODULE agrif_oce_interp
    USE agrif_oce_sponge
    USE lib_mpp
    USE vremap
+   USE lbclnk
  
    IMPLICIT NONE
    PRIVATE
@@ -42,7 +43,7 @@ MODULE agrif_oce_interp
    PUBLIC   interpun , interpvn
    PUBLIC   interptsn, interpsshn, interpavm
    PUBLIC   interpunb, interpvnb , interpub2b, interpvb2b
-   PUBLIC   interpe3t
+   PUBLIC   interpe3t, interpumsk, interpvmsk
    PUBLIC   interpht0, interpmbkt
    PUBLIC   agrif_initts, agrif_initssh
 
@@ -71,6 +72,19 @@ CONTAINS
       !
    END SUBROUTINE Agrif_tra
 
+   SUBROUTINE Agrif_Init_traceurs
+   	INTEGER :: jn
+      Agrif_SpecialValue    = 0._wp
+      Agrif_UseSpecialValue = .TRUE.
+      tsb(:,:,:,:) = 0.
+      CALL Agrif_Init_Variable(tsini_id, procname=agrif_initts)
+      Agrif_UseSpecialValue = .FALSE.
+            !    ! local domain boundaries  (T-point, unchanged sign)
+      DO jn=1,jpts
+        CALL lbc_lnk( 'traceur', tsb(:,:,:,jn), 'T', 1.)
+      ENDDO
+   END SUBROUTINE Agrif_Init_traceurs
+
 
    SUBROUTINE Agrif_dyn( kt )
       !!----------------------------------------------------------------------
@@ -96,249 +110,258 @@ CONTAINS
       !
       Agrif_UseSpecialValue = .FALSE.
       !
+
+      IF( lk_west ) THEN
       ! --- West --- !
-      ibdy1 = 2
-      ibdy2 = 1+nbghostcells 
-      !
-      IF( .NOT.ln_dynspg_ts ) THEN  ! Store transport
+         ibdy1 = 2
+         ibdy2 = 1+nbghostcells 
+         !
+         IF( .NOT.ln_dynspg_ts ) THEN  ! Store transport
+            DO ji = mi0(ibdy1), mi1(ibdy2)
+               uu_b(ji,:,Krhs_a) = 0._wp
+               DO jk = 1, jpkm1
+                  DO jj = 1, jpj
+                     uu_b(ji,jj,Krhs_a) = uu_b(ji,jj,Krhs_a) + e3u(ji,jj,jk,Krhs_a) * uu(ji,jj,jk,Krhs_a) * umask(ji,jj,jk)
+                  END DO
+               END DO
+
+               DO jj = 1, jpj
+                  uu_b(ji,jj,Krhs_a) = uu_b(ji,jj,Krhs_a) * r1_hu(ji,jj,Krhs_a)
+               END DO
+            END DO
+         ENDIF
+         !
          DO ji = mi0(ibdy1), mi1(ibdy2)
-            uu_b(ji,:,Krhs_a) = 0._wp
-
+            zub(ji,:) = 0._wp    ! Correct transport
             DO jk = 1, jpkm1
                DO jj = 1, jpj
-                  uu_b(ji,jj,Krhs_a) = uu_b(ji,jj,Krhs_a) + e3u(ji,jj,jk,Krhs_a) * uu(ji,jj,jk,Krhs_a) * umask(ji,jj,jk)
-               END DO
-            END DO
-
-            DO jj = 1, jpj
-               uu_b(ji,jj,Krhs_a) = uu_b(ji,jj,Krhs_a) * r1_hu(ji,jj,Krhs_a)
-            END DO
-         END DO
-      ENDIF
-      !
-      DO ji = mi0(ibdy1), mi1(ibdy2)
-         zub(ji,:) = 0._wp    ! Correct transport
-         DO jk = 1, jpkm1
-            DO jj = 1, jpj
-               zub(ji,jj) = zub(ji,jj) & 
-                  & + e3u(ji,jj,jk,Krhs_a)  * uu(ji,jj,jk,Krhs_a)*umask(ji,jj,jk)
-            END DO
-         END DO
-         DO jj=1,jpj
-            zub(ji,jj) = zub(ji,jj) * r1_hu(ji,jj,Krhs_a)
-         END DO
-            
-         DO jk = 1, jpkm1
-            DO jj = 1, jpj
-               uu(ji,jj,jk,Krhs_a) = ( uu(ji,jj,jk,Krhs_a) + uu_b(ji,jj,Krhs_a)-zub(ji,jj)) * umask(ji,jj,jk)
-            END DO
-         END DO
-      END DO
-            
-      IF( ln_dynspg_ts ) THEN       ! Set tangential velocities to time splitting estimate
-         DO ji = mi0(ibdy1), mi1(ibdy2)
-            zvb(ji,:) = 0._wp
-            DO jk = 1, jpkm1
-               DO jj = 1, jpj
-                  zvb(ji,jj) = zvb(ji,jj) + e3v(ji,jj,jk,Krhs_a) * vv(ji,jj,jk,Krhs_a) * vmask(ji,jj,jk)
-               END DO
-            END DO
-            DO jj = 1, jpj
-               zvb(ji,jj) = zvb(ji,jj) * r1_hv(ji,jj,Krhs_a)
-            END DO
-            DO jk = 1, jpkm1
-               DO jj = 1, jpj
-                  vv(ji,jj,jk,Krhs_a) = ( vv(ji,jj,jk,Krhs_a) + vv_b(ji,jj,Krhs_a)-zvb(ji,jj))*vmask(ji,jj,jk)
-               END DO
-            END DO
-         END DO
-      ENDIF
-
-      ! --- East --- !
-      ibdy1 = jpiglo-1-nbghostcells
-      ibdy2 = jpiglo-2 
-      !
-      IF( .NOT.ln_dynspg_ts ) THEN  ! Store transport
-         DO ji = mi0(ibdy1), mi1(ibdy2)
-            uu_b(ji,:,Krhs_a) = 0._wp
-            DO jk = 1, jpkm1
-               DO jj = 1, jpj
-                  uu_b(ji,jj,Krhs_a) = uu_b(ji,jj,Krhs_a) & 
-                      & + e3u(ji,jj,jk,Krhs_a) * uu(ji,jj,jk,Krhs_a) * umask(ji,jj,jk)
-               END DO
-            END DO
-            DO jj = 1, jpj
-               uu_b(ji,jj,Krhs_a) = uu_b(ji,jj,Krhs_a) * r1_hu(ji,jj,Krhs_a)
-            END DO
-         END DO
-      ENDIF
-      !
-      DO ji = mi0(ibdy1), mi1(ibdy2)
-         zub(ji,:) = 0._wp    ! Correct transport
-         DO jk = 1, jpkm1
-            DO jj = 1, jpj
-               zub(ji,jj) = zub(ji,jj) & 
-                  & + e3u(ji,jj,jk,Krhs_a)  * uu(ji,jj,jk,Krhs_a) * umask(ji,jj,jk)
-            END DO
-         END DO
-         DO jj=1,jpj
-            zub(ji,jj) = zub(ji,jj) * r1_hu(ji,jj,Krhs_a)
-         END DO
-            
-         DO jk = 1, jpkm1
-            DO jj = 1, jpj
-               uu(ji,jj,jk,Krhs_a) = ( uu(ji,jj,jk,Krhs_a) & 
-                 & + uu_b(ji,jj,Krhs_a)-zub(ji,jj))*umask(ji,jj,jk)
-            END DO
-         END DO
-      END DO
-            
-      IF( ln_dynspg_ts ) THEN       ! Set tangential velocities to time splitting estimate
-         ibdy1 = jpiglo-nbghostcells
-         ibdy2 = jpiglo-1 
-         DO ji = mi0(ibdy1), mi1(ibdy2)
-            zvb(ji,:) = 0._wp
-            DO jk = 1, jpkm1
-               DO jj = 1, jpj
-                  zvb(ji,jj) = zvb(ji,jj) &
-                     & + e3v(ji,jj,jk,Krhs_a) * vv(ji,jj,jk,Krhs_a) * vmask(ji,jj,jk)
-               END DO
-            END DO
-            DO jj = 1, jpj
-               zvb(ji,jj) = zvb(ji,jj) * r1_hv(ji,jj,Krhs_a)
-            END DO
-            DO jk = 1, jpkm1
-               DO jj = 1, jpj
-                  vv(ji,jj,jk,Krhs_a) = ( vv(ji,jj,jk,Krhs_a) & 
-                      & + vv_b(ji,jj,Krhs_a)-zvb(ji,jj)) * vmask(ji,jj,jk)
-               END DO
-            END DO
-         END DO
-      ENDIF
-
-      ! --- South --- !
-      jbdy1 = 2
-      jbdy2 = 1+nbghostcells 
-      !
-      IF( .NOT.ln_dynspg_ts ) THEN  ! Store transport
-         DO jj = mj0(jbdy1), mj1(jbdy2)
-            vv_b(:,jj,Krhs_a) = 0._wp
-            DO jk = 1, jpkm1
-               DO ji = 1, jpi
-                  vv_b(ji,jj,Krhs_a) = vv_b(ji,jj,Krhs_a) & 
-                      & + e3v(ji,jj,jk,Krhs_a) * vv(ji,jj,jk,Krhs_a) * vmask(ji,jj,jk)
-               END DO
-            END DO
-            DO ji=1,jpi
-               vv_b(ji,jj,Krhs_a) = vv_b(ji,jj,Krhs_a) * r1_hv(ji,jj,Krhs_a)     
-            END DO
-         END DO
-      ENDIF
-      !
-      DO jj = mj0(jbdy1), mj1(jbdy2)
-         zvb(:,jj) = 0._wp    ! Correct transport
-         DO jk=1,jpkm1
-            DO ji=1,jpi
-               zvb(ji,jj) = zvb(ji,jj) & 
-                  & + e3v(ji,jj,jk,Krhs_a) * vv(ji,jj,jk,Krhs_a) * vmask(ji,jj,jk)
-            END DO
-         END DO
-         DO ji = 1, jpi
-            zvb(ji,jj) = zvb(ji,jj) * r1_hv(ji,jj,Krhs_a)
-         END DO
-
-         DO jk = 1, jpkm1
-            DO ji = 1, jpi
-               vv(ji,jj,jk,Krhs_a) = ( vv(ji,jj,jk,Krhs_a) & 
-                 & + vv_b(ji,jj,Krhs_a) - zvb(ji,jj) ) * vmask(ji,jj,jk)
-            END DO
-         END DO
-      END DO
-            
-      IF( ln_dynspg_ts ) THEN       ! Set tangential velocities to time splitting estimate
-         DO jj = mj0(jbdy1), mj1(jbdy2)
-            zub(:,jj) = 0._wp
-            DO jk = 1, jpkm1
-               DO ji = 1, jpi
                   zub(ji,jj) = zub(ji,jj) & 
-                     & + e3u(ji,jj,jk,Krhs_a) * uu(ji,jj,jk,Krhs_a) * umask(ji,jj,jk)
+                     & + e3u(ji,jj,jk,Krhs_a)  * uu(ji,jj,jk,Krhs_a)*umask(ji,jj,jk)
                END DO
             END DO
-            DO ji = 1, jpi
+            DO jj=1,jpj
                zub(ji,jj) = zub(ji,jj) * r1_hu(ji,jj,Krhs_a)
             END DO
                
             DO jk = 1, jpkm1
-               DO ji = 1, jpi
-                  uu(ji,jj,jk,Krhs_a) = ( uu(ji,jj,jk,Krhs_a) & 
-                    & + uu_b(ji,jj,Krhs_a) - zub(ji,jj) ) * umask(ji,jj,jk)
+               DO jj = 1, jpj
+                  uu(ji,jj,jk,Krhs_a) = ( uu(ji,jj,jk,Krhs_a) + uu_b(ji,jj,Krhs_a)-zub(ji,jj)) * umask(ji,jj,jk)
                END DO
             END DO
          END DO
+               
+         IF( ln_dynspg_ts ) THEN       ! Set tangential velocities to time splitting estimate
+            DO ji = mi0(ibdy1), mi1(ibdy2)
+               zvb(ji,:) = 0._wp
+               DO jk = 1, jpkm1
+                  DO jj = 1, jpj
+                     zvb(ji,jj) = zvb(ji,jj) + e3v(ji,jj,jk,Krhs_a) * vv(ji,jj,jk,Krhs_a) * vmask(ji,jj,jk)
+                  END DO
+               END DO
+               DO jj = 1, jpj
+                  zvb(ji,jj) = zvb(ji,jj) * r1_hv(ji,jj,Krhs_a)
+               END DO
+               DO jk = 1, jpkm1
+                  DO jj = 1, jpj
+                     vv(ji,jj,jk,Krhs_a) = ( vv(ji,jj,jk,Krhs_a) + vv_b(ji,jj,Krhs_a)-zvb(ji,jj))*vmask(ji,jj,jk)
+                  END DO
+               END DO
+            END DO
+         ENDIF        
+      ENDIF
+      ! --- East --- !
+      IF( lk_east ) THEN
+         ibdy1 = jpiglo-1-nbghostcells
+         ibdy2 = jpiglo-2 
+         !
+         IF( .NOT.ln_dynspg_ts ) THEN  ! Store transport
+            DO ji = mi0(ibdy1), mi1(ibdy2)
+               uu_b(ji,:,Krhs_a) = 0._wp
+
+               DO jk = 1, jpkm1
+                  DO jj = 1, jpj
+                     uu_b(ji,jj,Krhs_a) = uu_b(ji,jj,Krhs_a) & 
+                         & + e3u(ji,jj,jk,Krhs_a) * uu(ji,jj,jk,Krhs_a) * umask(ji,jj,jk)
+                  END DO
+               END DO
+               DO jj = 1, jpj
+                  uu_b(ji,jj,Krhs_a) = uu_b(ji,jj,Krhs_a) * r1_hu(ji,jj,Krhs_a)
+               END DO
+            END DO
+         ENDIF
+         !
+         DO ji = mi0(ibdy1), mi1(ibdy2)
+            zub(ji,:) = 0._wp    ! Correct transport
+            DO jk = 1, jpkm1
+               DO jj = 1, jpj
+                  zub(ji,jj) = zub(ji,jj) & 
+                     & + e3u(ji,jj,jk,Krhs_a)  * uu(ji,jj,jk,Krhs_a) * umask(ji,jj,jk)
+               END DO
+            END DO
+            DO jj=1,jpj
+               zub(ji,jj) = zub(ji,jj) * r1_hu(ji,jj,Krhs_a)
+            END DO
+               
+            DO jk = 1, jpkm1
+               DO jj = 1, jpj
+                  uu(ji,jj,jk,Krhs_a) = ( uu(ji,jj,jk,Krhs_a) & 
+                    & + uu_b(ji,jj,Krhs_a)-zub(ji,jj))*umask(ji,jj,jk)
+               END DO
+            END DO
+         END DO
+               
+         IF( ln_dynspg_ts ) THEN       ! Set tangential velocities to time splitting estimate
+            ibdy1 = jpiglo-nbghostcells
+            ibdy2 = jpiglo-1 
+            DO ji = mi0(ibdy1), mi1(ibdy2)
+               zvb(ji,:) = 0._wp
+               DO jk = 1, jpkm1
+                  DO jj = 1, jpj
+                     zvb(ji,jj) = zvb(ji,jj) &
+                        & + e3v(ji,jj,jk,Krhs_a) * vv(ji,jj,jk,Krhs_a) * vmask(ji,jj,jk)
+                  END DO
+               END DO
+               DO jj = 1, jpj
+                  zvb(ji,jj) = zvb(ji,jj) * r1_hv(ji,jj,Krhs_a)
+               END DO
+               DO jk = 1, jpkm1
+                  DO jj = 1, jpj
+                     vv(ji,jj,jk,Krhs_a) = ( vv(ji,jj,jk,Krhs_a) & 
+                         & + vv_b(ji,jj,Krhs_a)-zvb(ji,jj)) * vmask(ji,jj,jk)
+                  END DO
+               END DO
+            END DO
+         ENDIF
+      ENDIF
+
+      ! --- South --- !
+      IF( lk_south ) THEN 
+         jbdy1 = 2
+         jbdy2 = 1+nbghostcells 
+         !
+         IF( .NOT.ln_dynspg_ts ) THEN  ! Store transport
+            DO jj = mj0(jbdy1), mj1(jbdy2)
+               vv_b(:,jj,Krhs_a) = 0._wp
+
+               DO jk = 1, jpkm1
+                  DO ji = 1, jpi
+                     vv_b(ji,jj,Krhs_a) = vv_b(ji,jj,Krhs_a) & 
+                         & + e3v(ji,jj,jk,Krhs_a) * vv(ji,jj,jk,Krhs_a) * vmask(ji,jj,jk)
+                  END DO
+               END DO
+               DO ji=1,jpi
+                  vv_b(ji,jj,Krhs_a) = vv_b(ji,jj,Krhs_a) * r1_hv(ji,jj,Krhs_a)     
+               END DO
+            END DO
+         ENDIF
+         !
+         DO jj = mj0(jbdy1), mj1(jbdy2)
+            zvb(:,jj) = 0._wp    ! Correct transport
+            DO jk=1,jpkm1
+               DO ji=1,jpi
+                  zvb(ji,jj) = zvb(ji,jj) & 
+                     & + e3v(ji,jj,jk,Krhs_a) * vv(ji,jj,jk,Krhs_a) * vmask(ji,jj,jk)
+               END DO
+            END DO
+            DO ji = 1, jpi
+               zvb(ji,jj) = zvb(ji,jj) * r1_hv(ji,jj,Krhs_a)
+            END DO
+
+            DO jk = 1, jpkm1
+               DO ji = 1, jpi
+                  vv(ji,jj,jk,Krhs_a) = ( vv(ji,jj,jk,Krhs_a) & 
+                    & + vv_b(ji,jj,Krhs_a) - zvb(ji,jj) ) * vmask(ji,jj,jk)
+               END DO
+            END DO
+         END DO
+               
+         IF( ln_dynspg_ts ) THEN       ! Set tangential velocities to time splitting estimate
+            DO jj = mj0(jbdy1), mj1(jbdy2)
+               zub(:,jj) = 0._wp
+               DO jk = 1, jpkm1
+                  DO ji = 1, jpi
+                     zub(ji,jj) = zub(ji,jj) & 
+                        & + e3u(ji,jj,jk,Krhs_a) * uu(ji,jj,jk,Krhs_a) * umask(ji,jj,jk)
+                  END DO
+               END DO
+               DO ji = 1, jpi
+                  zub(ji,jj) = zub(ji,jj) * r1_hu(ji,jj,Krhs_a)
+               END DO
+                  
+               DO jk = 1, jpkm1
+                  DO ji = 1, jpi
+                     uu(ji,jj,jk,Krhs_a) = ( uu(ji,jj,jk,Krhs_a) & 
+                       & + uu_b(ji,jj,Krhs_a) - zub(ji,jj) ) * umask(ji,jj,jk)
+                  END DO
+               END DO
+            END DO
+         ENDIF
       ENDIF
 
       ! --- North --- !
+      IF( lk_north ) THEN
       jbdy1 = jpjglo-1-nbghostcells
       jbdy2 = jpjglo-2 
       !
       IF( .NOT.ln_dynspg_ts ) THEN  ! Store transport
-         DO jj = mj0(jbdy1), mj1(jbdy2)
-            vv_b(:,jj,Krhs_a) = 0._wp
-            DO jk = 1, jpkm1
-               DO ji = 1, jpi
-                  vv_b(ji,jj,Krhs_a) = vv_b(ji,jj,Krhs_a) & 
-                      & + e3v(ji,jj,jk,Krhs_a) * vv(ji,jj,jk,Krhs_a) * vmask(ji,jj,jk)
+            DO jj = mj0(jbdy1), mj1(jbdy2)
+               vv_b(:,jj,Krhs_a) = 0._wp
+               DO jk = 1, jpkm1
+                  DO ji = 1, jpi
+                     vv_b(ji,jj,Krhs_a) = vv_b(ji,jj,Krhs_a) & 
+                         & + e3v(ji,jj,jk,Krhs_a) * vv(ji,jj,jk,Krhs_a) * vmask(ji,jj,jk)
+                  END DO
+               END DO
+               DO ji=1,jpi
+                  vv_b(ji,jj,Krhs_a) = vv_b(ji,jj,Krhs_a) * r1_hv(ji,jj,Krhs_a)
                END DO
             END DO
-            DO ji=1,jpi
-               vv_b(ji,jj,Krhs_a) = vv_b(ji,jj,Krhs_a) * r1_hv(ji,jj,Krhs_a)
+         ENDIF
+         !
+         DO jj = mj0(jbdy1), mj1(jbdy2)
+            zvb(:,jj) = 0._wp    ! Correct transport
+            DO jk=1,jpkm1
+               DO ji=1,jpi
+                  zvb(ji,jj) = zvb(ji,jj) & 
+                     & + e3v(ji,jj,jk,Krhs_a) * vv(ji,jj,jk,Krhs_a) * vmask(ji,jj,jk)
+               END DO
             END DO
-         END DO
-      ENDIF
-      !
-      DO jj = mj0(jbdy1), mj1(jbdy2)
-         zvb(:,jj) = 0._wp    ! Correct transport
-         DO jk=1,jpkm1
-            DO ji=1,jpi
-               zvb(ji,jj) = zvb(ji,jj) & 
-                  & + e3v(ji,jj,jk,Krhs_a) * vv(ji,jj,jk,Krhs_a) * vmask(ji,jj,jk)
+            DO ji = 1, jpi
+               zvb(ji,jj) = zvb(ji,jj) * r1_hv(ji,jj,Krhs_a)
             END DO
-         END DO
-         DO ji = 1, jpi
-            zvb(ji,jj) = zvb(ji,jj) * r1_hv(ji,jj,Krhs_a)
-         END DO
 
-         DO jk = 1, jpkm1
-            DO ji = 1, jpi
-               vv(ji,jj,jk,Krhs_a) = ( vv(ji,jj,jk,Krhs_a) & 
-                 & + vv_b(ji,jj,Krhs_a) - zvb(ji,jj) ) * vmask(ji,jj,jk)
-            END DO
-         END DO
-      END DO
-            
-      IF( ln_dynspg_ts ) THEN       ! Set tangential velocities to time splitting estimate
-         jbdy1 = jpjglo-nbghostcells
-         jbdy2 = jpjglo-1
-         DO jj = mj0(jbdy1), mj1(jbdy2)
-            zub(:,jj) = 0._wp
             DO jk = 1, jpkm1
                DO ji = 1, jpi
-                  zub(ji,jj) = zub(ji,jj) & 
-                     & + e3u(ji,jj,jk,Krhs_a) * uu(ji,jj,jk,Krhs_a) * umask(ji,jj,jk)
+                  vv(ji,jj,jk,Krhs_a) = ( vv(ji,jj,jk,Krhs_a) & 
+                    & + vv_b(ji,jj,Krhs_a) - zvb(ji,jj) ) * vmask(ji,jj,jk)
                END DO
             END DO
-            DO ji = 1, jpi
-               zub(ji,jj) = zub(ji,jj) * r1_hu(ji,jj,Krhs_a)
-            END DO
+         END DO
                
-            DO jk = 1, jpkm1
+         IF( ln_dynspg_ts ) THEN       ! Set tangential velocities to time splitting estimate
+            jbdy1 = jpjglo-nbghostcells
+            jbdy2 = jpjglo-1
+            DO jj = mj0(jbdy1), mj1(jbdy2)
+               zub(:,jj) = 0._wp
+               DO jk = 1, jpkm1
+                  DO ji = 1, jpi
+                     zub(ji,jj) = zub(ji,jj) & 
+                        & + e3u(ji,jj,jk,Krhs_a) * uu(ji,jj,jk,Krhs_a) * umask(ji,jj,jk)
+                  END DO
+               END DO
                DO ji = 1, jpi
-                  uu(ji,jj,jk,Krhs_a) = ( uu(ji,jj,jk,Krhs_a) & 
-                    & + uu_b(ji,jj,Krhs_a) - zub(ji,jj) ) * umask(ji,jj,jk)
+                  zub(ji,jj) = zub(ji,jj) * r1_hu(ji,jj,Krhs_a)
+               END DO
+                  
+               DO jk = 1, jpkm1
+                  DO ji = 1, jpi
+                     uu(ji,jj,jk,Krhs_a) = ( uu(ji,jj,jk,Krhs_a) & 
+                       & + uu_b(ji,jj,Krhs_a) - zub(ji,jj) ) * umask(ji,jj,jk)
+                  END DO
                END DO
             END DO
-         END DO
-      ENDIF
+         ENDIF
+      ENDIF   
       !
    END SUBROUTINE Agrif_dyn
 
@@ -356,56 +379,66 @@ CONTAINS
       IF( Agrif_Root() )   RETURN
       !
       !--- West ---!
-      istart = 2
-      iend   = nbghostcells+1
-      DO ji = mi0(istart), mi1(iend)
-         DO jj=1,jpj
-            va_e(ji,jj) = vbdy(ji,jj) * hvr_e(ji,jj)
-            ua_e(ji,jj) = ubdy(ji,jj) * hur_e(ji,jj)
+      IF(lk_west) THEN
+         istart = 2
+         iend   = nbghostcells+1
+         DO ji = mi0(istart), mi1(iend)
+            DO jj=1,jpj
+               va_e(ji,jj) = vbdy(ji,jj) * hvr_e(ji,jj)
+               ua_e(ji,jj) = ubdy(ji,jj) * hur_e(ji,jj)
+            END DO
          END DO
-      END DO
+      ENDIF
       !
+      IF(lk_east) THEN
       !--- East ---!
-      istart = jpiglo-nbghostcells
-      iend   = jpiglo-1
-      DO ji = mi0(istart), mi1(iend)
-         DO jj=1,jpj
-            va_e(ji,jj) = vbdy(ji,jj) * hvr_e(ji,jj)
+         istart = jpiglo-nbghostcells
+         iend   = jpiglo-1
+         DO ji = mi0(istart), mi1(iend)
+
+            DO jj=1,jpj
+               va_e(ji,jj) = vbdy(ji,jj) * hvr_e(ji,jj)
+            END DO
          END DO
-      END DO
-      istart = jpiglo-nbghostcells-1
-      iend   = jpiglo-2
-      DO ji = mi0(istart), mi1(iend)
-         DO jj=1,jpj
-            ua_e(ji,jj) = ubdy(ji,jj) * hur_e(ji,jj)
+         istart = jpiglo-nbghostcells-1
+         iend   = jpiglo-2
+         DO ji = mi0(istart), mi1(iend)
+            DO jj=1,jpj
+               ua_e(ji,jj) = ubdy(ji,jj) * hur_e(ji,jj)
+            END DO
          END DO
-      END DO
+      ENDIF 
       !
+      IF(lk_south) THEN
       !--- South ---!
-      jstart = 2
-      jend   = nbghostcells+1
-      DO jj = mj0(jstart), mj1(jend)
-         DO ji=1,jpi
-            ua_e(ji,jj) = ubdy(ji,jj) * hur_e(ji,jj)
-            va_e(ji,jj) = vbdy(ji,jj) * hvr_e(ji,jj)
+         jstart = 2
+         jend   = nbghostcells+1
+         DO jj = mj0(jstart), mj1(jend)
+
+            DO ji=1,jpi
+               ua_e(ji,jj) = ubdy(ji,jj) * hur_e(ji,jj)
+               va_e(ji,jj) = vbdy(ji,jj) * hvr_e(ji,jj)
+            END DO
          END DO
-      END DO
+      ENDIF       
       !
+      IF(lk_north) THEN
       !--- North ---!
-      jstart = jpjglo-nbghostcells
-      jend   = jpjglo-1
-      DO jj = mj0(jstart), mj1(jend)
-         DO ji=1,jpi
-            ua_e(ji,jj) = ubdy(ji,jj) * hur_e(ji,jj)
+         jstart = jpjglo-nbghostcells
+         jend   = jpjglo-1
+         DO jj = mj0(jstart), mj1(jend)
+            DO ji=1,jpi
+               ua_e(ji,jj) = ubdy(ji,jj) * hur_e(ji,jj)
+            END DO
          END DO
-      END DO
-      jstart = jpjglo-nbghostcells-1
-      jend   = jpjglo-2
-      DO jj = mj0(jstart), mj1(jend)
-         DO ji=1,jpi
-            va_e(ji,jj) = vbdy(ji,jj) * hvr_e(ji,jj)
+         jstart = jpjglo-nbghostcells-1
+         jend   = jpjglo-2
+         DO jj = mj0(jstart), mj1(jend)
+            DO ji=1,jpi
+               va_e(ji,jj) = vbdy(ji,jj) * hvr_e(ji,jj)
+            END DO
          END DO
-      END DO
+      ENDIF 
       !
    END SUBROUTINE Agrif_dyn_ts
 
@@ -549,40 +582,48 @@ CONTAINS
       Agrif_UseSpecialValue = .FALSE.
       !
       ! --- West --- !
-      istart = 2
-      iend   = 1 + nbghostcells
-      DO ji = mi0(istart), mi1(iend)
-         DO jj = 1, jpj
-            ssh(ji,jj,Krhs_a) = hbdy(ji,jj)
+      IF(lk_west) THEN
+         istart = 2
+         iend   = 1 + nbghostcells
+         DO ji = mi0(istart), mi1(iend)
+            DO jj = 1, jpj
+               ssh(ji,jj,Krhs_a) = hbdy(ji,jj)
+            ENDDO
          ENDDO
-      ENDDO
+      ENDIF
       !
       ! --- East --- !
-      istart = jpiglo - nbghostcells
-      iend   = jpiglo - 1
-      DO ji = mi0(istart), mi1(iend)
-         DO jj = 1, jpj
-            ssh(ji,jj,Krhs_a) = hbdy(ji,jj)
+      IF(lk_east) THEN
+         istart = jpiglo - nbghostcells
+         iend   = jpiglo - 1
+         DO ji = mi0(istart), mi1(iend)
+            DO jj = 1, jpj
+               ssh(ji,jj,Krhs_a) = hbdy(ji,jj)
+            ENDDO
          ENDDO
-      ENDDO
+      ENDIF
       !
       ! --- South --- !
-      jstart = 2
-      jend   = 1 + nbghostcells
-      DO jj = mj0(jstart), mj1(jend)
-         DO ji = 1, jpi
-            ssh(ji,jj,Krhs_a) = hbdy(ji,jj)
+      IF(lk_south) THEN
+         jstart = 2
+         jend   = 1 + nbghostcells
+         DO jj = mj0(jstart), mj1(jend)
+            DO ji = 1, jpi
+               ssh(ji,jj,Krhs_a) = hbdy(ji,jj)
+            ENDDO
          ENDDO
-      ENDDO
+      ENDIF
       !
       ! --- North --- !
-      jstart = jpjglo - nbghostcells
-      jend   = jpjglo - 1
-      DO jj = mj0(jstart), mj1(jend)
-         DO ji = 1, jpi
-            ssh(ji,jj,Krhs_a) = hbdy(ji,jj)
+      IF(lk_north) THEN
+         jstart = jpjglo - nbghostcells
+         jend   = jpjglo - 1
+         DO jj = mj0(jstart), mj1(jend)
+            DO ji = 1, jpi
+               ssh(ji,jj,Krhs_a) = hbdy(ji,jj)
+            ENDDO
          ENDDO
-      ENDDO
+      ENDIF
       !
    END SUBROUTINE Agrif_ssh
 
@@ -600,40 +641,48 @@ CONTAINS
       IF( Agrif_Root() )   RETURN
       !
       ! --- West --- !
-      istart = 2
-      iend   = 1+nbghostcells
-      DO ji = mi0(istart), mi1(iend)
-         DO jj = 1, jpj
-            ssha_e(ji,jj) = hbdy(ji,jj)
+      IF(lk_west) THEN
+         istart = 2
+         iend   = 1+nbghostcells
+         DO ji = mi0(istart), mi1(iend)
+            DO jj = 1, jpj
+               ssha_e(ji,jj) = hbdy(ji,jj)
+            ENDDO
          ENDDO
-      ENDDO
+      ENDIF
       !
       ! --- East --- !
-      istart = jpiglo - nbghostcells
-      iend   = jpiglo - 1
-      DO ji = mi0(istart), mi1(iend)
-         DO jj = 1, jpj
-            ssha_e(ji,jj) = hbdy(ji,jj)
+      IF(lk_east) THEN
+         istart = jpiglo - nbghostcells
+         iend   = jpiglo - 1
+         DO ji = mi0(istart), mi1(iend)
+            DO jj = 1, jpj
+               ssha_e(ji,jj) = hbdy(ji,jj)
+            ENDDO
          ENDDO
-      ENDDO
+      ENDIF
       !
       ! --- South --- !
-      jstart = 2
-      jend   = 1+nbghostcells
-      DO jj = mj0(jstart), mj1(jend)
-         DO ji = 1, jpi
-            ssha_e(ji,jj) = hbdy(ji,jj)
+      IF(lk_south) THEN
+         jstart = 2
+         jend   = 1+nbghostcells
+         DO jj = mj0(jstart), mj1(jend)
+            DO ji = 1, jpi
+               ssha_e(ji,jj) = hbdy(ji,jj)
+            ENDDO
          ENDDO
-      ENDDO
+      ENDIF
       !
       ! --- North --- !
-      jstart = jpjglo - nbghostcells
-      jend   = jpjglo - 1
-      DO jj = mj0(jstart), mj1(jend)
-         DO ji = 1, jpi
-            ssha_e(ji,jj) = hbdy(ji,jj)
+      IF(lk_north) THEN
+         jstart = jpjglo - nbghostcells
+         jend   = jpjglo - 1
+         DO jj = mj0(jstart), mj1(jend)
+            DO ji = 1, jpi
+               ssha_e(ji,jj) = hbdy(ji,jj)
+            ENDDO
          ENDDO
-      ENDDO
+      ENDIF
       !
    END SUBROUTINE Agrif_ssh_ts
 
@@ -699,6 +748,7 @@ CONTAINS
                DO jj=j1,j2
                   DO ji=i1,i2
                       ptab(ji,jj,jk,jpts+1) = tmask(ji,jj,jk) * e3t(ji,jj,jk,Kmm_a)
+
                   END DO
                END DO
             END DO

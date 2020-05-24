@@ -94,6 +94,7 @@ CONTAINS
 
 #if defined key_agrif
       ! ! Upper left longitude and latitude from parent:
+      ! Laurent: Should be modify in case of an east-west cyclic parent grid
       IF (.NOT.Agrif_root()) THEN
          zlam0 = zlam1 + Agrif_irhox() * REAL(Agrif_Parent(jpjglo)-2 , wp) * ze1deg * zcos_alpha  &
                    &   + ( Agrif_Ix()*Agrif_irhox()-(0.5_wp+nbghostcells)) * ze1deg * zcos_alpha  &

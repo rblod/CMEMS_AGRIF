@@ -106,10 +106,6 @@ CONTAINS
                uu  (:,:,:,Kbb) = 0._wp
                vv  (:,:,:,Kbb) = 0._wp  
             ELSE
-     
-              !  uu  (:,:,:,Kbb) = 0._wp
-              !  vv  (:,:,:,Kbb) = 0._wp  
-  
                CALL agrif_istate( Kbb, Kmm, Kaa ) 
             ENDIF
             !

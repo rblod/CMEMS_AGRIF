@@ -118,7 +118,6 @@ CONTAINS
          DO jn=1, jptra
             tr(i1:i2,j1:j2,1:jpk,jn,Krhs_a)=ptab_child(i1:i2,j1:j2,1:jpk,jn)*tmask(i1:i2,j1:j2,1:jpk) 
          END DO
-
       ENDIF
       !
    END SUBROUTINE interptrn

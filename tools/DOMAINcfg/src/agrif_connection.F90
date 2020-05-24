@@ -20,8 +20,9 @@
          
          ztabramp(:,:) = 0._wp
 
+          print *,'nbondi = ',nbondi,nbondj,jperio
          ! --- West --- !
-         IF( (nbondi == -1) .OR. (nbondi == 2) ) THEN
+         IF( ((nbondi == -1) .OR. (nbondi == 2) ).AND. .NOT. (jperio == 1 .OR. jperio == 4 .OR. jperio == 6)) THEN
             ind1 = 1+nbghostcells + istart
             ind2 = ind1 + ispongearea 
             DO jj = 1, jpj
@@ -32,7 +33,7 @@
          ENDIF
 
          ! --- East --- !
-         IF( (nbondi == 1) .OR. (nbondi == 2) ) THEN
+         IF( ((nbondi == 1) .OR. (nbondi == 2) ).AND. .NOT. (jperio == 1 .OR. jperio == 4 .OR. jperio == 6)) THEN
             !ind1 = nlci - nbghostcells - ispongearea
             ind2 = nlci - nbghostcells - istart
             ind1 = ind2 -ispongearea
@@ -46,7 +47,7 @@
          ENDIF
 
          ! --- South --- !
-         IF( (nbondj == -1) .OR. (nbondj == 2) ) THEN
+         IF(( (nbondj == -1) .OR. (nbondj == 2) ).AND.(south_boundary_open)) THEN
             ! ind1 = 1+nbghostcells
             ! ind2 = 1+nbghostcells + ispongearea
             ind1 = 1+nbghostcells + istart

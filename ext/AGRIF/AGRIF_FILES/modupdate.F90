@@ -278,6 +278,9 @@ subroutine Agrif_UpdateBcnd ( parent, child, uinf, usup,        &
     real,    dimension(nbdim), intent(in)   :: ds_child     !< Space steps of the child grid
     real,    dimension(nbdim), intent(in)   :: ds_parent    !< Space steps of the parent grid
     procedure()                             :: procname     !< Data recovery procedure
+    integer, dimension(6)  :: loctab_child      ! Indicates if the child grid has a common border
+                                                !    with the root grid
+    type(Agrif_Variable), pointer :: root_var   ! Variable on the root grid
 !
     integer,dimension(nbdim)     :: type_update ! Type of update (copy or average)
     integer,dimension(nbdim,2)   :: lubglob
@@ -287,7 +290,44 @@ subroutine Agrif_UpdateBcnd ( parent, child, uinf, usup,        &
     integer,dimension(nbdim,2,2,nbdim)   :: ptres  ! calculated
     integer                      :: nb, ndir
     integer :: coeffraf
+    integer :: n
 !
+    root_var => child % root_var
+    loctab_child(1:nbdim) = 0
+!
+    do n = 1,nbdim
+!
+        select case(root_var % interptab(n))
+!
+        case('x') ! x DIMENSION
+!
+            if (Agrif_Curgrid % NearRootBorder(1))      loctab_child(n) = -1
+            if (Agrif_Curgrid % DistantRootBorder(1))   loctab_child(n) = -2
+            if ((Agrif_Curgrid % NearRootBorder(1)) .AND. &
+                (Agrif_Curgrid % DistantRootBorder(1))) loctab_child(n) = -3
+!
+        case('y') ! y DIMENSION
+!
+            if (Agrif_Curgrid % NearRootBorder(2))      loctab_child(n) = -1
+            if (Agrif_Curgrid % DistantRootBorder(2))   loctab_child(n) = -2
+            if ((Agrif_Curgrid % NearRootBorder(2)) .AND. &
+                (Agrif_Curgrid % DistantRootBorder(2))) loctab_child(n) = -3
+!
+        case('z') ! z DIMENSION
+!
+            if (Agrif_Curgrid % NearRootBorder(3))      loctab_child(n) = -1
+            if (Agrif_Curgrid % DistantRootBorder(3))   loctab_child(n) = -2
+            if ((Agrif_Curgrid % NearRootBorder(3)) .AND. &
+                (Agrif_Curgrid % DistantRootBorder(3))) loctab_child(n) = -3
+!
+        case('N') ! No space DIMENSION
+!
+            loctab_child(n) = -3
+!
+        end select
+!
+    enddo
+
     type_update = child % root_var % type_update(1:nbdim)
 !
     DO i = 1, nbdim
@@ -329,6 +369,7 @@ subroutine Agrif_UpdateBcnd ( parent, child, uinf, usup,        &
     do nb = 1,nbdim
         if ( do_update(nb) ) then
             do ndir = 1,2
+              if (loctab_child(nb) /= (-ndir) .AND. loctab_child(nb) /= -3) then
                 ptres(nb,1,ndir,nb) = indtruetab(nb,ndir,1)
                 ptres(nb,2,ndir,nb) = indtruetab(nb,ndir,2)
                 do i = 1,nbdim
@@ -347,6 +388,7 @@ subroutine Agrif_UpdateBcnd ( parent, child, uinf, usup,        &
                         endif
                     endif
                 enddo
+              endif
             enddo
         endif
     enddo
@@ -354,6 +396,7 @@ subroutine Agrif_UpdateBcnd ( parent, child, uinf, usup,        &
     do nb = 1,nbdim
         if ( do_update(nb) ) then
             do ndir = 1,2
+              if (loctab_child(nb) /= (-ndir) .AND. loctab_child(nb) /= -3) then
                 call Agrif_UpdatenD(type_update, parent, child,             &
                         ptres(1:nbdim,1,ndir,nb),ptres(1:nbdim,2,ndir,nb),  &
                         lb_child(1:nbdim),lb_parent(1:nbdim),               &
@@ -363,6 +406,7 @@ subroutine Agrif_UpdateBcnd ( parent, child, uinf, usup,        &
                         posvar,do_update,                                   &
 #endif
                         nbdim,procname,nb,ndir)
+              endif
             enddo
         endif
     enddo
@@ -425,6 +469,8 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
     integer :: i, j,k,l,m
     LOGICAL,DIMENSION(:),ALLOCATABLE :: member_chuncks
     INTEGER,DIMENSION(:,:),ALLOCATABLE :: decal_chunks
+    INTEGER :: agrif_external_switch_index
+    INTEGER, DIMENSION(2) :: test_orientation
 !
 #if defined AGRIF_MPI
 !
@@ -448,7 +494,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
     type(Agrif_Variable), pointer, save :: tempC => NULL()       ! Temporary child grid variable
     type(Agrif_Variable), pointer, save :: tempP => NULL()       ! Temporary parent grid variable
     type(Agrif_Variable), pointer, save :: tempCextend => NULL() ! Temporary child
-    
+
     type(Agrif_Variable), pointer, save :: tempPextend => NULL() ! Temporary parent
     type(Agrif_Variable), pointer, save :: tempPextend_chunk => NULL() ! Temporary parent
     type(Agrif_Variable), pointer :: tempP_indic, tempP_average
@@ -456,7 +502,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
     logical :: compute_average
     real :: coeff_multi
     integer :: nb_dimensions
-    
+
 ! CHUNK (e.g. periodicity)
 
     INTEGER :: nb_chunks
@@ -465,7 +511,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
     INTEGER, DIMENSION(:,:,:), ALLOCATABLE :: bounds_chunks
     logical,dimension(:),allocatable :: correction_required
 !
-    
+
 !
 !   Get local lower and upper bound of the child variable
     call Agrif_get_var_bounds_array(child, lowerbound, upperbound, nbdim)
@@ -478,7 +524,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
 
     call Agrif_Childbounds( nbdim, lowerbound, upperbound, pttab, petab, Agrif_Procrank,    &
                             coords, pttruetab, cetruetab, memberin )
-                            
+
         if (agrif_debug_update) then
         print *,'************CHILDBOUNDS*********************************'
 #ifdef AGRIF_MPI
@@ -491,7 +537,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
         enddo
         print *,'*********************************************'
         endif
-        
+
     call Agrif_Prtbounds( nbdim, indminglob, indmaxglob, s_Parent_temp, s_Child_temp,       &
                          s_child, ds_child, s_parent, ds_parent,                            &
                          pttab, petab, lb_child, lb_parent                                  &
@@ -499,7 +545,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
                        , posvar, type_update, do_update, pttruetabwhole, cetruetabwhole     &
 #endif
             )
-            
+
         if (agrif_debug_update) then
         print *,'************PRTBOUNDS*********************************'
 #ifdef AGRIF_MPI
@@ -509,7 +555,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
         print *,'Direction ',i,' indminglob : ',indminglob(i)
         print *,'Direction ',i,' indmaxglob : ',indmaxglob(i)
         enddo
-        
+
         do i = 1 , nbdim
         print *,'Direction ',i,' s_Parent_temp : ',s_Parent_temp(i)
         print *,'Direction ',i,' s_Child_temp  : ',s_Child_temp(i)
@@ -524,7 +570,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
                                        pttruetab,cetruetab, coords,         &
                                        nbdim, Agrif_Procrank, member)
     ENDIF
-    
+
         if (agrif_debug_update) then
         print *,'************GlobalToLocalBounds******************'
 #ifdef AGRIF_MPI
@@ -534,7 +580,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
         print *,'Direction ',i,' childarray global : ',childarray(i,1,1),childarray(i,2,1)
         print *,'Direction ',i,' childarray local  : ',childarray(i,1,2),childarray(i,2,2)
         enddo
-        
+
         print *,'*********************************************'
         endif
 
@@ -544,7 +590,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
                          pttruetab, cetruetab, lb_child, lb_parent, &
                          posvar, type_update, do_update,            &
                          pttruetabwhole, cetruetabwhole)
-                         
+
         if (agrif_debug_update) then
         print *,'************PRTBOUNDS II *********************************'
 #ifdef AGRIF_MPI
@@ -554,7 +600,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
         print *,'Direction ',i,' indmin : ',indmin(i)
         print *,'Direction ',i,' indmax : ',indmax(i)
         enddo
-        
+
         do i = 1 , nbdim
         print *,'Direction ',i,' s_Parent_temp : ',s_Parent_temp(i)
         print *,'Direction ',i,' s_Child_temp  : ',s_Child_temp(i)
@@ -689,7 +735,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
                                             pttruetabwhole(1), cetruetabwhole(1),   &
                                             s_Child_temp(1), s_Parent_temp(1),      &
                                             ds_child(1), ds_parent(1) )
-                                            
+
             IF (Agrif_UseSpecialValueInUpdate) THEN
             allocate(tempC_indic)
             allocate(tempP_indic)
@@ -717,16 +763,16 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
                 coeff_multi = coeff_multi * nint(ds_parent(nb_dimensions)/ds_child(nb_dimensions))
               enddo
             ENDIF
-            
+
             WHERE (tempCextend%array1 == Agrif_SpecialValueFineGrid)
               tempC_indic%array1 = 0.
             ELSEWHERE
               tempC_indic%array1 = 1.
             END WHERE
-            
+
             Agrif_UseSpecialValueInUpdate = .FALSE.
             Agrif_Update_Weights = .TRUE.
- 
+
              call Agrif_Update_1D_Recursive( type_update_temp(1),   &
                                             tempP_indic%array1,       &
                                             tempC_indic%array1, &
@@ -754,7 +800,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
                   tempP%array1 = tempP%array1 /tempP_indic%array1
                END WHERE
             ENDIF
-           
+
             deallocate(tempP_indic%array1)
             deallocate(tempC_indic%array1)
             deallocate(tempC_indic)
@@ -764,7 +810,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
               deallocate(tempP_average)
             ENDIF
             ENDIF
-            
+
         endif
         if ( nbdim == 2 ) then
             call Agrif_Update_2D_Recursive( type_update(1:2),   &
@@ -780,7 +826,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
             allocate(tempP_indic)
             call Agrif_array_allocate(tempC_indic,lbound(tempCextend%array2),ubound(tempCextend%array2),nbdim)
             call Agrif_array_allocate(tempP_indic,lbound(tempP%array2),ubound(tempP%array2),nbdim)
- 
+
             compute_average = .FALSE.
             type_update_temp(1:nbdim) = type_update(1:nbdim)
             IF (ANY(type_update == Agrif_Update_Full_Weighting)) THEN
@@ -802,16 +848,16 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
                 coeff_multi = coeff_multi * nint(ds_parent(nb_dimensions)/ds_child(nb_dimensions))
               enddo
             ENDIF
-            
+
             WHERE (tempCextend%array2 == Agrif_SpecialValueFineGrid)
               tempC_indic%array2 = 0.
             ELSEWHERE
               tempC_indic%array2 = 1.
             END WHERE
-            
+
             Agrif_UseSpecialValueInUpdate = .FALSE.
             Agrif_Update_Weights = .TRUE.
-            
+
             call Agrif_Update_2D_Recursive( type_update_temp(1:2),   &
                                             tempP_indic%array2,       &
                                             tempC_indic%array2, &
@@ -839,7 +885,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
                   tempP%array2 = tempP%array2 /tempP_indic%array2
                END WHERE
             ENDIF
-           
+
             deallocate(tempP_indic%array2)
             deallocate(tempC_indic%array2)
             deallocate(tempC_indic)
@@ -849,7 +895,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
               deallocate(tempP_average)
             ENDIF
             ENDIF
-            
+
         endif
         if ( nbdim == 3 ) then
             call Agrif_Update_3D_Recursive( type_update(1:3),   &
@@ -859,7 +905,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
                                             pttruetabwhole(1:3), cetruetabwhole(1:3),   &
                                             s_Child_temp(1:3), s_Parent_temp(1:3),      &
                                             ds_child(1:3), ds_parent(1:3) )
-                                            
+
             IF (Agrif_UseSpecialValueInUpdate) THEN
             allocate(tempC_indic)
             allocate(tempP_indic)
@@ -887,16 +933,16 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
                 coeff_multi = coeff_multi * nint(ds_parent(nb_dimensions)/ds_child(nb_dimensions))
               enddo
             ENDIF
-            
+
             WHERE (tempCextend%array3 == Agrif_SpecialValueFineGrid)
               tempC_indic%array3 = 0.
             ELSEWHERE
               tempC_indic%array3 = 1.
             END WHERE
-            
+
             Agrif_UseSpecialValueInUpdate = .FALSE.
             Agrif_Update_Weights = .TRUE.
- 
+
              call Agrif_Update_3D_Recursive( type_update_temp(1:3),   &
                                             tempP_indic%array3,       &
                                             tempC_indic%array3, &
@@ -924,7 +970,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
                   tempP%array3 = tempP%array3 /tempP_indic%array3
                END WHERE
             ENDIF
-           
+
             deallocate(tempP_indic%array3)
             deallocate(tempC_indic%array3)
             deallocate(tempC_indic)
@@ -934,7 +980,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
               deallocate(tempP_average)
             ENDIF
             ENDIF
-            
+
         endif
         if ( nbdim == 4 ) then
             call Agrif_Update_4D_Recursive( type_update(1:4),   &
@@ -944,14 +990,14 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
                                             pttruetabwhole(1:4), cetruetabwhole(1:4),   &
                                             s_Child_temp(1:4), s_Parent_temp(1:4),      &
                                             ds_child(1:4), ds_parent(1:4) )
-                                            
+
             IF (Agrif_UseSpecialValueInUpdate) THEN
-            
+
             allocate(tempC_indic)
             allocate(tempP_indic)
             call Agrif_array_allocate(tempC_indic,lbound(tempCextend%array4),ubound(tempCextend%array4),nbdim)
             call Agrif_array_allocate(tempP_indic,lbound(tempP%array4),ubound(tempP%array4),nbdim)
-           
+
             compute_average = .FALSE.
             type_update_temp(1:nbdim) = type_update(1:nbdim)
             IF (ANY(type_update == Agrif_Update_Full_Weighting)) THEN
@@ -973,16 +1019,16 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
                 coeff_multi = coeff_multi * nint(ds_parent(nb_dimensions)/ds_child(nb_dimensions))
               enddo
             ENDIF
-            
+
             WHERE (tempCextend%array4 == Agrif_SpecialValueFineGrid)
               tempC_indic%array4 = 0.
             ELSEWHERE
               tempC_indic%array4 = 1.
             END WHERE
-            
+
             Agrif_UseSpecialValueInUpdate = .FALSE.
             Agrif_Update_Weights = .TRUE.
- 
+
              call Agrif_Update_4D_Recursive( type_update_temp(1:4),   &
                                             tempP_indic%array4,       &
                                             tempC_indic%array4, &
@@ -993,7 +1039,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
 
            Agrif_UseSpecialValueInUpdate = .TRUE.
            Agrif_Update_Weights = .FALSE.
-           
+
            IF (compute_average) THEN
                WHERE (tempP_indic%array4 == 0.)
                   tempP%array4 = Agrif_SpecialValueFineGrid
@@ -1019,7 +1065,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
               deallocate(tempP_average)
             ENDIF
             ENDIF
-            
+
         endif
         if ( nbdim == 5 ) then
             call Agrif_Update_5D_Recursive( type_update(1:5),   &
@@ -1029,7 +1075,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
                                             pttruetabwhole(1:5), cetruetabwhole(1:5),   &
                                             s_Child_temp(1:5), s_Parent_temp(1:5),      &
                                             ds_child(1:5), ds_parent(1:5) )
-                                            
+
             IF (Agrif_UseSpecialValueInUpdate) THEN
             allocate(tempC_indic)
             allocate(tempP_indic)
@@ -1057,16 +1103,16 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
                 coeff_multi = coeff_multi * nint(ds_parent(nb_dimensions)/ds_child(nb_dimensions))
               enddo
             ENDIF
-            
+
             WHERE (tempCextend%array5 == Agrif_SpecialValueFineGrid)
               tempC_indic%array5 = 0.
             ELSEWHERE
               tempC_indic%array5 = 1.
             END WHERE
-            
+
             Agrif_UseSpecialValueInUpdate = .FALSE.
             Agrif_Update_Weights = .TRUE.
- 
+
              call Agrif_Update_5D_Recursive( type_update_temp(1:5),   &
                                             tempP_indic%array5,       &
                                             tempC_indic%array5, &
@@ -1094,7 +1140,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
                   tempP%array5 = tempP%array5 /tempP_indic%array5
                END WHERE
             ENDIF
-           
+
             deallocate(tempP_indic%array5)
             deallocate(tempC_indic%array5)
             deallocate(tempC_indic)
@@ -1104,7 +1150,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
               deallocate(tempP_average)
             ENDIF
             ENDIF
-            
+
         endif
         if ( nbdim == 6 ) then
             call Agrif_Update_6D_Recursive( type_update(1:6),   &
@@ -1159,10 +1205,10 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
                   tempP%array6 = tempP%array6 /tempP_indic%array6
                END WHERE
             ENDIF
-            
+
             Agrif_UseSpecialValueInUpdate = .FALSE.
             Agrif_Update_Weights = .TRUE.
- 
+
              call Agrif_Update_6D_Recursive( type_update_temp(1:6),   &
                                             tempP_indic%array6,       &
                                             tempC_indic%array6, &
@@ -1173,13 +1219,13 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
 
            Agrif_UseSpecialValueInUpdate = .TRUE.
            Agrif_Update_Weights = .FALSE.
-           
+
             WHERE (tempP_indic%array6 == 0.)
               tempP%array6 = Agrif_SpecialValueFineGrid
             ELSEWHERE
               tempP%array6 = tempP%array6 /tempP_indic%array6
             END WHERE
-           
+
             deallocate(tempP_indic%array6)
             deallocate(tempC_indic%array6)
             deallocate(tempC_indic)
@@ -1245,7 +1291,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
         allocate(indminglob3_chunks(nb_chunks,nbdim))
         allocate(indmaxglob3_chunks(nb_chunks,nbdim))
         allocate(member_chuncks(nb_chunks))
-        
+
         do i=1,nb_chunks
           indminglob_chunks(i,:) = parentarray_chunk(i,:,1,2)
           indmaxglob_chunks(i,:) = parentarray_chunk(i,:,2,2)
@@ -1281,15 +1327,30 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
                                            ! lowerbound,  upperbound,                                  &
                                            ! indminglob2_chunks(j,:), indmaxglob2_chunks(j,:), coords, &
                                            ! nbdim, local_proc, member_chuncks(j),check_perio=.TRUE.)
-                                           
+
             call Agrif_GlobalToLocalBounds(parentarray_chunk(j,:,:,:),                               &
                                            lowerbound,  upperbound,                                  &
                                            indminglob2_chunks(j,:), indmaxglob2_chunks(j,:), coords, &
                                            nbdim, local_proc, member_chuncks(j))
-                                           
+
+            if (correction_required(j)) then
+                do i=1,2
+                    test_orientation(1)=agrif_external_switch_index(child%root_var % posvar(1),child%root_var % posvar(2), &
+                    parentarray_chunk(j,i,1,1),i)
+                    test_orientation(2)=agrif_external_switch_index(child%root_var % posvar(1),child%root_var % posvar(2), &
+                    parentarray_chunk(j,i,2,1),i)
+                    parentarray_chunk_decal(j,i,1,1)=minval(test_orientation)
+                    parentarray_chunk_decal(j,i,2,1)=maxval(test_orientation)
+                enddo
+                do i=3,nbdim
+                  parentarray_chunk_decal(j,i,:,1) = parentarray_chunk(j,i,:,1)+decal_chunks(j,i)
+                enddo
+            else
             do i=1,nbdim
             parentarray_chunk_decal(j,i,:,1) = parentarray_chunk(j,i,:,1)+decal_chunks(j,i)
             enddo
+            endif
+
             if (agrif_debug_update) then
             do i=1,nbdim
             print *,'parentarray = ',i,parentarray_chunk(j,i,1,1),parentarray_chunk(j,i,2,1), &
@@ -1303,7 +1364,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
 !     call Agrif_Childbounds(nbdim, lowerbound, upperbound,                   &
 !                            indminglob,  indmaxglob,  local_proc, coords,    &
 !                            indminglob2, indmaxglob2, member)
-                           
+
 !         if (agrif_debug_update) then
 !         print *,'************CHILDBOUNDS PARENT*********************************'
 ! #ifdef AGRIF_MPI
@@ -1322,7 +1383,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
 !                                        indminglob2, indmaxglob2, coords,    &
 !                                        nbdim, local_proc, member,check_perio=.TRUE.)
 !     ENDIF
-    
+
 !         if (agrif_debug_update) then
 !         print *,'************GlobalToLocalBounds II******************'
 ! #ifdef AGRIF_MPI
@@ -1332,11 +1393,10 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
 !         print *,'Direction ',i,' parentarray global : ',parentarray(i,1,1),parentarray(i,2,1)
 !         print *,'Direction ',i,' parentarray local  : ',parentarray(i,1,2),parentarray(i,2,2)
 !         enddo
-        
+
 !         print *,'*********************************************'
 !         endif
 
-    call Agrif_ParentGrid_to_ChildGrid()
 
         parentarray(:,1,:)=Huge(1)
         parentarray(:,2,:)=-Huge(1)
@@ -1350,13 +1410,35 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
              parentarray(i,1,2) = min(parentarray(i,1,2),parentarray_chunk(j,i,1,2))
              parentarray(i,2,1) = max(parentarray(i,2,1),parentarray_chunk_decal(j,i,2,1))
              parentarray(i,2,2) = max(parentarray(i,2,2),parentarray_chunk(j,i,2,2))
+            enddo
+
+            if (correction_required(j)) then
+                do i=1,2
+                    test_orientation(1)=agrif_external_switch_index(child%root_var % posvar(1),child%root_var % posvar(2), &
+                    indminglob2_chunks(j,i),i)
+                    test_orientation(2)=agrif_external_switch_index(child%root_var % posvar(1),child%root_var % posvar(2), &
+                    indmaxglob2_chunks(j,i),i)
+                    indminglob2(i)=min(indminglob2(i),minval(test_orientation))
+                    indmaxglob2(i)=max(indmaxglob2(i),maxval(test_orientation))
+                enddo
+
+                do i=3,nbdim
              indminglob2(i)=min(indminglob2(i),indminglob2_chunks(j,i)+decal_chunks(j,i))
              indmaxglob2(i)=max(indmaxglob2(i),indmaxglob2_chunks(j,i)+decal_chunks(j,i))
-            enddo
+                enddo
+            else
+            	            do i=1,nbdim
+             indminglob2(i)=min(indminglob2(i),indminglob2_chunks(j,i)+decal_chunks(j,i))
+             indmaxglob2(i)=max(indmaxglob2(i),indmaxglob2_chunks(j,i)+decal_chunks(j,i))
+                         enddo
+         endif
+
             member = .TRUE.
-          endif          
+          endif
         enddo
-        
+
+        call Agrif_ParentGrid_to_ChildGrid()
+
         if (agrif_debug_update) then
         print *,'************ FINAL PARENTARRAY *****************'
 #ifdef AGRIF_MPI
@@ -1367,7 +1449,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
         enddo
 #endif
         endif
-        
+
         if (agrif_debug_update) then
         print *,'************ FINAL INDMINGLOB *****************'
 #ifdef AGRIF_MPI
@@ -1533,7 +1615,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
     endif
 !
 
-        
+
         call Agrif_ChildGrid_to_ParentGrid()
 
         if (nb_chunks > 1) then
@@ -1555,7 +1637,7 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
         else
             tempPextend_chunk => tempPextend
         endif
-        
+
         do i=1,nb_chunks
 
         if (member_chuncks(i)) then
@@ -1577,30 +1659,30 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
         CASE(2)
 
             if (correction_required(i)) then
-              call correct_field(tempPextend_chunk%array2(parentarray_chunk_decal(i,1,1,1):parentarray_chunk_decal(i,1,2,1), & 
+              call correct_field(tempPextend_chunk%array2(parentarray_chunk_decal(i,1,1,1):parentarray_chunk_decal(i,1,2,1), &
                       parentarray_chunk_decal(i,2,1,1):parentarray_chunk_decal(i,2,2,1)), &
-                      parentarray_chunk_decal(i,1,1,1),parentarray_chunk_decal(i,1,2,1), & 
-                      parentarray_chunk_decal(i,2,1,1),parentarray_chunk_decal(i,2,2,1))           
+                      parentarray_chunk_decal(i,1,1,1),parentarray_chunk_decal(i,1,2,1), &
+                      parentarray_chunk_decal(i,2,1,1),parentarray_chunk_decal(i,2,2,1))
             endif
 
-            call procname(tempPextend_chunk%array2(parentarray_chunk_decal(i,1,1,1):parentarray_chunk_decal(i,1,2,1), & 
+            call procname(tempPextend_chunk%array2(parentarray_chunk_decal(i,1,1,1):parentarray_chunk_decal(i,1,2,1), &
                       parentarray_chunk_decal(i,2,1,1):parentarray_chunk_decal(i,2,2,1)),         &
                       parentarray_chunk(i,1,1,2),parentarray_chunk(i,1,2,2),    &
                       parentarray_chunk(i,2,1,2),parentarray_chunk(i,2,2,2),.FALSE.,nbin,ndirin)
-                      
+
         CASE(3)
 
             if (correction_required(i)) then
                 do k=parentarray_chunk(i,3,1,2),parentarray_chunk(i,3,2,2)
-              call correct_field(tempPextend_chunk%array3(parentarray_chunk_decal(i,1,1,1):parentarray_chunk_decal(i,1,2,1), & 
+              call correct_field(tempPextend_chunk%array3(parentarray_chunk_decal(i,1,1,1):parentarray_chunk_decal(i,1,2,1), &
                       parentarray_chunk_decal(i,2,1,1):parentarray_chunk_decal(i,2,2,1),k), &
-                      parentarray_chunk_decal(i,1,1,1),parentarray_chunk_decal(i,1,2,1), & 
-                      parentarray_chunk_decal(i,2,1,1),parentarray_chunk_decal(i,2,2,1))   
+                      parentarray_chunk_decal(i,1,1,1),parentarray_chunk_decal(i,1,2,1), &
+                      parentarray_chunk_decal(i,2,1,1),parentarray_chunk_decal(i,2,2,1))
                 enddo
             endif
 
-            call procname(tempPextend_chunk%array3(parentarray_chunk_decal(i,1,1,1):parentarray_chunk_decal(i,1,2,1), & 
-                      parentarray_chunk_decal(i,2,1,1):parentarray_chunk_decal(i,2,2,1), & 
+            call procname(tempPextend_chunk%array3(parentarray_chunk_decal(i,1,1,1):parentarray_chunk_decal(i,1,2,1), &
+                      parentarray_chunk_decal(i,2,1,1):parentarray_chunk_decal(i,2,2,1), &
                       parentarray_chunk_decal(i,3,1,1):parentarray_chunk_decal(i,3,2,1)),         &
                       parentarray_chunk(i,1,1,2),parentarray_chunk(i,1,2,2),    &
                       parentarray_chunk(i,2,1,2),parentarray_chunk(i,2,2,2),    &
@@ -1608,23 +1690,23 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
 
 
 
-                      
+
         CASE(4)
 
             if (correction_required(i)) then
                 do l=parentarray_chunk(i,4,1,2),parentarray_chunk(i,4,2,2)
                 do k=parentarray_chunk(i,3,1,2),parentarray_chunk(i,3,2,2)
-              call correct_field(tempPextend_chunk%array4(parentarray_chunk_decal(i,1,1,1):parentarray_chunk_decal(i,1,2,1), & 
+              call correct_field(tempPextend_chunk%array4(parentarray_chunk_decal(i,1,1,1):parentarray_chunk_decal(i,1,2,1), &
                       parentarray_chunk_decal(i,2,1,1):parentarray_chunk_decal(i,2,2,1),k,l), &
-                      parentarray_chunk_decal(i,1,1,1),parentarray_chunk_decal(i,1,2,1), & 
-                      parentarray_chunk_decal(i,2,1,1),parentarray_chunk_decal(i,2,2,1))   
+                      parentarray_chunk_decal(i,1,1,1),parentarray_chunk_decal(i,1,2,1), &
+                      parentarray_chunk_decal(i,2,1,1),parentarray_chunk_decal(i,2,2,1))
                 enddo
             enddo
             endif
 
-            call procname(tempPextend_chunk%array4(parentarray_chunk_decal(i,1,1,1):parentarray_chunk_decal(i,1,2,1), & 
-                      parentarray_chunk_decal(i,2,1,1):parentarray_chunk_decal(i,2,2,1), & 
-                      parentarray_chunk_decal(i,3,1,1):parentarray_chunk_decal(i,3,2,1), & 
+            call procname(tempPextend_chunk%array4(parentarray_chunk_decal(i,1,1,1):parentarray_chunk_decal(i,1,2,1), &
+                      parentarray_chunk_decal(i,2,1,1):parentarray_chunk_decal(i,2,2,1), &
+                      parentarray_chunk_decal(i,3,1,1):parentarray_chunk_decal(i,3,2,1), &
                       parentarray_chunk_decal(i,4,1,1):parentarray_chunk_decal(i,4,2,1)),         &
                       parentarray_chunk(i,1,1,2),parentarray_chunk(i,1,2,2),    &
                       parentarray_chunk(i,2,1,2),parentarray_chunk(i,2,2,2),    &
@@ -1637,19 +1719,19 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
                 do m=parentarray_chunk(i,5,1,2),parentarray_chunk(i,5,2,2)
                 do l=parentarray_chunk(i,4,1,2),parentarray_chunk(i,4,2,2)
                 do k=parentarray_chunk(i,3,1,2),parentarray_chunk(i,3,2,2)
-              call correct_field(tempPextend_chunk%array5(parentarray_chunk_decal(i,1,1,1):parentarray_chunk_decal(i,1,2,1), & 
+              call correct_field(tempPextend_chunk%array5(parentarray_chunk_decal(i,1,1,1):parentarray_chunk_decal(i,1,2,1), &
                       parentarray_chunk_decal(i,2,1,1):parentarray_chunk_decal(i,2,2,1),k,l,m), &
-                      parentarray_chunk_decal(i,1,1,1),parentarray_chunk_decal(i,1,2,1), & 
-                      parentarray_chunk_decal(i,2,1,1),parentarray_chunk_decal(i,2,2,1))   
+                      parentarray_chunk_decal(i,1,1,1),parentarray_chunk_decal(i,1,2,1), &
+                      parentarray_chunk_decal(i,2,1,1),parentarray_chunk_decal(i,2,2,1))
                 enddo
             enddo
             enddo
             endif
 
-            call procname(tempPextend_chunk%array5(parentarray_chunk_decal(i,1,1,1):parentarray_chunk_decal(i,1,2,1), & 
-                      parentarray_chunk_decal(i,2,1,1):parentarray_chunk_decal(i,2,2,1), & 
-                      parentarray_chunk_decal(i,3,1,1):parentarray_chunk_decal(i,3,2,1), & 
-                      parentarray_chunk_decal(i,4,1,1):parentarray_chunk_decal(i,4,2,1), & 
+            call procname(tempPextend_chunk%array5(parentarray_chunk_decal(i,1,1,1):parentarray_chunk_decal(i,1,2,1), &
+                      parentarray_chunk_decal(i,2,1,1):parentarray_chunk_decal(i,2,2,1), &
+                      parentarray_chunk_decal(i,3,1,1):parentarray_chunk_decal(i,3,2,1), &
+                      parentarray_chunk_decal(i,4,1,1):parentarray_chunk_decal(i,4,2,1), &
                       parentarray_chunk_decal(i,5,1,1):parentarray_chunk_decal(i,5,2,1)),         &
                       parentarray_chunk(i,1,1,2),parentarray_chunk(i,1,2,2),    &
                       parentarray_chunk(i,2,1,2),parentarray_chunk(i,2,2,2),    &
@@ -1659,11 +1741,11 @@ subroutine Agrif_UpdatenD ( type_update, parent, child,     &
 
         CASE(6)
 
-            call procname(tempPextend_chunk%array6(parentarray_chunk_decal(i,1,1,1):parentarray_chunk_decal(i,1,2,1), & 
-                      parentarray_chunk_decal(i,2,1,1):parentarray_chunk_decal(i,2,2,1), & 
-                      parentarray_chunk_decal(i,3,1,1):parentarray_chunk_decal(i,3,2,1), & 
-                      parentarray_chunk_decal(i,4,1,1):parentarray_chunk_decal(i,4,2,1), & 
-                      parentarray_chunk_decal(i,5,1,1):parentarray_chunk_decal(i,5,2,1), & 
+            call procname(tempPextend_chunk%array6(parentarray_chunk_decal(i,1,1,1):parentarray_chunk_decal(i,1,2,1), &
+                      parentarray_chunk_decal(i,2,1,1):parentarray_chunk_decal(i,2,2,1), &
+                      parentarray_chunk_decal(i,3,1,1):parentarray_chunk_decal(i,3,2,1), &
+                      parentarray_chunk_decal(i,4,1,1):parentarray_chunk_decal(i,4,2,1), &
+                      parentarray_chunk_decal(i,5,1,1):parentarray_chunk_decal(i,5,2,1), &
                       parentarray_chunk_decal(i,6,1,1):parentarray_chunk_decal(i,6,2,1)),         &
                       parentarray_chunk(i,1,1,2),parentarray_chunk(i,1,2,2),    &
                       parentarray_chunk(i,2,1,2),parentarray_chunk(i,2,2,2),    &

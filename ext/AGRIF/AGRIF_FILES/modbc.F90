@@ -72,7 +72,7 @@ subroutine Agrif_CorrectVariable ( parent, child, pweight, weight, procname )
     Agrif_Child_Gr => Agrif_Curgrid
     Agrif_Parent_Gr => Agrif_Curgrid % parent
 !
-    loctab_child(:) = 0
+    loctab_child(1:nbdim) = 0
     posvartab_child(1:nbdim) = root_var % posvar(1:nbdim)
 !
     do n = 1,nbdim

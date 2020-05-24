@@ -213,6 +213,7 @@ MODULE dom_oce
    !!----------------------------------------------------------------------
 #if defined key_agrif
    LOGICAL, PUBLIC, PARAMETER ::   lk_agrif = .TRUE.    !: agrif flag
+   LOGICAL, PUBLIC            ::   lk_south, lk_north, lk_west, lk_east !: Child grid boundaries (interpolation or not)
 #else
    LOGICAL, PUBLIC, PARAMETER ::   lk_agrif = .FALSE.   !: agrif flag
 #endif

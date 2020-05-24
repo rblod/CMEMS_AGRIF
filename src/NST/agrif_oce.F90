@@ -28,10 +28,12 @@ MODULE agrif_oce
    LOGICAL , PUBLIC ::   ln_chk_bathy  = .FALSE.   !: check of parent bathymetry 
    !
    INTEGER , PUBLIC, PARAMETER ::   nn_sponge_len = 2  !: Sponge width (in number of parent grid points)
+   LOGICAL , PUBLIC ::   south_boundary_open  = .TRUE. !: Is the South boundary open ?
+
    LOGICAL , PUBLIC :: spongedoneT = .FALSE.       !: tracer   sponge layer indicator
    LOGICAL , PUBLIC :: spongedoneU = .FALSE.       !: dynamics sponge layer indicator
    LOGICAL , PUBLIC :: lk_agrif_fstep = .TRUE.     !: if true: first step
-   LOGICAL , PUBLIC :: lk_agrif_debug = .TRUE.    !: if true: print debugging info
+   LOGICAL , PUBLIC :: lk_agrif_debug = .FALSE.    !: if true: print debugging info
 
    LOGICAL , PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) :: tabspongedone_tsn
 # if defined key_top
