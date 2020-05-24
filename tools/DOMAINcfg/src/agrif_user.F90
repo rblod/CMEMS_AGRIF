@@ -88,6 +88,7 @@ nx=nlci ; ny=nlcj
        CALL lbc_lnk( 'gphif', gphif, 'F', 1._wp)
 
        ! Correct South and North
+write(*,*) nbondj
        IF ((nbondj == -1).OR.(nbondj == 2)) THEN
          glamt(:,1)=glamt(:,2)
          gphit(:,1)=gphit(:,2)
@@ -1172,6 +1173,7 @@ END SUBROUTINE Agrif_detect
 SUBROUTINE agrif_before_regridding
 END SUBROUTINE agrif_before_regridding
 
+#ifdef key_mpp_mpi
 SUBROUTINE Agrif_InvLoc( indloc, nprocloc, i, indglob )
       !!----------------------------------------------------------------------
       !!                     *** ROUTINE Agrif_InvLoc ***
@@ -1229,4 +1231,5 @@ SUBROUTINE Agrif_estimate_parallel_cost(imin, imax,jmin, jmax, nbprocs, grid_cos
    grid_cost = REAL(imax-imin+1,wp)*REAL(jmax-jmin+1,wp) / REAL(nbprocs,wp)
    !
 END SUBROUTINE Agrif_estimate_parallel_cost
+#endif
 #endif

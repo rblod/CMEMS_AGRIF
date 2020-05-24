@@ -62,7 +62,7 @@ conv:
 		$(MAKE) -C ../../ext/AGRIF/LIB
 
 AGRIF_LIB: 
-		$(MAKE) -C ../../ext/AGRIF FC=$(FC) CPP=$(CPP) CPPFLAGS="-DAGRIF_MPI" FFLAGS="$(FFLAGS)"
+		$(MAKE) -C ../../ext/AGRIF FC=$(FC) CPP=$(CPP) CPPFLAGS="" FFLAGS="$(FFLAGS)"
 else
 
 prepagrif:
