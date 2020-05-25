@@ -43,7 +43,7 @@ MODULE agrif_oce_interp
    PUBLIC   interpun , interpvn
    PUBLIC   interptsn, interpsshn, interpavm
    PUBLIC   interpunb, interpvnb , interpub2b, interpvb2b
-   PUBLIC   interpe3t, interpumsk, interpvmsk
+   PUBLIC   interpe3t
    PUBLIC   interpht0, interpmbkt
    PUBLIC   agrif_initts, agrif_initssh
 
@@ -71,19 +71,6 @@ CONTAINS
       Agrif_UseSpecialValue = .FALSE.
       !
    END SUBROUTINE Agrif_tra
-
-   SUBROUTINE Agrif_Init_traceurs
-   	INTEGER :: jn
-      Agrif_SpecialValue    = 0._wp
-      Agrif_UseSpecialValue = .TRUE.
-      tsb(:,:,:,:) = 0.
-      CALL Agrif_Init_Variable(tsini_id, procname=agrif_initts)
-      Agrif_UseSpecialValue = .FALSE.
-            !    ! local domain boundaries  (T-point, unchanged sign)
-      DO jn=1,jpts
-        CALL lbc_lnk( 'traceur', tsb(:,:,:,jn), 'T', 1.)
-      ENDDO
-   END SUBROUTINE Agrif_Init_traceurs
 
 
    SUBROUTINE Agrif_dyn( kt )

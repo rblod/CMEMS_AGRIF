@@ -202,15 +202,10 @@ CONTAINS
 #if defined key_agrif 
 !RBCMEMS : check which one
       IF( .NOT. AGRIF_Root() ) THEN 
-         IF ((nbondi ==  1).OR.(nbondi == 2)) pww(nlci-1 , :     ,:) = 0.e0      ! east 
-         IF ((nbondi == -1).OR.(nbondi == 2)) pww(2      , :     ,:) = 0.e0      ! west 
-         IF ((nbondj ==  1).OR.(nbondj == 2)) pww(:      ,nlcj-1 ,:) = 0.e0      ! north 
-         IF ((nbondj == -1).OR.(nbondj == 2)) pww(:      ,2      ,:) = 0.e0      ! south 
-    
- !        IF(lk_east)  wn(nlci-1 , :     ,:) = 0.e0      ! east 
- !        IF(lk_west)  wn(2      , :     ,:) = 0.e0      ! west 
- !        IF(lk_north) wn(:      ,nlcj-1 ,:) = 0.e0      ! north 
- !        IF(lk_south) wn(:      ,2      ,:) = 0.e0      ! south 
+         IF(lk_east)  pww(nlci-1 , :     ,:) = 0.e0      ! east
+         IF(lk_west)  pww(2      , :     ,:) = 0.e0      ! west
+         IF(lk_north) pww(:      ,nlcj-1 ,:) = 0.e0      ! north
+         IF(lk_south) pww(:      ,2      ,:) = 0.e0      ! south
       ENDIF 
 #endif 
       !

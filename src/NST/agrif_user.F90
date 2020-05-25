@@ -333,10 +333,6 @@ SUBROUTINE Agrif_InitValues_cont
          IF( .NOT. l_vremap ) THEN
             !
             ! check if tmask and vertical scale factors agree with parent in sponge area:
-            CALL Agrif_Bc_variable(umsk_id,calledweight=1.,procname=interpumsk)
-            ! check if vmask agree with parent along northern and southern boundaries:
-            CALL Agrif_Bc_variable(vmsk_id,calledweight=1.,procname=interpvmsk)
-            ! check if tmask and vertical scale factors agree with parent over first two coarse grid points:
             CALL Agrif_Bc_variable(e3t_id,calledweight=1.,procname=interpe3t)
             !
          ELSE
@@ -895,7 +891,6 @@ SUBROUTINE Agrif_InitValues_cont_ice
    END SUBROUTINE agrif_nemo_init
 
    !
-END SUBROUTINE agrif_nemo_init
 
 SUBROUTINE agrif_nemo_init_part2
       !!----------------------------------------------------------------------
