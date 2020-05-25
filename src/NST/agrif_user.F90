@@ -904,7 +904,6 @@ SUBROUTINE agrif_nemo_init_part2
    !!
    IMPLICIT NONE
    !
-   INTEGER  ::   ios                 ! Local integer output status for namelist read
    INTEGER  ::   iminspon
 
    !
@@ -913,12 +912,18 @@ SUBROUTINE agrif_nemo_init_part2
    IF (lk_mpp) iminspon = MIN(iminspon,FLOOR(REAL(jpi-2)/REAL(Agrif_irhox())), FLOOR(REAL(jpj-2)/REAL(Agrif_irhox())) )
    IF (nn_sponge_len > iminspon)  CALL ctl_stop('agrif sponge length is too large')
    !
-   IF( agrif_oce_alloc()  > 0 )   CALL ctl_warn('agrif agrif_oce_alloc: allocation of arrays failed')
+ !  IF( agrif_oce_alloc()  > 0 )   CALL ctl_warn('agrif agrif_oce_alloc: allocation of arrays failed')
 
-   lk_west  = ( ((nbondi == -1) .OR. (nbondi == 2) ).AND. .NOT. (jperio == 1 .OR. jperio == 4 .OR. jperio == 6))
-   lk_east  = ( ((nbondi ==  1) .OR. (nbondi == 2) ).AND. .NOT. (jperio == 1 .OR. jperio == 4 .OR. jperio == 6))
-   lk_south = ( ((nbondj == -1) .OR. (nbondj == 2) ).AND. south_boundary_open)
-   lk_north = ( ((nbondj ==  1) .OR. (nbondj == 2) ))
+  ! lk_west  = ( ((nbondi == -1) .OR. (nbondi == 2) ).AND. .NOT. (jperio == 1 .OR. jperio == 4 .OR. jperio == 6))
+  ! lk_east  = ( ((nbondi ==  1) .OR. (nbondi == 2) ).AND. .NOT. (jperio == 1 .OR. jperio == 4 .OR. jperio == 6))
+  ! lk_south = ( ((nbondj == -1) .OR. (nbondj == 2) ).AND. south_boundary_open)
+  ! lk_north = ( ((nbondj ==  1) .OR. (nbondj == 2) ))
+
+
+   lk_west  = (  .NOT. (jperio == 1 .OR. jperio == 4 .OR. jperio == 6))
+   lk_east  = (  .NOT. (jperio == 1 .OR. jperio == 4 .OR. jperio == 6))
+   lk_south =  south_boundary_open
+   lk_north = .TRUE.
 
 END SUBROUTINE agrif_nemo_init_part2
 
