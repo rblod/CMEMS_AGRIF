@@ -186,6 +186,7 @@
    ln_chk_bathy  = .FALSE. !
    npt_connect   = 2
    npt_copy      = 2
+   south_boundary_open = .TRUE.
 /
 !-----------------------------------------------------------------------
 &nam_tide      !   tide parameters                                      ("key_tide")
