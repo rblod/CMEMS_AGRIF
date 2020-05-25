@@ -1172,6 +1172,7 @@ END SUBROUTINE Agrif_detect
 SUBROUTINE agrif_before_regridding
 END SUBROUTINE agrif_before_regridding
 
+#if defined  key_mpp_mpi
 SUBROUTINE Agrif_InvLoc( indloc, nprocloc, i, indglob )
       !!----------------------------------------------------------------------
       !!                     *** ROUTINE Agrif_InvLoc ***
@@ -1229,4 +1230,5 @@ SUBROUTINE Agrif_estimate_parallel_cost(imin, imax,jmin, jmax, nbprocs, grid_cos
    grid_cost = REAL(imax-imin+1,wp)*REAL(jmax-jmin+1,wp) / REAL(nbprocs,wp)
    !
 END SUBROUTINE Agrif_estimate_parallel_cost
+#endif
 #endif
