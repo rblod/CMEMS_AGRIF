@@ -11,6 +11,7 @@ MODULE dombat
    USE lib_mpp           ! distributed memory computing library
    USE timing            ! Timing
    USE agrif_modutil
+   USE agrif_parameters
    USE bilinear_interp
 
    IMPLICIT NONE
@@ -503,10 +504,16 @@ zshift = 0.
         !            
       ENDIF
       CALL lbc_lnk( 'dom_bat', bathy, 'T', 1. )
+       ! close south if needed
+
        ! Correct South and North
-       IF ((nbondj == -1).OR.(nbondj == 2)) THEN
-         bathy(:,1)=bathy(:,2)
-       ENDIF
+       IF(  south_boundary_open) THEN  
+          IF ((nbondj == -1).OR.(nbondj == 2)) THEN
+            bathy(:,1)=bathy(:,2)
+          ENDIF
+       ELSE
+            bathy(:,1) = 0.
+       ENDIF       
        IF ((nbondj == 1).OR.(nbondj == 2)) THEN
          bathy(:,jpj)=bathy(:,jpj-1)
        ENDIF
