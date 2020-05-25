@@ -28,7 +28,7 @@
       !
       !                    !* Agrif initialization
     !  CALL agrif_nemo_init
-       CALL agrif_nemo_init_part2 !* End of Agrif initialization (when domain periodicity and array's sizes are known)
+      CALL agrif_nemo_init_part2 !* End of Agrif initialization (when domain periodicity and array's sizes are known)
       CALL Agrif_InitValues_cont_dom
    !   CALL Agrif_InitValues_cont
 # if defined key_top
@@ -55,12 +55,12 @@
       l_ini_child = .TRUE.
       Agrif_SpecialValue    = 0._wp
       Agrif_UseSpecialValue = .TRUE.
-      uu=0 ; vv=0
+      uu(:,:,:,:) = 0.  ;  vv(:,:,:,:) = 0.   ;  ts(:,:,:,:,:) = 0.
        
       Krhs_a = Kbb ; Kmm_a = Kbb
 
       ! Brutal fix to pas 1x1 refinment. 
-      IF(Agrif_Fixed() == 0) THEN
+      IF(Agrif_Irhox() == 1) THEN
         CALL Agrif_Init_Variable(tsini_id, procname=interptsn) 
       ELSE
         CALL Agrif_Init_Variable(tsini_id, procname=agrif_initts) 
@@ -79,7 +79,7 @@
          ts(:,:,:,jn,Kbb) = ts(:,:,:,jn,Kbb)*tmask(:,:,:)
       END DO
       uu(:,:,:,Kbb) =  uu(:,:,:,Kbb) * umask(:,:,:)     
-      vv(:,:,:,Kbb) =  vv(:,:,:,Kbb) * umask(:,:,:)     
+      vv(:,:,:,Kbb) =  vv(:,:,:,Kbb) * vmask(:,:,:) 
 
       CALL lbc_lnk_multi( 'agrif_istate', uu(:,:,:,Kbb), 'U', -1. , vv(:,:,:,Kbb), 'V', -1. )
       CALL lbc_lnk( 'agrif_istate', ts(:,:,:,:,Kbb), 'T', 1. )

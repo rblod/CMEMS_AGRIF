@@ -417,9 +417,10 @@ CONTAINS
       IF( lk_c1d       )   CALL     c1d_init        ! 1D column configuration
                            CALL     wad_init        ! Wetting and drying options
 
+#if defined key_agrif
                           Kbb_a = Nbb; Kmm_a = Nnn; Krhs_a = Nrhs   ! agrif_oce module copies of time level indices
                           CALL Agrif_Declare_Var       !  "      "   "   "      "  DYN/TRA 
-
+#endif
 
                            CALL     dom_init( Nbb, Nnn, Naa, "OPA") ! Domain
       IF( ln_crs       )   CALL     crs_init(      Nnn )       ! coarsened grid: domain initialization 
@@ -450,7 +451,7 @@ CONTAINS
 
                           CALL Agrif_Declare_Var_dom   ! AGRIF: set the meshes for DOM
                       !    CALL Agrif_Declare_Var       !  "      "   "   "      "  DYN/TRA 
-                          IF( .NOT. Agrif_Root() )   CALL agrif_nemo_init
+                          IF( .NOT. Agrif_Root() )  CALL agrif_nemo_init
 
                           IF( .NOT. Agrif_Root() )  CALL Agrif_InitValues_cont
 
