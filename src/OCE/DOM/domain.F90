@@ -316,11 +316,12 @@ CONTAINS
 902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namrun in configuration namelist' )
       IF(lwm) WRITE ( numond, namrun )
 
+#if defined key_agrif
       IF( .NOT. Agrif_Root() ) THEN
             nn_it000 = (Agrif_Parent(nn_it000)-1)*Agrif_IRhot() + 1
             nn_itend =  Agrif_Parent(nn_itend)   *Agrif_IRhot()
       ENDIF
-
+#endif
       !
       IF(lwp) THEN                  ! control print
          WRITE(numout,*) '   Namelist : namrun   ---   run parameters'

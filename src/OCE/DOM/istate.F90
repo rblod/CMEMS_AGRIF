@@ -105,8 +105,10 @@ CONTAINS
                ssh(:,:,Kbb)   = 0._wp               ! set the ocean at rest
                uu  (:,:,:,Kbb) = 0._wp
                vv  (:,:,:,Kbb) = 0._wp  
+#if defined key_agrif
             ELSE
                CALL agrif_istate( Kbb, Kmm, Kaa ) 
+#endif
             ENDIF
             !
      !       IF( ll_wd ) THEN
