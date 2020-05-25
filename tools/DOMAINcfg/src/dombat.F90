@@ -123,6 +123,8 @@ zshift = 0.
          ENDIF     
 
          write(*,*) 'glam  ', minval(glamt), maxval(glamt) 
+                  write(*,*) 'zglam ', minval(glamf), maxval(glamf) 
+
          write(*,*) 'zglam ', minval(zglamf), maxval(zglamf) 
            
          zdel =  0.00   
@@ -500,7 +502,25 @@ zshift = 0.
          ENDIF
         !            
       ENDIF
-  !    CALL lbc_lnk( 'dom_bat', bathy, 'T', 1. )
+      CALL lbc_lnk( 'dom_bat', bathy, 'T', 1. )
+       ! Correct South and North
+       IF ((nbondj == -1).OR.(nbondj == 2)) THEN
+         bathy(:,1)=bathy(:,2)
+       ENDIF
+       IF ((nbondj == 1).OR.(nbondj == 2)) THEN
+         bathy(:,jpj)=bathy(:,jpj-1)
+       ENDIF
+
+       ! Correct West and East
+       IF (jperio /=1) THEN
+       IF ((nbondi == -1).OR.(nbondi == 2)) THEN
+         bathy(1,:)=bathy(2,:)
+       ENDIF
+       IF ((nbondi == 1).OR.(nbondi == 2)) THEN
+         bathy(jpi,:)=bathy(jpi-1,:)
+       ENDIF
+       ENDIF
+
 
    END SUBROUTINE dom_bat
 
