@@ -15,7 +15,7 @@ DOMCFG_DIR="../DOMAINcfg"
 # Suffix of domcfg files
 RAD='domain_cfg.nc'
 # Directory with original forcing on native grid
-FORCING_DIR=' /Users/rblod/DATA/NEMO/NEMO_v4/ORCA2_ICE_v4.0/'
+FORCING_DIR='/Users/rblod/DATA/NEMO/NEMO_v4/ORCA2_ICE_v4.0/'
 # Forcing file names, interpolation method (default bilin), and weigth file name (optional), lon(optional), lat(optional)  
 FILES=[
 ['geothermal_heating.nc'  ,'bilin','','',''],
