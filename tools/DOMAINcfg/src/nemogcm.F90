@@ -410,7 +410,8 @@ CONTAINS
       INTEGER :: ierr
       !!----------------------------------------------------------------------
       !
-      ierr =        oce_alloc       ()          ! ocean
+      !ierr =        oce_alloc       ()          ! ocean
+      ierr = 0
       ierr = ierr + dom_oce_alloc   ()          ! ocean domain
       !
       CALL mpp_sum( 'nemogcm', ierr )
