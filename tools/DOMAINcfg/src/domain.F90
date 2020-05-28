@@ -71,6 +71,7 @@ CONTAINS
       INTEGER ::   jk          ! dummy loop indices
       INTEGER ::   iconf = 0   ! local integers
       REAL(wp), POINTER, DIMENSION(:,:) ::   z1_hu_0, z1_hv_0
+      INTEGER , DIMENSION(jpi,jpj) ::   ik_top , ik_bot       ! top and bottom ocean level
       !!----------------------------------------------------------------------
       !
      ! IF( nn_timing == 1 )   CALL timing_start('dom_init')
@@ -87,8 +88,8 @@ CONTAINS
                   !   CALL dom_clo               ! Closed seas and lake
          
                      CALL dom_hgr               ! Horizontal mesh
-                     CALL dom_zgr               ! Vertical mesh and bathymetry
-                     CALL dom_msk               ! Masks
+                     CALL dom_zgr( ik_top, ik_bot )  ! Vertical mesh and bathymetry
+                     CALL dom_msk( ik_top, ik_bot )  ! Masks
       !
       ht_0(:,:) = e3t_0(:,:,1) * tmask(:,:,1)   ! Reference ocean thickness
       hu_0(:,:) = e3u_0(:,:,1) * umask(:,:,1)
@@ -135,7 +136,7 @@ CONTAINS
          !
       ENDIF
       !
-      CALL cfg_write         ! create the configuration file
+      ! CALL cfg_write         ! create the configuration file
       !
     !  IF( nn_timing == 1 )   CALL timing_stop('dom_init')
       !
@@ -158,10 +159,10 @@ CONTAINS
          &             nn_it000, nn_itend , nn_date0    , nn_time0     , nn_leapy  , nn_istate ,     &
          &             nn_stock, nn_write , ln_mskland  , ln_clobber   , nn_chunksz, nn_euler  ,     &
          &             ln_cfmeta, ln_iscpl
-      NAMELIST/namdom/ nn_bathy, cn_topo, cn_bath, cn_lon, cn_lat, rn_scale, nn_interp,              &
-         &             rn_bathy , rn_e3zps_min, rn_e3zps_rat, nn_msh, rn_hmin, rn_isfhmin,           &
-         &             rn_atfp , rn_rdt   , nn_closea   , ln_crs      , jphgr_msh ,                  &
-         &             ppglam0, ppgphi0, ppe1_deg, ppe2_deg, ppe1_m, ppe2_m,                         &
+      NAMELIST/namdom/ ln_read_cfg, nn_bathy, cn_domcfg, cn_topo, cn_bath, cn_lon,                   &
+         &             cn_lat, rn_scale, nn_interp, rn_bathy , rn_e3zps_min, rn_e3zps_rat, nn_msh,   &
+         &             rn_hmin, rn_isfhmin, rn_atfp , rn_rdt   , nn_closea   , ln_crs      ,         &
+         &             jphgr_msh, ppglam0, ppgphi0, ppe1_deg, ppe2_deg, ppe1_m, ppe2_m,              &
          &             ppsur, ppa0, ppa1, ppkth, ppacr, ppdzmin, pphmax, ldbletanh,                  &
          &             ppa2, ppkth2, ppacr2
 
