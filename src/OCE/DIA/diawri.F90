@@ -86,7 +86,7 @@ MODULE diawri
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: diawri.F90 12649 2020-04-03 07:11:57Z smasson $
+   !! $Id: diawri.F90 12933 2020-05-15 08:06:25Z smasson $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -997,8 +997,8 @@ CONTAINS
          CALL ice_wri_state( inum )
          CALL iom_close( inum )
       ENDIF
+      !
 #endif
-
    END SUBROUTINE dia_wri_state
 
    !!======================================================================

@@ -150,7 +150,7 @@ CONTAINS
             IF(lwp)WRITE(numout,*)'          year = ',iyear-2, ' freshwater budget read       = ', a_fwb_b
          ENDIF   
          !                                         ! Update fwfold if new year start
-         ikty = 365 * 86400 / rn_Dt               !!bug  use of 365 days leap year or 360d year !!!!!!!
+         ikty = 365 * 86400 / rn_Dt                  !!bug  use of 365 days leap year or 360d year !!!!!!!
          IF( MOD( kt, ikty ) == 0 ) THEN
             a_fwb_b = a_fwb                           ! mean sea level taking into account the ice+snow
                                                       ! sum over the global domain

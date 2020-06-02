@@ -52,7 +52,7 @@ MODULE step
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: step.F90 12650 2020-04-03 07:27:30Z smasson $
+   !! $Id: step.F90 12933 2020-05-15 08:06:25Z smasson $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -81,12 +81,11 @@ CONTAINS
       !!              -8- Outputs and diagnostics
       !!----------------------------------------------------------------------
       INTEGER ::   ji, jj, jk   ! dummy loop indice
-      INTEGER ::   indic        ! error indicator if < 0
 !!gm kcall can be removed, I guess
       INTEGER ::   kcall        ! optional integer argument (dom_vvl_sf_nxt)
       !! ---------------------------------------------------------------------
 #if defined key_agrif
-      IF( nstop > 0 ) return   ! avoid to go further if an error was detected during previous time step 
+      IF( nstop > 0 ) RETURN   ! avoid to go further if an error was detected during previous time step (child grid)
       kstp = nit000 + Agrif_Nb_Step()
       Kbb_a = Nbb; Kmm_a = Nnn; Krhs_a = Nrhs   ! agrif_oce module copies of time level indices
       IF( lk_agrif_debug ) THEN
@@ -114,10 +113,8 @@ CONTAINS
       !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
       ! update I/O and calendar 
       !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-                             indic = 0                ! reset to no error condition
-                             
       IF( kstp == nit000 ) THEN                       ! initialize IOM context (must be done after nemo_init for AGRIF+XIOS+OASIS)
-                             CALL iom_init( cxios_context, ld_closedef=.FALSE. )   ! for model grid (including passible AGRIF zoom)
+                             CALL iom_init( cxios_context, ld_closedef=.FALSE. )   ! for model grid (including possible AGRIF zoom)
          IF( lk_diamlr   )   CALL dia_mlr_iom_init    ! with additional setup for multiple-linear-regression analysis
                              CALL iom_init_closedef
          IF( ln_crs      )   CALL iom_init( TRIM(cxios_context)//"_crs" )  ! for coarse grid
@@ -313,11 +310,13 @@ CONTAINS
       !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<      
                          Kbb_a = Nbb; Kmm_a = Nnn; Krhs_a = Nrhs      ! agrif_oce module copies of time level indices
                          CALL Agrif_Integrate_ChildGrids( stp )       ! allows to finish all the Child Grids before updating
+
 #endif
       !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
       ! Control
       !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-                         CALL stp_ctl      ( kstp, Nbb, Nnn, indic )
+                         CALL stp_ctl      ( kstp, Nnn )
+
 #if defined key_agrif
       !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
       ! AGRIF update
@@ -325,8 +324,9 @@ CONTAINS
       IF( Agrif_NbStepint() == 0 .AND. nstop == 0 ) THEN
                          CALL Agrif_update_all( )                  ! Update all components
       ENDIF
+
 #endif
-      IF( ln_diaobs  )   CALL dia_obs      ( kstp, Nnn )      ! obs-minus-model (assimilation) diagnostics (call after dynamics update)
+      IF( ln_diaobs .AND. nstop == 0 )  CALL dia_obs( kstp, Nnn )  ! obs-minus-model (assimilation) diags (after dynamics update)
 
       !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
       ! File manipulation at the end of the first time step
@@ -340,14 +340,13 @@ CONTAINS
       !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
       ! Coupled mode
       !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-!!gm why lk_oasis and not lk_cpl ????
-      IF( lk_oasis   )   CALL sbc_cpl_snd( kstp, Nbb, Nnn )        ! coupled mode : field exchanges
+      IF( lk_oasis .AND. nstop == 0 )   CALL sbc_cpl_snd( kstp, Nbb, Nnn )     ! coupled mode : field exchanges
       !
 #if defined key_iomput
       !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
       ! Finalize contextes if end of simulation or error detected
       !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<                         
-      IF( kstp == nitend .OR. indic < 0 ) THEN 
+      IF( kstp == nitend .OR. nstop > 0 ) THEN 
                       CALL iom_context_finalize(      cxios_context          ) ! needed for XIOS+AGRIF
          IF( lrxios ) CALL iom_context_finalize(      crxios_context         )
          IF( ln_crs ) CALL iom_context_finalize( trim(cxios_context)//"_crs" ) ! 

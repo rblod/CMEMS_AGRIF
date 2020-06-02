@@ -185,7 +185,6 @@ if [ ${config} == "OVERFLOW" ] ;  then
     set_namelist namelist_cfg nn_it000 1
     set_namelist namelist_cfg nn_itend 120
     set_namelist namelist_cfg nn_stock 60
-    set_namelist namelist_cfg sn_cfctl%l_config .true.
     set_namelist namelist_cfg sn_cfctl%l_runstat .true.
     if [ ${USING_MPMD} == "yes" ] ; then
        set_xio_using_server iodef.xml true
@@ -205,7 +204,6 @@ if [ ${config} == "OVERFLOW" ] ;  then
     set_namelist namelist_cfg nn_it000 61
     set_namelist namelist_cfg nn_itend 120
     set_namelist namelist_cfg nn_stock 60
-    set_namelist namelist_cfg sn_cfctl%l_config .true.
     set_namelist namelist_cfg sn_cfctl%l_runstat .true.
     set_namelist namelist_cfg ln_rstart .true.
     set_namelist namelist_cfg nn_rstctl 2
@@ -287,7 +285,6 @@ if [ ${config} == "LOCK_EXCHANGE" ] ;  then
     set_namelist namelist_cfg cn_exp \"LOCK_LONG\"
     set_namelist namelist_cfg nn_it000 1
     set_namelist namelist_cfg nn_stock 60
-    set_namelist namelist_cfg sn_cfctl%l_config .true.
     set_namelist namelist_cfg sn_cfctl%l_runstat .true.
     set_namelist namelist_cfg nn_itend 120
     if [ ${USING_MPMD} == "yes" ] ; then
@@ -308,7 +305,6 @@ if [ ${config} == "LOCK_EXCHANGE" ] ;  then
     set_namelist namelist_cfg nn_it000 61
     set_namelist namelist_cfg nn_itend 120
     set_namelist namelist_cfg nn_stock 60
-    set_namelist namelist_cfg sn_cfctl%l_config .true.
     set_namelist namelist_cfg sn_cfctl%l_runstat .true.
     set_namelist namelist_cfg ln_rstart .true.
     set_namelist namelist_cfg nn_rstctl 2
@@ -392,14 +388,12 @@ if [ ${config} == "VORTEX" ] ;  then
     set_namelist namelist_cfg nn_it000 1
     set_namelist namelist_cfg nn_itend 240
     set_namelist namelist_cfg nn_stock 120
-    set_namelist namelist_cfg sn_cfctl%l_config .true.
     set_namelist namelist_cfg sn_cfctl%l_runstat .true.
 
     set_namelist 1_namelist_cfg cn_exp \"VORTEX_LONG\"
     set_namelist 1_namelist_cfg nn_it000 1
     set_namelist 1_namelist_cfg nn_itend 720
     set_namelist 1_namelist_cfg nn_stock 360
-    set_namelist 1_namelist_cfg sn_cfctl%l_config .true.
     set_namelist 1_namelist_cfg sn_cfctl%l_runstat .true.
 	
     if [ ${USING_MPMD} == "yes" ] ; then
@@ -420,7 +414,6 @@ if [ ${config} == "VORTEX" ] ;  then
     set_namelist namelist_cfg nn_it000 121
     set_namelist namelist_cfg nn_itend 240
     set_namelist namelist_cfg nn_stock 120
-    set_namelist namelist_cfg sn_cfctl%l_config .true.
     set_namelist namelist_cfg sn_cfctl%l_runstat .true.
     set_namelist namelist_cfg ln_rstart .true.
     set_namelist namelist_cfg nn_rstctl 2
@@ -429,7 +422,6 @@ if [ ${config} == "VORTEX" ] ;  then
     set_namelist 1_namelist_cfg cn_exp \"VORTEX_SHORT\"
     set_namelist 1_namelist_cfg nn_it000 361
     set_namelist 1_namelist_cfg nn_itend 720
-    set_namelist 1_namelist_cfg sn_cfctl%l_config .true.
     set_namelist 1_namelist_cfg sn_cfctl%l_runstat .true.
     set_namelist 1_namelist_cfg nn_stock 360
     set_namelist 1_namelist_cfg ln_rstart .true.
@@ -476,7 +468,6 @@ if [ ${config} == "VORTEX" ] ;  then
     set_namelist namelist_cfg nn_stock 120
     set_namelist namelist_cfg jpni 2
     set_namelist namelist_cfg jpnj 3
-    set_namelist namelist_cfg sn_cfctl%l_config .true.
     set_namelist namelist_cfg sn_cfctl%l_runstat .true.
    
     set_namelist 1_namelist_cfg cn_exp \"VORTEX_23\"
@@ -485,7 +476,6 @@ if [ ${config} == "VORTEX" ] ;  then
     set_namelist 1_namelist_cfg nn_stock 360
     set_namelist 1_namelist_cfg jpni 2
     set_namelist 1_namelist_cfg jpnj 3
-    set_namelist 1_namelist_cfg sn_cfctl%l_config .true.
     set_namelist 1_namelist_cfg sn_cfctl%l_runstat .true.
 
     if [ ${USING_MPMD} == "yes" ] ; then
@@ -514,7 +504,6 @@ if [ ${config} == "VORTEX" ] ;  then
     set_namelist namelist_cfg nn_stock 120
     set_namelist namelist_cfg jpni 3
     set_namelist namelist_cfg jpnj 2
-    set_namelist namelist_cfg sn_cfctl%l_config .true.
     set_namelist namelist_cfg sn_cfctl%l_runstat .true.
 
     set_namelist 1_namelist_cfg cn_exp \"VORTEX_32\"
@@ -523,7 +512,6 @@ if [ ${config} == "VORTEX" ] ;  then
     set_namelist 1_namelist_cfg nn_stock 360
     set_namelist 1_namelist_cfg jpni 3
     set_namelist 1_namelist_cfg jpnj 2
-    set_namelist 1_namelist_cfg sn_cfctl%l_config .true.
     set_namelist 1_namelist_cfg sn_cfctl%l_runstat .true.
 
     if [ ${USING_MPMD} == "yes" ] ; then
@@ -568,14 +556,12 @@ if [ ${config} == "ICE_AGRIF" ] ;  then
     set_namelist namelist_cfg cn_exp \"ICE_AGRIF_LONG\"
     set_namelist namelist_cfg nn_it000 1
     set_namelist namelist_cfg nn_itend 200
-    set_namelist namelist_cfg sn_cfctl%l_config .true.
     set_namelist namelist_cfg sn_cfctl%l_runstat .true.
     set_namelist namelist_cfg nn_stock 100
     
     set_namelist 1_namelist_cfg cn_exp \"ICE_AGRIF_LONG\"
     set_namelist 1_namelist_cfg nn_it000 1
     set_namelist 1_namelist_cfg nn_itend 600
-    set_namelist 1_namelist_cfg sn_cfctl%l_config .true.
     set_namelist 1_namelist_cfg sn_cfctl%l_runstat .true.
     set_namelist 1_namelist_cfg nn_stock 300
     
@@ -596,7 +582,6 @@ if [ ${config} == "ICE_AGRIF" ] ;  then
     set_namelist namelist_cfg cn_exp \"ICE_AGRIF_SHORT\"
     set_namelist namelist_cfg nn_it000 101
     set_namelist namelist_cfg nn_itend 200
-    set_namelist namelist_cfg sn_cfctl%l_config .true.
     set_namelist namelist_cfg sn_cfctl%l_runstat .true.
     set_namelist namelist_cfg nn_stock 100
     set_namelist namelist_cfg ln_rstart .true.
@@ -607,7 +592,6 @@ if [ ${config} == "ICE_AGRIF" ] ;  then
     set_namelist 1_namelist_cfg cn_exp \"ICE_AGRIF_SHORT\"
     set_namelist 1_namelist_cfg nn_it000 301
     set_namelist 1_namelist_cfg nn_itend 600
-    set_namelist 1_namelist_cfg sn_cfctl%l_config .true.
     set_namelist 1_namelist_cfg sn_cfctl%l_runstat .true.
     set_namelist 1_namelist_cfg nn_stock 300
     set_namelist 1_namelist_cfg ln_rstart .true.
@@ -662,7 +646,6 @@ if [ ${config} == "ICE_AGRIF" ] ;  then
     set_namelist namelist_cfg nn_stock 100
     set_namelist namelist_cfg jpni 2
     set_namelist namelist_cfg jpnj 3
-    set_namelist namelist_cfg sn_cfctl%l_config .true.
     set_namelist namelist_cfg sn_cfctl%l_runstat .true.
     
     set_namelist 1_namelist_cfg cn_exp \"ICE_AGRIF_23\"
@@ -671,7 +654,6 @@ if [ ${config} == "ICE_AGRIF" ] ;  then
     set_namelist 1_namelist_cfg nn_stock 300
     set_namelist 1_namelist_cfg jpni 2
     set_namelist 1_namelist_cfg jpnj 3
-    set_namelist 1_namelist_cfg sn_cfctl%l_config .true.
     set_namelist 1_namelist_cfg sn_cfctl%l_runstat .true.
 
     if [ ${USING_MPMD} == "yes" ] ; then
@@ -700,7 +682,6 @@ if [ ${config} == "ICE_AGRIF" ] ;  then
     set_namelist namelist_cfg nn_stock 100
     set_namelist namelist_cfg jpni 3
     set_namelist namelist_cfg jpnj 2
-    set_namelist namelist_cfg sn_cfctl%l_config .true.
     set_namelist namelist_cfg sn_cfctl%l_runstat .true.
     
     set_namelist 1_namelist_cfg cn_exp \"ICE_AGRIF_32\"
@@ -709,7 +690,6 @@ if [ ${config} == "ICE_AGRIF" ] ;  then
     set_namelist 1_namelist_cfg nn_stock 300
     set_namelist 1_namelist_cfg jpni 3
     set_namelist 1_namelist_cfg jpnj 2
-    set_namelist 1_namelist_cfg sn_cfctl%l_config .true.
     set_namelist 1_namelist_cfg sn_cfctl%l_runstat .true.
     
     if [ ${USING_MPMD} == "yes" ] ; then
@@ -756,7 +736,6 @@ if [ ${config} == "ISOMIP" ] ;  then
     set_namelist namelist_cfg nn_stock 48
     set_namelist namelist_cfg jpni 5
     set_namelist namelist_cfg jpnj 3
-    set_namelist namelist_cfg sn_cfctl%l_config .true.
     set_namelist namelist_cfg sn_cfctl%l_runstat .true.
     if [ ${USING_MPMD} == "yes" ] ; then
        set_xio_using_server iodef.xml true
@@ -780,7 +759,6 @@ if [ ${config} == "ISOMIP" ] ;  then
     set_namelist namelist_cfg nn_rstctl 2
     set_namelist namelist_cfg jpni 5
     set_namelist namelist_cfg jpnj 3
-    set_namelist namelist_cfg sn_cfctl%l_config .true.
     set_namelist namelist_cfg sn_cfctl%l_runstat .true.
     set_namelist namelist_cfg cn_ocerst_in \"ISOMIP_LONG_00000048_restart\"
     if [ ${USING_MPMD} == "yes" ] ; then
@@ -817,7 +795,6 @@ if [ ${config} == "ISOMIP" ] ;  then
     set_namelist namelist_cfg nn_itend 48
     set_namelist namelist_cfg jpni 7
     set_namelist namelist_cfg jpnj 3
-    set_namelist namelist_cfg sn_cfctl%l_config .true.
     set_namelist namelist_cfg sn_cfctl%l_runstat .true.
     if [ ${USING_MPMD} == "yes" ] ; then
        set_xio_using_server iodef.xml true
@@ -843,7 +820,6 @@ if [ ${config} == "ISOMIP" ] ;  then
     set_namelist namelist_cfg nn_itend 48
     set_namelist namelist_cfg jpni 8
     set_namelist namelist_cfg jpnj 4
-    set_namelist namelist_cfg sn_cfctl%l_config .true.
     set_namelist namelist_cfg sn_cfctl%l_runstat .true.
     if [ ${USING_MPMD} == "yes" ] ; then
        set_xio_using_server iodef.xml true

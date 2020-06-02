@@ -249,7 +249,7 @@ CONTAINS
       !
       IF ( l_isfoasis .AND. ln_isf ) THEN
          !
-         CALL ctl_stop( ' ln_ctl and ice shelf not tested' )
+         CALL ctl_stop( 'namelist combination ln_cpl and ln_isf not tested' )
          !
          ! NEMO coupled to ATMO model with isf cavity need oasis method for melt computation 
          IF ( ln_isfcav_mlt .AND. TRIM(cn_isfcav_mlt) /= 'oasis' ) CALL ctl_stop( 'cn_isfcav_mlt = oasis is the only option availble if fwf send by oasis' )
@@ -290,11 +290,9 @@ CONTAINS
          &             cn_isfload    , rn_isfload_T  , rn_isfload_S  , cn_isfdir
       !!----------------------------------------------------------------------
       !
-      REWIND( numnam_ref )              ! Namelist namsbc_rnf in reference namelist : Runoffs 
       READ  ( numnam_ref, namisf, IOSTAT = ios, ERR = 901)
 901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namisf in reference namelist' )
       !
-      REWIND( numnam_cfg )              ! Namelist namsbc_rnf in configuration namelist : Runoffs
       READ  ( numnam_cfg, namisf, IOSTAT = ios, ERR = 902 )
 902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namisf in configuration namelist' )
       IF(lwm) WRITE ( numond, namisf )

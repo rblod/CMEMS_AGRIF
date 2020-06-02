@@ -74,7 +74,7 @@ MODULE sbcwave
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: sbcwave.F90 12377 2020-02-12 14:39:06Z acc $
+   !! $Id: sbcwave.F90 12965 2020-05-25 07:34:57Z jchanut $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -208,15 +208,6 @@ CONTAINS
             &                 + e1v(ji,jj  ) * e3v(ji,jj  ,jk,Kmm) * vsd(ji,jj  ,jk)    &
             &                 - e1v(ji,jj-1) * e3v(ji,jj-1,jk,Kmm) * vsd(ji,jj-1,jk)  ) * r1_e1e2t(ji,jj)
       END_3D
-      !
-#if defined key_agrif
-      IF( .NOT. Agrif_Root() ) THEN
-         IF( nbondi == -1 .OR. nbondi == 2 )   ze3divh( 2:nbghostcells+1,:        ,:) = 0._wp      ! west
-         IF( nbondi ==  1 .OR. nbondi == 2 )   ze3divh( nlci-nbghostcells:nlci-1,:,:) = 0._wp      ! east
-         IF( nbondj == -1 .OR. nbondj == 2 )   ze3divh( :,2:nbghostcells+1        ,:) = 0._wp      ! south
-         IF( nbondj ==  1 .OR. nbondj == 2 )   ze3divh( :,nlcj-nbghostcells:nlcj-1,:) = 0._wp      ! north
-      ENDIF
-#endif
       !
       CALL lbc_lnk( 'sbcwave', ze3divh, 'T', 1. )
       !

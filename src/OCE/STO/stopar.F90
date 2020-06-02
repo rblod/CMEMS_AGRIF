@@ -115,7 +115,7 @@ MODULE stopar
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: stopar.F90 12377 2020-02-12 14:39:06Z acc $
+   !! $Id: stopar.F90 12933 2020-05-15 08:06:25Z smasson $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -683,12 +683,14 @@ CONTAINS
       !!
       !! ** Purpose :   read stochastic parameters from restart file
       !!----------------------------------------------------------------------
-      INTEGER  :: jsto, jseed
+      INTEGER             ::   jsto, jseed
+      INTEGER             ::   idg                 ! number of digits
       INTEGER(KIND=8)     ::   ziseed(4)           ! RNG seeds in integer type
       REAL(KIND=8)        ::   zrseed(4)           ! RNG seeds in real type (with same bits to save in restart)
       CHARACTER(LEN=9)    ::   clsto2d='sto2d_000' ! stochastic parameter variable name
       CHARACTER(LEN=9)    ::   clsto3d='sto3d_000' ! stochastic parameter variable name
-      CHARACTER(LEN=10)   ::   clseed='seed0_0000' ! seed variable name
+      CHARACTER(LEN=15)   ::   clseed='seed0_0000' ! seed variable name
+      CHARACTER(LEN=6)    ::   clfmt               ! writing format
       !!----------------------------------------------------------------------
 
       IF ( jpsto2d > 0 .OR. jpsto3d > 0 ) THEN
@@ -716,10 +718,12 @@ CONTAINS
 
          IF (ln_rstseed) THEN
             ! Get saved state of the random number generator
+            idg = MAX( INT(LOG10(REAL(jpnij,wp))) + 1, 4 )        ! how many digits to we need to write? min=4, max=9
+            WRITE(clfmt, "('(i', i1, '.', i1, ')')") idg, idg     ! "(ix.x)"
             DO jseed = 1 , 4
-               WRITE(clseed(5:5) ,'(i1.1)') jseed
-               WRITE(clseed(7:10),'(i4.4)') narea
-               CALL iom_get( numstor, clseed , zrseed(jseed) )
+               WRITE(clseed(5:5)      ,'(i1.1)') jseed
+               WRITE(clseed(7:7+idg-1),  clfmt ) narea
+               CALL iom_get( numstor, clseed(1:7+idg-1) , zrseed(jseed) )
             END DO
             ziseed = TRANSFER( zrseed , ziseed)
             CALL kiss_seed( ziseed(1) , ziseed(2) , ziseed(3) , ziseed(4) )
@@ -741,14 +745,16 @@ CONTAINS
       !!----------------------------------------------------------------------
       INTEGER, INTENT(in) ::   kt     ! ocean time-step
       !!
-      INTEGER  :: jsto, jseed
+      INTEGER             ::   jsto, jseed
+      INTEGER             ::   idg                 ! number of digits
       INTEGER(KIND=8)     ::   ziseed(4)           ! RNG seeds in integer type
       REAL(KIND=8)        ::   zrseed(4)           ! RNG seeds in real type (with same bits to save in restart)
       CHARACTER(LEN=20)   ::   clkt                ! ocean time-step defined as a character
       CHARACTER(LEN=50)   ::   clname              ! restart file name
       CHARACTER(LEN=9)    ::   clsto2d='sto2d_000' ! stochastic parameter variable name
       CHARACTER(LEN=9)    ::   clsto3d='sto3d_000' ! stochastic parameter variable name
-      CHARACTER(LEN=10)   ::   clseed='seed0_0000' ! seed variable name
+      CHARACTER(LEN=15)   ::   clseed='seed0_0000' ! seed variable name
+      CHARACTER(LEN=6)    ::   clfmt               ! writing format
       !!----------------------------------------------------------------------
 
       IF( .NOT. ln_rst_list .AND. nn_stock == -1 ) RETURN   ! we will never do any restart
@@ -770,10 +776,12 @@ CONTAINS
             ! get and save current state of the random number generator
             CALL kiss_state( ziseed(1) , ziseed(2) , ziseed(3) , ziseed(4) )
             zrseed = TRANSFER( ziseed , zrseed)
+            idg = MAX( INT(LOG10(REAL(jpnij,wp))) + 1, 4 )        ! how many digits to we need to write? min=4, max=9
+            WRITE(clfmt, "('(i', i1, '.', i1, ')')") idg, idg     ! "(ix.x)"
             DO jseed = 1 , 4
-               WRITE(clseed(5:5) ,'(i1.1)') jseed
-               WRITE(clseed(7:10),'(i4.4)') narea
-               CALL iom_rstput( kt, nitrst, numstow, clseed , zrseed(jseed) )
+               WRITE(clseed(5:5)      ,'(i1.1)') jseed
+               WRITE(clseed(7:7+idg-1),  clfmt ) narea
+               CALL iom_rstput( kt, nitrst, numstow, clseed(1:7+idg-1), zrseed(jseed) )
             END DO
             ! 2D stochastic parameters
             DO jsto = 1 , jpsto2d

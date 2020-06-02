@@ -25,10 +25,14 @@
 !------------------------------------------------------------------------------
 &namitd         !   Ice discretization
 !------------------------------------------------------------------------------
+   ln_cat_hfn       = .true.          !  ice categories are defined by a function following rn_himean**(-0.05)
+      rn_himean     =   2.0           !  expected domain-average ice thickness (m)
+   rn_himin         =   0.01          !  minimum ice thickness (m) used in remapping
 /
 !------------------------------------------------------------------------------
 &namdyn         !   Ice dynamics
 !------------------------------------------------------------------------------
+   ln_landfast_L16  = .true.          !  landfast: parameterization from Lemieux 2016
 /
 !------------------------------------------------------------------------------
 &namdyn_rdgrft  !   Ice ridging/rafting
@@ -41,6 +45,9 @@
 !------------------------------------------------------------------------------
 &namdyn_adv     !   Ice advection
 !------------------------------------------------------------------------------
+   ln_adv_Pra       = .false.         !  Advection scheme (Prather)
+   ln_adv_UMx       = .true.          !  Advection scheme (Ultimate-Macho)
+      nn_UMx        =   5             !     order of the scheme for UMx (1-5 ; 20=centered 2nd order)
 /
 !------------------------------------------------------------------------------
 &namsbc         !   Ice surface boundary conditions
@@ -61,6 +68,8 @@
 !------------------------------------------------------------------------------
 &namthd_do      !   Ice growth in open water
 !------------------------------------------------------------------------------
+   rn_hinew         =   0.02          !  thickness for new ice formation in open water (m), must be larger than rn_himin
+   ln_frazil        = .true.          !  Frazil ice parameterization (ice collection as a function of wind)
 /
 !------------------------------------------------------------------------------
 &namthd_sal     !   Ice salinity
@@ -69,10 +78,28 @@
 !------------------------------------------------------------------------------
 &namthd_pnd     !   Melt ponds
 !------------------------------------------------------------------------------
+   ln_pnd           = .true.          !  activate melt ponds or not
+     ln_pnd_H12     = .true.          !  activate evolutive melt ponds (from Holland et al 2012)
+     ln_pnd_alb     = .true.          !  melt ponds affect albedo or not
 /
+
 !------------------------------------------------------------------------------
 &namini         !   Ice initialization
 !------------------------------------------------------------------------------
+   ln_iceini        = .true.          !  activate ice initialization (T) or not (F)
+   ln_iceini_file   = .true.          !  netcdf file provided for initialization (T) or not (F)
+   ! -- for ln_iceini_file = T
+   sn_hti = 'WED025_init_JRA_200001.nc', -12 ,'icethic_cea',  .false.  , .true., 'yearly'  , '' , '', ''
+   sn_hts = 'WED025_init_JRA_200001.nc', -12 ,'icesnow_cea',  .false.  , .true., 'yearly'  , '' , '', ''
+   sn_ati = 'WED025_init_JRA_200001.nc', -12 ,'ice_cover'  ,  .false.  , .true., 'yearly'  , '' , '', ''
+   sn_smi = 'NOT USED'              , -12 ,'smi'   ,  .false.  , .true., 'yearly'  , '' , '', ''
+   sn_tmi = 'NOT USED'              , -12 ,'tmi'   ,  .false.  , .true., 'yearly'  , '' , '', ''
+   sn_tsu = 'NOT USED'              , -12 ,'tsu'   ,  .false.  , .true., 'yearly'  , '' , '', ''
+   sn_tms = 'NOT USED'              , -12 ,'tms'   ,  .false.  , .true., 'yearly'  , '' , '', ''
+   !      melt ponds (be careful, sn_apd is the pond concentration (not fraction), so it differs from rn_apd)
+   sn_apd = 'NOT USED'              , -12 ,'apd'   ,  .false.  , .true., 'yearly'  , '' , '', ''
+   sn_hpd = 'NOT USED'              , -12 ,'hpd'   ,  .false.  , .true., 'yearly'  , '' , '', ''
+   cn_dir='./'
 /
 !------------------------------------------------------------------------------
 &namalb         !   albedo parameters

@@ -27,6 +27,8 @@ MODULE nemogcm
    USE closea         ! treatment of closed seas (for ln_closea)
    USE usrdef_nam     ! user defined configuration
    USE eosbn2         ! equation of state            (eos bn2 routine)
+   USE bdy_oce,  ONLY : ln_bdy
+   USE bdyini         ! open boundary cond. setting       (bdy_init routine)
    !              ! ocean physics
    USE ldftra         ! lateral diffusivity setting    (ldf_tra_init routine)
    USE ldfslp         ! slopes of neutral surfaces     (ldf_slp_init routine)
@@ -70,7 +72,7 @@ MODULE nemogcm
 
    !!----------------------------------------------------------------------
    !! NEMO/OFF 4.0 , NEMO Consortium (2018)
-   !! $Id: nemogcm.F90 12641 2020-04-01 12:33:59Z smasson $
+   !! $Id: nemogcm.F90 12933 2020-05-15 08:06:25Z smasson $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -89,7 +91,7 @@ CONTAINS
       !! References : Madec, Delecluse,Imbard, and Levy, 1997:  internal report, IPSL.
       !!              Madec, 2008, internal report, IPSL.
       !!----------------------------------------------------------------------
-      INTEGER :: istp, indic       ! time step index
+      INTEGER :: istp       ! time step index
       !!----------------------------------------------------------------------
 
       CALL nemo_init  ! Initializations
@@ -129,7 +131,7 @@ CONTAINS
 #if ! defined key_sed_off
          IF( .NOT.ln_linssh )   CALL dta_dyn_sf_interp( istp, Nnn )  ! calculate now grid parameters
 #endif
-                                CALL stp_ctl    ( istp, indic )  ! Time loop: control and print
+                                CALL stp_ctl    ( istp )             ! Time loop: control and print
          istp = istp + 1
       END DO
       !
@@ -226,22 +228,8 @@ CONTAINS
 902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namctl in configuration namelist' )
       !
       ! finalize the definition of namctl variables
-      IF( sn_cfctl%l_allon ) THEN
-         ! Turn on all options.
-         CALL nemo_set_cfctl( sn_cfctl, .TRUE., .TRUE. )
-         ! Ensure all processors are active
-         sn_cfctl%procmin = 0 ; sn_cfctl%procmax = 1000000 ; sn_cfctl%procincr = 1
-      ELSEIF( sn_cfctl%l_config ) THEN
-         ! Activate finer control of report outputs
-         ! optionally switch off output from selected areas (note this only
-         ! applies to output which does not involve global communications)
-         IF( ( narea < sn_cfctl%procmin .OR. narea > sn_cfctl%procmax  ) .OR. &
-           & ( MOD( narea - sn_cfctl%procmin, sn_cfctl%procincr ) /= 0 ) )    &
-           &   CALL nemo_set_cfctl( sn_cfctl, .FALSE., .FALSE. )
-      ELSE
-         ! turn off all options.
-         CALL nemo_set_cfctl( sn_cfctl, .FALSE., .TRUE. )
-      ENDIF
+      IF( narea < sn_cfctl%procmin .OR. narea > sn_cfctl%procmax .OR. MOD( narea - sn_cfctl%procmin, sn_cfctl%procincr ) /= 0 )   &
+         &   CALL nemo_set_cfctl( sn_cfctl, .FALSE. )
       !
       lwp = (narea == 1) .OR. sn_cfctl%l_oceout    ! control of all listing output print
       !
@@ -306,7 +294,6 @@ CONTAINS
 
       ! Initialise time level indices
       Nbb = 1; Nnn = 2; Naa = 3; Nrhs = Naa
-	
 
       !                             !-------------------------------!
       !                             !  NEMO general initialization  !
@@ -328,6 +315,7 @@ CONTAINS
                            CALL  istate_init( Nnn, Naa )    ! ocean initial state (Dynamics and tracers)
 
                            CALL     sbc_init( Nbb, Nnn, Naa )    ! Forcings : surface module
+                           CALL     bdy_init    ! Open boundaries initialisation    
 
       !                                      ! Tracer physics
                            CALL ldf_tra_init    ! Lateral ocean tracer physics
@@ -370,9 +358,6 @@ CONTAINS
          WRITE(numout,*) 'nemo_ctl: Control prints'
          WRITE(numout,*) '~~~~~~~~'
          WRITE(numout,*) '   Namelist namctl'
-         WRITE(numout,*) '                              sn_cfctl%l_glochk  = ', sn_cfctl%l_glochk
-         WRITE(numout,*) '                              sn_cfctl%l_allon   = ', sn_cfctl%l_allon
-         WRITE(numout,*) '       finer control over o/p sn_cfctl%l_config  = ', sn_cfctl%l_config
          WRITE(numout,*) '                              sn_cfctl%l_runstat = ', sn_cfctl%l_runstat
          WRITE(numout,*) '                              sn_cfctl%l_trcstat = ', sn_cfctl%l_trcstat
          WRITE(numout,*) '                              sn_cfctl%l_oceout  = ', sn_cfctl%l_oceout
@@ -491,6 +476,7 @@ CONTAINS
       USE dom_oce,   ONLY : dom_oce_alloc
       USE zdf_oce,   ONLY : zdf_oce_alloc
       USE trc_oce,   ONLY : trc_oce_alloc
+      USE bdy_oce,   ONLY : bdy_oce_alloc
       !
       INTEGER :: ierr
       !!----------------------------------------------------------------------
@@ -500,33 +486,27 @@ CONTAINS
       ierr = ierr + dom_oce_alloc()          ! ocean domain
       ierr = ierr + zdf_oce_alloc()          ! ocean vertical physics
       ierr = ierr + trc_oce_alloc()          ! shared TRC / TRA arrays
+      ierr = ierr + bdy_oce_alloc()    ! bdy masks (incl. initialization)      
       !
       CALL mpp_sum( 'nemogcm', ierr )
       IF( ierr /= 0 )   CALL ctl_stop( 'STOP', 'nemo_alloc: unable to allocate standard ocean arrays' )
       !
    END SUBROUTINE nemo_alloc
 
-   SUBROUTINE nemo_set_cfctl(sn_cfctl, setto, for_all )
+   SUBROUTINE nemo_set_cfctl(sn_cfctl, setto )
       !!----------------------------------------------------------------------
       !!                     ***  ROUTINE nemo_set_cfctl  ***
       !!
       !! ** Purpose :   Set elements of the output control structure to setto.
-      !!                for_all should be .false. unless all areas are to be
-      !!                treated identically.
-      !!
+     !!
       !! ** Method  :   Note this routine can be used to switch on/off some
-      !!                types of output for selected areas but any output types
-      !!                that involve global communications (e.g. mpp_max, glob_sum)
-      !!                should be protected from selective switching by the
-      !!                for_all argument
+      !!                types of output for selected areas.
       !!----------------------------------------------------------------------
-      LOGICAL :: setto, for_all
-      TYPE(sn_ctl) :: sn_cfctl
+      TYPE(sn_ctl), INTENT(inout) :: sn_cfctl
+      LOGICAL     , INTENT(in   ) :: setto
       !!----------------------------------------------------------------------
-      IF( for_all ) THEN
-         sn_cfctl%l_runstat = setto
-         sn_cfctl%l_trcstat = setto
-      ENDIF
+      sn_cfctl%l_runstat = setto
+      sn_cfctl%l_trcstat = setto
       sn_cfctl%l_oceout  = setto
       sn_cfctl%l_layout  = setto
       sn_cfctl%l_prtctl  = setto
@@ -556,7 +536,7 @@ CONTAINS
    END SUBROUTINE istate_init
 
 
-   SUBROUTINE stp_ctl( kt, kindic )
+   SUBROUTINE stp_ctl( kt )
       !!----------------------------------------------------------------------
       !!                    ***  ROUTINE stp_ctl  ***
       !!
@@ -567,7 +547,6 @@ CONTAINS
       !! ** Actions :   'time.step' file containing the last ocean time-step
       !!----------------------------------------------------------------------
       INTEGER, INTENT(in   ) ::   kt      ! ocean time-step index
-      INTEGER, INTENT(inout) ::   kindic  ! indicator of solver convergence
       !!----------------------------------------------------------------------
       !
       IF( kt == nit000 .AND. lwm ) THEN

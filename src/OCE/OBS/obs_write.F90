@@ -49,7 +49,7 @@ MODULE obs_write
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: obs_write.F90 12377 2020-02-12 14:39:06Z acc $
+   !! $Id: obs_write.F90 12933 2020-05-15 08:06:25Z smasson $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 
@@ -85,6 +85,8 @@ CONTAINS
       TYPE(obfbdata) :: fbdata
       CHARACTER(LEN=40) :: clfname
       CHARACTER(LEN=10) :: clfiletype
+      CHARACTER(LEN=12) :: clfmt            ! writing format
+      INTEGER :: idg                        ! number of digits
       INTEGER :: ilevel
       INTEGER :: jvar
       INTEGER :: jo
@@ -180,7 +182,9 @@ CONTAINS
 
       fbdata%caddname(1)   = 'Hx'
 
-      WRITE(clfname, FMT="(A,'_fdbk_',I4.4,'.nc')") TRIM(clfiletype), nproc
+      idg = MAX( INT(LOG10(REAL(jpnij,wp))) + 1, 4 )            ! how many digits to we need to write? min=4, max=9
+      WRITE(clfmt, "('(a,a,i', i1, '.', i1, ',a)')") idg, idg   ! '(a,a,ix.x,a)'
+      WRITE(clfname,clfmt) TRIM(clfiletype), '_fdbk_', nproc, '.nc'
 
       IF(lwp) THEN
          WRITE(numout,*)
@@ -325,6 +329,8 @@ CONTAINS
       CHARACTER(LEN=40) :: clfname         ! netCDF filename
       CHARACTER(LEN=10) :: clfiletype
       CHARACTER(LEN=12), PARAMETER :: cpname = 'obs_wri_surf'
+      CHARACTER(LEN=12) :: clfmt           ! writing format
+      INTEGER :: idg                       ! number of digits
       INTEGER :: jo
       INTEGER :: ja
       INTEGER :: je
@@ -452,7 +458,9 @@ CONTAINS
 
       fbdata%caddname(1)   = 'Hx'
 
-      WRITE(clfname, FMT="(A,'_fdbk_',I4.4,'.nc')") TRIM(clfiletype), nproc
+      idg = MAX( INT(LOG10(REAL(jpnij,wp))) + 1, 4 )            ! how many digits to we need to write? min=4, max=9
+      WRITE(clfmt, "('(a,a,i', i1, '.', i1, ',a)')") idg, idg   ! '(a,a,ix.x,a)'
+      WRITE(clfname,clfmt) TRIM(clfiletype), '_fdbk_', nproc, '.nc'
 
       IF(lwp) THEN
          WRITE(numout,*)

@@ -50,6 +50,8 @@ MODULE tradmp
    !
    REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::   resto    !: restoring coeff. on T and S (s-1)
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
    !! $Id: tradmp.F90 10425 2018-12-19 21:54:16Z smasson $ 
@@ -109,43 +111,31 @@ CONTAINS
       !
       CASE( 0 )                        !*  newtonian damping throughout the water column  *!
          DO jn = 1, jpts
-            DO jk = 1, jpkm1
-               DO jj = 2, jpjm1
-                  DO ji = fs_2, fs_jpim1   ! vector opt.
-                     pts(ji,jj,jk,jn,Krhs) = pts(ji,jj,jk,jn,Krhs)           &
-                        &                  + resto(ji,jj,jk) * ( zts_dta(ji,jj,jk,jn) - pts(ji,jj,jk,jn,Kbb) )
-                  END DO
-               END DO
-            END DO
+            DO_3D_00_00( 1, jpkm1 )
+               pts(ji,jj,jk,jn,Krhs) = pts(ji,jj,jk,jn,Krhs)           &
+                  &                  + resto(ji,jj,jk) * ( zts_dta(ji,jj,jk,jn) - pts(ji,jj,jk,jn,Kbb) )
+            END_3D
          END DO
          !
       CASE ( 1 )                       !*  no damping in the turbocline (avt > 5 cm2/s)  *!
-         DO jk = 1, jpkm1
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1   ! vector opt.
-                  IF( avt(ji,jj,jk) <= avt_c ) THEN
-                     pts(ji,jj,jk,jp_tem,Krhs) = pts(ji,jj,jk,jp_tem,Krhs)   &
-                        &                      + resto(ji,jj,jk) * ( zts_dta(ji,jj,jk,jp_tem) - pts(ji,jj,jk,jp_tem,Kbb) )
-                     pts(ji,jj,jk,jp_sal,Krhs) = pts(ji,jj,jk,jp_sal,Krhs)   &
-                        &                      + resto(ji,jj,jk) * ( zts_dta(ji,jj,jk,jp_sal) - pts(ji,jj,jk,jp_sal,Kbb) )
-                  ENDIF
-               END DO
-            END DO
-         END DO
+         DO_3D_00_00( 1, jpkm1 )
+            IF( avt(ji,jj,jk) <= avt_c ) THEN
+               pts(ji,jj,jk,jp_tem,Krhs) = pts(ji,jj,jk,jp_tem,Krhs)   &
+                  &                      + resto(ji,jj,jk) * ( zts_dta(ji,jj,jk,jp_tem) - pts(ji,jj,jk,jp_tem,Kbb) )
+               pts(ji,jj,jk,jp_sal,Krhs) = pts(ji,jj,jk,jp_sal,Krhs)   &
+                  &                      + resto(ji,jj,jk) * ( zts_dta(ji,jj,jk,jp_sal) - pts(ji,jj,jk,jp_sal,Kbb) )
+            ENDIF
+         END_3D
          !
       CASE ( 2 )                       !*  no damping in the mixed layer   *!
-         DO jk = 1, jpkm1
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1   ! vector opt.
-                  IF( gdept(ji,jj,jk,Kmm) >= hmlp (ji,jj) ) THEN
-                     pts(ji,jj,jk,jp_tem,Krhs) = pts(ji,jj,jk,jp_tem,Krhs)   &
-                        &                      + resto(ji,jj,jk) * ( zts_dta(ji,jj,jk,jp_tem) - pts(ji,jj,jk,jp_tem,Kbb) )
-                     pts(ji,jj,jk,jp_sal,Krhs) = pts(ji,jj,jk,jp_sal,Krhs)   &
-                        &                      + resto(ji,jj,jk) * ( zts_dta(ji,jj,jk,jp_sal) - pts(ji,jj,jk,jp_sal,Kbb) )
-                  ENDIF
-               END DO
-            END DO
-         END DO
+         DO_3D_00_00( 1, jpkm1 )
+            IF( gdept(ji,jj,jk,Kmm) >= hmlp (ji,jj) ) THEN
+               pts(ji,jj,jk,jp_tem,Krhs) = pts(ji,jj,jk,jp_tem,Krhs)   &
+                  &                      + resto(ji,jj,jk) * ( zts_dta(ji,jj,jk,jp_tem) - pts(ji,jj,jk,jp_tem,Kbb) )
+               pts(ji,jj,jk,jp_sal,Krhs) = pts(ji,jj,jk,jp_sal,Krhs)   &
+                  &                      + resto(ji,jj,jk) * ( zts_dta(ji,jj,jk,jp_sal) - pts(ji,jj,jk,jp_sal,Kbb) )
+            ENDIF
+         END_3D
          !
       END SELECT
       !
@@ -156,8 +146,8 @@ CONTAINS
          DEALLOCATE( ztrdts ) 
       ENDIF
       !                           ! Control print
-      IF(ln_ctl)   CALL prt_ctl( tab3d_1=pts(:,:,:,jp_tem,Krhs), clinfo1=' dmp  - Ta: ', mask1=tmask,   &
-         &                       tab3d_2=pts(:,:,:,jp_sal,Krhs), clinfo2=       ' Sa: ', mask2=tmask, clinfo3='tra' )
+      IF(sn_cfctl%l_prtctl)   CALL prt_ctl( tab3d_1=pts(:,:,:,jp_tem,Krhs), clinfo1=' dmp  - Ta: ', mask1=tmask,   &
+         &                                  tab3d_2=pts(:,:,:,jp_sal,Krhs), clinfo2=       ' Sa: ', mask2=tmask, clinfo3='tra' )
       !
       IF( ln_timing )   CALL timing_stop('tra_dmp')
       !
@@ -177,11 +167,9 @@ CONTAINS
       NAMELIST/namtra_dmp/ ln_tradmp, nn_zdmp, cn_resto
       !!----------------------------------------------------------------------
       !
-      REWIND( numnam_ref )   ! Namelist namtra_dmp in reference namelist : T & S relaxation
       READ  ( numnam_ref, namtra_dmp, IOSTAT = ios, ERR = 901)
 901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namtra_dmp in reference namelist' )
       !
-      REWIND( numnam_cfg )   ! Namelist namtra_dmp in configuration namelist : T & S relaxation
       READ  ( numnam_cfg, namtra_dmp, IOSTAT = ios, ERR = 902 )
 902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namtra_dmp in configuration namelist' )
       IF(lwm) WRITE ( numond, namtra_dmp )

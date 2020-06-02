@@ -65,7 +65,7 @@ MODULE diawri
 
    !!----------------------------------------------------------------------
    !! NEMO/SAS 4.0 , NEMO Consortium (2018)
-   !! $Id: diawri.F90 12649 2020-04-03 07:11:57Z smasson $
+   !! $Id: diawri.F90 12933 2020-05-15 08:06:25Z smasson $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -137,9 +137,8 @@ CONTAINS
       !!      At each time step call histdef to compute the mean if ncessary
       !!      Each nn_write time step, output the instantaneous or mean fields
       !!----------------------------------------------------------------------
-      !!
       INTEGER, INTENT( in ) ::   kt      ! ocean time-step index
-      INTEGER, INTENT( in ) ::   Kmm  ! ocean time level index
+      INTEGER, INTENT( in ) ::   Kmm     ! ocean time level index
       !!
       LOGICAL ::   ll_print = .FALSE.                        ! =T print and flush numout
       CHARACTER (len=40) ::   clhstnam, clop, clmx           ! local names
@@ -461,8 +460,8 @@ CONTAINS
          CALL ice_wri_state( inum )
          CALL iom_close( inum )
       ENDIF
+      !
 #endif
-
    END SUBROUTINE dia_wri_state
 
    !!======================================================================

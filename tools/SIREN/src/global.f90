@@ -141,10 +141,10 @@ MODULE global
    INTEGER(i4)                             , PARAMETER :: ip_maxdumcfg = 10 !< maximum dummy variable, dimension, or attribute 
                                                                             !< in configuration file
 
-   CHARACTER(LEN=lc)                       , PARAMETER :: cp_url="$URL: svn+ssh://rblod@forge.ipsl.jussieu.fr/ipsl/forge/projets/nemo/svn/utils/tools/SIREN/src/global.f90 $"    !< svn url
+   CHARACTER(LEN=lc)                       , PARAMETER :: cp_url="$URL: https://forge.ipsl.jussieu.fr/nemo/svn/utils/tools_dev_r12970_AGRIF_CMEMS/SIREN/src/global.f90 $"    !< svn url
    CHARACTER(LEN=lc)                       , PARAMETER :: cp_version = "$Revision: 12080 $"
    CHARACTER(LEN=lc)                       , PARAMETER :: cp_author = "$Author: jpaul $"
-   CHARACTER(LEN=lc)                       , PARAMETER :: cp_date = "$Date: 2019-12-06 10:30:14 +0100 (Ven, 06 déc 2019) $"
+   CHARACTER(LEN=lc)                       , PARAMETER :: cp_date = "$Date: 2019-12-06 10:30:14 +0100 (Ven 06 déc 2019) $"
 
 END MODULE global
 

@@ -1,1 +1,0 @@
-/Users/rblod/CMEMS_AGRIF/tools/DOMAINcfg/BLD/fcm_env.sh

@@ -113,7 +113,7 @@ rn_Dt = 720.
 
 
    ln_usr      = .true.   !  user defined formulation                  (T => check usrdef_sbc)
-   nn_fwb      = 1
+   nn_fwb      = 4
 /
 !-----------------------------------------------------------------------
 &namsbc_flx    !   surface boundary condition : flux formulation        (ln_flx =T)
@@ -307,9 +307,7 @@ rn_Dt = 720.
 !-----------------------------------------------------------------------
 &nameos        !   ocean Equation Of Seawater                           (default: NO selection)
 !-----------------------------------------------------------------------
-   ln_teos10   = .false.         !  = Use TEOS-10
-   ln_eos80    = .false.         !  = Use EOS80
-   ln_leos     = .true.          !  = Use S-EOS (simplified Eq.)
+   ln_leos     = .true.          !  = Use L-EOS (linear Eq.)
                                  !
    !                     ! S-EOS coefficients (ln_seos=T):
    !                             !  rd(T,S,Z)*rau0 = -a0*(1+.5*lambda*dT+mu*Z+nu*dS)*dT+b0*dS

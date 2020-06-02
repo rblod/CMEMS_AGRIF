@@ -292,6 +292,22 @@ CONTAINS
          WRITE(numout,"(14x,'e2t mini: ',1f10.2,' at i = ',i5,' j= ',i5)") ze2min, iimi2, ijmi2
       ENDIF
       !
+      ! check that all processes are still there... If some process have an error,
+      ! they will never enter in cfg_write
+      IF( lk_mpp )   CALL mpp_max( 'nemogcm',nstop )
+      IF (nstop /= 0) THEN
+         WRITE(numout,*) ''
+         WRITE(numout,*) '========================================================'
+         WRITE(numout,*) 'E R R O R : ',nstop, ' error have been found'
+         WRITE(numout,*) '========================================================'
+         WRITE(numout,*) ''
+         IF ( lk_mpp ) THEN
+            CALL mppstop()
+         ELSE
+            STOP 123
+         END IF
+      END IF
+      !
    END SUBROUTINE dom_ctl
 
 

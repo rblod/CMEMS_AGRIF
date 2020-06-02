@@ -40,6 +40,8 @@ MODULE istate
 
    PUBLIC   istate_init   ! routine called by step.F90
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
    !! $Id: istate.F90 11423 2019-08-08 14:02:49Z mathiot $
@@ -74,7 +76,7 @@ CONTAINS
 
       rhd  (:,:,:  ) = 0._wp   ;   rhop (:,:,:  ) = 0._wp      ! set one for all to 0 at level jpk
       rn2b (:,:,:  ) = 0._wp   ;   rn2  (:,:,:  ) = 0._wp      ! set one for all to 0 at levels 1 and jpk
-      ts   (:,:,:,:,Kaa) = 0._wp                               ! set one for all to 0 at level jpk
+      ts  (:,:,:,:,Kaa) = 0._wp                                   ! set one for all to 0 at level jpk
       rab_b(:,:,:,:) = 0._wp   ;   rab_n(:,:,:,:) = 0._wp      ! set one for all to 0 at level jpk
 #if defined key_agrif
       uu   (:,:,:  ,Kaa) = 0._wp   ! used in agrif_oce_sponge at initialization
@@ -89,7 +91,7 @@ CONTAINS
       ELSE                                    ! Start from rest
          !                                    ! ---------------
          numror = 0                           ! define numror = 0 -> no restart file to read
-         neuler = 0                           ! Set time-step indicator at nit000 (euler forward)
+         l_1st_euler = .true.                 ! Set time-step indicator at nit000 (euler forward)
          CALL day_init                        ! model calendar (using both namelist and restart infos)
          !                                    ! Initialization of ocean to zero
          !
@@ -102,13 +104,11 @@ CONTAINS
                !
                ! Apply minimum wetdepth criterion
                !
-               DO jj = 1,jpj
-                  DO ji = 1,jpi
-                     IF( ht_0(ji,jj) + ssh(ji,jj,Kbb)  < rn_wdmin1 ) THEN
-                        ssh(ji,jj,Kbb) = tmask(ji,jj,1)*( rn_wdmin1 - (ht_0(ji,jj)) )
-                     ENDIF
-                  END DO
-               END DO 
+               DO_2D_11_11
+                  IF( ht_0(ji,jj) + ssh(ji,jj,Kbb)  < rn_wdmin1 ) THEN
+                     ssh(ji,jj,Kbb) = tmask(ji,jj,1)*( rn_wdmin1 - (ht_0(ji,jj)) )
+                  ENDIF
+               END_2D
             ENDIF 
             uu  (:,:,:,Kbb) = 0._wp
             vv  (:,:,:,Kbb) = 0._wp  
@@ -158,17 +158,13 @@ CONTAINS
       uu_b(:,:,Kbb) = 0._wp   ;   vv_b(:,:,Kbb) = 0._wp
       !
 !!gm  the use of umsak & vmask is not necessary below as uu(:,:,:,Kmm), vv(:,:,:,Kmm), uu(:,:,:,Kbb), vv(:,:,:,Kbb) are always masked
-      DO jk = 1, jpkm1
-         DO jj = 1, jpj
-            DO ji = 1, jpi
-               uu_b(ji,jj,Kmm) = uu_b(ji,jj,Kmm) + e3u(ji,jj,jk,Kmm) * uu(ji,jj,jk,Kmm) * umask(ji,jj,jk)
-               vv_b(ji,jj,Kmm) = vv_b(ji,jj,Kmm) + e3v(ji,jj,jk,Kmm) * vv(ji,jj,jk,Kmm) * vmask(ji,jj,jk)
-               !
-               uu_b(ji,jj,Kbb) = uu_b(ji,jj,Kbb) + e3u(ji,jj,jk,Kbb) * uu(ji,jj,jk,Kbb) * umask(ji,jj,jk)
-               vv_b(ji,jj,Kbb) = vv_b(ji,jj,Kbb) + e3v(ji,jj,jk,Kbb) * vv(ji,jj,jk,Kbb) * vmask(ji,jj,jk)
-            END DO
-         END DO
-      END DO
+      DO_3D_11_11( 1, jpkm1 )
+         uu_b(ji,jj,Kmm) = uu_b(ji,jj,Kmm) + e3u(ji,jj,jk,Kmm) * uu(ji,jj,jk,Kmm) * umask(ji,jj,jk)
+         vv_b(ji,jj,Kmm) = vv_b(ji,jj,Kmm) + e3v(ji,jj,jk,Kmm) * vv(ji,jj,jk,Kmm) * vmask(ji,jj,jk)
+         !
+         uu_b(ji,jj,Kbb) = uu_b(ji,jj,Kbb) + e3u(ji,jj,jk,Kbb) * uu(ji,jj,jk,Kbb) * umask(ji,jj,jk)
+         vv_b(ji,jj,Kbb) = vv_b(ji,jj,Kbb) + e3v(ji,jj,jk,Kbb) * vv(ji,jj,jk,Kbb) * vmask(ji,jj,jk)
+      END_3D
       !
       uu_b(:,:,Kmm) = uu_b(:,:,Kmm) * r1_hu(:,:,Kmm)
       vv_b(:,:,Kmm) = vv_b(:,:,Kmm) * r1_hv(:,:,Kmm)
