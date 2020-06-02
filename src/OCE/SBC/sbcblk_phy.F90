@@ -30,7 +30,7 @@ MODULE sbcblk_phy
    REAL(wp), PARAMETER, PUBLIC :: R_dry   = 287.05_wp   !: Specific gas constant for dry air              [J/K/kg]
    REAL(wp), PARAMETER, PUBLIC :: R_vap   = 461.495_wp  !: Specific gas constant for water vapor          [J/K/kg]
    REAL(wp), PARAMETER, PUBLIC :: reps0   = R_dry/R_vap !: ratio of gas constant for dry air and water vapor => ~ 0.622
-   REAL(wp), PARAMETER, PUBLIC :: rctv0   = R_vap/R_dry !: for virtual temperature (== (1-eps)/eps) => ~ 0.608
+   REAL(wp), PARAMETER, PUBLIC :: rctv0   = R_vap/R_dry - 1._wp  !: for virtual temperature (== (1-eps)/eps) => ~ 0.608
    REAL(wp), PARAMETER, PUBLIC :: rCp_air = 1000.5_wp   !: specific heat of air (only used for ice fluxes now...)
    REAL(wp), PARAMETER, PUBLIC :: rCd_ice = 1.4e-3_wp   !: transfer coefficient over ice
    REAL(wp), PARAMETER, PUBLIC :: albo    = 0.066_wp    !: ocean albedo assumed to be constant

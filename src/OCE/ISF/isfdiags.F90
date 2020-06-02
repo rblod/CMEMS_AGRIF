@@ -87,7 +87,7 @@ CONTAINS
       INTEGER , DIMENSION(jpi,jpj), INTENT(in) :: ktop , kbot   ! top and bottom level of the tbl
       REAL(wp), DIMENSION(jpi,jpj), INTENT(in) :: phtbl, pfrac  ! thickness of the tbl and fraction of last cell affected by the tbl
       REAL(wp), DIMENSION(jpi,jpj), INTENT(in) :: pvar2d        ! 2d var to map in 3d
-      CHARACTER(LEN=256), INTENT(in) :: cdvar
+      CHARACTER(LEN=*), INTENT(in) :: cdvar
       !!---------------------------------------------------------------------
       INTEGER  :: ji, jj, jk                       ! loop indices
       INTEGER  :: ikt, ikb                         ! top and bottom level of the tbl

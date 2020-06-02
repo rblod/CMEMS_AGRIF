@@ -28,7 +28,7 @@ MODULE agrif_oce
    LOGICAL , PUBLIC ::   ln_chk_bathy  = .FALSE.   !: check of parent bathymetry 
    !
    INTEGER , PUBLIC, PARAMETER ::   nn_sponge_len = 2  !: Sponge width (in number of parent grid points)
-   LOGICAL , PUBLIC ::   south_boundary_open  = .TRUE. !: Is the South boundary open ?
+   LOGICAL , PUBLIC ::   ln_bry_south  = .TRUE. !: Is the South boundary open ?
 
    LOGICAL , PUBLIC :: spongedoneT = .FALSE.       !: tracer   sponge layer indicator
    LOGICAL , PUBLIC :: spongedoneU = .FALSE.       !: dynamics sponge layer indicator
@@ -74,7 +74,11 @@ MODULE agrif_oce
    LOGICAL, PUBLIC :: use_sign_north
    REAL, PUBLIC :: sign_north
    LOGICAL, PUBLIC :: l_ini_child = .FALSE.
+# if defined key_vertical
+   LOGICAL, PUBLIC :: l_vremap    = .TRUE.
+# else
    LOGICAL, PUBLIC :: l_vremap    = .FALSE.
+# endif
 !$AGRIF_END_DO_NOT_TREAT
    
    !!----------------------------------------------------------------------

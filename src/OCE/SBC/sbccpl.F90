@@ -200,7 +200,7 @@ MODULE sbccpl
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: sbccpl.F90 12620 2020-03-27 19:22:03Z mathiot $
+   !! $Id: sbccpl.F90 12952 2020-05-19 12:34:16Z cetlod $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -363,7 +363,9 @@ CONTAINS
       srcv(jpr_itz2)%clname = 'O_ITauz2'      ! 3rd   -      -         -     - 
       ! 
       ! Vectors: change of sign at north fold ONLY if on the local grid
-      IF( TRIM( sn_rcv_tau%cldes ) == 'oce only' .OR. TRIM(sn_rcv_tau%cldes ) == 'oce and ice') THEN ! avoid working with the atmospheric fields if they are not coupled
+      IF(       TRIM( sn_rcv_tau%cldes ) == 'oce only' .OR. TRIM( sn_rcv_tau%cldes ) == 'oce and ice'  &
+           .OR. TRIM( sn_rcv_tau%cldes ) == 'mixed oce-ice' ) THEN ! avoid working with the atmospheric fields if they are not coupled
+
       IF( TRIM( sn_rcv_tau%clvor ) == 'local grid' )   srcv(jpr_otx1:jpr_itz2)%nsgn = -1.
       
       !                                                           ! Set grid and action
@@ -1480,6 +1482,7 @@ CONTAINS
       !!
       INTEGER ::   ji, jj   ! dummy loop indices
       INTEGER ::   itx      ! index of taux over ice
+      REAL(wp)                     ::   zztmp1, zztmp2
       REAL(wp), DIMENSION(jpi,jpj) ::   ztx, zty 
       !!----------------------------------------------------------------------
       !
@@ -1543,25 +1546,16 @@ CONTAINS
          CASE( 'U' )
             p_taui(:,:) = frcv(jpr_itx1)%z3(:,:,1)                   ! (U,V) ==> (U,V)
             p_tauj(:,:) = frcv(jpr_ity1)%z3(:,:,1)
-         CASE( 'F' )
-            DO_2D_00_00
-               p_taui(ji,jj) = 0.5 * ( frcv(jpr_itx1)%z3(ji,jj,1) + frcv(jpr_itx1)%z3(ji  ,jj-1,1) )
-               p_tauj(ji,jj) = 0.5 * ( frcv(jpr_ity1)%z3(ji,jj,1) + frcv(jpr_ity1)%z3(ji-1,jj  ,1) )
-            END_2D
          CASE( 'T' )
             DO_2D_00_00
-               p_taui(ji,jj) = 0.5 * ( frcv(jpr_itx1)%z3(ji+1,jj  ,1) + frcv(jpr_itx1)%z3(ji,jj,1) )
-               p_tauj(ji,jj) = 0.5 * ( frcv(jpr_ity1)%z3(ji  ,jj+1,1) + frcv(jpr_ity1)%z3(ji,jj,1) )
+               ! take care of the land-sea mask to avoid "pollution" of coastal stress. p[uv]taui used in frazil and  rheology 
+               zztmp1 = 0.5_wp * ( 2. - umask(ji,jj,1) ) * MAX( tmask(ji,jj,1),tmask(ji+1,jj  ,1) )
+               zztmp2 = 0.5_wp * ( 2. - vmask(ji,jj,1) ) * MAX( tmask(ji,jj,1),tmask(ji  ,jj+1,1) )
+               p_taui(ji,jj) = zztmp1 * ( frcv(jpr_itx1)%z3(ji+1,jj  ,1) + frcv(jpr_itx1)%z3(ji,jj,1) )
+               p_tauj(ji,jj) = zztmp2 * ( frcv(jpr_ity1)%z3(ji  ,jj+1,1) + frcv(jpr_ity1)%z3(ji,jj,1) )
             END_2D
-         CASE( 'I' )
-            DO_2D_00_00
-               p_taui(ji,jj) = 0.5 * ( frcv(jpr_itx1)%z3(ji+1,jj+1,1) + frcv(jpr_itx1)%z3(ji+1,jj  ,1) )
-               p_tauj(ji,jj) = 0.5 * ( frcv(jpr_ity1)%z3(ji+1,jj+1,1) + frcv(jpr_ity1)%z3(ji  ,jj+1,1) )
-            END_2D
-         END SELECT
-         IF( srcv(jpr_itx1)%clgrid /= 'U' ) THEN 
             CALL lbc_lnk_multi( 'sbccpl', p_taui, 'U',  -1., p_tauj, 'V',  -1. )
-         ENDIF
+         END SELECT
          
       ENDIF
       !

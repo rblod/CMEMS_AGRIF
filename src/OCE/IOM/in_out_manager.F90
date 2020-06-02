@@ -99,16 +99,6 @@ MODULE in_out_manager
    !!                    output monitoring
    !!----------------------------------------------------------------------
    TYPE :: sn_ctl                !: structure for control over output selection
-      LOGICAL :: l_glochk  = .FALSE.  !: range sanity checks are local (F) or global (T)
-                                      !  Use global setting for debugging only;
-                                      !  local breaches will still be reported
-                                      !  and stop the code in most cases.
-      LOGICAL :: l_allon   = .FALSE.  !: overall control; activate all following output options
-      LOGICAL :: l_config  = .FALSE.  !: activate/deactivate finer control
-                                      !  Note if l_config is True then sn_cfctl%l_allon is ignored.
-                                      !  Otherwise setting sn_cfctl%l_allon T/F is equivalent to 
-                                      !  setting all the following logicals in this structure T/F
-                                      !  and disabling subsetting of processors
       LOGICAL :: l_runstat = .FALSE.  !: Produce/do not produce run.stat file (T/F)
       LOGICAL :: l_trcstat = .FALSE.  !: Produce/do not produce tracer.stat file (T/F)
       LOGICAL :: l_oceout  = .FALSE.  !: Produce all ocean.outputs    (T) or just one (F)
@@ -168,6 +158,9 @@ MODULE in_out_manager
    !!----------------------------------------------------------------------
    INTEGER       ::   no_print = 0          !: optional argument of fld_fill (if present, suppress some control print)
    INTEGER       ::   nstop = 0             !: error flag (=number of reason for a premature stop run)
+!$AGRIF_DO_NOT_TREAT
+   INTEGER       ::   ngrdstop = -1         !: grid number having nstop > 1
+!$AGRIF_END_DO_NOT_TREAT
    INTEGER       ::   nwarn = 0             !: warning flag (=number of warning found during the run)
    CHARACTER(lc) ::   ctmp1, ctmp2, ctmp3   !: temporary characters 1 to 3
    CHARACTER(lc) ::   ctmp4, ctmp5, ctmp6   !: temporary characters 4 to 6
@@ -184,7 +177,7 @@ MODULE in_out_manager
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: in_out_manager.F90 12377 2020-02-12 14:39:06Z acc $
+   !! $Id: in_out_manager.F90 12933 2020-05-15 08:06:25Z smasson $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!=====================================================================
 END MODULE in_out_manager

@@ -129,44 +129,53 @@ CONTAINS
          ! Retrieve masks at open boundaries:
 
          ! --- West --- !
-         ztabramp(:,:) = 0._wp
-         ind1 = 1+nbghostcells
-         DO ji = mi0(ind1), mi1(ind1)                
-            ztabramp(ji,:) = ssumask(ji,:)
-         END DO
-         !
-         zmskwest(:) = 0._wp
-         zmskwest(1:jpj) = MAXVAL(ztabramp(:,:), dim=1)
+         IF( lk_west) THEN
+            ztabramp(:,:) = 0._wp
+            ind1 = 1+nbghostcells
+            DO ji = mi0(ind1), mi1(ind1)                
+               ztabramp(ji,:) = ssumask(ji,:)
+            END DO
+            !
+            zmskwest(:) = 0._wp
+            zmskwest(1:jpj) = MAXVAL(ztabramp(:,:), dim=1)
+         ENDIF
 
          ! --- East --- !
-         ztabramp(:,:) = 0._wp
-         ind1 = jpiglo - nbghostcells - 1
-         DO ji = mi0(ind1), mi1(ind1)                 
-            ztabramp(ji,:) = ssumask(ji,:)
-         END DO
-         !
-         zmskeast(:) = 0._wp
-         zmskeast(1:jpj) = MAXVAL(ztabramp(:,:), dim=1)
+         IF( lk_east ) THEN
+            ztabramp(:,:) = 0._wp
+            ind1 = jpiglo - nbghostcells - 1
+            DO ji = mi0(ind1), mi1(ind1)                 
+               ztabramp(ji,:) = ssumask(ji,:)
+            END DO
+            !
+            zmskeast(:) = 0._wp
+            zmskeast(1:jpj) = MAXVAL(ztabramp(:,:), dim=1)
+         ENDIF
 
          ! --- South --- !
-         ztabramp(:,:) = 0._wp
-         ind1 = 1+nbghostcells
-         DO jj = mj0(ind1), mj1(ind1)                 
-            ztabramp(:,jj) = ssvmask(:,jj)
-         END DO
-         !
-         zmsksouth(:) = 0._wp
-         zmsksouth(1:jpi) = MAXVAL(ztabramp(:,:), dim=2)
+         IF( lk_south ) THEN
+            ztabramp(:,:) = 0._wp
+            ind1 = 1+nbghostcells
+            DO jj = mj0(ind1), mj1(ind1)                 
+               ztabramp(:,jj) = ssvmask(:,jj)
+            END DO
+            !
+            zmsksouth(:) = 0._wp
+            zmsksouth(1:jpi) = MAXVAL(ztabramp(:,:), dim=2)
+         ENDIF
 
          ! --- North --- !
-         ztabramp(:,:) = 0._wp
-         ind1 = jpjglo - nbghostcells - 1
-         DO jj = mj0(ind1), mj1(ind1)                 
-            ztabramp(:,jj) = ssvmask(:,jj)
-         END DO
-         !
-         zmsknorth(:) = 0._wp
-         zmsknorth(1:jpi) = MAXVAL(ztabramp(:,:), dim=2)
+         IF( lk_north) THEN
+            ztabramp(:,:) = 0._wp
+            ind1 = jpjglo - nbghostcells - 1
+            DO jj = mj0(ind1), mj1(ind1)                 
+               ztabramp(:,jj) = ssvmask(:,jj)
+            END DO
+            !
+            zmsknorth(:) = 0._wp
+            zmsknorth(1:jpi) = MAXVAL(ztabramp(:,:), dim=2)
+         ENDIF
+
          ! JC: SPONGE MASKING TO BE SORTED OUT:
          zmskwest(:)  = 1._wp
          zmskeast(:)  = 1._wp
@@ -658,7 +667,8 @@ CONTAINS
          tabspongedone_u(i1+1:i2-1,j1+1:j2-1) = .TRUE.
 
          jmax = j2-1
-         IF (lk_north) jmax = MIN(jmax,nlcj-nbghostcells-2)   ! North
+        ! IF (lk_north) jmax = MIN(jmax,nlcj-nbghostcells-2)   ! North
+         IF ((nbondj == 1).OR.(nbondj == 2)) jmax = MIN(jmax,nlcj-nbghostcells-2)   ! North
 
          DO jj = j1+1, jmax
             DO ji = i1+1, i2   ! vector opt.
@@ -814,7 +824,8 @@ CONTAINS
          !                                                
 
          imax = i2 - 1
-         IF(lk_east) imax = MIN(imax,nlci-nbghostcells-2)   ! East
+      !   IF(lk_east) imax = MIN(imax,nlci-nbghostcells-2)   ! East
+         IF ((nbondi == 1).OR.(nbondi == 2))   imax = MIN(imax,nlci-nbghostcells-2)   ! East
 
          DO jj = j1+1, j2
             DO ji = i1+1, imax   ! vector opt.

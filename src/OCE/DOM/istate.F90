@@ -111,17 +111,17 @@ CONTAINS
 #endif
             ENDIF
             !
-     !       IF( ll_wd ) THEN
-     !          ssh(:,:,Kbb) =  -ssh_ref  ! Added in 30 here for bathy that adds 30 as Iterative test CEOD 
-     !          !
+            IF( ll_wd ) THEN
+               ssh(:,:,Kbb) =  -ssh_ref  ! Added in 30 here for bathy that adds 30 as Iterative test CEOD 
+               !
                ! Apply minimum wetdepth criterion
                !
-     !          DO_2D_11_11
-     !             IF( ht_0(ji,jj) + ssh(ji,jj,Kbb)  < rn_wdmin1 ) THEN
-     !                ssh(ji,jj,Kbb) = tmask(ji,jj,1)*( rn_wdmin1 - (ht_0(ji,jj)) )
-     !             ENDIF
-     !          END_2D
-     !       ENDIF 
+               DO_2D_11_11
+                  IF( ht_0(ji,jj) + ssh(ji,jj,Kbb)  < rn_wdmin1 ) THEN
+                     ssh(ji,jj,Kbb) = tmask(ji,jj,1)*( rn_wdmin1 - (ht_0(ji,jj)) )
+                  ENDIF
+               END_2D
+            ENDIF 
              !
          ELSE                                 ! user defined initial T and S
             CALL usr_def_istate( gdept(:,:,:,Kbb), tmask, ts(:,:,:,:,Kbb), uu(:,:,:,Kbb), vv(:,:,:,Kbb), ssh(:,:,Kbb)  )         

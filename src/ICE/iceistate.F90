@@ -178,237 +178,239 @@ CONTAINS
       IF( ln_iceini ) THEN
          !                             !---------------!
          
-IF( Agrif_Root() ) THEN
+         IF( Agrif_Root() ) THEN
 
-         IF( ln_iceini_file )THEN      ! Read a file   !
-            !                          !---------------!
-            WHERE( ff_t(:,:) >= 0._wp )   ;   zswitch(:,:) = 1._wp
-            ELSEWHERE                     ;   zswitch(:,:) = 0._wp
-            END WHERE
-            !
-            CALL fld_read( kt, 1, si ) ! input fields provided at the current time-step
-            !
-            ! -- mandatory fields -- !
-            zht_i_ini(:,:) = si(jp_hti)%fnow(:,:,1) * tmask(:,:,1)
-            zht_s_ini(:,:) = si(jp_hts)%fnow(:,:,1) * tmask(:,:,1)
-            zat_i_ini(:,:) = si(jp_ati)%fnow(:,:,1) * tmask(:,:,1)
+            IF( ln_iceini_file )THEN      ! Read a file   !
+               !                          !---------------!
+               WHERE( ff_t(:,:) >= 0._wp )   ;   zswitch(:,:) = 1._wp
+               ELSEWHERE                     ;   zswitch(:,:) = 0._wp
+               END WHERE
+               !
+               CALL fld_read( kt, 1, si ) ! input fields provided at the current time-step
+               !
+               ! -- mandatory fields -- !
+               zht_i_ini(:,:) = si(jp_hti)%fnow(:,:,1) * tmask(:,:,1)
+               zht_s_ini(:,:) = si(jp_hts)%fnow(:,:,1) * tmask(:,:,1)
+               zat_i_ini(:,:) = si(jp_ati)%fnow(:,:,1) * tmask(:,:,1)
 
-            ! -- optional fields -- !
-            !    if fields do not exist then set them to the values present in the namelist (except for snow and surface temperature)
-            !
-            ! ice salinity
-            IF( TRIM(si(jp_smi)%clrootname) == 'NOT USED' ) &
-               &     si(jp_smi)%fnow(:,:,1) = ( rn_smi_ini_n * zswitch + rn_smi_ini_s * (1._wp - zswitch) ) * tmask(:,:,1)
-            !
-            ! temperatures
-            IF    ( TRIM(si(jp_tmi)%clrootname) == 'NOT USED' .AND. TRIM(si(jp_tsu)%clrootname) == 'NOT USED' .AND. &
-               &    TRIM(si(jp_tms)%clrootname) == 'NOT USED' ) THEN
-               si(jp_tmi)%fnow(:,:,1) = ( rn_tmi_ini_n * zswitch + rn_tmi_ini_s * (1._wp - zswitch) ) * tmask(:,:,1)
-               si(jp_tsu)%fnow(:,:,1) = ( rn_tsu_ini_n * zswitch + rn_tsu_ini_s * (1._wp - zswitch) ) * tmask(:,:,1)
-               si(jp_tms)%fnow(:,:,1) = ( rn_tms_ini_n * zswitch + rn_tms_ini_s * (1._wp - zswitch) ) * tmask(:,:,1)
-            ELSEIF( TRIM(si(jp_tmi)%clrootname) == 'NOT USED' .AND. TRIM(si(jp_tms)%clrootname) /= 'NOT USED' ) THEN ! if T_s is read and not T_i, set T_i = (T_s + T_freeze)/2
-               si(jp_tmi)%fnow(:,:,1) = 0.5_wp * ( si(jp_tms)%fnow(:,:,1) + 271.15 )
-            ELSEIF( TRIM(si(jp_tmi)%clrootname) == 'NOT USED' .AND. TRIM(si(jp_tsu)%clrootname) /= 'NOT USED' ) THEN ! if T_su is read and not T_i, set T_i = (T_su + T_freeze)/2
-               si(jp_tmi)%fnow(:,:,1) = 0.5_wp * ( si(jp_tsu)%fnow(:,:,1) + 271.15 )
-            ELSEIF( TRIM(si(jp_tsu)%clrootname) == 'NOT USED' .AND. TRIM(si(jp_tms)%clrootname) /= 'NOT USED' ) THEN ! if T_s is read and not T_su, set T_su = T_s
-               si(jp_tsu)%fnow(:,:,1) = si(jp_tms)%fnow(:,:,1)
-            ELSEIF( TRIM(si(jp_tsu)%clrootname) == 'NOT USED' .AND. TRIM(si(jp_tmi)%clrootname) /= 'NOT USED' ) THEN ! if T_i is read and not T_su, set T_su = T_i
-               si(jp_tsu)%fnow(:,:,1) = si(jp_tmi)%fnow(:,:,1)
-            ELSEIF( TRIM(si(jp_tms)%clrootname) == 'NOT USED' .AND. TRIM(si(jp_tsu)%clrootname) /= 'NOT USED' ) THEN ! if T_su is read and not T_s, set T_s = T_su
-               si(jp_tms)%fnow(:,:,1) = si(jp_tsu)%fnow(:,:,1)
-            ELSEIF( TRIM(si(jp_tms)%clrootname) == 'NOT USED' .AND. TRIM(si(jp_tmi)%clrootname) /= 'NOT USED' ) THEN ! if T_i is read and not T_s, set T_s = T_i
-               si(jp_tms)%fnow(:,:,1) = si(jp_tmi)%fnow(:,:,1)
+               ! -- optional fields -- !
+               !    if fields do not exist then set them to the values present in the namelist (except for snow and surface temperature)
+               !
+               ! ice salinity
+               IF( TRIM(si(jp_smi)%clrootname) == 'NOT USED' ) &
+                  &     si(jp_smi)%fnow(:,:,1) = ( rn_smi_ini_n * zswitch + rn_smi_ini_s * (1._wp - zswitch) ) * tmask(:,:,1)
+               !
+               ! temperatures
+               IF    ( TRIM(si(jp_tmi)%clrootname) == 'NOT USED' .AND. TRIM(si(jp_tsu)%clrootname) == 'NOT USED' .AND. &
+                  &    TRIM(si(jp_tms)%clrootname) == 'NOT USED' ) THEN
+                  si(jp_tmi)%fnow(:,:,1) = ( rn_tmi_ini_n * zswitch + rn_tmi_ini_s * (1._wp - zswitch) ) * tmask(:,:,1)
+                  si(jp_tsu)%fnow(:,:,1) = ( rn_tsu_ini_n * zswitch + rn_tsu_ini_s * (1._wp - zswitch) ) * tmask(:,:,1)
+                  si(jp_tms)%fnow(:,:,1) = ( rn_tms_ini_n * zswitch + rn_tms_ini_s * (1._wp - zswitch) ) * tmask(:,:,1)
+               ELSEIF( TRIM(si(jp_tmi)%clrootname) == 'NOT USED' .AND. TRIM(si(jp_tms)%clrootname) /= 'NOT USED' ) THEN ! if T_s is read and not T_i, set T_i = (T_s + T_freeze)/2
+                  si(jp_tmi)%fnow(:,:,1) = 0.5_wp * ( si(jp_tms)%fnow(:,:,1) + 271.15 )
+               ELSEIF( TRIM(si(jp_tmi)%clrootname) == 'NOT USED' .AND. TRIM(si(jp_tsu)%clrootname) /= 'NOT USED' ) THEN ! if T_su is read and not T_i, set T_i = (T_su + T_freeze)/2
+                  si(jp_tmi)%fnow(:,:,1) = 0.5_wp * ( si(jp_tsu)%fnow(:,:,1) + 271.15 )
+               ELSEIF( TRIM(si(jp_tsu)%clrootname) == 'NOT USED' .AND. TRIM(si(jp_tms)%clrootname) /= 'NOT USED' ) THEN ! if T_s is read and not T_su, set T_su = T_s
+                  si(jp_tsu)%fnow(:,:,1) = si(jp_tms)%fnow(:,:,1)
+               ELSEIF( TRIM(si(jp_tsu)%clrootname) == 'NOT USED' .AND. TRIM(si(jp_tmi)%clrootname) /= 'NOT USED' ) THEN ! if T_i is read and not T_su, set T_su = T_i
+                  si(jp_tsu)%fnow(:,:,1) = si(jp_tmi)%fnow(:,:,1)
+               ELSEIF( TRIM(si(jp_tms)%clrootname) == 'NOT USED' .AND. TRIM(si(jp_tsu)%clrootname) /= 'NOT USED' ) THEN ! if T_su is read and not T_s, set T_s = T_su
+                  si(jp_tms)%fnow(:,:,1) = si(jp_tsu)%fnow(:,:,1)
+               ELSEIF( TRIM(si(jp_tms)%clrootname) == 'NOT USED' .AND. TRIM(si(jp_tmi)%clrootname) /= 'NOT USED' ) THEN ! if T_i is read and not T_s, set T_s = T_i
+                  si(jp_tms)%fnow(:,:,1) = si(jp_tmi)%fnow(:,:,1)
+               ENDIF
+               !
+               ! pond concentration
+               IF( TRIM(si(jp_apd)%clrootname) == 'NOT USED' ) &
+                  &     si(jp_apd)%fnow(:,:,1) = ( rn_apd_ini_n * zswitch + rn_apd_ini_s * (1._wp - zswitch) ) * tmask(:,:,1) & ! rn_apd = pond fraction => rn_apnd * a_i = pond conc.
+                  &                              * si(jp_ati)%fnow(:,:,1) 
+               !
+               ! pond depth
+               IF( TRIM(si(jp_hpd)%clrootname) == 'NOT USED' ) &
+                  &     si(jp_hpd)%fnow(:,:,1) = ( rn_hpd_ini_n * zswitch + rn_hpd_ini_s * (1._wp - zswitch) ) * tmask(:,:,1)
+               !
+               zsm_i_ini(:,:) = si(jp_smi)%fnow(:,:,1) * tmask(:,:,1)
+               ztm_i_ini(:,:) = si(jp_tmi)%fnow(:,:,1) * tmask(:,:,1)
+               zt_su_ini(:,:) = si(jp_tsu)%fnow(:,:,1) * tmask(:,:,1)
+               ztm_s_ini(:,:) = si(jp_tms)%fnow(:,:,1) * tmask(:,:,1)
+               zapnd_ini(:,:) = si(jp_apd)%fnow(:,:,1) * tmask(:,:,1)
+               zhpnd_ini(:,:) = si(jp_hpd)%fnow(:,:,1) * tmask(:,:,1)
+               !
+               ! change the switch for the following
+               WHERE( zat_i_ini(:,:) > 0._wp )   ;   zswitch(:,:) = tmask(:,:,1) 
+               ELSEWHERE                         ;   zswitch(:,:) = 0._wp
+               END WHERE
+
+               !                          !---------------!
+            ELSE                          ! Read namelist !
+               !                          !---------------!
+               ! no ice if (sst - Tfreez) >= thresold
+               WHERE( ( sst_m(:,:) - (t_bo(:,:) - rt0) ) * tmask(:,:,1) >= rn_thres_sst )   ;   zswitch(:,:) = 0._wp 
+               ELSEWHERE                                                                    ;   zswitch(:,:) = tmask(:,:,1)
+               END WHERE
+               !
+               ! assign initial thickness, concentration, snow depth and salinity to an hemisphere-dependent array
+               WHERE( ff_t(:,:) >= 0._wp )
+                  zht_i_ini(:,:) = rn_hti_ini_n * zswitch(:,:)
+                  zht_s_ini(:,:) = rn_hts_ini_n * zswitch(:,:)
+                  zat_i_ini(:,:) = rn_ati_ini_n * zswitch(:,:)
+                  zsm_i_ini(:,:) = rn_smi_ini_n * zswitch(:,:)
+                  ztm_i_ini(:,:) = rn_tmi_ini_n * zswitch(:,:)
+                  zt_su_ini(:,:) = rn_tsu_ini_n * zswitch(:,:)
+                  ztm_s_ini(:,:) = rn_tms_ini_n * zswitch(:,:)
+                  zapnd_ini(:,:) = rn_apd_ini_n * zswitch(:,:) * zat_i_ini(:,:) ! rn_apd = pond fraction => rn_apd * a_i = pond conc. 
+                  zhpnd_ini(:,:) = rn_hpd_ini_n * zswitch(:,:)
+               ELSEWHERE
+                  zht_i_ini(:,:) = rn_hti_ini_s * zswitch(:,:)
+                  zht_s_ini(:,:) = rn_hts_ini_s * zswitch(:,:)
+                  zat_i_ini(:,:) = rn_ati_ini_s * zswitch(:,:)
+                  zsm_i_ini(:,:) = rn_smi_ini_s * zswitch(:,:)
+                  ztm_i_ini(:,:) = rn_tmi_ini_s * zswitch(:,:)
+                  zt_su_ini(:,:) = rn_tsu_ini_s * zswitch(:,:)
+                  ztm_s_ini(:,:) = rn_tms_ini_s * zswitch(:,:)
+                  zapnd_ini(:,:) = rn_apd_ini_s * zswitch(:,:) * zat_i_ini(:,:) ! rn_apd = pond fraction => rn_apd * a_i = pond conc.
+                  zhpnd_ini(:,:) = rn_hpd_ini_s * zswitch(:,:)
+               END WHERE
+               !
             ENDIF
-            !
-            ! pond concentration
-            IF( TRIM(si(jp_apd)%clrootname) == 'NOT USED' ) &
-               &     si(jp_apd)%fnow(:,:,1) = ( rn_apd_ini_n * zswitch + rn_apd_ini_s * (1._wp - zswitch) ) * tmask(:,:,1) & ! rn_apd = pond fraction => rn_apnd * a_i = pond conc.
-               &                              * si(jp_ati)%fnow(:,:,1) 
-            !
-            ! pond depth
-            IF( TRIM(si(jp_hpd)%clrootname) == 'NOT USED' ) &
-               &     si(jp_hpd)%fnow(:,:,1) = ( rn_hpd_ini_n * zswitch + rn_hpd_ini_s * (1._wp - zswitch) ) * tmask(:,:,1)
-            !
-            zsm_i_ini(:,:) = si(jp_smi)%fnow(:,:,1) * tmask(:,:,1)
-            ztm_i_ini(:,:) = si(jp_tmi)%fnow(:,:,1) * tmask(:,:,1)
-            zt_su_ini(:,:) = si(jp_tsu)%fnow(:,:,1) * tmask(:,:,1)
-            ztm_s_ini(:,:) = si(jp_tms)%fnow(:,:,1) * tmask(:,:,1)
-            zapnd_ini(:,:) = si(jp_apd)%fnow(:,:,1) * tmask(:,:,1)
-            zhpnd_ini(:,:) = si(jp_hpd)%fnow(:,:,1) * tmask(:,:,1)
-            !
-            ! change the switch for the following
-            WHERE( zat_i_ini(:,:) > 0._wp )   ;   zswitch(:,:) = tmask(:,:,1) 
-            ELSEWHERE                         ;   zswitch(:,:) = 0._wp
-            END WHERE
-            !                          !---------------!
-         ELSE                          ! Read namelist !
-            !                          !---------------!
-            ! no ice if (sst - Tfreez) >= thresold
-            WHERE( ( sst_m(:,:) - (t_bo(:,:) - rt0) ) * tmask(:,:,1) >= rn_thres_sst )   ;   zswitch(:,:) = 0._wp 
-            ELSEWHERE                                                                    ;   zswitch(:,:) = tmask(:,:,1)
-            END WHERE
-            !
-            ! assign initial thickness, concentration, snow depth and salinity to an hemisphere-dependent array
-            WHERE( ff_t(:,:) >= 0._wp )
-               zht_i_ini(:,:) = rn_hti_ini_n * zswitch(:,:)
-               zht_s_ini(:,:) = rn_hts_ini_n * zswitch(:,:)
-               zat_i_ini(:,:) = rn_ati_ini_n * zswitch(:,:)
-               zsm_i_ini(:,:) = rn_smi_ini_n * zswitch(:,:)
-               ztm_i_ini(:,:) = rn_tmi_ini_n * zswitch(:,:)
-               zt_su_ini(:,:) = rn_tsu_ini_n * zswitch(:,:)
-               ztm_s_ini(:,:) = rn_tms_ini_n * zswitch(:,:)
-               zapnd_ini(:,:) = rn_apd_ini_n * zswitch(:,:) * zat_i_ini(:,:) ! rn_apd = pond fraction => rn_apd * a_i = pond conc. 
-               zhpnd_ini(:,:) = rn_hpd_ini_n * zswitch(:,:)
-            ELSEWHERE
-               zht_i_ini(:,:) = rn_hti_ini_s * zswitch(:,:)
-               zht_s_ini(:,:) = rn_hts_ini_s * zswitch(:,:)
-               zat_i_ini(:,:) = rn_ati_ini_s * zswitch(:,:)
-               zsm_i_ini(:,:) = rn_smi_ini_s * zswitch(:,:)
-               ztm_i_ini(:,:) = rn_tmi_ini_s * zswitch(:,:)
-               zt_su_ini(:,:) = rn_tsu_ini_s * zswitch(:,:)
-               ztm_s_ini(:,:) = rn_tms_ini_s * zswitch(:,:)
-               zapnd_ini(:,:) = rn_apd_ini_s * zswitch(:,:) * zat_i_ini(:,:) ! rn_apd = pond fraction => rn_apd * a_i = pond conc.
-               zhpnd_ini(:,:) = rn_hpd_ini_s * zswitch(:,:)
-            END WHERE
-            !
-         ENDIF
 
 
 
-         ! make sure ponds = 0 if no ponds scheme
-         IF ( .NOT.ln_pnd ) THEN
-            zapnd_ini(:,:) = 0._wp
-            zhpnd_ini(:,:) = 0._wp
-         ENDIF
-         
-         !-------------!
-         ! fill fields !
-         !-------------!
-         ! select ice covered grid points
-         npti = 0 ; nptidx(:) = 0
-         DO_2D_11_11
-            IF ( zht_i_ini(ji,jj) > 0._wp ) THEN
-               npti         = npti  + 1
-               nptidx(npti) = (jj - 1) * jpi + ji
+            ! make sure ponds = 0 if no ponds scheme
+            IF ( .NOT.ln_pnd ) THEN
+               zapnd_ini(:,:) = 0._wp
+               zhpnd_ini(:,:) = 0._wp
             ENDIF
-         END_2D
-
-         ! move to 1D arrays: (jpi,jpj) -> (jpi*jpj)
-         CALL tab_2d_1d( npti, nptidx(1:npti), h_i_1d (1:npti)  , zht_i_ini )
-         CALL tab_2d_1d( npti, nptidx(1:npti), h_s_1d (1:npti)  , zht_s_ini )
-         CALL tab_2d_1d( npti, nptidx(1:npti), at_i_1d(1:npti)  , zat_i_ini )
-         CALL tab_2d_1d( npti, nptidx(1:npti), t_i_1d (1:npti,1), ztm_i_ini )
-         CALL tab_2d_1d( npti, nptidx(1:npti), t_s_1d (1:npti,1), ztm_s_ini )
-         CALL tab_2d_1d( npti, nptidx(1:npti), t_su_1d(1:npti)  , zt_su_ini )
-         CALL tab_2d_1d( npti, nptidx(1:npti), s_i_1d (1:npti)  , zsm_i_ini )
-         CALL tab_2d_1d( npti, nptidx(1:npti), a_ip_1d(1:npti)  , zapnd_ini )
-         CALL tab_2d_1d( npti, nptidx(1:npti), h_ip_1d(1:npti)  , zhpnd_ini )
-
-         ! allocate temporary arrays
-         ALLOCATE( zhi_2d(npti,jpl), zhs_2d(npti,jpl), zai_2d (npti,jpl), &
-            &      zti_2d(npti,jpl), zts_2d(npti,jpl), ztsu_2d(npti,jpl), zsi_2d(npti,jpl), zaip_2d(npti,jpl), zhip_2d(npti,jpl) )
-         
-         ! distribute 1-cat into jpl-cat: (jpi*jpj) -> (jpi*jpj,jpl)
-         CALL ice_var_itd( h_i_1d(1:npti)  , h_s_1d(1:npti)  , at_i_1d(1:npti),                                                   &
-            &              zhi_2d          , zhs_2d          , zai_2d         ,                                                   &
-            &              t_i_1d(1:npti,1), t_s_1d(1:npti,1), t_su_1d(1:npti), s_i_1d(1:npti), a_ip_1d(1:npti), h_ip_1d(1:npti), &
-            &              zti_2d          , zts_2d          , ztsu_2d        , zsi_2d        , zaip_2d        , zhip_2d )
-
-         ! move to 3D arrays: (jpi*jpj,jpl) -> (jpi,jpj,jpl)
-         DO jl = 1, jpl
-            zti_3d(:,:,jl) = rt0 * tmask(:,:,1)
-            zts_3d(:,:,jl) = rt0 * tmask(:,:,1)
-         END DO
-         CALL tab_2d_3d( npti, nptidx(1:npti), zhi_2d   , h_i    )
-         CALL tab_2d_3d( npti, nptidx(1:npti), zhs_2d   , h_s    )
-         CALL tab_2d_3d( npti, nptidx(1:npti), zai_2d   , a_i    )
-         CALL tab_2d_3d( npti, nptidx(1:npti), zti_2d   , zti_3d )
-         CALL tab_2d_3d( npti, nptidx(1:npti), zts_2d   , zts_3d )
-         CALL tab_2d_3d( npti, nptidx(1:npti), ztsu_2d  , t_su   )
-         CALL tab_2d_3d( npti, nptidx(1:npti), zsi_2d   , s_i    )
-         CALL tab_2d_3d( npti, nptidx(1:npti), zaip_2d  , a_ip   )
-         CALL tab_2d_3d( npti, nptidx(1:npti), zhip_2d  , h_ip   )
-
-         ! deallocate temporary arrays
-         DEALLOCATE( zhi_2d, zhs_2d, zai_2d , &
-            &        zti_2d, zts_2d, ztsu_2d, zsi_2d, zaip_2d, zhip_2d )
-
-         ! calculate extensive and intensive variables
-         CALL ice_var_salprof ! for sz_i
-         DO jl = 1, jpl
+            
+            !-------------!
+            ! fill fields !
+            !-------------!
+            ! select ice covered grid points
+            npti = 0 ; nptidx(:) = 0
             DO_2D_11_11
-               v_i (ji,jj,jl) = h_i(ji,jj,jl) * a_i(ji,jj,jl)
-               v_s (ji,jj,jl) = h_s(ji,jj,jl) * a_i(ji,jj,jl)
-               sv_i(ji,jj,jl) = MIN( MAX( rn_simin , s_i(ji,jj,jl) ) , rn_simax ) * v_i(ji,jj,jl)
+               IF ( zht_i_ini(ji,jj) > 0._wp ) THEN
+                  npti         = npti  + 1
+                  nptidx(npti) = (jj - 1) * jpi + ji
+               ENDIF
             END_2D
-         END DO
-         !
-         DO jl = 1, jpl
-            DO_3D_11_11( 1, nlay_s )
-               t_s(ji,jj,jk,jl) = zts_3d(ji,jj,jl)
-               e_s(ji,jj,jk,jl) = zswitch(ji,jj) * v_s(ji,jj,jl) * r1_nlay_s * &
-                  &               rhos * ( rcpi * ( rt0 - t_s(ji,jj,jk,jl) ) + rLfus )
-            END_3D
-         END DO
-         !
-         DO jl = 1, jpl
-            DO_3D_11_11( 1, nlay_i )
-               t_i (ji,jj,jk,jl) = zti_3d(ji,jj,jl) 
-               ztmelts          = - rTmlt * sz_i(ji,jj,jk,jl) + rt0 ! melting temperature in K
-               e_i(ji,jj,jk,jl) = zswitch(ji,jj) * v_i(ji,jj,jl) * r1_nlay_i * &
-                  &               rhoi * (  rcpi  * ( ztmelts - t_i(ji,jj,jk,jl) ) + &
-                  &                         rLfus * ( 1._wp - (ztmelts-rt0) / MIN( (t_i(ji,jj,jk,jl)-rt0), -epsi20 ) ) &
-                  &                       - rcp   * ( ztmelts - rt0 ) )
-            END_3D
-         END DO
 
-         ! Melt ponds
-         WHERE( a_i > epsi10 )
-            a_ip_frac(:,:,:) = a_ip(:,:,:) / a_i(:,:,:)
-         ELSEWHERE
-            a_ip_frac(:,:,:) = 0._wp
-         END WHERE
-         v_ip(:,:,:) = h_ip(:,:,:) * a_ip(:,:,:)
-          
-         ! specific temperatures for coupled runs
-         tn_ice(:,:,:) = t_su(:,:,:)
-         t1_ice(:,:,:) = t_i (:,:,1,:)
-         !
-      
-ELSE
+            ! move to 1D arrays: (jpi,jpj) -> (jpi*jpj)
+            CALL tab_2d_1d( npti, nptidx(1:npti), h_i_1d (1:npti)  , zht_i_ini )
+            CALL tab_2d_1d( npti, nptidx(1:npti), h_s_1d (1:npti)  , zht_s_ini )
+            CALL tab_2d_1d( npti, nptidx(1:npti), at_i_1d(1:npti)  , zat_i_ini )
+            CALL tab_2d_1d( npti, nptidx(1:npti), t_i_1d (1:npti,1), ztm_i_ini )
+            CALL tab_2d_1d( npti, nptidx(1:npti), t_s_1d (1:npti,1), ztm_s_ini )
+            CALL tab_2d_1d( npti, nptidx(1:npti), t_su_1d(1:npti)  , zt_su_ini )
+            CALL tab_2d_1d( npti, nptidx(1:npti), s_i_1d (1:npti)  , zsm_i_ini )
+            CALL tab_2d_1d( npti, nptidx(1:npti), a_ip_1d(1:npti)  , zapnd_ini )
+            CALL tab_2d_1d( npti, nptidx(1:npti), h_ip_1d(1:npti)  , zhpnd_ini )
+
+            ! allocate temporary arrays
+            ALLOCATE( zhi_2d(npti,jpl), zhs_2d(npti,jpl), zai_2d (npti,jpl), &
+               &      zti_2d(npti,jpl), zts_2d(npti,jpl), ztsu_2d(npti,jpl), zsi_2d(npti,jpl), zaip_2d(npti,jpl), zhip_2d(npti,jpl) )
+            
+            ! distribute 1-cat into jpl-cat: (jpi*jpj) -> (jpi*jpj,jpl)
+            CALL ice_var_itd( h_i_1d(1:npti)  , h_s_1d(1:npti)  , at_i_1d(1:npti),                                                   &
+               &              zhi_2d          , zhs_2d          , zai_2d         ,                                                   &
+               &              t_i_1d(1:npti,1), t_s_1d(1:npti,1), t_su_1d(1:npti), s_i_1d(1:npti), a_ip_1d(1:npti), h_ip_1d(1:npti), &
+               &              zti_2d          , zts_2d          , ztsu_2d        , zsi_2d        , zaip_2d        , zhip_2d )
+
+            ! move to 3D arrays: (jpi*jpj,jpl) -> (jpi,jpj,jpl)
+            DO jl = 1, jpl
+               zti_3d(:,:,jl) = rt0 * tmask(:,:,1)
+               zts_3d(:,:,jl) = rt0 * tmask(:,:,1)
+            END DO
+            CALL tab_2d_3d( npti, nptidx(1:npti), zhi_2d   , h_i    )
+            CALL tab_2d_3d( npti, nptidx(1:npti), zhs_2d   , h_s    )
+            CALL tab_2d_3d( npti, nptidx(1:npti), zai_2d   , a_i    )
+            CALL tab_2d_3d( npti, nptidx(1:npti), zti_2d   , zti_3d )
+            CALL tab_2d_3d( npti, nptidx(1:npti), zts_2d   , zts_3d )
+            CALL tab_2d_3d( npti, nptidx(1:npti), ztsu_2d  , t_su   )
+            CALL tab_2d_3d( npti, nptidx(1:npti), zsi_2d   , s_i    )
+            CALL tab_2d_3d( npti, nptidx(1:npti), zaip_2d  , a_ip   )
+            CALL tab_2d_3d( npti, nptidx(1:npti), zhip_2d  , h_ip   )
+
+            ! deallocate temporary arrays
+            DEALLOCATE( zhi_2d, zhs_2d, zai_2d , &
+               &        zti_2d, zts_2d, ztsu_2d, zsi_2d, zaip_2d, zhip_2d )
+
+            ! calculate extensive and intensive variables
+            CALL ice_var_salprof ! for sz_i
+            DO jl = 1, jpl
+               DO_2D_11_11
+                  v_i (ji,jj,jl) = h_i(ji,jj,jl) * a_i(ji,jj,jl)
+                  v_s (ji,jj,jl) = h_s(ji,jj,jl) * a_i(ji,jj,jl)
+                  sv_i(ji,jj,jl) = MIN( MAX( rn_simin , s_i(ji,jj,jl) ) , rn_simax ) * v_i(ji,jj,jl)
+               END_2D
+            END DO
+            !
+            DO jl = 1, jpl
+               DO_3D_11_11( 1, nlay_s )
+                  t_s(ji,jj,jk,jl) = zts_3d(ji,jj,jl)
+                  e_s(ji,jj,jk,jl) = zswitch(ji,jj) * v_s(ji,jj,jl) * r1_nlay_s * &
+                     &               rhos * ( rcpi * ( rt0 - t_s(ji,jj,jk,jl) ) + rLfus )
+               END_3D
+            END DO
+            !
+            DO jl = 1, jpl
+               DO_3D_11_11( 1, nlay_i )
+                  t_i (ji,jj,jk,jl) = zti_3d(ji,jj,jl) 
+                  ztmelts          = - rTmlt * sz_i(ji,jj,jk,jl) + rt0 ! melting temperature in K
+                  e_i(ji,jj,jk,jl) = zswitch(ji,jj) * v_i(ji,jj,jl) * r1_nlay_i * &
+                     &               rhoi * (  rcpi  * ( ztmelts - t_i(ji,jj,jk,jl) ) + &
+                     &                         rLfus * ( 1._wp - (ztmelts-rt0) / MIN( (t_i(ji,jj,jk,jl)-rt0), -epsi20 ) ) &
+                     &                       - rcp   * ( ztmelts - rt0 ) )
+               END_3D
+            END DO
+
+            ! Melt ponds
+            WHERE( a_i > epsi10 )
+               a_ip_frac(:,:,:) = a_ip(:,:,:) / a_i(:,:,:)
+            ELSEWHERE
+               a_ip_frac(:,:,:) = 0._wp
+            END WHERE
+            v_ip(:,:,:) = h_ip(:,:,:) * a_ip(:,:,:)
+             
+            ! specific temperatures for coupled runs
+            tn_ice(:,:,:) = t_su(:,:,:)
+            t1_ice(:,:,:) = t_i (:,:,1,:)
+            !
+         
+#if  defined key_agrif
+         ELSE
  
-         Agrif_SpecialValue    = -9999.
-         Agrif_UseSpecialValue = .TRUE.
-         CALL Agrif_init_variable(tra_iceini_id,procname=interp_tra_ice)
-         use_sign_north = .TRUE.
-         sign_north = -1.
-         CALL Agrif_init_variable(u_iceini_id  ,procname=interp_u_ice)
-         CALL Agrif_init_variable(v_iceini_id  ,procname=interp_v_ice)
-         Agrif_SpecialValue    = 0._wp
-         use_sign_north = .FALSE.
-         Agrif_UseSpecialValue = .FALSE.
-     ! lbc ???? 
-! Here we know : a_i, v_i, v_s, sv_i, oa_i, a_ip, v_ip, t_su, e_s, e_i
-         CALL ice_var_glo2eqv
-         CALL ice_var_zapsmall
-         CALL ice_var_agg(2)
+            Agrif_SpecialValue    = -9999.
+            Agrif_UseSpecialValue = .TRUE.
+            CALL Agrif_init_variable(tra_iceini_id,procname=interp_tra_ice)
+            use_sign_north = .TRUE.
+            sign_north = -1.
+            CALL Agrif_init_variable(u_iceini_id  ,procname=interp_u_ice)
+            CALL Agrif_init_variable(v_iceini_id  ,procname=interp_v_ice)
+            Agrif_SpecialValue    = 0._wp
+            use_sign_north = .FALSE.
+            Agrif_UseSpecialValue = .FALSE.
+        ! lbc ???? 
+   ! Here we know : a_i, v_i, v_s, sv_i, oa_i, a_ip, v_ip, t_su, e_s, e_i
+            CALL ice_var_glo2eqv
+            CALL ice_var_zapsmall
+            CALL ice_var_agg(2)
 
-         ! Melt ponds
-         WHERE( a_i > epsi10 )
-            a_ip_frac(:,:,:) = a_ip(:,:,:) / a_i(:,:,:)
-         ELSEWHERE
-            a_ip_frac(:,:,:) = 0._wp
-         END WHERE
-         WHERE( a_ip > 0._wp )       ! ???????    
-            h_ip(:,:,:) = v_ip(:,:,:) / a_ip(:,:,:)
-         ELSEWHERE
-            h_ip(:,:,:) = 0._wp
-         END WHERE   
+            ! Melt ponds
+            WHERE( a_i > epsi10 )
+               a_ip_frac(:,:,:) = a_ip(:,:,:) / a_i(:,:,:)
+            ELSEWHERE
+               a_ip_frac(:,:,:) = 0._wp
+            END WHERE
+            WHERE( a_ip > 0._wp )       ! ???????    
+               h_ip(:,:,:) = v_ip(:,:,:) / a_ip(:,:,:)
+            ELSEWHERE
+               h_ip(:,:,:) = 0._wp
+            END WHERE   
 
-         tn_ice(:,:,:) = t_su(:,:,:)
-         t1_ice(:,:,:) = t_i (:,:,1,:)
-ENDIF
-
+            tn_ice(:,:,:) = t_su(:,:,:)
+            t1_ice(:,:,:) = t_i (:,:,1,:)
+#endif
+          ENDIF ! Agrif_Root
       ENDIF ! ln_iceini
       !
       at_i(:,:) = SUM( a_i, dim=3 )

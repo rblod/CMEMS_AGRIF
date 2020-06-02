@@ -140,6 +140,13 @@ CONTAINS
       !                            !-----------------------!
       CALL nemo_init               !==  Initialisations  ==!
       !                            !-----------------------!
+#if defined key_agrif
+      Kbb_a = Nbb; Kmm_a = Nnn; Krhs_a = Nrhs   ! agrif_oce module copies of time level indices
+      CALL Agrif_Declare_Var       !  "      "   "   "      "  DYN/TRA
+# if defined key_top
+      CALL Agrif_Declare_Var_top   !  "      "   "   "      "  TOP
+# endif
+#endif
       ! check that all process are still there... If some process have an error,
       ! they will never enter in step and other processes will wait until the end of the cpu time!
       CALL mpp_max( 'nemogcm', nstop )
@@ -173,13 +180,6 @@ CONTAINS
          CALL stp
          istp = istp + 1
       END DO
-      !
-      IF( .NOT. Agrif_Root() ) THEN
-         CALL Agrif_ParentGrid_To_ChildGrid()
-         IF( ln_diaobs )   CALL dia_obs_wri
-         IF( ln_timing )   CALL timing_finalize
-         CALL Agrif_ChildGrid_To_ParentGrid()
-      ENDIF
       !
 # else
       !
@@ -225,7 +225,14 @@ CONTAINS
       !
       IF( nstop /= 0 .AND. lwp ) THEN        ! error print
          WRITE(ctmp1,*) '   ==>>>   nemo_gcm: a total of ', nstop, ' errors have been found'
-         CALL ctl_stop( ctmp1 )
+         IF( ngrdstop > 0 ) THEN
+            WRITE(ctmp9,'(i2)') ngrdstop
+            WRITE(ctmp2,*) '      ==>>>   Error detected in Agrif grid '//TRIM(ctmp9)
+            WRITE(ctmp3,*) '      ==>>>   look for error messages in '//TRIM(ctmp9)//'_ocean_output* files'
+            CALL ctl_stop( ctmp1, ctmp2, ctmp3 )
+         ELSE
+            CALL ctl_stop( ctmp1 )
+         ENDIF
       ENDIF
       !
       IF( ln_timing )   CALL timing_finalize
@@ -323,22 +330,8 @@ CONTAINS
 902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namctl in configuration namelist' )
       !
       ! finalize the definition of namctl variables
-      IF( sn_cfctl%l_allon ) THEN
-         ! Turn on all options.
-         CALL nemo_set_cfctl( sn_cfctl, .TRUE., .TRUE. )
-         ! Ensure all processors are active
-         sn_cfctl%procmin = 0 ; sn_cfctl%procmax = 1000000 ; sn_cfctl%procincr = 1
-      ELSEIF( sn_cfctl%l_config ) THEN
-         ! Activate finer control of report outputs
-         ! optionally switch off output from selected areas (note this only
-         ! applies to output which does not involve global communications)
-         IF( ( narea < sn_cfctl%procmin .OR. narea > sn_cfctl%procmax  ) .OR. &
-           & ( MOD( narea - sn_cfctl%procmin, sn_cfctl%procincr ) /= 0 ) )    &
-           &   CALL nemo_set_cfctl( sn_cfctl, .FALSE., .FALSE. )
-      ELSE
-         ! turn off all options.
-         CALL nemo_set_cfctl( sn_cfctl, .FALSE., .TRUE. )
-      ENDIF
+      IF( narea < sn_cfctl%procmin .OR. narea > sn_cfctl%procmax .OR. MOD( narea - sn_cfctl%procmin, sn_cfctl%procincr ) /= 0 )   &
+         &   CALL nemo_set_cfctl( sn_cfctl, .FALSE. )
       !
       lwp = (narea == 1) .OR. sn_cfctl%l_oceout    ! control of all listing output print
       !
@@ -401,7 +394,9 @@ CONTAINS
 
       ! Initialise time level indices
       Nbb = 1; Nnn = 2; Naa = 3; Nrhs = Naa
-
+#if defined key_agrif
+      Kbb_a = Nbb; Kmm_a = Nnn; Krhs_a = Nrhs   ! agrif_oce module copies of time level indices
+#endif 
       !                             !-------------------------------!
       !                             !  NEMO general initialization  !
       !                             !-------------------------------!
@@ -418,11 +413,12 @@ CONTAINS
                            CALL     wad_init        ! Wetting and drying options
 
 #if defined key_agrif
-                          Kbb_a = Nbb; Kmm_a = Nnn; Krhs_a = Nrhs   ! agrif_oce module copies of time level indices
-                          CALL Agrif_Declare_Var       !  "      "   "   "      "  DYN/TRA 
+     CALL Agrif_Declare_Var_ini   !  "      "   "   "      "  DOM
 #endif
-
                            CALL     dom_init( Nbb, Nnn, Naa, "OPA") ! Domain
+
+
+
       IF( ln_crs       )   CALL     crs_init(      Nnn )       ! coarsened grid: domain initialization 
       IF( sn_cfctl%l_prtctl )   &
          &                 CALL prt_ctl_init        ! Print control
@@ -443,43 +439,13 @@ CONTAINS
          RETURN                                       ! end of initialization
       ENDIF
       !
-      
-         ! AGRIF variables declared here for interpolation of
-         ! initial state just after        
-#if defined key_agrif
-                !          Kbb_a = Nbb; Kmm_a = Nnn; Krhs_a = Nrhs   ! agrif_oce module copies of time level indices
-
-                          CALL Agrif_Declare_Var_dom   ! AGRIF: set the meshes for DOM
-                      !    CALL Agrif_Declare_Var       !  "      "   "   "      "  DYN/TRA 
-                          IF( .NOT. Agrif_Root() )  CALL agrif_nemo_init
-
-                          IF( .NOT. Agrif_Root() )  CALL Agrif_InitValues_cont
-
-# if defined key_top
-                          CALL Agrif_Declare_Var_top   !  "      "   "   "      "  TOP
-# endif
-              !             CALL Agrif_Declare_Var_ice
-#endif
 
                            CALL  istate_init( Nbb, Nnn, Naa )    ! ocean initial state (Dynamics and tracers)
 
       !                                      ! external forcing 
-                           CALL    tide_init    ! tidal harmonics
-!#if defined key_agrif
-!# if defined key_si3
-!                           CALL Agrif_Declare_Var_ice  !  "      "   "   "      "  Sea ice
-
-!# endif
-!#endif
-
+                           CALL    tide_init                     ! tidal harmonics
                            CALL     sbc_init( Nbb, Nnn, Naa )    ! surface boundary conditions (including sea-ice)
-#if defined key_agrif
-# if defined key_si3
-                           IF( .NOT. Agrif_Root() ) CALL Agrif_InitValues_cont_ice
-                           
-# endif
-#endif
-                           CALL     bdy_init    ! Open boundaries initialisation
+                           CALL     bdy_init                     ! Open boundaries initialisation
 
       !                                      ! Ocean physics
                            CALL zdf_phy_init( Nnn )    ! Vertical physics
@@ -558,9 +524,6 @@ CONTAINS
          WRITE(numout,*) 'nemo_ctl: Control prints'
          WRITE(numout,*) '~~~~~~~~'
          WRITE(numout,*) '   Namelist namctl'
-         WRITE(numout,*) '                              sn_cfctl%l_glochk  = ', sn_cfctl%l_glochk
-         WRITE(numout,*) '                              sn_cfctl%l_allon   = ', sn_cfctl%l_allon
-         WRITE(numout,*) '       finer control over o/p sn_cfctl%l_config  = ', sn_cfctl%l_config
          WRITE(numout,*) '                              sn_cfctl%l_runstat = ', sn_cfctl%l_runstat
          WRITE(numout,*) '                              sn_cfctl%l_trcstat = ', sn_cfctl%l_trcstat
          WRITE(numout,*) '                              sn_cfctl%l_oceout  = ', sn_cfctl%l_oceout
@@ -708,27 +671,20 @@ CONTAINS
    END SUBROUTINE nemo_alloc
 
    
-   SUBROUTINE nemo_set_cfctl(sn_cfctl, setto, for_all )
+   SUBROUTINE nemo_set_cfctl(sn_cfctl, setto )
       !!----------------------------------------------------------------------
       !!                     ***  ROUTINE nemo_set_cfctl  ***
       !!
       !! ** Purpose :   Set elements of the output control structure to setto.
-      !!                for_all should be .false. unless all areas are to be
-      !!                treated identically.
       !!
       !! ** Method  :   Note this routine can be used to switch on/off some
-      !!                types of output for selected areas but any output types
-      !!                that involve global communications (e.g. mpp_max, glob_sum)
-      !!                should be protected from selective switching by the
-      !!                for_all argument
+      !!                types of output for selected areas.
       !!----------------------------------------------------------------------
-      LOGICAL :: setto, for_all
-      TYPE(sn_ctl) :: sn_cfctl
+      TYPE(sn_ctl), INTENT(inout) :: sn_cfctl
+      LOGICAL     , INTENT(in   ) :: setto
       !!----------------------------------------------------------------------
-      IF( for_all ) THEN
-         sn_cfctl%l_runstat = setto
-         sn_cfctl%l_trcstat = setto
-      ENDIF
+      sn_cfctl%l_runstat = setto
+      sn_cfctl%l_trcstat = setto
       sn_cfctl%l_oceout  = setto
       sn_cfctl%l_layout  = setto
       sn_cfctl%l_prtctl  = setto

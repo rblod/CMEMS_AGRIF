@@ -97,15 +97,15 @@ CONTAINS
       !
       Agrif_UseSpecialValue = .FALSE.
       !
-
-      IF( lk_west ) THEN
       ! --- West --- !
+      IF( lk_west ) THEN
          ibdy1 = 2
          ibdy2 = 1+nbghostcells 
          !
          IF( .NOT.ln_dynspg_ts ) THEN  ! Store transport
             DO ji = mi0(ibdy1), mi1(ibdy2)
                uu_b(ji,:,Krhs_a) = 0._wp
+
                DO jk = 1, jpkm1
                   DO jj = 1, jpj
                      uu_b(ji,jj,Krhs_a) = uu_b(ji,jj,Krhs_a) + e3u(ji,jj,jk,Krhs_a) * uu(ji,jj,jk,Krhs_a) * umask(ji,jj,jk)
@@ -154,17 +154,17 @@ CONTAINS
                   END DO
                END DO
             END DO
-         ENDIF        
+         ENDIF
       ENDIF
+
       ! --- East --- !
-      IF( lk_east ) THEN
+      IF( lk_east) THEN
          ibdy1 = jpiglo-1-nbghostcells
          ibdy2 = jpiglo-2 
          !
          IF( .NOT.ln_dynspg_ts ) THEN  ! Store transport
             DO ji = mi0(ibdy1), mi1(ibdy2)
                uu_b(ji,:,Krhs_a) = 0._wp
-
                DO jk = 1, jpkm1
                   DO jj = 1, jpj
                      uu_b(ji,jj,Krhs_a) = uu_b(ji,jj,Krhs_a) & 
@@ -222,14 +222,13 @@ CONTAINS
       ENDIF
 
       ! --- South --- !
-      IF( lk_south ) THEN 
+      IF( lk_south ) THEN
          jbdy1 = 2
          jbdy2 = 1+nbghostcells 
          !
          IF( .NOT.ln_dynspg_ts ) THEN  ! Store transport
             DO jj = mj0(jbdy1), mj1(jbdy2)
                vv_b(:,jj,Krhs_a) = 0._wp
-
                DO jk = 1, jpkm1
                   DO ji = 1, jpi
                      vv_b(ji,jj,Krhs_a) = vv_b(ji,jj,Krhs_a) & 
@@ -287,10 +286,10 @@ CONTAINS
 
       ! --- North --- !
       IF( lk_north ) THEN
-      jbdy1 = jpjglo-1-nbghostcells
-      jbdy2 = jpjglo-2 
-      !
-      IF( .NOT.ln_dynspg_ts ) THEN  ! Store transport
+         jbdy1 = jpjglo-1-nbghostcells
+         jbdy2 = jpjglo-2 
+         !
+         IF( .NOT.ln_dynspg_ts ) THEN  ! Store transport
             DO jj = mj0(jbdy1), mj1(jbdy2)
                vv_b(:,jj,Krhs_a) = 0._wp
                DO jk = 1, jpkm1
@@ -348,7 +347,7 @@ CONTAINS
                END DO
             END DO
          ENDIF
-      ENDIF   
+      ENDIF
       !
    END SUBROUTINE Agrif_dyn
 
@@ -366,7 +365,7 @@ CONTAINS
       IF( Agrif_Root() )   RETURN
       !
       !--- West ---!
-      IF(lk_west) THEN
+      IF( lk_west ) THEN
          istart = 2
          iend   = nbghostcells+1
          DO ji = mi0(istart), mi1(iend)
@@ -377,8 +376,8 @@ CONTAINS
          END DO
       ENDIF
       !
-      IF(lk_east) THEN
       !--- East ---!
+      IF( lk_east ) THEN
          istart = jpiglo-nbghostcells
          iend   = jpiglo-1
          DO ji = mi0(istart), mi1(iend)
@@ -396,8 +395,8 @@ CONTAINS
          END DO
       ENDIF 
       !
-      IF(lk_south) THEN
       !--- South ---!
+      IF( lk_south ) THEN
          jstart = 2
          jend   = nbghostcells+1
          DO jj = mj0(jstart), mj1(jend)
@@ -409,8 +408,8 @@ CONTAINS
          END DO
       ENDIF       
       !
-      IF(lk_north) THEN
       !--- North ---!
+      IF( lk_north ) THEN
          jstart = jpjglo-nbghostcells
          jend   = jpjglo-1
          DO jj = mj0(jstart), mj1(jend)
@@ -443,56 +442,64 @@ CONTAINS
       IF( Agrif_Root() )   RETURN
       !
       !--- West ---!
-      istart = 2
-      iend   = nbghostcells+1
-      DO ji = mi0(istart), mi1(iend)
-         DO jj=1,jpj
-            zv(ji,jj) = vbdy(ji,jj) * e1v(ji,jj)
-            zu(ji,jj) = ubdy(ji,jj) * e2u(ji,jj)
+      IF( lk_west ) THEN
+         istart = 2
+         iend   = nbghostcells+1
+         DO ji = mi0(istart), mi1(iend)
+            DO jj=1,jpj
+               zv(ji,jj) = vbdy(ji,jj) * e1v(ji,jj)
+               zu(ji,jj) = ubdy(ji,jj) * e2u(ji,jj)
+            END DO
          END DO
-      END DO
+      ENDIF
       !
       !--- East ---!
-      istart = jpiglo-nbghostcells
-      iend   = jpiglo-1
-      DO ji = mi0(istart), mi1(iend)
-         DO jj=1,jpj
-            zv(ji,jj) = vbdy(ji,jj) * e1v(ji,jj)
+      IF( lk_east ) THEN
+         istart = jpiglo-nbghostcells
+         iend   = jpiglo-1
+         DO ji = mi0(istart), mi1(iend)
+            DO jj=1,jpj
+               zv(ji,jj) = vbdy(ji,jj) * e1v(ji,jj)
+            END DO
          END DO
-      END DO
-      istart = jpiglo-nbghostcells-1
-      iend   = jpiglo-2
-      DO ji = mi0(istart), mi1(iend)
-         DO jj=1,jpj
-            zu(ji,jj) = ubdy(ji,jj) * e2u(ji,jj)
+         istart = jpiglo-nbghostcells-1
+         iend   = jpiglo-2
+         DO ji = mi0(istart), mi1(iend)
+            DO jj=1,jpj
+               zu(ji,jj) = ubdy(ji,jj) * e2u(ji,jj)
+            END DO
          END DO
-      END DO
+      ENDIF
       !
       !--- South ---!
-      jstart = 2
-      jend   = nbghostcells+1
-      DO jj = mj0(jstart), mj1(jend)
-         DO ji=1,jpi
-            zu(ji,jj) = ubdy(ji,jj) * e2u(ji,jj)
-            zv(ji,jj) = vbdy(ji,jj) * e1v(ji,jj)
+      IF( lk_south ) THEN
+         jstart = 2
+         jend   = nbghostcells+1
+         DO jj = mj0(jstart), mj1(jend)
+            DO ji=1,jpi
+               zu(ji,jj) = ubdy(ji,jj) * e2u(ji,jj)
+               zv(ji,jj) = vbdy(ji,jj) * e1v(ji,jj)
+            END DO
          END DO
-      END DO
+      ENDIF
       !
       !--- North ---!
-      jstart = jpjglo-nbghostcells
-      jend   = jpjglo-1
-      DO jj = mj0(jstart), mj1(jend)
-         DO ji=1,jpi
-            zu(ji,jj) = ubdy(ji,jj) * e2u(ji,jj)
+      IF( lk_north ) THEN
+         jstart = jpjglo-nbghostcells
+         jend   = jpjglo-1
+         DO jj = mj0(jstart), mj1(jend)
+            DO ji=1,jpi
+               zu(ji,jj) = ubdy(ji,jj) * e2u(ji,jj)
+            END DO
          END DO
-      END DO
-      jstart = jpjglo-nbghostcells-1
-      jend   = jpjglo-2
-      DO jj = mj0(jstart), mj1(jend)
-         DO ji=1,jpi
-            zv(ji,jj) = vbdy(ji,jj) * e1v(ji,jj)
+         jstart = jpjglo-nbghostcells-1
+         jend   = jpjglo-2
+         DO jj = mj0(jstart), mj1(jend)
+            DO ji=1,jpi
+               zv(ji,jj) = vbdy(ji,jj) * e1v(ji,jj)
+            END DO
          END DO
-      END DO
+      ENDIF
       !
    END SUBROUTINE Agrif_dyn_ts_flux
 

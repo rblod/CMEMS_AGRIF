@@ -18,11 +18,12 @@ MODULE bdyini
    !!----------------------------------------------------------------------
    USE oce            ! ocean dynamics and tracers variables
    USE dom_oce        ! ocean space and time domain
+   USE sbc_oce , ONLY: nn_ice
    USE bdy_oce        ! unstructured open boundary conditions
    USE bdydta         ! open boundary cond. setting   (bdy_dta_init routine)
    USE bdytides       ! open boundary cond. setting   (bdytide_init routine)
    USE tide_mod, ONLY: ln_tide ! tidal forcing
-   USE phycst   , ONLY: rday
+   USE phycst  , ONLY: rday
    !
    USE in_out_manager ! I/O units
    USE lbclnk         ! ocean lateral boundary conditions (or mpp link)
@@ -44,7 +45,7 @@ MODULE bdyini
    INTEGER, DIMENSION(jp_nseg) ::   jpjsob, jpisdt, jpisft, npckgs   !
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: bdyini.F90 12377 2020-02-12 14:39:06Z acc $ 
+   !! $Id: bdyini.F90 12921 2020-05-14 07:51:23Z smasson $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -71,7 +72,6 @@ CONTAINS
       INTEGER  ::   ios                 ! Local integer output status for namelist read
       !!----------------------------------------------------------------------
 
-      cn_coords_file = ''
       ! ------------------------
       ! Read namelist parameters
       ! ------------------------
@@ -315,6 +315,11 @@ CONTAINS
          ENDIF
 
          dta_bdy(ib_bdy)%lneed_ice = cn_ice(ib_bdy) /= 'none'
+
+         IF( dta_bdy(ib_bdy)%lneed_ice .AND. nn_ice /= 2 ) THEN
+            WRITE(ctmp1,*) 'bdy number ', ib_bdy,', needs ice model but nn_ice = ', nn_ice
+            CALL ctl_stop( ctmp1 )
+         ENDIF
 
          IF( lwp .AND. dta_bdy(ib_bdy)%lneed_ice ) THEN 
             SELECT CASE( nn_ice_dta(ib_bdy) )                   ! 

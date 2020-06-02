@@ -130,7 +130,7 @@ MODULE sbcblk
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: sbcblk.F90 12814 2020-04-24 17:51:20Z gsamson $
+   !! $Id: sbcblk.F90 12925 2020-05-14 13:46:17Z smasson $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -672,8 +672,8 @@ CONTAINS
 
          ! ... utau, vtau at U- and V_points, resp.
          !     Note the use of 0.5*(2-umask) in order to unmask the stress along coastlines
-         !     Note the use of MAX(tmask(i,j),tmask(i+1,j) is to mask tau over ice shelves
-         DO_2D_10_10
+         !     Note that coastal wind stress is not used in the code... so this extra care has no effect
+         DO_2D_00_00
             utau(ji,jj) = 0.5 * ( 2. - umask(ji,jj,1) ) * ( zwnd_i(ji,jj) + zwnd_i(ji+1,jj  ) ) &
                &          * MAX(tmask(ji,jj,1),tmask(ji+1,jj,1))
             vtau(ji,jj) = 0.5 * ( 2. - vmask(ji,jj,1) ) * ( zwnd_j(ji,jj) + zwnd_j(ji  ,jj+1) ) &
@@ -885,17 +885,21 @@ CONTAINS
       zcd_dui(:,:) = wndm_ice(:,:) * Cd_ice(:,:)
 
       IF( ln_blk ) THEN
-         ! ------------------------------------------------------------ !
-         !    Wind stress relative to the moving ice ( U10m - U_ice )   !
-         ! ------------------------------------------------------------ !
-         ! C-grid ice dynamics :   U & V-points (same as ocean)
-         DO_2D_00_00
-            putaui(ji,jj) = 0.5_wp * (  rhoa(ji+1,jj) * zcd_dui(ji+1,jj)             &
-               &                      + rhoa(ji  ,jj) * zcd_dui(ji  ,jj)  )          &
-               &         * ( 0.5_wp * ( pwndi(ji+1,jj) + pwndi(ji,jj) ) - rn_vfac * puice(ji,jj) )
-            pvtaui(ji,jj) = 0.5_wp * (  rhoa(ji,jj+1) * zcd_dui(ji,jj+1)             &
-               &                      + rhoa(ji,jj  ) * zcd_dui(ji,jj  )  )          &
-               &         * ( 0.5_wp * ( pwndj(ji,jj+1) + pwndj(ji,jj) ) - rn_vfac * pvice(ji,jj) )
+         ! ------------------------------------------------------------- !
+         !    Wind stress relative to the moving ice ( U10m - U_ice )    !
+         ! ------------------------------------------------------------- !
+         zztmp1 = rn_vfac * 0.5_wp
+         DO_2D_01_01    ! at T point 
+            putaui(ji,jj) = rhoa(ji,jj) * zcd_dui(ji,jj) * ( pwndi(ji,jj) - zztmp1 * ( puice(ji-1,jj  ) + puice(ji,jj) ) )
+            pvtaui(ji,jj) = rhoa(ji,jj) * zcd_dui(ji,jj) * ( pwndj(ji,jj) - zztmp1 * ( pvice(ji  ,jj-1) + pvice(ji,jj) ) )
+         END_2D
+         !
+         DO_2D_00_00    ! U & V-points (same as ocean).
+            ! take care of the land-sea mask to avoid "pollution" of coastal stress. p[uv]taui used in frazil and  rheology 
+            zztmp1 = 0.5_wp * ( 2. - umask(ji,jj,1) ) * MAX( tmask(ji,jj,1),tmask(ji+1,jj  ,1) )
+            zztmp2 = 0.5_wp * ( 2. - vmask(ji,jj,1) ) * MAX( tmask(ji,jj,1),tmask(ji  ,jj+1,1) )
+            putaui(ji,jj) = zztmp1 * ( putaui(ji,jj) + putaui(ji+1,jj  ) )
+            pvtaui(ji,jj) = zztmp2 * ( pvtaui(ji,jj) + pvtaui(ji  ,jj+1) )
          END_2D
          CALL lbc_lnk_multi( 'sbcblk', putaui, 'U', -1., pvtaui, 'V', -1. )
          !

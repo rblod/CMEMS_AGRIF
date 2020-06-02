@@ -238,13 +238,9 @@ CONTAINS
       IF(lwm) CALL ctl_opn( numoni , 'output.namelist.ice', 'UNKNOWN', 'FORMATTED', 'SEQUENTIAL', -1, numout, lwp, 1 )
       !
       CALL par_init                ! set some ice run parameters
-
-
+      !
 #if defined key_agrif
-# if defined key_si3
-     CALL Agrif_Declare_Var_ice  !  "      "   "   "      "  Sea ice
-
-# endif
+      CALL Agrif_Declare_Var_ice  !  "      "   "   "      "  Sea ice
 #endif
       !
       !                                ! Allocate the ice arrays (sbc_ice already allocated in sbc_init)

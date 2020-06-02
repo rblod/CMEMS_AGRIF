@@ -644,6 +644,7 @@
    rn_trelax_tra = 0.01    !  inverse of relaxation time (in steps) for tracers []
    rn_trelax_dyn = 0.01    !  inverse of relaxation time (in steps) for dynamics []
    ln_chk_bathy  = .false. !  =T  check the parent bathymetry
+   ln_bry_south  = .true.  !  =T  south boundary open
 /
 !-----------------------------------------------------------------------
 &nam_tide      !   tide parameters                                      (default: OFF)

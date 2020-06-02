@@ -51,7 +51,7 @@ MODULE sshwzv
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: sshwzv.F90 12489 2020-02-28 15:55:11Z davestorkey $
+   !! $Id: sshwzv.F90 12965 2020-05-25 07:34:57Z jchanut $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -200,12 +200,36 @@ CONTAINS
       ENDIF
       !
 #if defined key_agrif 
-!RBCMEMS : check which one
       IF( .NOT. AGRIF_Root() ) THEN 
-         IF(lk_east)  pww(nlci-1 , :     ,:) = 0.e0      ! east
-         IF(lk_west)  pww(2      , :     ,:) = 0.e0      ! west
-         IF(lk_north) pww(:      ,nlcj-1 ,:) = 0.e0      ! north
-         IF(lk_south) pww(:      ,2      ,:) = 0.e0      ! south
+         ! Mask vertical velocity at first/last columns/row 
+         ! inside computational domain (cosmetic) 
+         ! --- West --- !
+         DO ji = mi0(2), mi1(2)
+            DO jj = 1, jpj
+               pww(ji,jj,:) = 0._wp 
+            ENDDO
+         ENDDO
+         !
+         ! --- East --- !
+         DO ji = mi0(jpiglo-1), mi1(jpiglo-1)
+            DO jj = 1, jpj
+               pww(ji,jj,:) = 0._wp
+            ENDDO
+         ENDDO
+         !
+         ! --- South --- !
+         DO jj = mj0(2), mj1(2)
+            DO ji = 1, jpi
+               pww(ji,jj,:) = 0._wp
+            ENDDO
+         ENDDO
+         !
+         ! --- North --- !
+         DO jj = mj0(jpjglo-1), mj1(jpjglo-1)
+            DO ji = 1, jpi
+               pww(ji,jj,:) = 0._wp
+            ENDDO
+         ENDDO
       ENDIF 
 #endif 
       !

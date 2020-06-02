@@ -41,7 +41,7 @@ MODULE divhor
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: divhor.F90 12377 2020-02-12 14:39:06Z acc $ 
+   !! $Id: divhor.F90 12965 2020-05-25 07:34:57Z jchanut $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -82,16 +82,6 @@ CONTAINS
             &               - e1v(ji,jj-1) * e3v(ji,jj-1,jk,Kmm) * vv(ji,jj-1,jk,Kmm)  )   &
             &            * r1_e1e2t(ji,jj) / e3t(ji,jj,jk,Kmm)
       END_3D
-      !
-#if defined key_agrif
-      IF( .NOT. Agrif_Root() ) THEN
-!RBCMEMS : check 
-         IF(lk_west)  hdiv(   2   ,  :   ,:) = 0._wp      ! west
-         IF(lk_east)  hdiv( nlci-1,  :   ,:) = 0._wp      ! east
-         IF(lk_south) hdiv(   :   ,  2   ,:) = 0._wp      ! south
-         IF(lk_north) hdiv(   :   ,nlcj-1,:) = 0._wp      ! north
-      ENDIF
-#endif
       !
       IF( ln_rnf )   CALL sbc_rnf_div( hdiv, Kmm )                     !==  runoffs    ==!   (update hdiv field)
       !

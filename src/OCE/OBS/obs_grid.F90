@@ -86,7 +86,7 @@ MODULE obs_grid
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: obs_grid.F90 10068 2018-08-28 14:09:04Z nicolasmartin $
+   !! $Id: obs_grid.F90 12933 2020-05-15 08:06:25Z smasson $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 
@@ -683,7 +683,9 @@ CONTAINS
       REAL, DIMENSION(histsize) :: &
          & fhistx1, fhistx2, fhisty1, fhisty2
       REAL(wp) :: histtol
-      
+      CHARACTER(LEN=26) :: clfmt            ! writing format
+      INTEGER           :: idg              ! number of digits
+ 
       IF (ln_grid_search_lookup) THEN
          
          WRITE(numout,*) 'Calling obs_grid_setup'
@@ -708,11 +710,12 @@ CONTAINS
          ENDIF
 
          IF ( ln_grid_global ) THEN
-            WRITE(cfname, FMT="(A,'_',A)") &
-               &          TRIM(cn_gridsearchfile), 'global.nc'
+            WRITE(cfname, FMT="(A,'_',A)") TRIM(cn_gridsearchfile), 'global.nc'
          ELSE
-            WRITE(cfname, FMT="(A,'_',I4.4,'of',I4.4,'by',I4.4,'.nc')") &
-               &          TRIM(cn_gridsearchfile), nproc, jpni, jpnj
+            idg = MAX( INT(LOG10(REAL(jpnij,wp))) + 1, 4 )        ! how many digits to we need to write? min=4, max=9
+            ! define the following format: "(a,a,ix.x,a,ix.x,a,ix.x,a)"
+            WRITE(clfmt, "('(a,a,i', i1, '.', i1',a,i', i1, '.', i1',a,i', i1, '.', i1',a)')") idg, idg, idg, idg, idg, idg
+            WRITE(cfname,      clfmt     ) TRIM(cn_gridsearchfile),'_', nproc,'of', jpni,'by', jpnj,'.nc'
          ENDIF
 
          fileexist=nf90_open( TRIM( cfname ), nf90_nowrite, &

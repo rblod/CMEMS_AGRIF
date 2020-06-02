@@ -25,10 +25,7 @@ MODULE domvvl
    USE wet_dry         ! wetting and drying
    USE usrdef_istate   ! user defined initial state (wad only)
    USE restart         ! ocean restart
-#if defined key_agrif
-   USE agrif_oce_interp
-#endif
-   !   !
+   !
    USE in_out_manager  ! I/O manager
    USE iom             ! I/O manager library
    USE lib_mpp         ! distributed memory computing library
@@ -922,24 +919,9 @@ CONTAINS
 !                     &            / ( ht_0(:,:) + 1._wp -ssmask(:,:) ) * tmask(:,:,jk)
 !               END DO
 !               e3t(:,:,:,Kmm) = e3t(:,:,:,Kbb)
-
-
-               IF( Agrif_Root() ) THEN
-                  ssh(:,:,Kbb) = 0._wp
-                  e3t(:,:,:,Kbb) = e3t_0(:,:,:)                
-#if defined key_agrif
-               ELSE
-                  CALL Agrif_Init_Variable(sshini_id, procname=agrif_initssh)
-                  CALL lbc_lnk( 'agrif_istate', ssh(:,:,Kbb), 'T', 1. )
-                  DO jk = 1, jpk
-                     e3t(:,:,jk,Kbb) =  e3t_0(:,:,jk) * ( ht_0(:,:) + ssh(:,:,Kbb)  ) &
-                        &                            / ( ht_0(:,:) + 1._wp - ssmask(:,:) ) * tmask(:,:,jk)   &
-                        &              + e3t_0(:,:,jk) * ( 1._wp - tmask(:,:,jk) )
-                  END DO
-#endif 
-               ENDIF
-               ssh(:,:,Kmm) = ssh(:,:,Kbb)
-               e3t(:,:,:,Kmm) = e3t(:,:,:,Kbb)      
+                ssh(:,:,Kmm)=0._wp
+                e3t(:,:,:,Kmm)=e3t_0(:,:,:)
+                e3t(:,:,:,Kbb)=e3t_0(:,:,:)
                !
             END IF           ! end of ll_wd edits
 

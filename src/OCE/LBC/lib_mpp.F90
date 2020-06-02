@@ -175,7 +175,7 @@ MODULE lib_mpp
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: lib_mpp.F90 12512 2020-03-05 12:17:12Z smueller $
+   !! $Id: lib_mpp.F90 12933 2020-05-15 08:06:25Z smasson $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -1111,12 +1111,25 @@ CONTAINS
       CHARACTER(len=*), INTENT(in   )           ::   cd1
       CHARACTER(len=*), INTENT(in   ), OPTIONAL ::        cd2, cd3, cd4, cd5
       CHARACTER(len=*), INTENT(in   ), OPTIONAL ::   cd6, cd7, cd8, cd9, cd10
+      !
+      CHARACTER(LEN=8) ::   clfmt            ! writing format
+      INTEGER ::   inum
+      INTEGER ::   idg  ! number of digits
       !!----------------------------------------------------------------------
       !
       nstop = nstop + 1
       !
-      ! force to open ocean.output file if not already opened
-      IF( numout == 6 ) CALL ctl_opn( numout, 'ocean.output', 'APPEND', 'FORMATTED', 'SEQUENTIAL', -1, 6, .FALSE. )
+      IF( numout == 6 ) THEN                          ! force to open ocean.output file if not already opened
+         CALL ctl_opn( numout, 'ocean.output', 'APPEND', 'FORMATTED', 'SEQUENTIAL', -1, 6, .FALSE. )
+      ELSE
+         IF( narea > 1 .AND. cd1 == 'STOP' ) THEN     ! add an error message in ocean.output
+            CALL ctl_opn( inum,'ocean.output', 'APPEND', 'FORMATTED', 'SEQUENTIAL', -1, 6, .FALSE. )
+            WRITE(inum,*)
+            idg = MAX( INT(LOG10(REAL(jpnij-1,wp))) + 1, 4 )        ! how many digits to we need to write? min=4, max=9
+            WRITE(clfmt, "('(a,i', i1, '.', i1, ')')") idg, idg     ! '(a,ix.x)'
+            WRITE(inum,clfmt) ' ===>>> : see E R R O R in ocean.output_', narea - 1
+         ENDIF
+      ENDIF
       !
                             WRITE(numout,*)
                             WRITE(numout,*) ' ===>>> : E R R O R'
@@ -1144,6 +1157,8 @@ CONTAINS
          WRITE(numout,*)  
          WRITE(numout,*)  'huge E-R-R-O-R : immediate stop'
          WRITE(numout,*)  
+         CALL FLUSH(numout)
+         CALL SLEEP(60)   ! make sure that all output and abort files are written by all cores. 60s should be enough...
          CALL mppstop( ld_abort = .true. )
       ENDIF
       !
@@ -1206,14 +1221,20 @@ CONTAINS
       INTEGER, OPTIONAL, INTENT(in   ) ::   karea     ! proc number
       !
       CHARACTER(len=80) ::   clfile
+      CHARACTER(LEN=10) ::   clfmt            ! writing format
       INTEGER           ::   iost
+      INTEGER           ::   idg  ! number of digits
       !!----------------------------------------------------------------------
       !
       ! adapt filename
       ! ----------------
       clfile = TRIM(cdfile)
       IF( PRESENT( karea ) ) THEN
-         IF( karea > 1 )   WRITE(clfile, "(a,'_',i4.4)") TRIM(clfile), karea-1
+         IF( karea > 1 ) THEN
+            idg = MAX( INT(LOG10(REAL(jpnij-1,wp))) + 1, 4 )        ! how many digits to we need to write? min=4, max=9
+            WRITE(clfmt, "('(a,a,i', i1, '.', i1, ')')") idg, idg   ! '(a,a,ix.x)'
+            WRITE(clfile, clfmt) TRIM(clfile), '_', karea-1
+         ENDIF
       ENDIF
 #if defined key_agrif
       IF( .NOT. Agrif_Root() )   clfile = TRIM(Agrif_CFixed())//'_'//TRIM(clfile)

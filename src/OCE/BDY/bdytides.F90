@@ -49,7 +49,7 @@ MODULE bdytides
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: bdytides.F90 12489 2020-02-28 15:55:11Z davestorkey $
+   !! $Id: bdytides.F90 12921 2020-05-14 07:51:23Z smasson $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -64,21 +64,22 @@ CONTAINS
       !!----------------------------------------------------------------------
       !! namelist variables
       !!-------------------
-      CHARACTER(len=80)                         ::   filtide             !: Filename root for tidal input files
-      LOGICAL                                   ::   ln_bdytide_2ddta    !: If true, read 2d harmonic data
+      CHARACTER(len=80)                         ::   filtide             ! Filename root for tidal input files
+      LOGICAL                                   ::   ln_bdytide_2ddta    ! If true, read 2d harmonic data
       !!
-      INTEGER                                   ::   ib_bdy, itide, ib   !: dummy loop indices
-      INTEGER                                   ::   ii, ij              !: dummy loop indices
+      INTEGER                                   ::   ib_bdy, itide, ib   ! dummy loop indices
+      INTEGER                                   ::   ii, ij              ! dummy loop indices
       INTEGER                                   ::   inum, igrd
-      INTEGER, DIMENSION(3)                     ::   ilen0       !: length of boundary data (from OBC arrays)
+      INTEGER                                   ::   isz                 ! bdy data size
       INTEGER                                   ::   ios                 ! Local integer output status for namelist read
       INTEGER                                   ::   nbdy_rdstart, nbdy_loc
-      CHARACTER(LEN=50)                         ::   cerrmsg             !: error string
-      CHARACTER(len=80)                         ::   clfile              !: full file name for tidal input file 
-      REAL(wp),ALLOCATABLE, DIMENSION(:,:,:)    ::   dta_read            !: work space to read in tidal harmonics data
-      REAL(wp),ALLOCATABLE, DIMENSION(:,:)      ::   ztr, zti            !:  "     "    "   "   "   "        "      " 
+      CHARACTER(LEN=50)                         ::   cerrmsg             ! error string
+      CHARACTER(len=80)                         ::   clfile              ! full file name for tidal input file 
+      REAL(wp),ALLOCATABLE, DIMENSION(:,:,:)    ::   dta_read            ! work space to read in tidal harmonics data
+      REAL(wp),ALLOCATABLE, DIMENSION(:,:)      ::   ztr, zti            !  "     "    "   "   "   "        "      " 
       !!
-      TYPE(TIDES_DATA),  POINTER                ::   td                  !: local short cut   
+      TYPE(TIDES_DATA), POINTER                 ::   td                  ! local short cut   
+      TYPE(  OBC_DATA), POINTER                 ::   dta                 ! local short cut
       !!
       NAMELIST/nambdy_tide/filtide, ln_bdytide_2ddta
       !!----------------------------------------------------------------------
@@ -92,8 +93,9 @@ CONTAINS
       DO ib_bdy = 1, nb_bdy
          IF( nn_dyn2d_dta(ib_bdy) >= 2 ) THEN
             !
-            td => tides(ib_bdy)
-
+            td  => tides(ib_bdy)
+            dta => dta_bdy(ib_bdy)
+         
             ! Namelist nambdy_tide : tidal harmonic forcing at open boundaries
             filtide(:) = ''
 
@@ -129,87 +131,88 @@ CONTAINS
             ENDIF 
             IF(lwp) WRITE(numout,*) ' '
 
-            ! Allocate space for tidal harmonics data - get size from OBC data arrays
+            ! Allocate space for tidal harmonics data - get size from BDY data arrays
+            ! Allocate also slow varying data in the case of time splitting:
+            ! Do it anyway because at this stage knowledge of free surface scheme is unknown
             ! -----------------------------------------------------------------------
-
-            ! JC: If FRS scheme is used, we assume that tidal is needed over the whole
-            ! relaxation area      
-            IF( cn_dyn2d(ib_bdy) == 'frs' ) THEN   ;   ilen0(:) = idx_bdy(ib_bdy)%nblen   (:)
-            ELSE                                   ;   ilen0(:) = idx_bdy(ib_bdy)%nblenrim(:)
+            IF( ASSOCIATED(dta%ssh) ) THEN   ! we use bdy ssh on this mpi subdomain
+               isz = SIZE(dta%ssh)
+               ALLOCATE( td%ssh0( isz, nb_harmo, 2 ), td%ssh( isz, nb_harmo, 2 ), dta_bdy_s(ib_bdy)%ssh( isz ) )
+               dta_bdy_s(ib_bdy)%ssh(:) = 0._wp   ! needed?
+            ENDIF
+            IF( ASSOCIATED(dta%u2d) ) THEN   ! we use bdy u2d on this mpi subdomain
+               isz = SIZE(dta%u2d)
+               ALLOCATE( td%u0  ( isz, nb_harmo, 2 ), td%u  ( isz, nb_harmo, 2 ), dta_bdy_s(ib_bdy)%u2d( isz ) )
+               dta_bdy_s(ib_bdy)%u2d(:) = 0._wp   ! needed?
+            ENDIF
+            IF( ASSOCIATED(dta%v2d) ) THEN   ! we use bdy v2d on this mpi subdomain
+               isz = SIZE(dta%v2d)
+               ALLOCATE( td%v0  ( isz, nb_harmo, 2 ), td%v  ( isz, nb_harmo, 2 ), dta_bdy_s(ib_bdy)%v2d( isz ) )
+               dta_bdy_s(ib_bdy)%v2d(:) = 0._wp   ! needed?
             ENDIF
 
-            ALLOCATE( td%ssh0( ilen0(1), nb_harmo, 2 ) )
-            ALLOCATE( td%ssh ( ilen0(1), nb_harmo, 2 ) )
-
-            ALLOCATE( td%u0( ilen0(2), nb_harmo, 2 ) )
-            ALLOCATE( td%u ( ilen0(2), nb_harmo, 2 ) )
-
-            ALLOCATE( td%v0( ilen0(3), nb_harmo, 2 ) )
-            ALLOCATE( td%v ( ilen0(3), nb_harmo, 2 ) )
-
-            td%ssh0(:,:,:) = 0._wp
-            td%ssh (:,:,:) = 0._wp
-            td%u0  (:,:,:) = 0._wp
-            td%u   (:,:,:) = 0._wp
-            td%v0  (:,:,:) = 0._wp
-            td%v   (:,:,:) = 0._wp
-
+            ! fill td%ssh0, td%u0, td%v0
+            ! -----------------------------------------------------------------------
             IF( ln_bdytide_2ddta ) THEN
+               !
                ! It is assumed that each data file contains all complex harmonic amplitudes
                ! given on the global domain (ie global, jpiglo x jpjglo)
                !
                ALLOCATE( zti(jpi,jpj), ztr(jpi,jpj) )
                !
                ! SSH fields
-               clfile = TRIM(filtide)//'_grid_T.nc'
-               CALL iom_open( clfile , inum ) 
-               igrd = 1                       ! Everything is at T-points here
-               DO itide = 1, nb_harmo
-                  CALL iom_get( inum, jpdom_autoglo, TRIM(tide_harmonics(itide)%cname_tide)//'_z1', ztr(:,:) )
-                  CALL iom_get( inum, jpdom_autoglo, TRIM(tide_harmonics(itide)%cname_tide)//'_z2', zti(:,:) ) 
-                  DO ib = 1, ilen0(igrd)
-                     ii = idx_bdy(ib_bdy)%nbi(ib,igrd)
-                     ij = idx_bdy(ib_bdy)%nbj(ib,igrd)
-                     IF( ii == 1 .OR. ii == jpi .OR. ij == 1 .OR. ij == jpj )  CYCLE   ! to remove?
-                     td%ssh0(ib,itide,1) = ztr(ii,ij)
-                     td%ssh0(ib,itide,2) = zti(ii,ij)
+               IF( ASSOCIATED(dta%ssh) ) THEN   ! we use bdy ssh on this mpi subdomain
+                  clfile = TRIM(filtide)//'_grid_T.nc'
+                  CALL iom_open( clfile , inum ) 
+                  igrd = 1                       ! Everything is at T-points here
+                  DO itide = 1, nb_harmo
+                     CALL iom_get( inum, jpdom_autoglo, TRIM(tide_harmonics(itide)%cname_tide)//'_z1', ztr(:,:) )
+                     CALL iom_get( inum, jpdom_autoglo, TRIM(tide_harmonics(itide)%cname_tide)//'_z2', zti(:,:) ) 
+                     DO ib = 1, SIZE(dta%ssh)
+                        ii = idx_bdy(ib_bdy)%nbi(ib,igrd)
+                        ij = idx_bdy(ib_bdy)%nbj(ib,igrd)
+                        td%ssh0(ib,itide,1) = ztr(ii,ij)
+                        td%ssh0(ib,itide,2) = zti(ii,ij)
+                     END DO
                   END DO
-               END DO 
-               CALL iom_close( inum )
+                  CALL iom_close( inum )
+               ENDIF
                !
                ! U fields
-               clfile = TRIM(filtide)//'_grid_U.nc'
-               CALL iom_open( clfile , inum ) 
-               igrd = 2                       ! Everything is at U-points here
-               DO itide = 1, nb_harmo
-                  CALL iom_get  ( inum, jpdom_autoglo, TRIM(tide_harmonics(itide)%cname_tide)//'_u1', ztr(:,:) )
-                  CALL iom_get  ( inum, jpdom_autoglo, TRIM(tide_harmonics(itide)%cname_tide)//'_u2', zti(:,:) )
-                  DO ib = 1, ilen0(igrd)
-                     ii = idx_bdy(ib_bdy)%nbi(ib,igrd)
-                     ij = idx_bdy(ib_bdy)%nbj(ib,igrd)
-                     IF( ii == 1 .OR. ii == jpi .OR. ij == 1 .OR. ij == jpj )  CYCLE   ! to remove?
-                     td%u0(ib,itide,1) = ztr(ii,ij)
-                     td%u0(ib,itide,2) = zti(ii,ij)
+               IF( ASSOCIATED(dta%u2d) ) THEN   ! we use bdy u2d on this mpi subdomain
+                  clfile = TRIM(filtide)//'_grid_U.nc'
+                  CALL iom_open( clfile , inum ) 
+                  igrd = 2                       ! Everything is at U-points here
+                  DO itide = 1, nb_harmo
+                     CALL iom_get  ( inum, jpdom_autoglo, TRIM(tide_harmonics(itide)%cname_tide)//'_u1', ztr(:,:) )
+                     CALL iom_get  ( inum, jpdom_autoglo, TRIM(tide_harmonics(itide)%cname_tide)//'_u2', zti(:,:) )
+                     DO ib = 1, SIZE(dta%u2d)
+                        ii = idx_bdy(ib_bdy)%nbi(ib,igrd)
+                        ij = idx_bdy(ib_bdy)%nbj(ib,igrd)
+                        td%u0(ib,itide,1) = ztr(ii,ij)
+                        td%u0(ib,itide,2) = zti(ii,ij)
+                     END DO
                   END DO
-               END DO
-               CALL iom_close( inum )
+                  CALL iom_close( inum )
+               ENDIF
                !
                ! V fields
-               clfile = TRIM(filtide)//'_grid_V.nc'
-               CALL iom_open( clfile , inum ) 
-               igrd = 3                       ! Everything is at V-points here
-               DO itide = 1, nb_harmo
-                  CALL iom_get  ( inum, jpdom_autoglo, TRIM(tide_harmonics(itide)%cname_tide)//'_v1', ztr(:,:) )
-                  CALL iom_get  ( inum, jpdom_autoglo, TRIM(tide_harmonics(itide)%cname_tide)//'_v2', zti(:,:) )
-                  DO ib = 1, ilen0(igrd)
-                     ii = idx_bdy(ib_bdy)%nbi(ib,igrd)
-                     ij = idx_bdy(ib_bdy)%nbj(ib,igrd)
-                     IF( ii == 1 .OR. ii == jpi .OR. ij == 1 .OR. ij == jpj )  CYCLE   ! to remove?
-                     td%v0(ib,itide,1) = ztr(ii,ij)
-                     td%v0(ib,itide,2) = zti(ii,ij)
+               IF( ASSOCIATED(dta%v2d) ) THEN   ! we use bdy v2d on this mpi subdomain
+                  clfile = TRIM(filtide)//'_grid_V.nc'
+                  CALL iom_open( clfile , inum ) 
+                  igrd = 3                       ! Everything is at V-points here
+                  DO itide = 1, nb_harmo
+                     CALL iom_get  ( inum, jpdom_autoglo, TRIM(tide_harmonics(itide)%cname_tide)//'_v1', ztr(:,:) )
+                     CALL iom_get  ( inum, jpdom_autoglo, TRIM(tide_harmonics(itide)%cname_tide)//'_v2', zti(:,:) )
+                     DO ib = 1, SIZE(dta%v2d)
+                        ii = idx_bdy(ib_bdy)%nbi(ib,igrd)
+                        ij = idx_bdy(ib_bdy)%nbj(ib,igrd)
+                        td%v0(ib,itide,1) = ztr(ii,ij)
+                        td%v0(ib,itide,2) = zti(ii,ij)
+                     END DO
                   END DO
-               END DO  
-               CALL iom_close( inum )
+                  CALL iom_close( inum )
+               ENDIF
                !
                DEALLOCATE( ztr, zti ) 
                !
@@ -217,51 +220,51 @@ CONTAINS
                !
                ! Read tidal data only on bdy segments
                ! 
-               ALLOCATE( dta_read( MAXVAL(ilen0(1:3)), 1, 1 ) )
+               ALLOCATE( dta_read( MAXVAL( idx_bdy(ib_bdy)%nblen(:) ), 1, 1 ) )
                !
                ! Open files and read in tidal forcing data
                ! -----------------------------------------
 
                DO itide = 1, nb_harmo
                   !                                                              ! SSH fields
-                  clfile = TRIM(filtide)//TRIM(tide_harmonics(itide)%cname_tide)//'_grid_T.nc'
-                  CALL iom_open( clfile, inum )
-                  CALL fld_map( inum, 'z1' , dta_read(1:ilen0(1),1:1,1:1) , 1, idx_bdy(ib_bdy)%nbmap(:,1) )
-                  td%ssh0(:,itide,1) = dta_read(1:ilen0(1),1,1)
-                  CALL fld_map( inum, 'z2' , dta_read(1:ilen0(1),1:1,1:1) , 1, idx_bdy(ib_bdy)%nbmap(:,1) )
-                  td%ssh0(:,itide,2) = dta_read(1:ilen0(1),1,1)
-                  CALL iom_close( inum )
+                  IF( ASSOCIATED(dta%ssh) ) THEN   ! we use bdy ssh on this mpi subdomain
+                     isz = SIZE(dta%ssh)
+                     clfile = TRIM(filtide)//TRIM(tide_harmonics(itide)%cname_tide)//'_grid_T.nc'
+                     CALL iom_open( clfile, inum )
+                     CALL fld_map( inum, 'z1', dta_read(1:isz,1:1,1:1) , 1, idx_bdy(ib_bdy)%nbmap(:,1) )
+                     td%ssh0(:,itide,1) = dta_read(1:isz,1,1)
+                     CALL fld_map( inum, 'z2', dta_read(1:isz,1:1,1:1) , 1, idx_bdy(ib_bdy)%nbmap(:,1) )
+                     td%ssh0(:,itide,2) = dta_read(1:isz,1,1)
+                     CALL iom_close( inum )
+                  ENDIF
                   !                                                              ! U fields
-                  clfile = TRIM(filtide)//TRIM(tide_harmonics(itide)%cname_tide)//'_grid_U.nc'
-                  CALL iom_open( clfile, inum )
-                  CALL fld_map( inum, 'u1' , dta_read(1:ilen0(2),1:1,1:1) , 1, idx_bdy(ib_bdy)%nbmap(:,2) )
-                  td%u0(:,itide,1) = dta_read(1:ilen0(2),1,1)
-                  CALL fld_map( inum, 'u2' , dta_read(1:ilen0(2),1:1,1:1) , 1, idx_bdy(ib_bdy)%nbmap(:,2) )
-                  td%u0(:,itide,2) = dta_read(1:ilen0(2),1,1)
-                  CALL iom_close( inum )
+                  IF( ASSOCIATED(dta%u2d) ) THEN   ! we use bdy u2d on this mpi subdomain
+                     isz = SIZE(dta%u2d)
+                     clfile = TRIM(filtide)//TRIM(tide_harmonics(itide)%cname_tide)//'_grid_U.nc'
+                     CALL iom_open( clfile, inum )
+                     CALL fld_map( inum, 'u1', dta_read(1:isz,1:1,1:1) , 1, idx_bdy(ib_bdy)%nbmap(:,2) )
+                     td%u0(:,itide,1) = dta_read(1:isz,1,1)
+                     CALL fld_map( inum, 'u2', dta_read(1:isz,1:1,1:1) , 1, idx_bdy(ib_bdy)%nbmap(:,2) )
+                     td%u0(:,itide,2) = dta_read(1:isz,1,1)
+                     CALL iom_close( inum )
+                  ENDIF
                   !                                                              ! V fields
-                  clfile = TRIM(filtide)//TRIM(tide_harmonics(itide)%cname_tide)//'_grid_V.nc'
-                  CALL iom_open( clfile, inum )
-                  CALL fld_map( inum, 'v1' , dta_read(1:ilen0(3),1:1,1:1) , 1, idx_bdy(ib_bdy)%nbmap(:,3) )
-                  td%v0(:,itide,1) = dta_read(1:ilen0(3),1,1)
-                  CALL fld_map( inum, 'v2' , dta_read(1:ilen0(3),1:1,1:1) , 1, idx_bdy(ib_bdy)%nbmap(:,3) )
-                  td%v0(:,itide,2) = dta_read(1:ilen0(3),1,1)
-                  CALL iom_close( inum )
+                  IF( ASSOCIATED(dta%v2d) ) THEN   ! we use bdy v2d on this mpi subdomain
+                     isz = SIZE(dta%v2d)
+                     clfile = TRIM(filtide)//TRIM(tide_harmonics(itide)%cname_tide)//'_grid_V.nc'
+                     CALL iom_open( clfile, inum )
+                     CALL fld_map( inum, 'v1', dta_read(1:isz,1:1,1:1) , 1, idx_bdy(ib_bdy)%nbmap(:,3) )
+                     td%v0(:,itide,1) = dta_read(1:isz,1,1)
+                     CALL fld_map( inum, 'v2', dta_read(1:isz,1:1,1:1) , 1, idx_bdy(ib_bdy)%nbmap(:,3) )
+                     td%v0(:,itide,2) = dta_read(1:isz,1,1)
+                     CALL iom_close( inum )
+                  ENDIF
                   !
                END DO ! end loop on tidal components
                !
                DEALLOCATE( dta_read )
                !
             ENDIF ! ln_bdytide_2ddta=.true.
-            !
-            ! Allocate slow varying data in the case of time splitting:
-            ! Do it anyway because at this stage knowledge of free surface scheme is unknown
-            ALLOCATE( dta_bdy_s(ib_bdy)%ssh ( ilen0(1) ) )
-            ALLOCATE( dta_bdy_s(ib_bdy)%u2d ( ilen0(2) ) )
-            ALLOCATE( dta_bdy_s(ib_bdy)%v2d ( ilen0(3) ) )
-            dta_bdy_s(ib_bdy)%ssh(:) = 0._wp
-            dta_bdy_s(ib_bdy)%u2d(:) = 0._wp
-            dta_bdy_s(ib_bdy)%v2d(:) = 0._wp
             !
          ENDIF ! nn_dyn2d_dta(ib_bdy) >= 2
          !
@@ -282,9 +285,7 @@ CONTAINS
       REAL(wp),OPTIONAL, INTENT(in) ::   pt_offset   ! time offset in units of timesteps
       !
       LOGICAL  ::   lk_first_btstp            ! =.TRUE. if time splitting and first barotropic step
-      INTEGER  ::   itide, ib_bdy, ib, igrd   ! loop indices
-      INTEGER, DIMENSION(jpbgrd)   ::   ilen0 
-      INTEGER, DIMENSION(1:jpbgrd) ::   nblen, nblenrim  ! short cuts
+      INTEGER  ::   itide, ib_bdy, ib         ! loop indices
       REAL(wp) ::   z_arg, z_sarg, zramp, zoff, z_cost, z_sist, zt_offset   
       !!----------------------------------------------------------------------
       !
@@ -309,13 +310,6 @@ CONTAINS
          !
          IF( nn_dyn2d_dta(ib_bdy) >= 2 ) THEN
             !
-            nblen(1:jpbgrd) = idx_bdy(ib_bdy)%nblen(1:jpbgrd)
-            nblenrim(1:jpbgrd) = idx_bdy(ib_bdy)%nblenrim(1:jpbgrd)
-            !
-            IF( cn_dyn2d(ib_bdy) == 'frs' ) THEN   ;   ilen0(:) = nblen   (:)
-            ELSE                                   ;   ilen0(:) = nblenrim(:)
-            ENDIF     
-            !
             ! We refresh nodal factors every day below
             ! This should be done somewhere else
             IF ( ( nsec_day == NINT(0.5_wp * rn_Dt) .OR. kt==nit000 ) .AND. lk_first_btstp ) THEN
@@ -336,9 +330,9 @@ CONTAINS
             !
             ! If time splitting, initialize arrays from slow varying open boundary data:
             IF ( PRESENT(kit) ) THEN           
-               IF ( dta_bdy(ib_bdy)%lneed_ssh   ) dta_bdy(ib_bdy)%ssh(1:ilen0(1)) = dta_bdy_s(ib_bdy)%ssh(1:ilen0(1))
-               IF ( dta_bdy(ib_bdy)%lneed_dyn2d ) dta_bdy(ib_bdy)%u2d(1:ilen0(2)) = dta_bdy_s(ib_bdy)%u2d(1:ilen0(2))
-               IF ( dta_bdy(ib_bdy)%lneed_dyn2d ) dta_bdy(ib_bdy)%v2d(1:ilen0(3)) = dta_bdy_s(ib_bdy)%v2d(1:ilen0(3))
+               IF ( ASSOCIATED(dta_bdy(ib_bdy)%ssh) ) dta_bdy(ib_bdy)%ssh(:) = dta_bdy_s(ib_bdy)%ssh(:)
+               IF ( ASSOCIATED(dta_bdy(ib_bdy)%u2d) ) dta_bdy(ib_bdy)%u2d(:) = dta_bdy_s(ib_bdy)%u2d(:)
+               IF ( ASSOCIATED(dta_bdy(ib_bdy)%v2d) ) dta_bdy(ib_bdy)%v2d(:) = dta_bdy_s(ib_bdy)%v2d(:)
             ENDIF
             !
             ! Update open boundary data arrays:
@@ -348,31 +342,32 @@ CONTAINS
                z_cost = zramp * COS( z_sarg )
                z_sist = zramp * SIN( z_sarg )
                !
-               IF ( dta_bdy(ib_bdy)%lneed_ssh ) THEN
-                  igrd=1                              ! SSH on tracer grid
-                  DO ib = 1, ilen0(igrd)
+               IF ( ASSOCIATED(dta_bdy(ib_bdy)%ssh) ) THEN   ! SSH on tracer grid
+                  DO ib = 1, SIZE(dta_bdy(ib_bdy)%ssh)
                      dta_bdy(ib_bdy)%ssh(ib) = dta_bdy(ib_bdy)%ssh(ib) + &
                         &                      ( tides(ib_bdy)%ssh(ib,itide,1)*z_cost + &
                         &                        tides(ib_bdy)%ssh(ib,itide,2)*z_sist )
                   END DO
                ENDIF
                !
-               IF ( dta_bdy(ib_bdy)%lneed_dyn2d ) THEN
-                  igrd=2                              ! U grid
-                  DO ib = 1, ilen0(igrd)
+               IF ( ASSOCIATED(dta_bdy(ib_bdy)%u2d) ) THEN  ! U grid
+                  DO ib = 1, SIZE(dta_bdy(ib_bdy)%u2d)
                      dta_bdy(ib_bdy)%u2d(ib) = dta_bdy(ib_bdy)%u2d(ib) + &
                         &                      ( tides(ib_bdy)%u(ib,itide,1)*z_cost + &
                         &                        tides(ib_bdy)%u(ib,itide,2)*z_sist )
                   END DO
-                  igrd=3                              ! V grid
-                  DO ib = 1, ilen0(igrd) 
+               ENDIF
+               !
+               IF ( ASSOCIATED(dta_bdy(ib_bdy)%v2d) ) THEN   ! V grid
+                  DO ib = 1, SIZE(dta_bdy(ib_bdy)%v2d)
                      dta_bdy(ib_bdy)%v2d(ib) = dta_bdy(ib_bdy)%v2d(ib) + &
                         &                      ( tides(ib_bdy)%v(ib,itide,1)*z_cost + &
                         &                        tides(ib_bdy)%v(ib,itide,2)*z_sist )
                   END DO
                ENDIF
+               !
             END DO             
-         END IF
+         ENDIF
       END DO
       !
    END SUBROUTINE bdy_dta_tides
@@ -385,33 +380,33 @@ CONTAINS
       TYPE(OBC_INDEX) , INTENT(in   ) ::   idx   ! OBC indices
       TYPE(TIDES_DATA), INTENT(inout) ::   td    ! tidal harmonics data
       !
-      INTEGER ::   itide, igrd, ib       ! dummy loop indices
-      INTEGER, DIMENSION(1) ::   ilen0   ! length of boundary data (from OBC arrays)
+      INTEGER ::   itide, isz, ib       ! dummy loop indices
       REAL(wp),ALLOCATABLE, DIMENSION(:) ::   mod_tide, phi_tide
       !!----------------------------------------------------------------------
       !
-      igrd=1   
-                              ! SSH on tracer grid.
-      ilen0(1) =  SIZE(td%ssh0(:,1,1))
-      !
-      ALLOCATE( mod_tide(ilen0(igrd)), phi_tide(ilen0(igrd)) )
-      !
-      DO itide = 1, nb_harmo
-         DO ib = 1, ilen0(igrd)
-            mod_tide(ib)=SQRT(td%ssh0(ib,itide,1)**2.+td%ssh0(ib,itide,2)**2.)
-            phi_tide(ib)=ATAN2(-td%ssh0(ib,itide,2),td%ssh0(ib,itide,1))
+      IF( ASSOCIATED(td%ssh0) ) THEN   ! SSH on tracer grid.
+         !
+         isz = SIZE( td%ssh0, dim = 1 )
+         ALLOCATE( mod_tide(isz), phi_tide(isz) )
+         !
+         DO itide = 1, nb_harmo
+            DO ib = 1, isz
+               mod_tide(ib)=SQRT( td%ssh0(ib,itide,1)*td%ssh0(ib,itide,1) + td%ssh0(ib,itide,2)*td%ssh0(ib,itide,2) )
+               phi_tide(ib)=ATAN2(-td%ssh0(ib,itide,2),td%ssh0(ib,itide,1))
+            END DO
+            DO ib = 1, isz
+               mod_tide(ib)=mod_tide(ib)*tide_harmonics(itide)%f
+               phi_tide(ib)=phi_tide(ib)+tide_harmonics(itide)%v0+tide_harmonics(itide)%u
+            END DO
+            DO ib = 1, isz
+               td%ssh(ib,itide,1)= mod_tide(ib)*COS(phi_tide(ib))
+               td%ssh(ib,itide,2)=-mod_tide(ib)*SIN(phi_tide(ib))
+            END DO
          END DO
-         DO ib = 1 , ilen0(igrd)
-            mod_tide(ib)=mod_tide(ib)*tide_harmonics(itide)%f
-            phi_tide(ib)=phi_tide(ib)+tide_harmonics(itide)%v0+tide_harmonics(itide)%u
-         ENDDO
-         DO ib = 1 , ilen0(igrd)
-            td%ssh(ib,itide,1)= mod_tide(ib)*COS(phi_tide(ib))
-            td%ssh(ib,itide,2)=-mod_tide(ib)*SIN(phi_tide(ib))
-         ENDDO
-      END DO
-      !
-      DEALLOCATE( mod_tide, phi_tide )
+         !
+         DEALLOCATE( mod_tide, phi_tide )
+         !
+      ENDIF
       !
    END SUBROUTINE tide_init_elevation
 
@@ -423,57 +418,59 @@ CONTAINS
       TYPE(OBC_INDEX) , INTENT(in   ) ::   idx   ! OBC indices
       TYPE(TIDES_DATA), INTENT(inout) ::   td    ! tidal harmonics data
       !
-      INTEGER ::   itide, igrd, ib       ! dummy loop indices
-      INTEGER, DIMENSION(3) ::   ilen0   ! length of boundary data (from OBC arrays)
+      INTEGER ::   itide, isz, ib        ! dummy loop indices
       REAL(wp),ALLOCATABLE, DIMENSION(:) ::   mod_tide, phi_tide
       !!----------------------------------------------------------------------
       !
-      ilen0(2) =  SIZE(td%u0(:,1,1))
-      ilen0(3) =  SIZE(td%v0(:,1,1))
-      !
-      igrd=2                                 ! U grid.
-      !
-      ALLOCATE( mod_tide(ilen0(igrd)) , phi_tide(ilen0(igrd)) )
-      !
-      DO itide = 1, nb_harmo
-         DO ib = 1, ilen0(igrd)
-            mod_tide(ib)=SQRT(td%u0(ib,itide,1)**2.+td%u0(ib,itide,2)**2.)
-            phi_tide(ib)=ATAN2(-td%u0(ib,itide,2),td%u0(ib,itide,1))
+      IF( ASSOCIATED(td%u0) ) THEN   ! U grid. we use bdy u2d on this mpi subdomain
+         !
+         isz = SIZE( td%u0, dim = 1 )
+         ALLOCATE( mod_tide(isz), phi_tide(isz) )
+         !
+         DO itide = 1, nb_harmo
+            DO ib = 1, isz
+               mod_tide(ib)=SQRT( td%u0(ib,itide,1)*td%u0(ib,itide,1) + td%u0(ib,itide,2)*td%u0(ib,itide,2) )
+               phi_tide(ib)=ATAN2(-td%u0(ib,itide,2),td%u0(ib,itide,1))
+            END DO
+            DO ib = 1, isz
+               mod_tide(ib)=mod_tide(ib)*tide_harmonics(itide)%f
+               phi_tide(ib)=phi_tide(ib)+tide_harmonics(itide)%v0 + tide_harmonics(itide)%u
+            END DO
+            DO ib = 1, isz
+               td%u(ib,itide,1)= mod_tide(ib)*COS(phi_tide(ib))
+               td%u(ib,itide,2)=-mod_tide(ib)*SIN(phi_tide(ib))
+            END DO
          END DO
-         DO ib = 1, ilen0(igrd)
-            mod_tide(ib)=mod_tide(ib)*tide_harmonics(itide)%f
-            phi_tide(ib)=phi_tide(ib)+tide_harmonics(itide)%v0 + tide_harmonics(itide)%u
-         ENDDO
-         DO ib = 1, ilen0(igrd)
-            td%u(ib,itide,1)= mod_tide(ib)*COS(phi_tide(ib))
-            td%u(ib,itide,2)=-mod_tide(ib)*SIN(phi_tide(ib))
-         ENDDO
-      END DO
+         !
+         DEALLOCATE( mod_tide, phi_tide )
+         !
+      ENDIF
       !
-      DEALLOCATE( mod_tide , phi_tide )
-      !
-      igrd=3                                 ! V grid.
-      !
-      ALLOCATE( mod_tide(ilen0(igrd)) , phi_tide(ilen0(igrd)) )
-
-      DO itide = 1, nb_harmo
-         DO ib = 1, ilen0(igrd)
-            mod_tide(ib)=SQRT(td%v0(ib,itide,1)**2.+td%v0(ib,itide,2)**2.)
-            phi_tide(ib)=ATAN2(-td%v0(ib,itide,2),td%v0(ib,itide,1))
+      IF( ASSOCIATED(td%v0) ) THEN   ! V grid. we use bdy u2d on this mpi subdomain
+         !
+         isz = SIZE( td%v0, dim = 1 )
+         ALLOCATE( mod_tide(isz), phi_tide(isz) )
+         !
+         DO itide = 1, nb_harmo
+            DO ib = 1, isz
+               mod_tide(ib)=SQRT( td%v0(ib,itide,1)*td%v0(ib,itide,1) + td%v0(ib,itide,2)*td%v0(ib,itide,2) )
+               phi_tide(ib)=ATAN2(-td%v0(ib,itide,2),td%v0(ib,itide,1))
+            END DO
+            DO ib = 1, isz
+               mod_tide(ib)=mod_tide(ib)*tide_harmonics(itide)%f
+               phi_tide(ib)=phi_tide(ib)+tide_harmonics(itide)%v0 + tide_harmonics(itide)%u
+            END DO
+            DO ib = 1, isz
+               td%v(ib,itide,1)= mod_tide(ib)*COS(phi_tide(ib))
+               td%v(ib,itide,2)=-mod_tide(ib)*SIN(phi_tide(ib))
+            END DO
          END DO
-         DO ib = 1, ilen0(igrd)
-            mod_tide(ib)=mod_tide(ib)*tide_harmonics(itide)%f
-            phi_tide(ib)=phi_tide(ib)+tide_harmonics(itide)%v0 + tide_harmonics(itide)%u
-         ENDDO
-         DO ib = 1, ilen0(igrd)
-            td%v(ib,itide,1)= mod_tide(ib)*COS(phi_tide(ib))
-            td%v(ib,itide,2)=-mod_tide(ib)*SIN(phi_tide(ib))
-         ENDDO
-      END DO
+         !
+         DEALLOCATE( mod_tide, phi_tide )
+         !
+      ENDIF
       !
-      DEALLOCATE( mod_tide, phi_tide )
-      !
-  END SUBROUTINE tide_init_velocities
+   END SUBROUTINE tide_init_velocities
 
    !!======================================================================
 END MODULE bdytides

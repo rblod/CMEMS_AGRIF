@@ -16,6 +16,7 @@ MODULE dom_oce
 
    !!----------------------------------------------------------------------
    !!   Agrif_Root    : dummy function used when lk_agrif=F
+   !!   Agrif_Fixed   : dummy function used when lk_agrif=F
    !!   Agrif_CFixed  : dummy function used when lk_agrif=F
    !!   dom_oce_alloc : dynamical allocation of dom_oce arrays
    !!----------------------------------------------------------------------
@@ -232,6 +233,10 @@ CONTAINS
    LOGICAL FUNCTION Agrif_Root()
       Agrif_Root = .TRUE.
    END FUNCTION Agrif_Root
+
+   INTEGER FUNCTION Agrif_Fixed()
+      Agrif_Fixed = 0
+   END FUNCTION Agrif_Fixed
 
    CHARACTER(len=3) FUNCTION Agrif_CFixed()
       Agrif_CFixed = '0' 

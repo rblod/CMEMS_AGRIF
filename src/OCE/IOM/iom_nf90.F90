@@ -40,7 +40,7 @@ MODULE iom_nf90
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: iom_nf90.F90 12649 2020-04-03 07:11:57Z smasson $
+   !! $Id: iom_nf90.F90 12933 2020-05-15 08:06:25Z smasson $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -61,7 +61,9 @@ CONTAINS
 
       CHARACTER(LEN=256) ::   clinfo           ! info character
       CHARACTER(LEN=256) ::   cltmp            ! temporary character
+      CHARACTER(LEN=12 ) ::   clfmt            ! writing format
       CHARACTER(LEN=3  ) ::   clcomp           ! name of component calling iom_nf90_open
+      INTEGER            ::   idg              ! number of digits
       INTEGER            ::   iln              ! lengths of character
       INTEGER            ::   istop            ! temporary storage of nstop
       INTEGER            ::   if90id           ! nf90 identifier of the opened file
@@ -108,7 +110,9 @@ CONTAINS
          iln = INDEX( cdname, '.nc' )
          IF( ldwrt ) THEN              !* the file should be open in write mode so we create it...
             IF( jpnij > 1 ) THEN
-               WRITE(cltmp,'(a,a,i4.4,a)') cdname(1:iln-1), '_', narea-1, '.nc'
+               idg = MAX( INT(LOG10(REAL(jpnij-1,wp))) + 1, 4 )          ! how many digits to we need to write? min=4, max=9
+               WRITE(clfmt, "('(a,a,i', i1, '.', i1, ',a)')") idg, idg   ! '(a,a,ix.x,a)'
+               WRITE(cltmp,clfmt) cdname(1:iln-1), '_', narea-1, '.nc'
                cdname = TRIM(cltmp)
             ENDIF
             IF(lwp) WRITE(numout,*) TRIM(clinfo)//' create new file: '//TRIM(cdname)//' in WRITE mode'

@@ -46,7 +46,7 @@ MODULE dommsk
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: dommsk.F90 12377 2020-02-12 14:39:06Z acc $ 
+   !! $Id: dommsk.F90 12965 2020-05-25 07:34:57Z jchanut $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -258,14 +258,6 @@ CONTAINS
                   fmask(ji,jpj,jk) = rn_shlat * MIN( 1._wp , MAX( zwf(ji+1,jpj), zwf(ji-1,jpj), zwf(ji,jpjm1) ) )
                ENDIF
             END DO
-#if defined key_agrif 
-            IF( .NOT. AGRIF_Root() ) THEN 
-               IF(lk_east)  fmask(nlci-1 , :     ,jk) = 0.e0      ! east 
-               IF(lk_west)  fmask(1      , :     ,jk) = 0.e0      ! west 
-               IF(lk_north) fmask(:      ,nlcj-1 ,jk) = 0.e0      ! north 
-               IF(lk_south) fmask(:      ,1      ,jk) = 0.e0      ! south 
-            ENDIF 
-#endif 
          END DO
          !
          DEALLOCATE( zwf )

@@ -47,7 +47,7 @@ MODULE icbtrj
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: icbtrj.F90 12489 2020-02-28 15:55:11Z davestorkey $
+   !! $Id: icbtrj.F90 12933 2020-05-15 08:06:25Z smasson $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -61,8 +61,10 @@ CONTAINS
       INTEGER, INTENT(in) ::   ktend   ! time step index
       !
       INTEGER                ::   iret, iyear, imonth, iday
+      INTEGER                ::   idg  ! number of digits
       REAL(wp)               ::   zfjulday, zsec
       CHARACTER(len=80)      ::   cl_filename
+      CHARACTER(LEN=12)      ::   clfmt            ! writing format
       CHARACTER(LEN=20)      ::   cldate_ini, cldate_end
       TYPE(iceberg), POINTER ::   this
       TYPE(point)  , POINTER ::   pt
@@ -79,10 +81,13 @@ CONTAINS
       WRITE(cldate_end, '(i4.4,2i2.2)') iyear, imonth, iday
 
       ! define trajectory output name
-      IF ( lk_mpp ) THEN   ;   WRITE(cl_filename,'("trajectory_icebergs_",A,"-",A,"_",I4.4,".nc")')   &
-         &                        TRIM(ADJUSTL(cldate_ini)), TRIM(ADJUSTL(cldate_end)), narea-1
-      ELSE                 ;   WRITE(cl_filename,'("trajectory_icebergs_",A,"-",A         ,".nc")')   &
-         &                        TRIM(ADJUSTL(cldate_ini)), TRIM(ADJUSTL(cldate_end))
+      cl_filename = 'trajectory_icebergs_'//TRIM(ADJUSTL(cldate_ini))//'-'//TRIM(ADJUSTL(cldate_end))
+      IF ( lk_mpp ) THEN
+         idg = MAX( INT(LOG10(REAL(jpnij-1,wp))) + 1, 4 )          ! how many digits to we need to write? min=4, max=9
+         WRITE(clfmt, "('(a,a,i', i1, '.', i1, ',a)')") idg, idg   ! '(a,a,ix.x,a)'
+         WRITE(cl_filename,clfmt) TRIM(cl_filename), '_', narea-1, '.nc'
+      ELSE
+         WRITE(cl_filename,'(A,".nc")') TRIM(cl_filename)
       ENDIF
       IF( lwp .AND. nn_verbose_level >= 0 )   WRITE(numout,'(2a)') 'icebergs, icb_trj_init: creating ',TRIM(cl_filename)
 

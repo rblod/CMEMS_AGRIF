@@ -336,14 +336,8 @@ CONTAINS
       IF( ierr /= 0 )   CALL ctl_stop( 'STOP', 'mpp_init: unable to allocate standard ocean arrays' )
       
 #if defined key_agrif
-
       IF( .NOT. Agrif_Root() ) THEN       ! AGRIF children: specific setting (cf. agrif_user.F90)
          CALL agrif_nemo_init()
-         IF( jpiglo /= nbcellsx + 2 + 2*nbghostcells_x )   &
-            CALL ctl_stop( 'STOP', 'mpp_init: Agrif children requires jpiglo == nbcellsx + 2 + 2*nbghostcells_x' )
-         IF( jpjglo /= nbcellsy + 2 + nbghostcells_y_s + nbghostcells_y_n )   &
-            CALL ctl_stop( 'STOP', 'mpp_init: Agrif children requires jpjglo == nbcellsy + 2 + nbghostcells_y_s + nbghostcells_y_n' )
-         IF( ln_use_jattr )   CALL ctl_stop( 'STOP', 'mpp_init:Agrif children requires ln_use_jattr = .false. ' )
       ENDIF
 #endif
       !

@@ -30,7 +30,7 @@ MODULE step_c1d
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: step_c1d.F90 12740 2020-04-12 09:03:06Z smasson $
+   !! $Id: step_c1d.F90 12933 2020-05-15 08:06:25Z smasson $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -55,10 +55,7 @@ CONTAINS
       INTEGER, INTENT(in) ::   kstp   ! ocean time-step index
       !
       INTEGER ::   jk       ! dummy loop indice
-      INTEGER ::   indic    ! error indicator if < 0
       !! ---------------------------------------------------------------------
-
-                             indic = 0                ! reset to no error condition
       IF( kstp == nit000 )   CALL iom_init( "nemo")   ! iom_put initialization (must be done after nemo_init for AGRIF+XIOS+OASIS)
       IF( kstp /= nit000 )   CALL day( kstp )         ! Calendar (day was already called at nit000 in day_init)
                              CALL iom_setkt( kstp - nit000 + 1, "nemo" )   ! say to iom that we are at time step kstp
@@ -136,12 +133,12 @@ CONTAINS
       !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
       ! Control and restarts
       !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-                             CALL stp_ctl( kstp, Nbb, Nnn, indic )
+                             CALL stp_ctl( kstp, Nnn )
       IF( kstp == nit000 )   CALL iom_close( numror )          ! close input  ocean restart file
       IF( lrst_oce       )   CALL rst_write( kstp, Nbb, Nnn )  ! write output ocean restart file
       !
 #if defined key_iomput
-      IF( kstp == nitend .OR. indic < 0 )   CALL xios_context_finalize()   ! needed for XIOS
+      IF( kstp == nitend .OR. nstop > 0 )   CALL xios_context_finalize()   ! needed for XIOS
       !
 #endif
    END SUBROUTINE stp_c1d
