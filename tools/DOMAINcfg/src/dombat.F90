@@ -2,7 +2,6 @@
 
 MODULE dombat
 
-   USE oce               ! ocean variables
    USE dom_oce           ! ocean domain
    !
    USE in_out_manager    ! I/O manager

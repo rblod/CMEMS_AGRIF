@@ -25,7 +25,6 @@ MODULE dommsk
    USE dom_oce        ! ocean space and time domain
    USE domisf         ! domain: ice shelf
    USE domwri         ! domain: write the meshmask file
-   USE oce            ! ocean dynamics and tracers
    USE usrdef_fmask   ! user defined fmask
    USE bdy_oce        ! open boundary
    !

@@ -44,8 +44,8 @@ MODULE dom_oce
    INTEGER , PUBLIC ::   nn_closea       !: =0 suppress closed sea/lake from the ORCA domain or not (=1)
 
    INTEGER, PUBLIC :: nn_interp
-   CHARACTER(LEN=132), PUBLIC :: cn_domcfg
-   CHARACTER(LEN=132), PUBLIC :: cn_topo
+   CHARACTER(LEN=200), PUBLIC :: cn_domcfg
+   CHARACTER(LEN=200), PUBLIC :: cn_topo
    CHARACTER(LEN=132), PUBLIC :: cn_bath
    CHARACTER(LEN=132), PUBLIC :: cn_lon
    CHARACTER(LEN=132), PUBLIC :: cn_lat

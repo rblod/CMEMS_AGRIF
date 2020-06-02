@@ -6,7 +6,6 @@ MODULE step_oce
    !! History :   3.3  !  2010-08  (C. Ethe)  Original code - reorganisation of the initial phase
    !!             3.7  !  2014-01  (G. Madec) LDF simplication 
    !!----------------------------------------------------------------------
-   USE oce              ! ocean dynamics and tracers variables
    USE dom_oce          ! ocean space and time domain variables
 
    USE daymod           ! calendar                         (day     routine)

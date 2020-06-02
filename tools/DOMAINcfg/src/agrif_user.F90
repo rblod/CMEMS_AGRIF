@@ -11,7 +11,6 @@ SUBROUTINE Agrif_InitValues
       !! ** Purpose :: Declaration of variables to be interpolated
       !!----------------------------------------------------------------------
    USE Agrif_Util
-   USE oce
    USE dom_oce
    USE nemogcm
    USE domain
