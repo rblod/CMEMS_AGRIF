@@ -26,6 +26,10 @@ INTEGER :: ji,jj,jk,ikb,ikt
       END DO
       IF ( ln_isfcav ) THEN
       ! (ISF) define e3uw (adapted for 2 cells in the water column)
+      print *,'NOT READY SINCE:'
+      print *,'MBATHY HAS NOT BEEN CORRECTED / UPDATED'
+      print *,'EVEN NOT COMPUTED IN THE CASE ln_read_cfg = .TRUE.'
+      STOP
          DO jj = 2, jpjm1 
             DO ji = 2, jpim1   ! vector opt. 
                ikb = MAX(mbathy (ji,jj),mbathy (ji+1,jj))

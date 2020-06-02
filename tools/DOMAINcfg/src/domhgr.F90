@@ -454,6 +454,7 @@ CONTAINS
       INTEGER, INTENT( inout ) ::   ke1e2u_v   ! fag: e1e2u & e1e2v read in coordinate file (=1) or not (=0)
       !
       INTEGER ::   inum   ! temporary logical unit
+      CHARACTER(LEN=135) :: coordinate_filename
       !!----------------------------------------------------------------------
       !
       IF(lwp) THEN
@@ -462,7 +463,12 @@ CONTAINS
          WRITE(numout,*) '~~~~~~~~      jpiglo = ', jpiglo, ' jpjglo = ', jpjglo, ' jpk = ', jpk
       ENDIF
       !
-      CALL iom_open( 'coordinates', inum )
+      IF (ln_read_cfg) THEN
+         coordinate_filename=TRIM(cn_domcfg)
+      ELSE
+         coordinate_filename='coordinates'
+      ENDIF
+      CALL iom_open( coordinate_filename, inum )
       !
       CALL iom_get( inum, jpdom_data, 'glamt', glamt, lrowattr=ln_use_jattr )
       CALL iom_get( inum, jpdom_data, 'glamu', glamu, lrowattr=ln_use_jattr )

@@ -24,7 +24,7 @@ SUBROUTINE Agrif_InitValues
    CALL nemo_init       !* Initializations of each fine grid
 
    CALL dom_nam
-   CALL cfg_write         ! create the configuration file
+   !CALL cfg_write         ! create the configuration file
 
 END SUBROUTINE Agrif_InitValues
 
@@ -88,6 +88,7 @@ nx=nlci ; ny=nlcj
        CALL lbc_lnk( 'gphif', gphif, 'F', 1._wp)
 
        ! Correct South and North
+write(*,*) nbondj
        IF ((nbondj == -1).OR.(nbondj == 2)) THEN
          glamt(:,1)=glamt(:,2)
          gphit(:,1)=gphit(:,2)

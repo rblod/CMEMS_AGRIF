@@ -25,6 +25,8 @@ MODULE dommsk
    USE dom_oce        ! ocean space and time domain
    USE domisf         ! domain: ice shelf
    USE domwri         ! domain: write the meshmask file
+   USE oce            ! ocean dynamics and tracers
+   USE usrdef_fmask   ! user defined fmask
    USE bdy_oce        ! open boundary
    !
    USE in_out_manager ! I/O manager
@@ -51,7 +53,7 @@ MODULE dommsk
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE dom_msk
+   SUBROUTINE dom_msk( k_top, k_bot )
       !!---------------------------------------------------------------------
       !!                 ***  ROUTINE dom_msk  ***
       !!
@@ -61,7 +63,7 @@ CONTAINS
       !! ** Method  :   The ocean/land mask  at t-point is deduced from ko_top 
       !!      and ko_bot, the indices of the fist and last ocean t-levels which 
       !!      are either defined in usrdef_zgr or read in zgr_read.
-      !!                The velocity masks (umask, vmask) 
+      !!                The velocity masks (umask, vmask, wmask, wumask, wvmask) 
       !!      are deduced from a product of the two neighboring tmask.
       !!                The vorticity mask (fmask) is deduced from tmask taking
       !!      into account the choice of lateral boundary condition (rn_shlat) :
@@ -76,7 +78,7 @@ CONTAINS
       !!      tmask_h : halo mask at t-point, i.e. excluding duplicated rows/lines
       !!                due to cyclic or North Fold boundaries as well as MPP halos.
       !!
-      !! ** Action :   tmask, umask, vmask, wmask : land/ocean mask 
+      !! ** Action :   tmask, umask, vmask, wmask, wumask, wvmask : land/ocean mask 
       !!                         at t-, u-, v- w, wu-, and wv-points (=0. or 1.)
       !!               fmask   : land/ocean mask at f-point (=0., or =1., or 
       !!                         =rn_shlat along lateral boundaries)
@@ -84,6 +86,8 @@ CONTAINS
       !!               tmask_h : halo mask
       !!               ssmask , ssumask, ssvmask, ssfmask : 2D ocean mask
       !!----------------------------------------------------------------------
+
+      INTEGER, DIMENSION(:,:), INTENT(in) ::   k_top, k_bot   ! first and last ocean level
       !
       INTEGER  ::   ji, jj, jk     ! dummy loop indices
       INTEGER  ::   iif, iil       ! local integers
@@ -132,19 +136,34 @@ CONTAINS
      ! -----------------------------
      ! N.B. tmask has already the right boundary conditions since mbathy is ok
      !
-      tmask(:,:,:) = 0._wp
-      DO jk = 1, jpk
-         DO jj = 1, jpj
-            DO ji = 1, jpi
-               IF(      ( REAL( mbathy (ji,jj) - jk, wp ) + 0.1_wp >= 0._wp )         &
-               &  .AND. ( REAL( misfdep(ji,jj) - jk, wp ) - 0.1_wp <= 0._wp ) ) THEN
-                  tmask(ji,jj,jk) = 1._wp
-               END IF  
-            END DO
-         END DO
-      END DO    
+!      tmask(:,:,:) = 0._wp
+!      DO jk = 1, jpk
+!         DO jj = 1, jpj
+!            DO ji = 1, jpi
+!               IF(      ( REAL( mbathy (ji,jj) - jk, wp ) + 0.1_wp >= 0._wp )         &
+!               &  .AND. ( REAL( misfdep(ji,jj) - jk, wp ) - 0.1_wp <= 0._wp ) ) THEN
+!                  tmask(ji,jj,jk) = 1._wp
+!               END IF  
+!            END DO
+!         END DO
+!      END DO    
  
-      IF ( ln_isfsubgl ) CALL zgr_isf_subgl
+!      IF ( ln_isfsubgl ) CALL zgr_isf_subgl
+
+      !  Ocean/land mask at t-point  (computed from ko_top and ko_bot)
+      ! ----------------------------
+      !
+      tmask(:,:,:) = 0._wp
+      DO jj = 1, jpj
+         DO ji = 1, jpi
+            iktop = k_top(ji,jj)
+            ikbot = k_bot(ji,jj)
+            IF( iktop /= 0 ) THEN       ! water in the column
+               tmask(ji,jj,iktop:ikbot  ) = 1._wp
+            ENDIF
+         END DO  
+      END DO  
+
 
 !SF  add here lbc_lnk: bug not still understood : cause now domain configuration is read !
 !!gm I don't understand why...  
@@ -195,6 +214,7 @@ CONTAINS
          wmask (:,:,jk) = tmask(:,:,jk) * tmask(:,:,jk-1)
       END DO
 
+
       ! Ocean/land column mask at t-, u-, and v-points   (i.e. at least 1 wet cell in the vertical)
       ! ----------------------------------------------
       ssmask (:,:) = MAXVAL( tmask(:,:,:), DIM=3 )
@@ -235,6 +255,7 @@ CONTAINS
       !                          ! interior mask : 2D ocean mask x halo mask 
       tmask_i(:,:) = ssmask(:,:) * tmask_h(:,:)
 
+
       ! Lateral boundary conditions on velocity (modify fmask)
       ! ---------------------------------------  
       IF( rn_shlat /= 0 ) THEN      ! Not free-slip lateral boundary condition
@@ -269,10 +290,10 @@ CONTAINS
             END DO
 #if defined key_agrif 
             IF( .NOT. AGRIF_Root() ) THEN 
-               IF ((nbondi ==  1).OR.(nbondi == 2)) fmask(nlci-1 , :     ,jk) = 0.e0      ! east 
-               IF ((nbondi == -1).OR.(nbondi == 2)) fmask(1      , :     ,jk) = 0.e0      ! west 
-               IF ((nbondj ==  1).OR.(nbondj == 2)) fmask(:      ,nlcj-1 ,jk) = 0.e0      ! north 
-               IF ((nbondj == -1).OR.(nbondj == 2)) fmask(:      ,1      ,jk) = 0.e0      ! south 
+               IF(lk_east)  fmask(nlci-1 , :     ,jk) = 0.e0      ! east 
+               IF(lk_west)  fmask(1      , :     ,jk) = 0.e0      ! west 
+               IF(lk_north) fmask(:      ,nlcj-1 ,jk) = 0.e0      ! north 
+               IF(lk_south) fmask(:      ,1      ,jk) = 0.e0      ! south 
             ENDIF 
 #endif 
          END DO
@@ -284,9 +305,12 @@ CONTAINS
          ! CAUTION : The fmask may be further modified in dyn_vor_init ( dynvor.F90 ) depending on ln_vorlat
          !
       ENDIF
+      
+      ! User defined alteration of fmask (use to reduce ocean transport in specified straits)
+      ! -------------------------------- 
       !
-      ! write out mesh mask
-      IF ( nn_msh > 0 ) CALL dom_wri
+
+      CALL usr_def_fmask( cn_cfg, nn_cfg, fmask )
       !
    END SUBROUTINE dom_msk
    

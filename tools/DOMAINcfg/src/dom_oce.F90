@@ -29,6 +29,7 @@ MODULE dom_oce
    !! ----------------------------
    INTEGER , PUBLIC ::   nmsh            !: = 1 create a mesh-mask file
    !                                    !!* Namelist namdom : time & space domain *
+   LOGICAL,  PUBLIC ::   ln_read_cfg     !: .true. read from an existing domain_cfg file
    INTEGER , PUBLIC ::   nn_bathy        !: = 0/1/2 ,compute/read the bathymetry file
    REAL(wp), PUBLIC ::   rn_bathy        !: depth of flat bottom (active if nn_bathy=0; if =0 depth=jpkm1)
    REAL(wp), PUBLIC ::   rn_hmin         !: minimum ocean depth (>0) or minimum number of ocean levels (<0)
@@ -43,6 +44,7 @@ MODULE dom_oce
    INTEGER , PUBLIC ::   nn_closea       !: =0 suppress closed sea/lake from the ORCA domain or not (=1)
 
    INTEGER, PUBLIC :: nn_interp
+   CHARACTER(LEN=132), PUBLIC :: cn_domcfg
    CHARACTER(LEN=132), PUBLIC :: cn_topo
    CHARACTER(LEN=132), PUBLIC :: cn_bath
    CHARACTER(LEN=132), PUBLIC :: cn_lon
@@ -280,6 +282,7 @@ MODULE dom_oce
    !!----------------------------------------------------------------------
 #if defined key_agrif
    LOGICAL, PUBLIC, PARAMETER ::   lk_agrif = .TRUE.    !: agrif flag
+   LOGICAL, PUBLIC            ::   lk_south, lk_north, lk_west, lk_east !: Child grid boundaries (interpolation or not)
 #else
    LOGICAL, PUBLIC, PARAMETER ::   lk_agrif = .FALSE.   !: agrif flag
 #endif
@@ -327,7 +330,27 @@ CONTAINS
          &      e1e2f(jpi,jpj) , r1_e1e2f(jpi,jpj)                                     ,     &
          &      ff_f (jpi,jpj) ,    ff_t (jpi,jpj)                                     , STAT=ierr(3) )
          !
-      ALLOCATE( gdept_0(jpi,jpj,jpk) , gdepw_0(jpi,jpj,jpk) , STAT=ierr(4) )         !
+      ! ALLOCATE( gdept_0(jpi,jpj,jpk) , gdepw_0(jpi,jpj,jpk) , gde3w_0(jpi,jpj,jpk) ,      &
+      !    &      gdept_b(jpi,jpj,jpk) , gdepw_b(jpi,jpj,jpk) ,                             &
+      !    &      gdept_n(jpi,jpj,jpk) , gdepw_n(jpi,jpj,jpk) , gde3w_n(jpi,jpj,jpk) , STAT=ierr(4) )
+
+         ALLOCATE( gdept_0(jpi,jpj,jpk) , gdepw_0(jpi,jpj,jpk), STAT=ierr(4) )
+
+         !
+      ! ALLOCATE( e3t_0(jpi,jpj,jpk) , e3u_0(jpi,jpj,jpk) , e3v_0(jpi,jpj,jpk) , e3f_0(jpi,jpj,jpk) , e3w_0(jpi,jpj,jpk) ,   &
+      !    &      e3t_b(jpi,jpj,jpk) , e3u_b(jpi,jpj,jpk) , e3v_b(jpi,jpj,jpk) ,                      e3w_b(jpi,jpj,jpk) ,   &
+      !    &      e3t_n(jpi,jpj,jpk) , e3u_n(jpi,jpj,jpk) , e3v_n(jpi,jpj,jpk) , e3f_n(jpi,jpj,jpk) , e3w_n(jpi,jpj,jpk) ,   &
+      !    &      e3t_a(jpi,jpj,jpk) , e3u_a(jpi,jpj,jpk) , e3v_a(jpi,jpj,jpk) ,                                             &
+      !    !                                                          !
+      !    &      e3uw_0(jpi,jpj,jpk) , e3vw_0(jpi,jpj,jpk) ,         &
+      !    &      e3uw_b(jpi,jpj,jpk) , e3vw_b(jpi,jpj,jpk) ,         &
+      !    &      e3uw_n(jpi,jpj,jpk) , e3vw_n(jpi,jpj,jpk) ,     STAT=ierr(5) )
+
+         !
+    !  ALLOCATE( ht_0(jpi,jpj) , hu_0(jpi,jpj) , hv_0(jpi,jpj) ,                                           &
+    !     &                      hu_b(jpi,jpj) , hv_b(jpi,jpj) , r1_hu_b(jpi,jpj) , r1_hv_b(jpi,jpj) ,     &
+    !     &      ht_n(jpi,jpj) , hu_n(jpi,jpj) , hv_n(jpi,jpj) , r1_hu_n(jpi,jpj) , r1_hv_n(jpi,jpj) ,     &
+    !     &                      hu_a(jpi,jpj) , hv_a(jpi,jpj) , r1_hu_a(jpi,jpj) , r1_hv_a(jpi,jpj) , STAT=ierr(6)  )
          !
       ALLOCATE( e3t_0 (jpi,jpj,jpk) , e3u_0 (jpi,jpj,jpk) , e3v_0(jpi,jpj,jpk) , e3f_0(jpi,jpj,jpk) , e3w_0(jpi,jpj,jpk) ,   &
          &      e3uw_0(jpi,jpj,jpk) , e3vw_0(jpi,jpj,jpk) , STAT=ierr(5) )

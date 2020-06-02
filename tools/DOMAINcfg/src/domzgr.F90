@@ -35,6 +35,7 @@ MODULE domzgr
    !!       fgamma       : Siddorn and Furner 2012 stretching function
    !!---------------------------------------------------------------------
    USE dom_oce           ! ocean domain
+   USE depth_e3       ! depth <=> e3
    !
    USE in_out_manager    ! I/O manager
    USE iom               ! I/O library
@@ -91,7 +92,7 @@ MODULE domzgr
    !!----------------------------------------------------------------------
 CONTAINS       
 
-   SUBROUTINE dom_zgr
+   SUBROUTINE dom_zgr( k_top, k_bot )
       !!----------------------------------------------------------------------
       !!                ***  ROUTINE dom_zgr  ***
       !!                   
@@ -108,9 +109,15 @@ CONTAINS
       !!
       !! ** Action  :   define gdep., e3., mbathy and bathy
       !!----------------------------------------------------------------------
+      INTEGER, DIMENSION(:,:), INTENT(out) ::   k_top, k_bot   ! ocean first and last level indices
+      !
       INTEGER ::   ioptio, ibat   ! local integer
       INTEGER ::   ios
       !
+      INTEGER :: jk
+      REAL(wp) ::   zrefdep             ! depth of the reference level (~10m)
+
+
       NAMELIST/namzgr/ ln_zco, ln_zps, ln_sco, ln_isfcav, ln_linssh
       !!----------------------------------------------------------------------
       !
@@ -123,6 +130,37 @@ CONTAINS
       READ  ( numnam_cfg, namzgr, IOSTAT = ios, ERR = 902 )
 902   IF( ios /= 0 ) CALL ctl_nam ( ios , 'namzgr in configuration namelist', lwp )
       IF(lwm) WRITE ( numond, namzgr )
+
+      IF(ln_read_cfg) THEN
+         IF(lwp) WRITE(numout,*)
+         IF(lwp) WRITE(numout,*) '   ==>>>   Read vertical mesh in ', TRIM( cn_domcfg ), ' file'
+         !
+         CALL zgr_read   ( ln_zco  , ln_zps  , ln_sco, ln_isfcav,   &
+            &              gdept_1d, gdepw_1d, e3t_1d, e3w_1d   ,   &    ! 1D gridpoints depth
+            &              gdept_0 , gdepw_0                    ,   &    ! gridpoints depth
+            &              e3t_0   , e3u_0   , e3v_0 , e3f_0    ,   &    ! vertical scale factors
+            &              e3w_0   , e3uw_0  , e3vw_0           ,   &    ! vertical scale factors
+            &              k_top   , k_bot            )                  ! 1st & last ocean level
+            !
+!!gm to be remove when removing the OLD definition of e3 scale factors so that gde3w disappears
+!      ! Compute gde3w_0 (vertical sum of e3w)
+!      gde3w_0(:,:,1) = 0.5_wp * e3w_0(:,:,1)
+!      DO jk = 2, jpk
+!         gde3w_0(:,:,jk) = gde3w_0(:,:,jk-1) + e3w_0(:,:,jk)
+!      END DO
+      !
+
+      !                                ! top/bottom ocean level indices for t-, u- and v-points (f-point also for top)
+      CALL zgr_top_bot( k_top, k_bot )      ! with a minimum value set to 1
+
+      !                                ! deepest/shallowest W level Above/Below ~10m
+!!gm BUG in s-coordinate this does not work!
+      zrefdep = 10._wp - 0.1_wp * MINVAL( e3w_1d )                   ! ref. depth with tolerance (10% of minimum layer thickness)
+      nlb10 = MINLOC( gdepw_1d, mask = gdepw_1d > zrefdep, dim = 1 ) ! shallowest W level Below ~10m
+      nla10 = nlb10 - 1                                              ! deepest    W level Above ~10m
+!!gm end bug
+
+      ENDIF        
 
       IF(lwp) THEN                     ! Control print
          WRITE(numout,*)
@@ -149,6 +187,8 @@ CONTAINS
       IF ( ln_zco .AND. ln_isfcav ) ioptio = ioptio + 1
       IF ( ln_sco .AND. ln_isfcav ) ioptio = ioptio + 1
       IF( ioptio > 0 )   CALL ctl_stop( ' Cavity not tested/compatible with full step (zco) and sigma (ln_sco) ' )
+
+      IF(.NOT.ln_read_cfg) THEN
       !
       ! Build the vertical coordinate system
       ! ------------------------------------
@@ -162,10 +202,15 @@ CONTAINS
       ! final adjustment of mbathy & check 
       ! -----------------------------------
                           CALL zgr_bot_level    ! deepest ocean level for t-, u- and v-points
+                          k_bot = mbkt
                           CALL zgr_top_level    ! shallowest ocean level for T-, U-, V- points
+                          k_top = mikt
+
+      ENDIF
       !
       IF( nprint == 1 .AND. lwp )   THEN
-         WRITE(numout,*) ' MIN val mbathy  ', MINVAL(  mbathy(:,:) ), ' MAX ', MAXVAL( mbathy(:,:) )
+         WRITE(numout,*) ' MIN val k_top   ', MINVAL(   k_top(:,:) ), ' MAX ', MAXVAL( k_top(:,:) )
+         WRITE(numout,*) ' MIN val k_bot   ', MINVAL(   k_bot(:,:) ), ' MAX ', MAXVAL( k_bot(:,:) )
          WRITE(numout,*) ' MIN val depth t ', MINVAL( gdept_0(:,:,:) ),   &
             &                          ' w ', MINVAL( gdepw_0(:,:,:) )
          WRITE(numout,*) ' MIN val e3    t ', MINVAL(   e3t_0(:,:,:) ), ' f ', MINVAL(   e3f_0(:,:,:) ),  &
@@ -180,9 +225,156 @@ CONTAINS
             &                          ' uw', MAXVAL(  e3uw_0(:,:,:) ), ' vw', MAXVAL(  e3vw_0(:,:,:) ),  &
             &                          ' w ', MAXVAL(   e3w_0(:,:,:) )
       ENDIF
+
       !
    END SUBROUTINE dom_zgr
 
+   SUBROUTINE zgr_read( ld_zco  , ld_zps  , ld_sco  , ld_isfcav,   &   ! type of vertical coordinate
+      &                 pdept_1d, pdepw_1d, pe3t_1d , pe3w_1d  ,   &   ! 1D reference vertical coordinate
+      &                 pdept , pdepw ,                            &   ! 3D t & w-points depth
+      &                 pe3t  , pe3u  , pe3v   , pe3f ,            &   ! vertical scale factors
+      &                 pe3w  , pe3uw , pe3vw         ,            &   !     -      -      -
+      &                 k_top  , k_bot    )                            ! top & bottom ocean level
+      !!---------------------------------------------------------------------
+      !!              ***  ROUTINE zgr_read  ***
+      !!
+      !! ** Purpose :   Read the vertical information in the domain configuration file
+      !!
+      !!----------------------------------------------------------------------
+      LOGICAL                   , INTENT(out) ::   ld_zco, ld_zps, ld_sco      ! vertical coordinate flags
+      LOGICAL                   , INTENT(out) ::   ld_isfcav                   ! under iceshelf cavity flag
+      REAL(wp), DIMENSION(:)    , INTENT(out) ::   pdept_1d, pdepw_1d          ! 1D grid-point depth       [m]
+      REAL(wp), DIMENSION(:)    , INTENT(out) ::   pe3t_1d , pe3w_1d           ! 1D vertical scale factors [m]
+      REAL(wp), DIMENSION(:,:,:), INTENT(out) ::   pdept, pdepw                ! grid-point depth          [m]
+      REAL(wp), DIMENSION(:,:,:), INTENT(out) ::   pe3t , pe3u , pe3v , pe3f   ! vertical scale factors    [m]
+      REAL(wp), DIMENSION(:,:,:), INTENT(out) ::   pe3w , pe3uw, pe3vw         !    -       -      -
+      INTEGER , DIMENSION(:,:)  , INTENT(out) ::   k_top , k_bot               ! first & last ocean level
+      !
+      INTEGER  ::   jk     ! dummy loop index
+      INTEGER  ::   inum   ! local logical unit
+      REAL(WP) ::   z_zco, z_zps, z_sco, z_cav
+      REAL(wp), DIMENSION(jpi,jpj) ::   z2d   ! 2D workspace
+      !!----------------------------------------------------------------------
+      !
+      IF(lwp) THEN
+         WRITE(numout,*)
+         WRITE(numout,*) '   zgr_read : read the vertical coordinates in ', TRIM( cn_domcfg ), ' file'
+         WRITE(numout,*) '   ~~~~~~~~'
+      ENDIF
+      !
+      CALL iom_open( cn_domcfg, inum )
+      !
+      !                          !* type of vertical coordinate
+      CALL iom_get( inum, 'ln_zco'   , z_zco )
+      CALL iom_get( inum, 'ln_zps'   , z_zps )
+      CALL iom_get( inum, 'ln_sco'   , z_sco )
+      IF( z_zco == 0._wp ) THEN   ;   ld_zco = .false.   ;   ELSE   ;   ld_zco = .true.   ;   ENDIF
+      IF( z_zps == 0._wp ) THEN   ;   ld_zps = .false.   ;   ELSE   ;   ld_zps = .true.   ;   ENDIF
+      IF( z_sco == 0._wp ) THEN   ;   ld_sco = .false.   ;   ELSE   ;   ld_sco = .true.   ;   ENDIF
+      !
+      !                          !* ocean cavities under iceshelves
+      CALL iom_get( inum, 'ln_isfcav', z_cav )
+      IF( z_cav == 0._wp ) THEN   ;   ld_isfcav = .false.   ;   ELSE   ;   ld_isfcav = .true.   ;   ENDIF
+      !
+      !                          !* vertical scale factors
+      CALL iom_get( inum, jpdom_unknown, 'e3t_1d'  , pe3t_1d  )                     ! 1D reference coordinate
+      CALL iom_get( inum, jpdom_unknown, 'e3w_1d'  , pe3w_1d  )
+      !
+      CALL iom_get( inum, jpdom_data, 'e3t_0'  , pe3t  , lrowattr=ln_use_jattr )    ! 3D coordinate
+      CALL iom_get( inum, jpdom_data, 'e3u_0'  , pe3u  , lrowattr=ln_use_jattr )
+      CALL iom_get( inum, jpdom_data, 'e3v_0'  , pe3v  , lrowattr=ln_use_jattr )
+      CALL iom_get( inum, jpdom_data, 'e3f_0'  , pe3f  , lrowattr=ln_use_jattr )
+      CALL iom_get( inum, jpdom_data, 'e3w_0'  , pe3w  , lrowattr=ln_use_jattr )
+      CALL iom_get( inum, jpdom_data, 'e3uw_0' , pe3uw , lrowattr=ln_use_jattr )
+      CALL iom_get( inum, jpdom_data, 'e3vw_0' , pe3vw , lrowattr=ln_use_jattr )
+      !
+      !                          !* depths
+      !                                   !- old depth definition (obsolescent feature)
+      IF(  iom_varid( inum, 'gdept_1d', ldstop = .FALSE. ) > 0  .AND.  &
+         & iom_varid( inum, 'gdepw_1d', ldstop = .FALSE. ) > 0  .AND.  &
+         & iom_varid( inum, 'gdept_0' , ldstop = .FALSE. ) > 0  .AND.  &
+         & iom_varid( inum, 'gdepw_0' , ldstop = .FALSE. ) > 0    ) THEN
+         CALL ctl_warn( 'zgr_read : old definition of depths and scale factors used ', & 
+            &           '           depths at t- and w-points read in the domain configuration file')
+         CALL iom_get( inum, jpdom_unknown, 'gdept_1d', pdept_1d )   
+         CALL iom_get( inum, jpdom_unknown, 'gdepw_1d', pdepw_1d )
+         CALL iom_get( inum, jpdom_data   , 'gdept_0' , pdept , lrowattr=ln_use_jattr )
+         CALL iom_get( inum, jpdom_data   , 'gdepw_0' , pdepw , lrowattr=ln_use_jattr )
+         !
+      ELSE                                !- depths computed from e3. scale factors
+         CALL e3_to_depth( pe3t_1d, pe3w_1d, pdept_1d, pdepw_1d )    ! 1D reference depth
+         CALL e3_to_depth( pe3t   , pe3w   , pdept   , pdepw    )    ! 3D depths
+         IF(lwp) THEN
+            WRITE(numout,*)
+            WRITE(numout,*) '              Reference 1D z-coordinate depth and scale factors:'
+            WRITE(numout, "(9x,' level  gdept_1d  gdepw_1d  e3t_1d   e3w_1d  ')" )
+            WRITE(numout, "(10x, i4, 4f9.2)" ) ( jk, pdept_1d(jk), pdepw_1d(jk), pe3t_1d(jk), pe3w_1d(jk), jk = 1, jpk )
+         ENDIF
+      ENDIF
+      !
+      !                          !* ocean top and bottom level
+      CALL iom_get( inum, jpdom_data, 'top_level'    , z2d  , lrowattr=ln_use_jattr )   ! 1st wet T-points (ISF)
+      k_top(:,:) = NINT( z2d(:,:) )
+      CALL iom_get( inum, jpdom_data, 'bottom_level' , z2d  , lrowattr=ln_use_jattr )   ! last wet T-points
+      k_bot(:,:) = NINT( z2d(:,:) )
+      !
+      ! reference depth for negative bathy (wetting and drying only)
+      ! IF( ll_wd )  CALL iom_get( inum,  'rn_wd_ref_depth' , ssh_ref   )
+      !
+      CALL iom_close( inum )
+      !
+   END SUBROUTINE zgr_read
+
+   SUBROUTINE zgr_top_bot( k_top, k_bot )
+      !!----------------------------------------------------------------------
+      !!                    ***  ROUTINE zgr_top_bot  ***
+      !!
+      !! ** Purpose :   defines the vertical index of ocean bottom (mbk. arrays)
+      !!
+      !! ** Method  :   computes from k_top and k_bot with a minimum value of 1 over land
+      !!
+      !! ** Action  :   mikt, miku, mikv :   vertical indices of the shallowest 
+      !!                                     ocean level at t-, u- & v-points
+      !!                                     (min value = 1)
+      !! ** Action  :   mbkt, mbku, mbkv :   vertical indices of the deeptest 
+      !!                                     ocean level at t-, u- & v-points
+      !!                                     (min value = 1 over land)
+      !!----------------------------------------------------------------------
+      INTEGER , DIMENSION(:,:), INTENT(in) ::   k_top, k_bot   ! top & bottom ocean level indices
+      !
+      INTEGER ::   ji, jj   ! dummy loop indices
+      REAL(wp), DIMENSION(jpi,jpj) ::   zk   ! workspace
+      !!----------------------------------------------------------------------
+      !
+      IF(lwp) WRITE(numout,*)
+      IF(lwp) WRITE(numout,*) '    zgr_top_bot : ocean top and bottom k-index of T-, U-, V- and W-levels '
+      IF(lwp) WRITE(numout,*) '    ~~~~~~~~~~~'
+      !
+      mikt(:,:) = MAX( k_top(:,:) , 1 )    ! top    ocean k-index of T-level (=1 over land)
+      !
+      mbkt(:,:) = MAX( k_bot(:,:) , 1 )    ! bottom ocean k-index of T-level (=1 over land)
+ 
+      !                                    ! N.B.  top     k-index of W-level = mikt
+      !                                    !       bottom  k-index of W-level = mbkt+1
+      DO jj = 1, jpjm1
+         DO ji = 1, jpim1
+            miku(ji,jj) = MAX(  mikt(ji+1,jj  ) , mikt(ji,jj)  )
+            mikv(ji,jj) = MAX(  mikt(ji  ,jj+1) , mikt(ji,jj)  )
+            mikf(ji,jj) = MAX(  mikt(ji  ,jj+1) , mikt(ji,jj), mikt(ji+1,jj  ), mikt(ji+1,jj+1)  )
+            !
+            mbku(ji,jj) = MIN(  mbkt(ji+1,jj  ) , mbkt(ji,jj)  )
+            mbkv(ji,jj) = MIN(  mbkt(ji  ,jj+1) , mbkt(ji,jj)  )
+         END DO
+      END DO
+      ! converte into REAL to use lbc_lnk ; impose a min value of 1 as a zero can be set in lbclnk 
+      zk(:,:) = REAL( miku(:,:), wp )   ;   CALL lbc_lnk( 'domzgr', zk, 'U', 1. )   ;   miku(:,:) = MAX( NINT( zk(:,:) ), 1 )
+      zk(:,:) = REAL( mikv(:,:), wp )   ;   CALL lbc_lnk( 'domzgr', zk, 'V', 1. )   ;   mikv(:,:) = MAX( NINT( zk(:,:) ), 1 )
+      zk(:,:) = REAL( mikf(:,:), wp )   ;   CALL lbc_lnk( 'domzgr', zk, 'F', 1. )   ;   mikf(:,:) = MAX( NINT( zk(:,:) ), 1 )
+      !
+      zk(:,:) = REAL( mbku(:,:), wp )   ;   CALL lbc_lnk( 'domzgr', zk, 'U', 1. )   ;   mbku(:,:) = MAX( NINT( zk(:,:) ), 1 )
+      zk(:,:) = REAL( mbkv(:,:), wp )   ;   CALL lbc_lnk( 'domzgr', zk, 'V', 1. )   ;   mbkv(:,:) = MAX( NINT( zk(:,:) ), 1 )
+      !
+   END SUBROUTINE zgr_top_bot
 
    SUBROUTINE zgr_z
       !!----------------------------------------------------------------------

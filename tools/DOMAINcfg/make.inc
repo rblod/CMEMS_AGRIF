@@ -10,7 +10,7 @@ CPPFLAGS += $(CPPARCH)
 CC=mpicc
 CFLAGS = -Df2cFortran 
 
-NCDF_ROOT:=$(shell nc-config --prefix)
+NCDF_ROOT=/opt/local
 INC_NETCDF = -I$(NCDF_ROOT)/include
 LIB_NETCDF= -L$(NCDF_ROOT)/lib/ -lnetcdf -lnetcdff
 

@@ -1,4 +1,3 @@
-!!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !! NEMO/OCE :   Reference namelist_ref                                !!
 !!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !! NEMO/OCE  :  1 - Domain & run manager (namrun, namcfg, namdom, namzgr, namzgr_sco )
@@ -186,6 +185,7 @@
    ln_chk_bathy  = .FALSE. !
    npt_connect   = 2
    npt_copy      = 2
+   south_boundary_open = .TRUE.
 /
 !-----------------------------------------------------------------------
 &nam_tide      !   tide parameters                                      ("key_tide")

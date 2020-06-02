@@ -407,7 +407,8 @@ CONTAINS
       INTEGER :: ierr
       !!----------------------------------------------------------------------
       !
-      ierr = dom_oce_alloc   ()          ! ocean domain
+      ierr = 0
+      ierr = ierr + dom_oce_alloc   ()          ! ocean domain
       !
       CALL mpp_sum( 'nemogcm', ierr )
       IF( ierr /= 0 )   CALL ctl_stop( 'STOP', 'nemo_alloc : unable to allocate standard ocean arrays' )

@@ -758,20 +758,18 @@ subroutine Agrif_Init_Grids ( procname1, procname2 )
 ! TEST FOR COARSE GRID (GRAND MOTHER GRID) in AGRIF_FixedGrids.in
     nunit = Agrif_Get_Unit()
     open(nunit, file='AGRIF_FixedGrids.in', form='formatted', status="old", ERR=98)
-    if (Agrif_Probdim == 3) then
-       read(nunit,*) is_coarse, rhox, rhoy, rhoz, rhot
-    elseif (Agrif_Probdim == 2) then
-       read(nunit,*) is_coarse, rhox, rhoy, rhot
-    elseif (Agrif_Probdim == 2) then
-       read(nunit,*) is_coarse, rhox, rhot
-    endif
+    read(nunit,*) is_coarse
     if (is_coarse == -1) then
        agrif_coarse = .TRUE.
+       rewind(nunit)
        if (Agrif_Probdim == 3) then
+          read(nunit,*) is_coarse, rhox, rhoy, rhoz, rhot
           coarse_spaceref(1:3)=(/rhox,rhoy,rhoz/)
        elseif (Agrif_Probdim == 2) then
+          read(nunit,*) is_coarse, rhox, rhoy, rhot
           coarse_spaceref(1:2)=(/rhox,rhoy/)
-       elseif (Agrif_Probdim == 2) then
+       elseif (Agrif_Probdim == 1) then
+          read(nunit,*) is_coarse, rhox, rhot
           coarse_spaceref(1:1)=(/rhox/)
        endif
        coarse_timeref(1:Agrif_Probdim) = rhot
