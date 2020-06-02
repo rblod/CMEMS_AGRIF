@@ -49,7 +49,7 @@ MODULE trcbc
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/TOP 4.0 , NEMO Consortium (2018)
-   !! $Id: trcbc.F90 12489 2020-02-28 15:55:11Z davestorkey $
+   !! $Id: trcbc.F90 12852 2020-05-01 16:24:35Z cetlod $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -150,7 +150,7 @@ CONTAINS
                IF(nn_trcdmp_bdy(ib) == 2                      )   trcdta_bdy(jn,ib)%dmp = .true.
                IF(trcdta_bdy(jn,ib)%cn_obc == 'frs' .AND. nn_trcdmp_bdy(ib) /= 0 )  &
                    & CALL ctl_stop( 'trc_bc_ini: Use FRS OR relaxation' )
-               IF(  .NOT.( 0 < nn_trcdmp_bdy(ib)  .AND.  nn_trcdmp_bdy(ib) <= 2 )  )   &
+               IF(  .NOT.( 0 <= nn_trcdmp_bdy(ib)  .AND.  nn_trcdmp_bdy(ib) <= 2 )  )   &
                    & CALL ctl_stop( 'trc_bc_ini: Not a valid option for nn_trcdmp_bdy. Allowed: 0,1,2.' )
             END DO
          END DO

@@ -351,9 +351,9 @@
    sn_hydrofe  = 'hydrofe.orca'    ,    -12            , 'epsdb'       ,  .false.     , .true. , 'yearly'  , ''       , ''    , ''
 !
    cn_dir      = './'      !  root directory for the location of the dynamical files
-   ln_ironsed  =  .true.   ! boolean for Fe input from sediments
-   ln_ironice  =  .true.   ! boolean for Fe input from sea ice
-   ln_hydrofe  =  .true.   ! boolean for from hydrothermal vents
+   ln_ironsed  =  .false.   ! boolean for Fe input from sediments
+   ln_ironice  =  .false.   ! boolean for Fe input from sea ice
+   ln_hydrofe  =  .false.   ! boolean for from hydrothermal vents
    sedfeinput  =  2.e-9    ! Coastal release of Iron
    distcoast   =  5.e3     ! Distance off the coast for Iron from sediments
    mfrac       =  0.035    ! Fe mineral fraction of dust

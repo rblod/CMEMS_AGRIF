@@ -183,22 +183,8 @@ CONTAINS
 902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namctl in configuration namelist' )
       !
       ! finalize the definition of namctl variables
-      IF( sn_cfctl%l_allon ) THEN
-         ! Turn on all options.
-         CALL nemo_set_cfctl( sn_cfctl, .TRUE., .TRUE. )
-         ! Ensure all processors are active
-         sn_cfctl%procmin = 0 ; sn_cfctl%procmax = 1000000 ; sn_cfctl%procincr = 1
-      ELSEIF( sn_cfctl%l_config ) THEN
-         ! Activate finer control of report outputs
-         ! optionally switch off output from selected areas (note this only
-         ! applies to output which does not involve global communications)
-         IF( ( narea < sn_cfctl%procmin .OR. narea > sn_cfctl%procmax  ) .OR. &
-           & ( MOD( narea - sn_cfctl%procmin, sn_cfctl%procincr ) /= 0 ) )    &
-           &   CALL nemo_set_cfctl( sn_cfctl, .FALSE., .FALSE. )
-      ELSE
-         ! turn off all options.
-         CALL nemo_set_cfctl( sn_cfctl, .FALSE., .TRUE. )
-      ENDIF
+      IF( narea < sn_cfctl%procmin .OR. narea > sn_cfctl%procmax .OR. MOD( narea - sn_cfctl%procmin, sn_cfctl%procincr ) /= 0 )   &
+         &   CALL nemo_set_cfctl( sn_cfctl, .FALSE. )
       !
       lwp = (narea == 1) .OR. sn_cfctl%l_oceout    ! control of all listing output print
       !
@@ -307,9 +293,6 @@ CONTAINS
          WRITE(numout,*) 'nemo_ctl: Control prints'
          WRITE(numout,*) '~~~~~~~~'
          WRITE(numout,*) '   Namelist namctl'
-         WRITE(numout,*) '                              sn_cfctl%l_glochk  = ', sn_cfctl%l_glochk
-         WRITE(numout,*) '                              sn_cfctl%l_allon   = ', sn_cfctl%l_allon
-         WRITE(numout,*) '       finer control over o/p sn_cfctl%l_config  = ', sn_cfctl%l_config
          WRITE(numout,*) '                              sn_cfctl%l_runstat = ', sn_cfctl%l_runstat
          WRITE(numout,*) '                              sn_cfctl%l_trcstat = ', sn_cfctl%l_trcstat
          WRITE(numout,*) '                              sn_cfctl%l_oceout  = ', sn_cfctl%l_oceout
@@ -445,27 +428,20 @@ CONTAINS
    END SUBROUTINE nemo_alloc
 
    
-   SUBROUTINE nemo_set_cfctl(sn_cfctl, setto, for_all )
+   SUBROUTINE nemo_set_cfctl(sn_cfctl, setto )
       !!----------------------------------------------------------------------
       !!                     ***  ROUTINE nemo_set_cfctl  ***
       !!
       !! ** Purpose :   Set elements of the output control structure to setto.
-      !!                for_all should be .false. unless all areas are to be
-      !!                treated identically.
       !!
       !! ** Method  :   Note this routine can be used to switch on/off some
-      !!                types of output for selected areas but any output types
-      !!                that involve global communications (e.g. mpp_max, glob_sum)
-      !!                should be protected from selective switching by the
-      !!                for_all argument
+      !!                types of output for selected areas.
       !!----------------------------------------------------------------------
-      LOGICAL :: setto, for_all
-      TYPE(sn_ctl) :: sn_cfctl
+      TYPE(sn_ctl), INTENT(inout) :: sn_cfctl
+      LOGICAL     , INTENT(in   ) :: setto
       !!----------------------------------------------------------------------
-      IF( for_all ) THEN
-         sn_cfctl%l_runstat = setto
-         sn_cfctl%l_trcstat = setto
-      ENDIF
+      sn_cfctl%l_runstat = setto
+      sn_cfctl%l_trcstat = setto
       sn_cfctl%l_oceout  = setto
       sn_cfctl%l_layout  = setto
       sn_cfctl%l_prtctl  = setto

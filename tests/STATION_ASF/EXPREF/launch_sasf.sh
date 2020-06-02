@@ -34,6 +34,12 @@ mkdir -p ${WORK_DIR}
 
 if [ ! -f ${NEMO_EXE} ]; then echo " Mhhh, no compiled nemo.exe found into ${NEMO_DIR}/tests/STATION_ASF/BLD/bin !"; exit; fi
 
+echo
+echo " *** Using the following NEMO executable:"
+echo "  ${NEMO_EXE} "
+echo
+
+
 NEMO_EXPREF="${NEMO_DIR}/tests/STATION_ASF/EXPREF"
 if [ ! -d ${NEMO_EXPREF} ]; then echo " Mhhh, no EXPREF directory ${NEMO_EXPREF} !"; exit; fi
 

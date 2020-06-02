@@ -77,12 +77,13 @@ CONTAINS
       !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
       ! Control and restarts
       !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-      CALL stp_ctl( kstp, Nbb, Nnn, indic )
+      CALL stp_ctl( kstp, Nnn )
+
       IF( kstp == nit000 )   CALL iom_close( numror )          ! close input  ocean restart file
       IF( lrst_oce       )   CALL rst_write( kstp, Nbb, Nnn )  ! write output ocean restart file
       !
 #if defined key_iomput
-      IF( kstp == nitend .OR. indic < 0 )   CALL xios_context_finalize()   ! needed for XIOS
+      IF( kstp == nitend .OR. nstop > 0 )   CALL xios_context_finalize()   ! needed for XIOS
       !
 #endif
    END SUBROUTINE stp_c1d
