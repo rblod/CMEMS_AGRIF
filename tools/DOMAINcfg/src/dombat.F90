@@ -1,5 +1,3 @@
-#define write !
-
 MODULE dombat
 
    USE dom_oce           ! ocean domain
@@ -9,8 +7,10 @@ MODULE dombat
    USE lbclnk            ! ocean lateral boundary conditions (or mpp link)
    USE lib_mpp           ! distributed memory computing library
    USE timing            ! Timing
+#if defined key_agrif
    USE agrif_modutil
    USE agrif_parameters
+#endif   
    USE bilinear_interp
 
    IMPLICIT NONE
@@ -66,16 +66,10 @@ CONTAINS
       zglamv(:,:) = glamv(:,:)
       zglamf(:,:) = glamf(:,:)
 
-     ! DO jj=1,jpj
-     !    DO ji=2, jpi
-            IF( glamt(1,1) .GT. glamt(jpi,jpj) ) THEN
-      !         write(*,*) ji, jj
-               ln_pacifiq =.false. 
-            ENDIF
-     !    END DO 
-     ! END DO  
-zshift = 0.
-         IF( ln_pacifiq  ) THEN
+      IF( glamt(1,1) .GT. glamt(jpi,jpj) ) ln_pacifiq =.false. 
+
+      zshift = 0.
+      IF( ln_pacifiq  ) THEN
          zshift = 0.!Abs(minval(glamt)) +0.1 
          WHERE ( glamt < 0 )
             zglamt = zglamt + zshift + 360.
@@ -89,11 +83,8 @@ zshift = 0.
          WHERE ( glamf < 0 )
             zglamf = zglamf + zshift +360.
          END WHERE
-       ENDIF
+      ENDIF
 
-      write(*,*) 'ln_pacifiq = ', ln_pacifiq 
-    !  bathy =0
-    !  return
       status=-1
 
       IF (lonlat_2D) THEN
@@ -120,33 +111,19 @@ zshift = 0.
             WHERE(lon_new1D < 0.00001) 
                 lon_new1D = lon_new1D +360.!zshift
              END WHERE
-         ENDIF     
-
-         write(*,*) 'glam  ', minval(glamt), maxval(glamt) 
-                  write(*,*) 'zglam ', minval(glamf), maxval(glamf) 
-
-         write(*,*) 'zglam ', minval(zglamf), maxval(zglamf) 
-           
+         ENDIF                
          zdel =  0.00   
          IF( MAXVAL(zglamf) > 180 + zshift ) THEN  
-            write(*,*) 'CAS1'
             !          
          !   WHERE( lon_new1D < 0 )
          !       lon_new1D = lon_new1D + 360.
          !   END WHERE
-            write(*,*) 'data ', minval(lon_new1D),maxval(lon_new1D)
             !     
             i_min = MAXLOC(lon_new1D,mask = lon_new1D < MINVAL(zglamf(1:jpi-1,1:jpj-1)) )
             i_max = MINLOC(lon_new1D,mask = lon_new1D > MAXVAL(zglamf(1:jpi-1,1:jpj-1)) )                   
             j_min = MAXLOC(lat_new1D,mask = lat_new1D < MINVAL( gphif(1:jpi-1,1:jpj-1)) )
             j_max = MINLOC(lat_new1D,mask = lat_new1D > MAXVAL( gphif(1:jpi-1,1:jpj-1)) )
             !
-           
-
-            write(*,*) 'MINMAX ', i_min, i_max, j_min,j_max
-            write(*,*) 'LON MINMAX', lon_new1D(i_min(1)), lon_new1D(i_max(1))
-            write(*,*) 'LAT MINMAX', lat_new1D(j_min(1)), lat_new1D(j_max(1))
-          !  stop
             tabdim1 = ( SIZE(lon_new1D) - i_min(1) + 1 ) + i_max(1)                   
             !          
             IF(j_min(1)-2 >= 1 .AND. j_max(1)+3 <= SIZE(lat_new1D,1) ) THEN
@@ -154,57 +131,36 @@ zshift = 0.
                j_max(1) = j_max(1)+ 3
             ENDIF
             tabdim2 = j_max(1) - j_min(1) + 1
-
-            write(*,*) 'DIMS ', tabdim1, tabdim2
-
             !
             ALLOCATE(coarselon  (tabdim1,tabdim2), STAT=status(1))
             ALLOCATE(coarselat  (tabdim1,tabdim2), STAT=status(2))
             ALLOCATE(Coarsebathy(tabdim1,tabdim2), STAT=status(3)) 
-            write(*,*) 'Apres ALLOCATE'
 
             IF( SUM(status) /= 0 ) CALL ctl_stop( 'STOP', 'dom_bat : unable to allocate arrays' )          
             !
             DO ji = 1,tabdim1
                coarselat(ji,:) = lat_new1D(j_min(1):j_max(1))
             END DO
-            write(*,*) 'Apres loop1'
            
             !
             DO jj = 1, tabdim2                                 
                coarselon(1:SIZE(lon_new1D)-i_min(1)+1      ,jj) = lon_new1D(i_min(1):SIZE(lon_new1D))
                coarselon(2+SIZE(lon_new1D)-i_min(1):tabdim1,jj) = lon_new1D(1:i_max(1))   
             END DO
-            write(*,*) 'Apres loop2'
             ! 
-           !
             CALL iom_get(inum, jpdom_unknown, bathyname,coarsebathy(1:SIZE(lon_new1D)-i_min(1)+1,:), &
             kstart=(/i_min(1),j_min(1)/), kcount=(/SIZE(lon_new1D)-i_min(1)+1,tabdim2/))   ! +1?
-
-            write(*,*) 'Apres iom_get 2'
-
+            !
             CALL iom_get(inum, jpdom_unknown, bathyname,coarsebathy(2+SIZE(lon_new1D)-i_min(1):tabdim1,:), &
             kstart=(/1,j_min(1)/),kcount=(/i_max(1),tabdim2/))                
-            write(*,*) 'Apres iom_get 2'
-
             !
          ELSE
-            write(*,*) 'CAS2'
           !  WHERE( lon_new1D > (180. + zshift) )   lon_new1D = lon_new1D - 360.
-            write(*,*) 'data ', minval(lon_new1D),maxval(lon_new1D)
-
             i_min = MAXLOC(lon_new1D,mask = lon_new1D < MINVAL(zglamf)-zdel)
             i_max = MINLOC(lon_new1D,mask = lon_new1D > MAXVAL(zglamf)+zdel)
             j_min = MAXLOC(lat_new1D,mask = lat_new1D < MINVAL(gphif)-zdel)
             j_max = MINLOC(lat_new1D,mask = lat_new1D > MAXVAL(gphif)+zdel)
-       !     write(*,*) Agrif_cfixed(),MINVAL(zglamt),maxval(zglamt),size(zglamt,1), size(zglamt,2)
-       !     write(*,*) zglamt(:,1)
-            write(*,*) 'MINMAX ', i_min, i_max, j_min,j_max
-            write(*,*) 'LON MINMAX', lon_new1D(i_min(1)), lon_new1D(i_max(1))
-            write(*,*) 'LAT MINMAX', lat_new1D(j_min(1)), lat_new1D(j_max(1))
-
-          !stop
-            
+         
             i_min(1)=max(i_min(1),1)
             !      
             IF(i_min(1)-2 >= 1 .AND. i_max(1)+3 <= SIZE(lon_new1D,1) ) THEN
@@ -218,35 +174,29 @@ zshift = 0.
                j_max(1) = j_max(1)+3
             ENDIF
             tabdim2 = j_max(1) - j_min(1) + 1
-
-            write(*,*) 'DIMS ', tabdim1, tabdim2
             !
             ALLOCATE(coarselon  (tabdim1,tabdim2), STAT=status(1)) 
             ALLOCATE(coarselat  (tabdim1,tabdim2), STAT=status(2)) 
             ALLOCATE(coarsebathy(tabdim1,tabdim2), STAT=status(3)) 
-            write(*,*) 'Apres ALLOCATE'
 
             IF( SUM(status) /= 0 ) CALL ctl_stop( 'STOP', 'dom_bat : unable to allocate arrays' )  
             !
             DO jj = 1,tabdim2
                coarselon(:,jj) = lon_new1D(i_min(1):i_max(1))
             END DO
-            write(*,*) 'Apres loop1'
             !      
             DO ji = 1,tabdim1
               coarselat(ji,:) = lat_new1D(j_min(1):j_max(1)) 
             END DO
-            write(*,*) 'Apres loop2'
             !
             CALL iom_get(inum,jpdom_unknown,bathyname,coarsebathy, &
             &                  kstart=(/i_min(1),j_min(1)/),kcount=(/tabdim1,tabdim2/))
-            write(*,*) 'Apres iom_get'
-
             !
          ENDIF   ! > 180
     
          DEALLOCATE(lon_new1D) ; DEALLOCATE(lat_new1D)
          CALL iom_close (inum)
+         
          coarsebathy = coarsebathy *rn_scale
         ! reset land to 0 
          WHERE (coarsebathy < 0.)        
@@ -268,8 +218,7 @@ zshift = 0.
             STOP 
          ENDIF
       ENDIF  
-      !stop
-      bathy(:,:) =0.
+      bathy(:,:) = 0.
       !
       !------------------------------------
       !MEDIAN AVERAGE or ARITHMETIC AVERAGE
@@ -285,7 +234,6 @@ zshift = 0.
          !                       
          DO jj = 1,jpj
             DO ji = 1,jpi
-              write(*,*) jj, ji
                !     
                ! FINE GRID CELLS DEFINITION  
                ji1=max(ji-1,1)
@@ -301,14 +249,6 @@ zshift = 0.
                     Cell_lonmax(ji,jj) = Cell_lonmin(ji,jj)
                     Cell_lonmin(ji,jj) = zdel-360
                ENDIF
-
-
-               IF (jj==122 .and. ji==40) THEN
-               write(*,*) Cell_lonmin(ji,jj), Cell_lonmax(ji,jj)
-               write(*,*) zglamf(ji-1,jj-1),zglamf(ji,jj-1),zglamf(ji,jj),zglamf(ji-1,jj)
-             !  stop
-               ENDIF 
-
                !               
                ! SEARCH FOR ALL POINTS CONTAINED IN THIS CELL
                !    
@@ -323,7 +263,6 @@ zshift = 0.
       !   DO jj = 2,jpj
       !      DO ji = 2,jpi
                iimin = 1
-               write(*,*) coarselon(iimin,1) , Cell_lonmin(ji,jj)
                DO WHILE( coarselon(iimin,1) < Cell_lonmin(ji,jj) ) 
                   iimin = iimin + 1
              !     IF ( iimin .LE. 1 ) THEN
@@ -331,10 +270,8 @@ zshift = 0.
              !     EXIT
              !     ENDIF
                ENDDO
-               write(*,*) 'apres while1', iimin,jjmin,size(coarselat,1)
                !               
                jjmin = 1
-               write(*,*) coarselat(iimin,jjmin) , Cell_latmin(ji,jj)
                DO WHILE( coarselat(iimin,jjmin) < Cell_latmin(ji,jj) ) 
                   jjmin = jjmin + 1
              !     IF ( iimin .LE. 1 ) THEN
@@ -343,12 +280,8 @@ zshift = 0.
              !     ENDIF
                ENDDO
                jjmin=max(1,jjmin)
-
-               write(*,*) 'apres while2'
-
                !                
                iimax = iimin 
-               write(*,*) coarselon(iimax,1) , Cell_lonmax(ji,jj)
                DO WHILE( coarselon(iimax,1)<= Cell_lonmax(ji,jj) ) 
                   iimax = iimax + 1
                   IF ( iimax .GE. SIZE(coarsebathy,1) ) THEN
@@ -356,11 +289,8 @@ zshift = 0.
                   EXIT
                 ENDIF
                ENDDO
-               write(*,*) 'apres while3'
-
                !                               
                jjmax = jjmin 
-               write(*,*) coarselat(iimax,jjmax) , Cell_latmax(ji,jj)
                DO WHILE( coarselat(iimax,jjmax) <= Cell_latmax(ji,jj) ) 
                   jjmax = jjmax + 1
                   IF ( jjmax .GE. SIZE(coarsebathy,2) ) THEN
@@ -368,7 +298,6 @@ zshift = 0.
                   EXIT
                 ENDIF
                ENDDO
-               write(*,*) 'apres while4'
                !
             !   iimax = iimax-1
             !   jjmax = jjmax-1
@@ -386,38 +315,18 @@ zshift = 0.
                IF( nxhr == 0 .OR. nyhr == 0 ) THEN
                   trouble_points(ji,jj) = 1
                ELSE
-
                   ALLOCATE( vardep(nxhr,nyhr) )
                   ALLOCATE( mask_oce(nxhr,nyhr) )
                   mask_oce = 0       
-
                   vardep(:,:) = coarsebathy(iimin:iimax,jjmin:jjmax)
-
                   WHERE( vardep(:,:) .GT. 0. ) 
-                   mask_oce = 1
+                     mask_oce = 1
                   ENDWHERE
-                 nxyhr = nxhr*nyhr
-
-
-               IF (jj==122 .and. ji==40) THEN
-               write(*,*) iimin, jjmin , iimax, jjmax
-               write(*,*) zglamt(ji,jj)
-              write(*,*) coarselon(iimin,jjmin), coarselon(iimin,jjmax),coarselon(iimax,jjmin),coarselon(iimax,jjmax)
-               write(*,*) nxhr,nyhr
-               write(*,*) SUM(mask_oce)
-              ! stop
-               endif            
-
-
-
+                  nxyhr = nxhr*nyhr
 !                 IF( SUM(mask_oce) == 0 ) THEN
-                  IF( SUM(mask_oce) < 0.5*(nxhr*nyhr) ) THEN
+                   IF( SUM(mask_oce) < 0.5*(nxhr*nyhr) ) THEN
                      bathy(ji,jj) = 0.
-                                      IF (jj==122 .and. ji==40) THEN
-                                        write(*,*) 'zeroisation'
-                                      endif
-  
-                  ELSE
+                   ELSE
                      IF( nn_interp == 0 ) THEN
                         ! Arithmetic average                   
                         bathy(ji,jj) = SUM (vardep(:,:)*mask_oce(:,:))/SUM(mask_oce)
@@ -439,11 +348,6 @@ zshift = 0.
                         DEALLOCATE(vardep1d)   
                      ENDIF
                   ENDIF
-                                                       IF (jj==122 .and. ji==40) THEN
-                                        write(*,*) bathy(ji,jj)
-                                      !  stop
-                                      endif
-
                   DEALLOCATE (mask_oce,vardep)
                ENDIF
             ENDDO
@@ -453,9 +357,7 @@ zshift = 0.
             CALL ctl_warn ('too much empty cells, proceed to bilinear interpolation')
             nn_interp = 2
          ENDIF
-
       ENDIF
-      write(*,*) 'Apres loop3', nn_interp
 
      !
      ! create logical array masksrc
@@ -503,29 +405,35 @@ zshift = 0.
         !            
       ENDIF
       CALL lbc_lnk( 'dom_bat', bathy, 'T', 1. )
-       ! close south if needed
 
        ! Correct South and North
-       IF(  south_boundary_open) THEN  
-          IF ((nbondj == -1).OR.(nbondj == 2)) THEN
-            bathy(:,1)=bathy(:,2)
-          ENDIF
-       ELSE
+#if defined key_agrif
+      IF( ln_bry_south ) THEN  
+         IF( (nbondj == -1).OR.(nbondj == 2) ) THEN
+           bathy(:,1)=bathy(:,2)
+         ENDIF
+      ELSE
             bathy(:,1) = 0.
-       ENDIF       
-       IF ((nbondj == 1).OR.(nbondj == 2)) THEN
-         bathy(:,jpj)=bathy(:,jpj-1)
-       ENDIF
+      ENDIF
+#else
+      IF ((nbondj == -1).OR.(nbondj == 2)) THEN
+            bathy(:,1)=bathy(:,2)
+      ENDIF
+#endif
 
-       ! Correct West and East
-       IF (jperio /=1) THEN
-       IF ((nbondi == -1).OR.(nbondi == 2)) THEN
-         bathy(1,:)=bathy(2,:)
-       ENDIF
-       IF ((nbondi == 1).OR.(nbondi == 2)) THEN
+      IF ((nbondj == 1).OR.(nbondj == 2)) THEN
+         bathy(:,jpj)=bathy(:,jpj-1)
+      ENDIF
+
+      ! Correct West and East
+      IF (jperio /=1) THEN
+         IF ((nbondi == -1).OR.(nbondi == 2)) THEN
+            bathy(1,:)=bathy(2,:)
+         ENDIF
+         IF ((nbondi == 1).OR.(nbondi == 2)) THEN
          bathy(jpi,:)=bathy(jpi-1,:)
-       ENDIF
-       ENDIF
+         ENDIF
+      ENDIF
 
 
    END SUBROUTINE dom_bat

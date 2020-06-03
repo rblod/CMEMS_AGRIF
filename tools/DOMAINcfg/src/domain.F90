@@ -84,12 +84,12 @@ CONTAINS
       CALL dom_zgr( ik_top, ik_bot )  ! Vertical mesh and bathymetry
       CALL dom_msk( ik_top, ik_bot )  ! Masks
       !
-
-      !
       !
       CALL dom_ctl                  ! print extrema of masked scale factors
       ! 
-   !   CALL cfg_write                ! create the configuration file
+#if ! defined key_agrif
+      CALL cfg_write                ! create the configuration file
+#endif
       !
    END SUBROUTINE dom_init
 
@@ -116,8 +116,8 @@ CONTAINS
   !       &             ppsur, ppa0, ppa1, ppkth, ppacr, ppdzmin, pphmax, ldbletanh,                  &
   !       &             ppa2, ppkth2, ppacr2
 
-      NAMELIST/namdom/ ln_read_cfg, nn_bathy, cn_topo, cn_bath, cn_lon, cn_lat, rn_scale, nn_interp, &
-         &             cn_domcfg, rn_bathy , rn_e3zps_min, rn_e3zps_rat, nn_msh, rn_hmin,            &
+      NAMELIST/namdom/ nn_bathy, cn_topo, cn_bath, cn_lon, cn_lat, rn_scale, nn_interp, &
+         &              rn_bathy , rn_e3zps_min, rn_e3zps_rat, nn_msh, rn_hmin,            &
          &             rn_atfp , rn_rdt   ,  ln_crs      , jphgr_msh ,                               &
          &             ppglam0, ppgphi0, ppe1_deg, ppe2_deg, ppe1_m, ppe2_m,                         &
          &             ppsur, ppa0, ppa1, ppkth, ppacr, ppdzmin, pphmax, ldbletanh,                  &

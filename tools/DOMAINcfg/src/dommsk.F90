@@ -153,15 +153,29 @@ CONTAINS
       ! ----------------------------
       !
       tmask(:,:,:) = 0._wp
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-            iktop = k_top(ji,jj)
-            ikbot = k_bot(ji,jj)
-            IF( iktop /= 0 ) THEN       ! water in the column
-               tmask(ji,jj,iktop:ikbot  ) = 1._wp
-            ENDIF
+      IF( ln_read_cfg) THEN
+         DO jj = 1, jpj
+            DO ji = 1, jpi
+               iktop = k_top(ji,jj)
+               ikbot = k_bot(ji,jj)
+               IF( iktop /= 0 ) THEN       ! water in the column
+                  tmask(ji,jj,iktop:ikbot  ) = 1._wp
+               ENDIF
+            END DO  
          END DO  
-      END DO  
+         ELSE
+         DO jk = 1, jpk
+            DO jj = 1, jpj
+               DO ji = 1, jpi
+                  IF(      ( REAL( mbathy (ji,jj) - jk, wp ) + 0.1_wp >= 0._wp )         &
+                  &  .AND. ( REAL( misfdep(ji,jj) - jk, wp ) - 0.1_wp <= 0._wp ) ) THEN
+                     tmask(ji,jj,jk) = 1._wp
+                  END IF
+               END DO
+            END DO
+         END DO
+         IF ( ln_isfsubgl ) CALL zgr_isf_subgl
+      ENDIF
 
 
 !SF  add here lbc_lnk: bug not still understood : cause now domain configuration is read !
