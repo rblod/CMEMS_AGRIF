@@ -203,33 +203,41 @@ CONTAINS
       IF( .NOT. AGRIF_Root() ) THEN 
          ! Mask vertical velocity at first/last columns/row 
          ! inside computational domain (cosmetic) 
-         ! --- West --- !
-         DO ji = mi0(2), mi1(2)
-            DO jj = 1, jpj
-               pww(ji,jj,:) = 0._wp 
+         ! --- West --- !         
+         IF( lk_west) THEN
+            DO ji = mi0(2), mi1(2)
+               DO jj = 1, jpj
+                  pww(ji,jj,:) = 0._wp 
+               ENDDO
             ENDDO
-         ENDDO
+         ENDIF
          !
          ! --- East --- !
-         DO ji = mi0(jpiglo-1), mi1(jpiglo-1)
-            DO jj = 1, jpj
-               pww(ji,jj,:) = 0._wp
+         IF( lk_east) THEN
+            DO ji = mi0(jpiglo-1), mi1(jpiglo-1)
+               DO jj = 1, jpj
+                  pww(ji,jj,:) = 0._wp
+               ENDDO
             ENDDO
-         ENDDO
+         ENDIF
          !
          ! --- South --- !
-         DO jj = mj0(2), mj1(2)
-            DO ji = 1, jpi
-               pww(ji,jj,:) = 0._wp
+         IF( lk_south) THEN
+            DO jj = mj0(2), mj1(2)
+               DO ji = 1, jpi
+                  pww(ji,jj,:) = 0._wp
+               ENDDO
             ENDDO
-         ENDDO
+         ENDIF
          !
          ! --- North --- !
-         DO jj = mj0(jpjglo-1), mj1(jpjglo-1)
-            DO ji = 1, jpi
-               pww(ji,jj,:) = 0._wp
+         IF( lk_north) THEN
+            DO jj = mj0(jpjglo-1), mj1(jpjglo-1)
+               DO ji = 1, jpi
+                  pww(ji,jj,:) = 0._wp
+               ENDDO
             ENDDO
-         ENDDO
+         ENDIF
       ENDIF 
 #endif 
       !
