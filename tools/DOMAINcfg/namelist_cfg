@@ -14,8 +14,6 @@
 !-----------------------------------------------------------------------
 &namdom        !   space and time domain (bathymetry, mesh, timestep)
 !-----------------------------------------------------------------------
-   ln_read_cfg = .false.   !  read existing domaincfg file
-   cn_domcfg   =  'domaing_cfg.nc'             ! used if ln_ref_cfg T
    nn_bathy    =    1      !  compute analyticaly (=0) or read (=1) the bathymetry file
                            !  or compute (2) from external bathymetry
    nn_interp   =    1                          ! type of interpolation (nn_bathy =2)                       
@@ -149,7 +147,7 @@ jpnj=0
 /
 !-----------------------------------------------------------------------
 &namagrif      !  AGRIF zoom                                            ("key_agrif")
-south_boundary_open = .TRUE.
+ln_bry_south = .TRUE.
 !-----------------------------------------------------------------------
 /
 !-----------------------------------------------------------------------

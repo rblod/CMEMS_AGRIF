@@ -33,7 +33,7 @@ MODULE agrif_oce
    LOGICAL , PUBLIC :: spongedoneT = .FALSE.       !: tracer   sponge layer indicator
    LOGICAL , PUBLIC :: spongedoneU = .FALSE.       !: dynamics sponge layer indicator
    LOGICAL , PUBLIC :: lk_agrif_fstep = .TRUE.     !: if true: first step
-   LOGICAL , PUBLIC :: lk_agrif_debug = .FALSE.    !: if true: print debugging info
+   LOGICAL , PUBLIC :: lk_agrif_debug = .TRUE.    !: if true: print debugging info
 
    LOGICAL , PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) :: tabspongedone_tsn
 # if defined key_top

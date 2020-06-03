@@ -1393,7 +1393,7 @@ CONTAINS
 
        IF (before) THEN
          DO jm=1,jpts
-             tabres(i1:i2,j1:j2,k1:k2,jm) = ts(i1:i2,j1:j2,k1:k2,jm,Kmm_a)
+             tabres(i1:i2,j1:j2,k1:k2,jm) = ts(i1:i2,j1:j2,k1:k2,jm,Kbb_a)
          END DO
        ELSE
          DO jm=1,jpts

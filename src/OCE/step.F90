@@ -226,7 +226,7 @@ CONTAINS
       IF( ln_diadct  )   CALL dia_dct   ( kstp,      Nnn )      ! Transports
                          CALL dia_ar5   ( kstp,      Nnn )      ! ar5 diag
                          CALL dia_ptr   ( kstp,      Nnn )      ! Poleward adv/ldf TRansports diagnostics
-                         CALL dia_wri   ( kstp,      Nnn )      ! ocean model: outputs
+                         CALL dia_wri   ( kstp,      NBb )      ! ocean model: outputs
       IF( ln_crs     )   CALL crs_fld   ( kstp,      Nnn )      ! ocean model: online field coarsening & output
       IF( lk_diadetide ) CALL dia_detide( kstp )                ! Weights computation for daily detiding of model diagnostics
       IF( lk_diamlr  )   CALL dia_mlr                           ! Update time used in multiple-linear-regression analysis

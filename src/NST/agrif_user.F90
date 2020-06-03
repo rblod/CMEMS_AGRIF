@@ -60,15 +60,15 @@
 
       ! Brutal fix to pas 1x1 refinment. 
   !    IF(Agrif_Irhox() == 1) THEN
-  !       CALL Agrif_Init_Variable(tsini_id, procname=agrif_initts) 
+         CALL Agrif_Init_Variable(tsini_id, procname=agrif_initts) 
   !    ELSE
-         CALL Agrif_Init_Variable(tsini_id, procname=interptsn) 
+   !      CALL Agrif_Init_Variable(tsini_id, procname=interptsn) 
   !    ENDIF
       Agrif_UseSpecialValue = ln_spc_dyn
       use_sign_north = .TRUE.
       sign_north = -1.
-      CALL Agrif_Init_Variable(uini_id , procname=interpun )
-      CALL Agrif_Init_Variable(vini_id , procname=interpvn )
+  !    CALL Agrif_Init_Variable(uini_id , procname=interpun )
+  !    CALL Agrif_Init_Variable(vini_id , procname=interpvn )
       use_sign_north = .FALSE.
       Agrif_UseSpecialValue = .FALSE.            !
       l_ini_child = .FALSE.
@@ -79,6 +79,8 @@
       END DO
       uu(:,:,:,Kbb) =  uu(:,:,:,Kbb) * umask(:,:,:)     
       vv(:,:,:,Kbb) =  vv(:,:,:,Kbb) * vmask(:,:,:) 
+
+      uu(:,:,:,:) = 0.  ;  vv(:,:,:,:) = 0.   
 
       CALL lbc_lnk_multi( 'agrif_istate', uu(:,:,:,Kbb), 'U', -1. , vv(:,:,:,Kbb), 'V', -1. )
       CALL lbc_lnk( 'agrif_istate', ts(:,:,:,:,Kbb), 'T', 1. )

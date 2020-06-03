@@ -29,7 +29,6 @@ MODULE dom_oce
    !! ----------------------------
    INTEGER , PUBLIC ::   nmsh            !: = 1 create a mesh-mask file
    !                                    !!* Namelist namdom : time & space domain *
-   LOGICAL,  PUBLIC ::   ln_read_cfg     !: .true. read from an existing domain_cfg file
    INTEGER , PUBLIC ::   nn_bathy        !: = 0/1/2 ,compute/read the bathymetry file
    REAL(wp), PUBLIC ::   rn_bathy        !: depth of flat bottom (active if nn_bathy=0; if =0 depth=jpkm1)
    REAL(wp), PUBLIC ::   rn_hmin         !: minimum ocean depth (>0) or minimum number of ocean levels (<0)
@@ -44,7 +43,6 @@ MODULE dom_oce
    INTEGER , PUBLIC ::   nn_closea       !: =0 suppress closed sea/lake from the ORCA domain or not (=1)
 
    INTEGER, PUBLIC :: nn_interp
-   CHARACTER(LEN=200), PUBLIC :: cn_domcfg
    CHARACTER(LEN=200), PUBLIC :: cn_topo
    CHARACTER(LEN=132), PUBLIC :: cn_bath
    CHARACTER(LEN=132), PUBLIC :: cn_lon
