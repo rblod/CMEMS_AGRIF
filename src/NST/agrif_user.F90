@@ -63,6 +63,7 @@
          CALL Agrif_Init_Variable(tsini_id, procname=agrif_initts)
   !    ELSE
    !      CALL Agrif_Init_Variable(tsini_id, procname=interptsn)
+
   !    ENDIF
       Agrif_UseSpecialValue = ln_spc_dyn
       use_sign_north = .TRUE.
@@ -70,6 +71,7 @@
   !    CALL Agrif_Init_Variable(uini_id , procname=interpun )
   !    CALL Agrif_Init_Variable(vini_id , procname=interpvn )
        use_sign_north = .FALSE.
+
       Agrif_UseSpecialValue = .FALSE.            !
       l_ini_child = .FALSE.
       Krhs_a = Kaa ; Kmm_a = Kmm
