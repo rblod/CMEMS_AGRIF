@@ -4,7 +4,7 @@
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/NST 4.0 , NEMO Consortium (2018)
-   !! $Id: agrif_user.F90 12489 2020-02-28 15:55:11Z davestorkey $
+   !! $Id: agrif_user.F90 13026 2020-06-03 14:30:02Z rblod $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
    SUBROUTINE agrif_user
@@ -122,23 +122,21 @@
       ind2 = 2 + nbghostcells_x
       ind3 = 2 + nbghostcells_y_s
 
-      CALL agrif_declare_variable((/2,2,0/),(/ind3,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nlci,nlcj,jpk/),e3t_id)
-      CALL agrif_declare_variable((/2,2/),(/ind3,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),mbkt_id)
-      CALL agrif_declare_variable((/2,2/),(/ind3,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),ht0_id)
+      CALL agrif_declare_variable((/2,2,0/),(/ind2,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nlci,nlcj,jpk/),e3t_id)
+      CALL agrif_declare_variable((/2,2/)  ,(/ind2,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),mbkt_id)
+      CALL agrif_declare_variable((/2,2/)  ,(/ind2,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),ht0_id)
 
       CALL agrif_declare_variable((/1,2/),(/ind2-1,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),e1u_id)
       CALL agrif_declare_variable((/2,1/),(/ind2,ind3-1/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),e2v_id)
 
    
       ! Initial or restart velues
-      CALL Agrif_Set_MaskMaxSearch(25)
-      !
-      CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts+1/),tsini_id)
-      CALL agrif_declare_variable((/1,2,0,0/),(/ind2-1,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/)     ,uini_id ) 
-      CALL agrif_declare_variable((/2,1,0,0/),(/ind2,ind3-1,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/)     ,vini_id )
-      CALL agrif_declare_variable((/2,2/),(/ind3,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),sshini_id)
+      
+      CALL agrif_declare_variable((/2,2,0,0/),(/ind2  ,ind3  ,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts+1/),tsini_id)
+      CALL agrif_declare_variable((/1,2,0,0/),(/ind2-1,ind3  ,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/)     ,uini_id ) 
+      CALL agrif_declare_variable((/2,1,0,0/),(/ind2  ,ind3-1,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/)     ,vini_id )
+      CALL agrif_declare_variable((/2,2/)    ,(/ind2,ind3/)        ,(/'x','y'/),(/1,1/),(/nlci,nlcj/),sshini_id)
       ! 
-      CALL Agrif_Set_MaskMaxSearch(5)
      
       ! 2. Type of interpolation
       !-------------------------
@@ -474,19 +472,17 @@
       ind3 = 2 + nbghostcells_y_s
 
 # if defined key_vertical
-      CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts+1/),tsn_id)
-      CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts+1/),tsn_sponge_id)
-
-      CALL agrif_declare_variable((/1,2,0,0/),(/ind2-1,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),un_interp_id) !
+      CALL agrif_declare_variable((/2,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts+1/),tsn_id)
+      CALL agrif_declare_variable((/2,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts+1/),tsn_sponge_id)
+      CALL agrif_declare_variable((/1,2,0,0/),(/ind2-1,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),un_interp_id)
       CALL agrif_declare_variable((/2,1,0,0/),(/ind2,ind3-1,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),vn_interp_id)
       CALL agrif_declare_variable((/1,2,0,0/),(/ind2-1,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),un_update_id)
       CALL agrif_declare_variable((/2,1,0,0/),(/ind2,ind3-1,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),vn_update_id)
       CALL agrif_declare_variable((/1,2,0,0/),(/ind2-1,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),un_sponge_id)
       CALL agrif_declare_variable((/2,1,0,0/),(/ind2,ind3-1,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),vn_sponge_id)
 # else
-      CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts/),tsn_id)
-      CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts/),tsn_sponge_id)
-
+      CALL agrif_declare_variable((/2,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts/),tsn_id)
+      CALL agrif_declare_variable((/2,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,jpts/),tsn_sponge_id)
       CALL agrif_declare_variable((/1,2,0,0/),(/ind2-1,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),un_interp_id)
       CALL agrif_declare_variable((/2,1,0,0/),(/ind2,ind3-1,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),vn_interp_id)
       CALL agrif_declare_variable((/1,2,0,0/),(/ind2-1,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),un_update_id)
@@ -494,24 +490,23 @@
       CALL agrif_declare_variable((/1,2,0,0/),(/ind2-1,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),un_sponge_id)
       CALL agrif_declare_variable((/2,1,0,0/),(/ind2,ind3-1,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),vn_sponge_id)
 # endif
+      CALL agrif_declare_variable((/1,2/),(/ind2-1,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),unb_id)
+      CALL agrif_declare_variable((/2,1/),(/ind2,ind3-1/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),vnb_id)
+      CALL agrif_declare_variable((/1,2/),(/ind2-1,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),ub2b_interp_id)
+      CALL agrif_declare_variable((/2,1/),(/ind2,ind3-1/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),vb2b_interp_id)
+      CALL agrif_declare_variable((/1,2/),(/ind2-1,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),ub2b_update_id)
+      CALL agrif_declare_variable((/2,1/),(/ind2,ind3-1/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),vb2b_update_id)
 
-      CALL agrif_declare_variable((/1,2/),(/ind2,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),unb_id)
-      CALL agrif_declare_variable((/2,1/),(/ind3,ind2/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),vnb_id)
-      CALL agrif_declare_variable((/1,2/),(/ind2,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),ub2b_interp_id)
-      CALL agrif_declare_variable((/2,1/),(/ind3,ind2/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),vb2b_interp_id)
-      CALL agrif_declare_variable((/1,2/),(/ind2,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),ub2b_update_id)
-      CALL agrif_declare_variable((/2,1/),(/ind3,ind2/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),vb2b_update_id)
-
-      CALL agrif_declare_variable((/2,2/),(/ind3,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),sshn_id)
+      CALL agrif_declare_variable((/2,2/),(/ind2,ind3/),(/'x','y'/),(/1,1/),(/nlci,nlcj/),sshn_id)
 
 
       IF( ln_zdftke.OR.ln_zdfgls ) THEN  ! logical not known at this point
 !         CALL agrif_declare_variable((/2,2,0/),(/ind3,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nlci,nlcj,jpk/), en_id)
 !         CALL agrif_declare_variable((/2,2,0/),(/ind3,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nlci,nlcj,jpk/),avt_id)
 # if defined key_vertical
-         CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),avm_id)
+         CALL agrif_declare_variable((/2,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,2/),avm_id)
 # else
-         CALL agrif_declare_variable((/2,2,0,0/),(/ind3,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),avm_id)
+         CALL agrif_declare_variable((/2,2,0,0/),(/ind2,ind3,0,0/),(/'x','y','N','N'/),(/1,1,1,1/),(/nlci,nlcj,jpk,1/),avm_id)
 # endif
       ENDIF
      
