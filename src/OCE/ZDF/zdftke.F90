@@ -44,6 +44,12 @@ MODULE zdftke
    USE sbc_oce        ! surface boundary condition: ocean
    USE zdfdrg         ! vertical physics: top/bottom drag coef.
    USE zdfmxl         ! vertical physics: mixed layer
+#if defined key_si3
+   USE ice, ONLY: hm_i, h_i
+#endif
+#if defined key_cice
+   USE sbc_ice, ONLY: h_i
+#endif
    !
    USE in_out_manager ! I/O manager
    USE iom            ! I/O manager library
@@ -63,6 +69,8 @@ MODULE zdftke
    LOGICAL  ::   ln_mxl0   ! mixing length scale surface value as function of wind stress or not
    INTEGER  ::   nn_mxl    ! type of mixing length (=0/1/2/3)
    REAL(wp) ::   rn_mxl0   ! surface  min value of mixing length (kappa*z_o=0.4*0.1 m)  [m]
+   INTEGER  ::      nn_mxlice ! type of scaling under sea-ice
+   REAL(wp) ::      rn_mxlice ! max constant ice thickness value when scaling under sea-ice ( nn_mxlice=1)
    INTEGER  ::   nn_pdl    ! Prandtl number or not (ratio avt/avm) (=0/1)
    REAL(wp) ::   rn_ediff  ! coefficient for avt: avt=rn_ediff*mxl*sqrt(e)
    REAL(wp) ::   rn_ediss  ! coefficient of the Kolmogoroff dissipation 
@@ -91,7 +99,7 @@ MODULE zdftke
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: zdftke.F90 12702 2020-04-07 09:16:52Z mathiot $
+   !! $Id: zdftke.F90 13058 2020-06-07 18:13:59Z rblod $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -421,7 +429,7 @@ CONTAINS
       INTEGER  ::   ji, jj, jk   ! dummy loop indices
       REAL(wp) ::   zrn2, zraug, zcoef, zav   ! local scalars
       REAL(wp) ::   zdku,   zdkv, zsqen       !   -      -
-      REAL(wp) ::   zemxl, zemlm, zemlp       !   -      -
+      REAL(wp) ::   zemxl, zemlm, zemlp, zmaxice       !   -      -
       REAL(wp), DIMENSION(jpi,jpj,jpk) ::   zmxlm, zmxld   ! 3D workspace
       !!--------------------------------------------------------------------
       !
@@ -435,14 +443,53 @@ CONTAINS
       zmxlm(:,:,:)  = rmxl_min    
       zmxld(:,:,:)  = rmxl_min
       !
-      IF( ln_mxl0 ) THEN            ! surface mixing length = F(stress) : l=vkarmn*2.e5*taum/(rho0*g)
+     IF( ln_mxl0 ) THEN            ! surface mixing length = F(stress) : l=vkarmn*2.e5*taum/(rho0*g)
+         !
          zraug = vkarmn * 2.e5_wp / ( rho0 * grav )
+#if ! defined key_si3 && ! defined key_cice
          DO_2D_00_00
-            zmxlm(ji,jj,1) = MAX( rn_mxl0, zraug * taum(ji,jj) * tmask(ji,jj,1) )
+            zmxlm(ji,jj,1) =  zraug * taum(ji,jj) * tmask(ji,jj,1)
          END_2D
-      ELSE 
+#else
+         SELECT CASE( nn_mxlice )             ! Type of scaling under sea-ice
+         !
+         CASE( 0 )                      ! No scaling under sea-ice
+            DO_2D_00_00
+               zmxlm(ji,jj,1) = zraug * taum(ji,jj) * tmask(ji,jj,1)
+            END_2D
+            !
+         CASE( 1 )                           ! scaling with constant sea-ice thickness
+            DO_2D_00_00
+               zmxlm(ji,jj,1) =  ( ( 1. - fr_i(ji,jj) ) * zraug * taum(ji,jj) + fr_i(ji,jj) * rn_mxlice ) * tmask(ji,jj,1)
+            END_2D
+            !
+         CASE( 2 )                                 ! scaling with mean sea-ice thickness
+            DO_2D_00_00
+#if defined key_si3
+               zmxlm(ji,jj,1) = ( ( 1. - fr_i(ji,jj) ) * zraug * taum(ji,jj) + fr_i(ji,jj) * hm_i(ji,jj) * 2. ) * tmask(ji,jj,1)
+#elif defined key_cice
+               zmaxice = MAXVAL( h_i(ji,jj,:) )
+               zmxlm(ji,jj,1) = ( ( 1. - fr_i(ji,jj) ) * zraug * taum(ji,jj) + fr_i(ji,jj) * zmaxice ) * tmask(ji,jj,1)
+#endif
+            END_2D
+            !
+         CASE( 3 )                                 ! scaling with max sea-ice thickness
+            DO_2D_00_00
+               zmaxice = MAXVAL( h_i(ji,jj,:) )
+               zmxlm(ji,jj,1) = ( ( 1. - fr_i(ji,jj) ) * zraug * taum(ji,jj) + fr_i(ji,jj) * zmaxice ) * tmask(ji,jj,1)
+            END_2D
+            !
+         END SELECT
+#endif
+         !
+         DO_2D_00_00
+            zmxlm(ji,jj,1) = MAX( rn_mxl0, zmxlm(ji,jj,1) )
+         END_2D
+         !
+      ELSE
          zmxlm(:,:,1) = rn_mxl0
       ENDIF
+
       !
       DO_3D_00_00( 2, jpkm1 )
          zrn2 = MAX( rn2(ji,jj,jk), rsmall )
@@ -546,10 +593,11 @@ CONTAINS
       INTEGER             ::   ji, jj, jk   ! dummy loop indices
       INTEGER             ::   ios
       !!
-      NAMELIST/namzdf_tke/ rn_ediff, rn_ediss , rn_ebb , rn_emin  ,          &
-         &                 rn_emin0, rn_bshear, nn_mxl , ln_mxl0  ,          &
-         &                 rn_mxl0 , nn_pdl   , ln_drg , ln_lc    , rn_lc,   &
-         &                 nn_etau , nn_htau  , rn_efr , rn_eice  
+      NAMELIST/namzdf_tke/ rn_ediff, rn_ediss , rn_ebb   , rn_emin  ,  &
+         &                 rn_emin0, rn_bshear, nn_mxl   , ln_mxl0  ,  &
+         &                 rn_mxl0 , nn_mxlice, rn_mxlice,             &
+         &                 nn_pdl  , ln_drg   , ln_lc    , rn_lc,      &
+         &                 nn_etau , nn_htau  , rn_efr   , rn_eice  
       !!----------------------------------------------------------------------
       !
       READ  ( numnam_ref, namzdf_tke, IOSTAT = ios, ERR = 901)
@@ -575,6 +623,11 @@ CONTAINS
          WRITE(numout,*) '      background shear (>0)                       rn_bshear = ', rn_bshear
          WRITE(numout,*) '      mixing length type                          nn_mxl    = ', nn_mxl
          WRITE(numout,*) '         surface mixing length = F(stress) or not    ln_mxl0   = ', ln_mxl0
+         IF( ln_mxl0 ) THEN
+            WRITE(numout,*) '      type of scaling under sea-ice               nn_mxlice = ', nn_mxlice
+            IF( nn_mxlice == 1 ) &
+            WRITE(numout,*) '      ice thickness when scaling under sea-ice    rn_mxlice = ', rn_mxlice
+         ENDIF         
          WRITE(numout,*) '         surface  mixing length minimum value        rn_mxl0   = ', rn_mxl0
          WRITE(numout,*) '      top/bottom friction forcing flag            ln_drg    = ', ln_drg
          WRITE(numout,*) '      Langmuir cells parametrization              ln_lc     = ', ln_lc

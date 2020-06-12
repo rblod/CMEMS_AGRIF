@@ -33,7 +33,7 @@ MODULE agrif_ice_interp
 
    !!----------------------------------------------------------------------
    !! NEMO/NST 4.0 , NEMO Consortium (2018)
-   !! $Id: agrif_ice_interp.F90 10069 2018-08-28 14:12:24Z nicolasmartin $
+   !! $Id: agrif_ice_interp.F90 13026 2020-06-03 14:30:02Z rblod $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 

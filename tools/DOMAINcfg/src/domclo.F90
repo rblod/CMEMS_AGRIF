@@ -11,7 +11,7 @@ MODULE domclo
    USE dom_oce         ! ocean space and time domain
    USE domngb          ! closest point algorithm
    USE phycst          ! rpi, rad, ra
-   USE domutil         ! flood filling algorithm (fill_pool)
+   USE domutl          ! flood filling algorithm (fill_pool)
    USE in_out_manager  ! I/O manager
    USE lbclnk          ! lateral boundary condition - MPP exchanges
    USE lib_mpp

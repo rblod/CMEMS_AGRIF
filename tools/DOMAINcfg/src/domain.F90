@@ -67,8 +67,6 @@ CONTAINS
       INTEGER , DIMENSION(jpi,jpj) ::   ik_top , ik_bot       ! top and bottom ocean level
       !!----------------------------------------------------------------------
       !
-     ! IF( nn_timing == 1 )   CALL timing_start('dom_init')
-      !
       IF(lwp) THEN
          WRITE(numout,*)
          WRITE(numout,*) 'dom_init : domain initialization'
@@ -104,17 +102,10 @@ CONTAINS
       !!              - namnc4 namelist   ! "key_netcdf4" only
       !!----------------------------------------------------------------------
       USE ioipsl
-      NAMELIST/namrun/ cn_ocerst_indir, cn_ocerst_outdir, nn_stocklist, ln_rst_list,                 &
-                       nn_no   , cn_exp   , cn_ocerst_in, cn_ocerst_out, ln_rstart , nn_rstctl ,     &
-         &             nn_it000, nn_itend , nn_date0    , nn_time0     , nn_leapy  , nn_istate ,     &
-         &             nn_stock, nn_write , ln_mskland  , ln_clobber   , nn_chunksz, nn_euler  ,     &
+      NAMELIST/namrun/ cn_exp   ,    &          
+         &             nn_it000, nn_itend , nn_date0    , nn_time0     , nn_leapy  ,     &
+         &             ln_mskland  , ln_clobber   , nn_chunksz,     &
          &             ln_cfmeta, ln_iscpl
-  !    NAMELIST/namdom/ nn_bathy, cn_topo, cn_bath, cn_lon, cn_lat, nn_interp,                        &
-  !       &             rn_bathy , rn_e3zps_min, rn_e3zps_rat, nn_msh, rn_hmin,                       &
-  !       &             rn_atfp , rn_rdt   , ln_crs      , jphgr_msh ,                                &
-  !       &             ppglam0, ppgphi0, ppe1_deg, ppe2_deg, ppe1_m, ppe2_m,                         &
-  !       &             ppsur, ppa0, ppa1, ppkth, ppacr, ppdzmin, pphmax, ldbletanh,                  &
-  !       &             ppa2, ppkth2, ppacr2
 
       NAMELIST/namdom/ nn_bathy, cn_topo, cn_bath, cn_lon, cn_lat, rn_scale, nn_interp, &
          &              rn_bathy , rn_e3zps_min, rn_e3zps_rat, nn_msh, rn_hmin,            &
@@ -148,49 +139,10 @@ CONTAINS
       ENDIF
 
       cexper = cn_exp
-      nrstdt = nn_rstctl
       nit000 = nn_it000
       nitend = nn_itend
       ndate0 = nn_date0
       nleapy = nn_leapy
-      ninist = nn_istate
-      nstock = nn_stock
-      nstocklist = nn_stocklist
-      nwrite = nn_write
-      neuler = nn_euler
-      IF ( neuler == 1 .AND. .NOT. ln_rstart ) THEN
-         WRITE(ctmp1,*) 'ln_rstart =.FALSE., nn_euler is forced to 0 '
-         CALL ctl_warn( ctmp1 )
-         neuler = 0
-      ENDIF
-
-      !                             ! control of output frequency
-      IF ( nstock == 0 .OR. nstock > nitend ) THEN
-         WRITE(ctmp1,*) 'nstock = ', nstock, ' it is forced to ', nitend
-         CALL ctl_warn( ctmp1 )
-         nstock = nitend
-      ENDIF
-      IF ( nwrite == 0 ) THEN
-         WRITE(ctmp1,*) 'nwrite = ', nwrite, ' it is forced to ', nitend
-         CALL ctl_warn( ctmp1 )
-         nwrite = nitend
-      ENDIF
-
-
-
-
-      SELECT CASE ( nleapy )        ! Choose calendar for IOIPSL
-      CASE (  1 ) 
-         CALL ioconf_calendar('gregorian')
-         IF(lwp) WRITE(numout,*) '   The IOIPSL calendar is "gregorian", i.e. leap year'
-      CASE (  0 )
-         CALL ioconf_calendar('noleap')
-         IF(lwp) WRITE(numout,*) '   The IOIPSL calendar is "noleap", i.e. no leap year'
-      CASE ( 30 )
-         CALL ioconf_calendar('360d')
-         IF(lwp) WRITE(numout,*) '   The IOIPSL calendar is "360d", i.e. 360 days in a year'
-      END SELECT
-
 
       ! 
       cn_topo =''

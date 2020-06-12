@@ -86,7 +86,7 @@ MODULE diawri
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: diawri.F90 12933 2020-05-15 08:06:25Z smasson $
+   !! $Id: diawri.F90 13103 2020-06-12 11:44:47Z rblod $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -170,6 +170,8 @@ CONTAINS
          END_2D
          CALL iom_put( "sbs", z2d )                ! bottom salinity
       ENDIF
+
+      CALL iom_put( "rhop", rhop(:,:,:) )          ! 3D potential density (sigma0)
 
       IF ( iom_use("taubot") ) THEN                ! bottom stress
          zztmp = rho0 * 0.25

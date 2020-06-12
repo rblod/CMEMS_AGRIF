@@ -72,7 +72,7 @@ MODULE sbcmod
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: sbcmod.F90 12489 2020-02-28 15:55:11Z davestorkey $
+   !! $Id: sbcmod.F90 13058 2020-06-07 18:13:59Z rblod $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -119,17 +119,7 @@ CONTAINS
 #if defined key_mpp_mpi
       ncom_fsbc = nn_fsbc    ! make nn_fsbc available for lib_mpp
 #endif
-      !                             !* overwrite namelist parameter using CPP key information
-#if defined key_agrif
- !     IF( Agrif_Root() ) THEN                ! AGRIF zoom (cf r1242: possibility to run without ice in fine grid)
- !        IF( lk_si3  )   nn_ice      = 2
- !        IF( lk_cice )   nn_ice      = 3
- !     ENDIF
-!!GS: TBD
-!#else
-!      IF( lk_si3  )   nn_ice      = 2
-!      IF( lk_cice )   nn_ice      = 3
-#endif
+      !
       !
       IF(lwp) THEN                  !* Control print
          WRITE(numout,*) '   Namelist namsbc (partly overwritten with CPP key setting)'

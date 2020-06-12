@@ -29,7 +29,7 @@ MODULE usrdef_hgr
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: usrdef_hgr.F90 12489 2020-02-28 15:55:11Z davestorkey $ 
+   !! $Id: usrdef_hgr.F90 13026 2020-06-03 14:30:02Z rblod $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS

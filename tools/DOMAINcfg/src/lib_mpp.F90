@@ -18,7 +18,6 @@ MODULE lib_mpp
    !!            3.2  !  2009  (R. Benshila) SHMEM suppression, north fold in lbc_nfd
    !!            3.2  !  2009  (O. Marti)    add mpp_ini_znl
    !!            4.0  !  2011  (G. Madec)  move ctl_ routines from in_out_manager
-   !!            3.5  !  2012  (S.Mocavero, I. Epicoco) Add mpp_lnk_bdy_3d/2d routines to optimize the BDY comm.
    !!            3.5  !  2013  (C. Ethe, G. Madec)  message passing arrays as local variables 
    !!            3.5  !  2013  (S.Mocavero, I.Epicoco - CMCC) north fold optimizations
    !!            3.6  !  2015  (O. Tintó and M. Castrillo - BSC) Added '_multiple' case for 2D lbc and max
@@ -86,7 +85,6 @@ MODULE lib_mpp
    PUBLIC   mppscatter, mppgather
    PUBLIC   mpp_ini_znl
    PUBLIC   mppsend, mpprecv                          ! needed by TAM and ICB routines
-   PUBLIC   mpp_lnk_bdy_2d, mpp_lnk_bdy_3d, mpp_lnk_bdy_4d
    
    !! * Interfaces
    !! define generic interface for these routine as they are called sometimes
@@ -178,10 +176,6 @@ MODULE lib_mpp
    TYPE( DELAYARR ), DIMENSION(nbdelay), PUBLIC  ::   todelay              
    INTEGER,          DIMENSION(nbdelay), PUBLIC  ::   ndelayid = -1     !: mpi request id of the delayed operations
 
-   ! timing summary report
-   REAL(wp), DIMENSION(2), PUBLIC ::  waiting_time = 0._wp
-   REAL(wp)              , PUBLIC ::  compute_time = 0._wp, elapsed_time = 0._wp
-   
    REAL(wp), DIMENSION(:), ALLOCATABLE, SAVE ::   tampon   ! buffer in case of bsend
 
    LOGICAL, PUBLIC ::   ln_nnogather                !: namelist control of northfold comms
@@ -434,41 +428,6 @@ CONTAINS
 
 
    !!----------------------------------------------------------------------
-   !!                   ***  routine mpp_lnk_bdy_(2,3,4)d  ***
-   !!
-   !!   * Argument : dummy argument use in mpp_lnk_... routines
-   !!                ptab   :   array or pointer of arrays on which the boundary condition is applied
-   !!                cd_nat :   nature of array grid-points
-   !!                psgn   :   sign used across the north fold boundary
-   !!                kb_bdy :   BDY boundary set
-   !!                kfld   :   optional, number of pt3d arrays
-   !!----------------------------------------------------------------------
-   !
-   !                       !==  2D array and array of 2D pointer  ==!
-   !
-#  define DIM_2d
-#     define ROUTINE_BDY           mpp_lnk_bdy_2d
-#     include "mpp_bdy_generic.h90"
-#     undef ROUTINE_BDY
-#  undef DIM_2d
-   !
-   !                       !==  3D array and array of 3D pointer  ==!
-   !
-#  define DIM_3d
-#     define ROUTINE_BDY           mpp_lnk_bdy_3d
-#     include "mpp_bdy_generic.h90"
-#     undef ROUTINE_BDY
-#  undef DIM_3d
-   !
-   !                       !==  4D array and array of 4D pointer  ==!
-   !
-#  define DIM_4d
-#     define ROUTINE_BDY           mpp_lnk_bdy_4d
-#     include "mpp_bdy_generic.h90"
-#     undef ROUTINE_BDY
-#  undef DIM_4d
-
-   !!----------------------------------------------------------------------
    !!
    !!   load_array  &   mpp_lnk_2d_9    à generaliser a 3D et 4D
    
@@ -639,9 +598,7 @@ CONTAINS
 
       ! send y_in into todelay(idvar)%y1d with a non-blocking communication
 #if defined key_mpi2
-      IF( ln_timing ) CALL tic_tac( .TRUE., ld_global = .TRUE.)
       CALL  mpi_allreduce( y_in(:), todelay(idvar)%y1d(:), isz, MPI_DOUBLE_COMPLEX, mpi_sumdd, ilocalcomm, ndelayid(idvar), ierr )
-      IF( ln_timing ) CALL tic_tac(.FALSE., ld_global = .TRUE.)
 #else
       CALL mpi_iallreduce( y_in(:), todelay(idvar)%y1d(:), isz, MPI_DOUBLE_COMPLEX, mpi_sumdd, ilocalcomm, ndelayid(idvar), ierr )
 #endif
@@ -702,9 +659,7 @@ CONTAINS
 
       ! send p_in into todelay(idvar)%z1d with a non-blocking communication
 #if defined key_mpi2
-      IF( ln_timing ) CALL tic_tac( .TRUE., ld_global = .TRUE.)
       CALL  mpi_allreduce( p_in(:), todelay(idvar)%z1d(:), isz, MPI_DOUBLE_PRECISION, mpi_max, ilocalcomm, ndelayid(idvar), ierr )
-      IF( ln_timing ) CALL tic_tac(.FALSE., ld_global = .TRUE.)
 #else
       CALL mpi_iallreduce( p_in(:), todelay(idvar)%z1d(:), isz, MPI_DOUBLE_PRECISION, mpi_max, ilocalcomm, ndelayid(idvar), ierr )
 #endif
@@ -724,9 +679,7 @@ CONTAINS
       !!----------------------------------------------------------------------
       IF( ndelayid(kid) /= -2 ) THEN  
 #if ! defined key_mpi2
-         IF( ln_timing ) CALL tic_tac( .TRUE., ld_global = .TRUE.)
          CALL mpi_wait( ndelayid(kid), MPI_STATUS_IGNORE, ierr )                        ! make sure todelay(kid) is received
-         IF( ln_timing ) CALL tic_tac(.FALSE., ld_global = .TRUE.)
 #endif
          IF( ASSOCIATED(todelay(kid)%y1d) )   todelay(kid)%z1d(:) = REAL(todelay(kid)%y1d(:), wp)  ! define %z1d from %y1d
          ndelayid(kid) = -2   ! add flag to know that mpi_wait was already called on kid
@@ -1235,12 +1188,10 @@ CONTAINS
       !
       itaille = jpimax * ( ipj + 2*kextj )
       !
-      IF( ln_timing ) CALL tic_tac(.TRUE.)
       CALL MPI_ALLGATHER( znorthloc_e(1,1-kextj)    , itaille, MPI_DOUBLE_PRECISION,    &
          &                znorthgloio_e(1,1-kextj,1), itaille, MPI_DOUBLE_PRECISION,    &
          &                ncomm_north, ierr )
       !
-      IF( ln_timing ) CALL tic_tac(.FALSE.)
       !
       DO jr = 1, ndim_rank_north            ! recover the global north array
          iproc = nrank_north(jr) + 1
@@ -1367,8 +1318,6 @@ CONTAINS
       !                           ! Migrations
       imigr = ipreci * ( jpj + 2*kextj )
       !
-      IF( ln_timing ) CALL tic_tac(.TRUE.)
-      !
       SELECT CASE ( nbondi )
       CASE ( -1 )
          CALL mppsend( 2, r2dwe(1-kextj,1,1), imigr, noea, ml_req1 )
@@ -1386,8 +1335,6 @@ CONTAINS
          CALL mpprecv( 2, r2dwe(1-kextj,1,2), imigr, nowe )
          IF(l_isend) CALL mpi_wait(ml_req1,ml_stat,ml_err)
       END SELECT
-      !
-      IF( ln_timing ) CALL tic_tac(.FALSE.)
       !
       !                           ! Write Dirichlet lateral conditions
       iihom = jpi - nn_hls
@@ -1424,8 +1371,6 @@ CONTAINS
       !                           ! Migrations
       imigr = iprecj * ( jpi + 2*kexti )
       !
-      IF( ln_timing ) CALL tic_tac(.TRUE.)
-      !
       SELECT CASE ( nbondj )
       CASE ( -1 )
          CALL mppsend( 4, r2dsn(1-kexti,1,1), imigr, nono, ml_req1 )
@@ -1443,8 +1388,6 @@ CONTAINS
          CALL mpprecv( 4, r2dsn(1-kexti,1,2), imigr, noso )
          IF(l_isend) CALL mpi_wait(ml_req1,ml_stat,ml_err)
       END SELECT
-      !
-      IF( ln_timing ) CALL tic_tac(.FALSE.)
       !
       !                           ! Write Dirichlet lateral conditions
       ijhom = jpj - nn_hls

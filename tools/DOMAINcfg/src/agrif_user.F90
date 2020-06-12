@@ -1,4 +1,10 @@
 #if defined key_agrif
+   SUBROUTINE agrif_user()
+      !!----------------------------------------------------------------------
+      !!                 *** ROUTINE agrif_user ***
+      !!----------------------------------------------------------------------
+   END SUBROUTINE agrif_user
+
    SUBROUTINE agrif_initworkspace()
       !!----------------------------------------------------------------------
       !!                 *** ROUTINE Agrif_InitWorkspace ***

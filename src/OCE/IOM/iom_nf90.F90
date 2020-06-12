@@ -40,7 +40,7 @@ MODULE iom_nf90
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: iom_nf90.F90 12933 2020-05-15 08:06:25Z smasson $
+   !! $Id: iom_nf90.F90 13058 2020-06-07 18:13:59Z rblod $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -110,8 +110,8 @@ CONTAINS
          iln = INDEX( cdname, '.nc' )
          IF( ldwrt ) THEN              !* the file should be open in write mode so we create it...
             IF( jpnij > 1 ) THEN
-               idg = MAX( INT(LOG10(REAL(jpnij-1,wp))) + 1, 4 )          ! how many digits to we need to write? min=4, max=9
-               WRITE(clfmt, "('(a,a,i', i1, '.', i1, ',a)')") idg, idg   ! '(a,a,ix.x,a)'
+               idg = MAX( INT(LOG10(REAL(MAX(1,jpnij-1),wp))) + 1, 4 )          ! how many digits to we need to write? min=4, max=9
+               WRITE(clfmt, "('(a,a,i', i1, '.', i1, ',a)')") idg, idg          ! '(a,a,ix.x,a)'
                WRITE(cltmp,clfmt) cdname(1:iln-1), '_', narea-1, '.nc'
                cdname = TRIM(cltmp)
             ENDIF

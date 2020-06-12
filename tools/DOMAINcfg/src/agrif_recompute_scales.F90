@@ -1,10 +1,24 @@
-#if defined key_agrif
-subroutine agrif_recompute_scalefactors
+MODULE agrif_recompute_scales
+
    USE dom_oce
    USE lbclnk            ! ocean lateral boundary conditions (or mpp link)
    USE lib_mpp
-implicit none
-INTEGER :: ji,jj,jk,ikb,ikt
+
+   IMPLICiT NONE
+
+   PRIVATE
+
+   PUBLIC agrif_recompute_scalefactors
+
+CONTAINS
+
+#if defined key_agrif
+   SUBROUTINE agrif_recompute_scalefactors
+      !!----------------------------------------------------------------------
+      !!                     ***  ROUTINE nemo_gcm  ***
+      !!----------------------------------------------------------------------
+      !
+      INTEGER :: ji, jj, jk, ikb, ikt
 
       ! Scale factors and depth at U-, V-, UW and VW-points
       DO jk = 1, jpk                        ! initialisation to z-scale factors
@@ -84,9 +98,10 @@ INTEGER :: ji,jj,jk,ikb,ikt
       IF( MINVAL( e3w_0  (:,:,:) ) <= 0._wp )   CALL ctl_stop( '    zgr_zps :   e r r o r   e3w_0 <= 0' )
       IF( MINVAL( gdept_0(:,:,:) ) <  0._wp )   CALL ctl_stop( '    zgr_zps :   e r r o r   gdept_0 <  0' )
       IF( MINVAL( gdepw_0(:,:,:) ) <  0._wp )   CALL ctl_stop( '    zgr_zps :   e r r o r   gdepw_0 <  0' )
-      
-end subroutine agrif_recompute_scalefactors
+      ! 
+   END SUBROUTINE agrif_recompute_scalefactors
 #else
-subroutine agrif_recompute_scalefactors_empty
-end subroutine agrif_recompute_scalefactors_empty
+   SUBROUTINE agrif_recompute_scalefactors
+   END SUBROUTINE agrif_recompute_scalefactors
 #endif
+END MODULE agrif_recompute_scales    

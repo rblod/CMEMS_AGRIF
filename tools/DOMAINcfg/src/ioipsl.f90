@@ -8,6 +8,5 @@ MODULE ioipsl
   USE errioipsl   
   USE calendar   
   USE stringop
-  USE fliocom    
 
 END MODULE ioipsl

@@ -44,7 +44,7 @@ MODULE icbrst
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: icbrst.F90 12933 2020-05-15 08:06:25Z smasson $
+   !! $Id: icbrst.F90 13103 2020-06-12 11:44:47Z rblod $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -191,7 +191,7 @@ CONTAINS
       INTEGER ::   ix_dim, iy_dim, ik_dim, in_dim
       CHARACTER(len=256)     :: cl_path
       CHARACTER(len=256)     :: cl_filename
-      CHARACTER(len=256)     :: cl_kt
+      CHARACTER(len=8  )     :: cl_kt
       CHARACTER(LEN=12 )     :: clfmt            ! writing format
       TYPE(iceberg), POINTER :: this
       TYPE(point)  , POINTER :: pt
@@ -212,13 +212,13 @@ CONTAINS
          !
          ! file name
          WRITE(cl_kt, '(i8.8)') kt
-         cl_filename = TRIM(cexper)//"_"//TRIM(ADJUSTL(cl_kt))//"_"//TRIM(cn_icbrst_out)
+         cl_filename = TRIM(cexper)//"_"//cl_kt//"_"//TRIM(cn_icbrst_out)
          IF( lk_mpp ) THEN
-            idg = MAX( INT(LOG10(REAL(jpnij-1,wp))) + 1, 4 )          ! how many digits to we need to write? min=4, max=9
-            WRITE(clfmt, "('(a,a,i', i1, '.', i1, ',a)')") idg, idg   ! '(a,a,ix.x,a)'
-            WRITE(cl_filename,clfmt) TRIM(cl_filename), '_', narea-1, '.nc'
+            idg = MAX( INT(LOG10(REAL(MAX(1,jpnij-1),wp))) + 1, 4 )          ! how many digits to we need to write? min=4, max=9
+            WRITE(clfmt, "('(a,a,i', i1, '.', i1, ',a)')") idg, idg          ! '(a,a,ix.x,a)'
+            WRITE(cl_filename,  clfmt) TRIM(cl_filename), '_', narea-1, '.nc'
          ELSE
-            WRITE(cl_filename,'(A,".nc")') TRIM(cl_filename)
+            WRITE(cl_filename,'(a,a)') TRIM(cl_filename),               '.nc'
          ENDIF
 
          IF ( lwp .AND. nn_verbose_level >= 0) WRITE(numout,'(2a)') 'icebergs, write_restart: creating ',  &

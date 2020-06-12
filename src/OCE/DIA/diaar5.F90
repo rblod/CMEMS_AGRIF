@@ -40,7 +40,7 @@ MODULE diaar5
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: diaar5.F90 12630 2020-03-31 08:54:04Z jchanut $
+   !! $Id: diaar5.F90 13103 2020-06-12 11:44:47Z rblod $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -76,7 +76,7 @@ CONTAINS
       !
       REAL(wp), ALLOCATABLE, DIMENSION(:,:)     :: zarea_ssh , zbotpres       ! 2D workspace 
       REAL(wp), ALLOCATABLE, DIMENSION(:,:)     :: zpe, z2d                   ! 2D workspace 
-      REAL(wp), ALLOCATABLE, DIMENSION(:,:,:)   :: zrhd , zrhop, ztpot   ! 3D workspace
+      REAL(wp), ALLOCATABLE, DIMENSION(:,:,:)   :: zrhd , ztpot               ! 3D workspace
       REAL(wp), ALLOCATABLE, DIMENSION(:,:,:,:) :: ztsn                       ! 4D workspace
 
       !!--------------------------------------------------------------------
@@ -86,7 +86,7 @@ CONTAINS
 
       IF( l_ar5 ) THEN 
          ALLOCATE( zarea_ssh(jpi,jpj), zbotpres(jpi,jpj), z2d(jpi,jpj) )
-         ALLOCATE( zrhd(jpi,jpj,jpk) , zrhop(jpi,jpj,jpk) )
+         ALLOCATE( zrhd(jpi,jpj,jpk) )
          ALLOCATE( ztsn(jpi,jpj,jpk,jpts) )
          zarea_ssh(:,:) = e1e2t(:,:) * ssh(:,:,Kmm)
       ENDIF
@@ -154,24 +154,20 @@ CONTAINS
          CALL iom_put( 'sshthster', zssh_steric )
       
          !                                         ! steric sea surface height
-         CALL eos( ts(:,:,:,:,Kmm), zrhd, zrhop, gdept(:,:,:,Kmm) )                 ! now in situ and potential density
-         zrhop(:,:,jpk) = 0._wp
-         CALL iom_put( 'rhop', zrhop )
-         !
          zbotpres(:,:) = 0._wp                        ! no atmospheric surface pressure, levitating sea-ice
          DO jk = 1, jpkm1
-            zbotpres(:,:) = zbotpres(:,:) + e3t(:,:,jk,Kmm) * zrhd(:,:,jk)
+            zbotpres(:,:) = zbotpres(:,:) + e3t(:,:,jk,Kmm) * rhd(:,:,jk)
          END DO
          IF( ln_linssh ) THEN
             IF ( ln_isfcav ) THEN
                DO ji = 1,jpi
                   DO jj = 1,jpj
                      iks = mikt(ji,jj)
-                     zbotpres(ji,jj) = zbotpres(ji,jj) + ssh(ji,jj,Kmm) * zrhd(ji,jj,iks) + riceload(ji,jj)
+                     zbotpres(ji,jj) = zbotpres(ji,jj) + ssh(ji,jj,Kmm) * rhd(ji,jj,iks) + riceload(ji,jj)
                   END DO
                END DO
             ELSE
-               zbotpres(:,:) = zbotpres(:,:) + ssh(:,:,Kmm) * zrhd(:,:,1)
+               zbotpres(:,:) = zbotpres(:,:) + ssh(:,:,Kmm) * rhd(:,:,1)
             END IF
          END IF
          !    
@@ -292,7 +288,6 @@ CONTAINS
 
       IF( l_ar5 ) THEN
         DEALLOCATE( zarea_ssh , zbotpres, z2d )
-        DEALLOCATE( zrhd      , zrhop    )
         DEALLOCATE( ztsn                 )
       ENDIF
       !
@@ -366,7 +361,8 @@ CONTAINS
       l_ar5 = .FALSE.
       IF(   iom_use( 'voltot'  ) .OR. iom_use( 'sshtot'    )  .OR. iom_use( 'sshdyn' )  .OR.  & 
          &  iom_use( 'masstot' ) .OR. iom_use( 'temptot'   )  .OR. iom_use( 'saltot' ) .OR.  &    
-         &  iom_use( 'botpres' ) .OR. iom_use( 'sshthster' )  .OR. iom_use( 'sshsteric' )  ) L_ar5 = .TRUE.
+         &  iom_use( 'botpres' ) .OR. iom_use( 'sshthster' )  .OR. iom_use( 'sshsteric' ) .OR. &
+         &  iom_use( 'rhop' )  ) L_ar5 = .TRUE.
   
       IF( l_ar5 ) THEN
          !

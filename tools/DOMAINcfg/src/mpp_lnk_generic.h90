@@ -153,8 +153,6 @@
       !                           ! Migrations
       imigr = nn_hls * jpj * ipk * ipl * ipf      
       !
-      IF( ln_timing ) CALL tic_tac(.TRUE.)
-      !
       SELECT CASE ( nbondi )
       CASE ( -1 )
          CALL mppsend( 2, zt3we(1,1,1,1,1,1), imigr, noea, ml_req1 )
@@ -172,8 +170,6 @@
          CALL mpprecv( 2, zt3we(1,1,1,1,1,1), imigr, nowe )
          IF(l_isend)   CALL mpi_wait(ml_req1, ml_stat, ml_err )
       END SELECT
-      !
-      IF( ln_timing ) CALL tic_tac(.FALSE.)
       !
       !                           ! Write Dirichlet lateral conditions
       iihom = nlci-nn_hls
@@ -275,8 +271,6 @@
       !                           ! Migrations
       imigr = nn_hls * jpi * ipk * ipl * ipf
       !
-      IF( ln_timing ) CALL tic_tac(.TRUE.)
-      ! 
       SELECT CASE ( nbondj )
       CASE ( -1 )
          CALL mppsend( 4, zt3sn(1,1,1,1,1,1), imigr, nono, ml_req1 )
@@ -295,8 +289,6 @@
          IF(l_isend)   CALL mpi_wait(ml_req1, ml_stat, ml_err )
       END SELECT
       !
-      IF( ln_timing ) CALL tic_tac(.FALSE.)
-      !                           ! Write Dirichlet lateral conditions
       ijhom = nlcj-nn_hls
       !
       SELECT CASE ( nbondj )

@@ -1,4 +1,4 @@
-MODULE domutil
+MODULE domutl
    !!
    !!======================================================================
    !!                       ***  MODULE  closea  ***
@@ -71,7 +71,7 @@ CONTAINS
             rseedmap(ii,ij,ik) = 1.
          END IF
       END IF
-      nseed=SUM(rseedmap); IF( lk_mpp )   CALL mpp_sum('domutil', nseed )  ! nseed =0 means on land => WARNING later on
+      nseed=SUM(rseedmap); IF( lk_mpp )   CALL mpp_sum('domutl', nseed )  ! nseed =0 means on land => WARNING later on
       !
       ! loop until the stack size is 0 or if the pool is larger than the critical size
       IF (nseed > 0) THEN
@@ -105,10 +105,10 @@ CONTAINS
             END DO
             !
             ! exchange seed
-            nseed=SUM(rseedmap); IF( lk_mpp )   CALL mpp_sum('domutil', nseed )  ! this is the sum of all the point check this iteration
+            nseed=SUM(rseedmap); IF( lk_mpp )   CALL mpp_sum('domutl', nseed )  ! this is the sum of all the point check this iteration
             !
             rseedmap_b(:,:,:)=rseedmap(:,:,:)
-            CALL lbc_lnk('domutil', rseedmap, 'T', 1.)
+            CALL lbc_lnk('domutl', rseedmap, 'T', 1.)
             !
             ! build new list of seed
             DO ii=1,jpi
@@ -167,7 +167,7 @@ CONTAINS
             rseedmap(ii,ij) = 1.
          END IF
       END IF
-      nseed=SUM(rseedmap); IF( lk_mpp )   CALL mpp_sum('domutil', nseed )  ! nseed =0 means on land => WARNING later on
+      nseed=SUM(rseedmap); IF( lk_mpp )   CALL mpp_sum('domutl', nseed )  ! nseed =0 means on land => WARNING later on
       !
       ! loop until the stack size is 0 or if the pool is larger than the critical size
       IF (nseed > 0) THEN
@@ -194,9 +194,9 @@ CONTAINS
             END DO
             !
             ! exchange seed
-            nseed=SUM(rseedmap); IF( lk_mpp )   CALL mpp_sum('domutil', nseed )  ! this is the sum of all the point check this iteration
+            nseed=SUM(rseedmap); IF( lk_mpp )   CALL mpp_sum('domutl', nseed )  ! this is the sum of all the point check this iteration
             !
-            CALL lbc_lnk('domutil', rseedmap, 'T', 1.)
+            CALL lbc_lnk('domutl', rseedmap, 'T', 1.)
             !
             ! build new list of seed
             ! new seed only if data > 0 (ie not land), data not already filled and rseedmap > 0
@@ -267,4 +267,4 @@ CONTAINS
       ENDIF
    END SUBROUTINE del_head_idx
    !
-END MODULE domutil
+END MODULE domutl

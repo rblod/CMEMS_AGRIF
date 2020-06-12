@@ -20,7 +20,7 @@ MODULE agrif_ice
 
    !!----------------------------------------------------------------------
    !! NEMO/NST 4.0 , NEMO Consortium (2018)
-   !! $Id: agrif_ice.F90 10068 2018-08-28 14:09:04Z nicolasmartin $
+   !! $Id: agrif_ice.F90 13026 2020-06-03 14:30:02Z rblod $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 

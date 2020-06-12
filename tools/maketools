@@ -158,6 +158,16 @@ echo "${NEW_CONF} "  > ${COMPIL_DIR}/tools.txt
 #- When used for the first time, choose a compiler ---
 . ${COMPIL_DIR}/Fcheck_archfile.sh arch_tools.fcm cpp_tools.fcm ${CMP_NAM} || exit
 
+#- At this stage the configuration has beeen chosen
+#- We coose the default light file
+export USEBLD=bldxag_tools.cfg
+
+#- We look after agrif
+grep key_agrif ${COMPIL_DIR}/cpp_tools.fcm && export AGRIFUSE=1 && export USEBLD=${USEBLD/xag/}
+
+. ${COMPIL_DIR}/Fprep_agrif.sh ${NEW_CONF} ${TOOLS_DIR} || exit 3
+
+
 #-
 #_ END OF CONFIGURATION PHASE
 #_
@@ -166,15 +176,25 @@ echo "${NEW_CONF} "  > ${COMPIL_DIR}/tools.txt
 #- Compile ---
 
 if [ "${NBR_PRC}" -gt 0 ]; then
-cd ${NEMO_TDIR}/${NEW_CONF} || cd -
+cd ${TOOLS_DIR}/${NEW_CONF} || cd -
 
-fcm build ${x_c} --ignore-lock -v 1 -j ${NBR_PRC} ${COMPIL_DIR}/bld_tools.cfg || cd -
-if [ -n "$(ls ${NEMO_TDIR}/${NEW_CONF}/BLD/bin/*.exe)" ]; then
-for i in `ls ${NEMO_TDIR}/${NEW_CONF}/BLD/bin/*.exe`
-   do
-      ln -sf ${i}  ${TOOLS_DIR}/${NEW_CONF}/.
-   done
-fi
+	## if AGRIF we do a first preprocessing
+	if [[ ${#x_c} -eq 0 && "$AGRIFUSE" -eq 1 ]]; then
+		fcm build --ignore-lock -j 1 ${COMPIL_DIR}/bld_preproagr_tools.cfg ||{ cd - ; exit 1 ;}
+		echo ''
+		echo "---------------------------------"
+		echo "CONV preprocessing successfull !!"
+		echo "---------------------------------"
+		echo ''
+	fi
+
+   fcm build ${x_c} --ignore-lock -v 1 -j ${NBR_PRC} ${COMPIL_DIR}/${USEBLD} || cd -
+   if [ -n "$(ls ${NEMO_TDIR}/${NEW_CONF}/BLD/bin/*.exe)" ]; then
+      for i in `ls ${NEMO_TDIR}/${NEW_CONF}/BLD/bin/*.exe`
+      do
+         ln -sf ${i}  ${TOOLS_DIR}/${NEW_CONF}/.
+      done
+   fi
 fi
 #-
 #- Come back to original directory ---

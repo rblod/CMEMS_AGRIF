@@ -42,7 +42,7 @@ MODULE p4zsms
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/TOP 4.0 , NEMO Consortium (2018)
-   !! $Id: p4zsms.F90 12489 2020-02-28 15:55:11Z davestorkey $ 
+   !! $Id: p4zsms.F90 13058 2020-06-07 18:13:59Z rblod $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -205,7 +205,7 @@ CONTAINS
       !
       IF( l_trdtrc ) THEN
          DO jn = jp_pcs0, jp_pcs1
-           ztrdt(:,:,:,jn) = ( tr(:,:,:,jn,Kbb) - ztrdt(:,:,:,jn) ) * rfact2r 
+           ztrdt(:,:,:,jn) = ( tr(:,:,:,jn,Kbb) - ztrdt(:,:,:,jn) ) * rfactr 
            CALL trd_trc( tr(:,:,:,jn,Krhs), jn, jptra_sms, kt, Kmm )   ! save trends
          END DO
          DEALLOCATE( ztrdt ) 

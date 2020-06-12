@@ -6,7 +6,6 @@ MODULE dombat
    USE iom               ! I/O library
    USE lbclnk            ! ocean lateral boundary conditions (or mpp link)
    USE lib_mpp           ! distributed memory computing library
-   USE timing            ! Timing
 #if defined key_agrif
    USE agrif_modutil
    USE agrif_parameters

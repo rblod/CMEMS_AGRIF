@@ -32,7 +32,7 @@ MODULE iom_def
    INTEGER, PARAMETER, PUBLIC ::   jpmax_files  = 100  !: maximum number of simultaneously opened file
    INTEGER, PARAMETER, PUBLIC ::   jpmax_vars   = 1200 !: maximum number of variables in one file
    INTEGER, PARAMETER, PUBLIC ::   jpmax_dims   =  4   !: maximum number of dimensions for one variable
-   INTEGER, PARAMETER, PUBLIC ::   jpmax_digits =  5   !: maximum number of digits for the cpu number in the file name
+   INTEGER, PARAMETER, PUBLIC ::   jpmax_digits =  9   !: maximum number of digits for the cpu number in the file name
 
 
 !$AGRIF_DO_NOT_TREAT
@@ -80,7 +80,7 @@ MODULE iom_def
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: iom_def.F90 12649 2020-04-03 07:11:57Z smasson $
+   !! $Id: iom_def.F90 13103 2020-06-12 11:44:47Z rblod $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!======================================================================
 END MODULE iom_def

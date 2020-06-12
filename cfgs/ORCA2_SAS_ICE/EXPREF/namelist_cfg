@@ -58,7 +58,9 @@
 !-----------------------------------------------------------------------
    nn_fsbc     = 1         !  frequency of SBC module call
    ln_blk      = .true.    !  Bulk formulation                          (T => fill namsbc_blk )
-   nn_ice      = 2         !  =2  sea-ice model                         ("key_SI3" or "key_cice")
+   nn_ice      = 2         !  =0 no ice boundary condition
+      !                    !  =1 use observed ice-cover                 (  => fill namsbc_iif )
+      !                    !  =2 or 3 for SI3 and CICE, respectively
 /
 !-----------------------------------------------------------------------
 &namsbc_blk   !   namsbc_blk  generic Bulk formula                      (ln_blk =T)

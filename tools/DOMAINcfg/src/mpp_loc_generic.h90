@@ -66,9 +66,7 @@
       zain(1,:) = zmin
       zain(2,:) = REAL(index0, wp)
       !
-      IF( ln_timing ) CALL tic_tac(.TRUE., ld_global = .TRUE.)
       CALL MPI_ALLREDUCE( zain, zaout, 1, MPI_2DOUBLE_PRECISION, MPI_OPERATION ,MPI_COMM_OCE, ierror)
-      IF( ln_timing ) CALL tic_tac(.FALSE., ld_global = .TRUE.)
       !
       pmin      = zaout(1,1)
       index0    = NINT( zaout(2,1) )

@@ -43,7 +43,7 @@ MODULE trdtra
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: trdtra.F90 12489 2020-02-28 15:55:11Z davestorkey $
+   !! $Id: trdtra.F90 13103 2020-06-12 11:44:47Z rblod $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -81,7 +81,8 @@ CONTAINS
       REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(in), OPTIONAL ::   pu      ! now velocity 
       REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(in), OPTIONAL ::   ptra    ! now tracer variable
       !
-      INTEGER ::   jk   ! loop indices
+      INTEGER ::   jk    ! loop indices
+      INTEGER ::   i01   ! 0 or 1
       REAL(wp),        DIMENSION(jpi,jpj,jpk) ::   ztrds             ! 3D workspace
       REAL(wp), ALLOCATABLE, DIMENSION(:,:,:) ::   zwt, zws, ztrdt   ! 3D workspace
       !!----------------------------------------------------------------------
@@ -89,10 +90,12 @@ CONTAINS
       IF( .NOT. ALLOCATED( trdtx ) ) THEN      ! allocate trdtra arrays
          IF( trd_tra_alloc() /= 0 )   CALL ctl_stop( 'STOP', 'trd_tra : unable to allocate arrays' )
       ENDIF
-
+      !
+      i01 = COUNT( (/ PRESENT(pu) .OR. ( ktrd /= jptra_xad .AND. ktrd /= jptra_yad .AND. ktrd /= jptra_zad ) /) )
+      !
       IF( ctype == 'TRA' .AND. ktra == jp_tem ) THEN   !==  Temperature trend  ==!
          !
-         SELECT CASE( ktrd )
+         SELECT CASE( ktrd*i01 )
          !                            ! advection: transform the advective flux into a trend
          CASE( jptra_xad )   ;   CALL trd_tra_adv( ptrd, pu, ptra, 'X', trdtx, Kmm ) 
          CASE( jptra_yad )   ;   CALL trd_tra_adv( ptrd, pu, ptra, 'Y', trdty, Kmm ) 
@@ -111,7 +114,7 @@ CONTAINS
 
       IF( ctype == 'TRA' .AND. ktra == jp_sal ) THEN      !==  Salinity trends  ==!
          !
-         SELECT CASE( ktrd )
+         SELECT CASE( ktrd*i01 )
          !                            ! advection: transform the advective flux into a trend
          !                            !            and send T & S trends to trd_tra_mng
          CASE( jptra_xad  )   ;   CALL trd_tra_adv( ptrd , pu  , ptra, 'X'  , ztrds, Kmm ) 
@@ -162,7 +165,7 @@ CONTAINS
 
       IF( ctype == 'TRC' ) THEN                           !==  passive tracer trend  ==!
          !
-         SELECT CASE( ktrd )
+         SELECT CASE( ktrd*i01 )
          !                            ! advection: transform the advective flux into a masked trend
          CASE( jptra_xad )   ;   CALL trd_tra_adv( ptrd , pu , ptra, 'X', ztrds, Kmm ) 
          CASE( jptra_yad )   ;   CALL trd_tra_adv( ptrd , pu , ptra, 'Y', ztrds, Kmm ) 

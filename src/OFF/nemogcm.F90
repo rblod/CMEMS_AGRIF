@@ -72,7 +72,7 @@ MODULE nemogcm
 
    !!----------------------------------------------------------------------
    !! NEMO/OFF 4.0 , NEMO Consortium (2018)
-   !! $Id: nemogcm.F90 12933 2020-05-15 08:06:25Z smasson $
+   !! $Id: nemogcm.F90 13058 2020-06-07 18:13:59Z rblod $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -146,7 +146,8 @@ CONTAINS
 
       IF( nstop /= 0 .AND. lwp ) THEN                 ! error print
          WRITE(ctmp1,*) '   ==>>>   nemo_gcm: a total of ', nstop, ' errors have been found'
-         CALL ctl_stop( ctmp1 )
+         WRITE(ctmp2,*) '           Look for "E R R O R" messages in all existing ocean_output* files'
+         CALL ctl_stop( ' ', ctmp1, ' ', ctmp2 )
       ENDIF
       !
       IF( ln_timing )   CALL timing_finalize

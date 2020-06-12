@@ -1,4 +1,3 @@
-!
 MODULE agrif_modutil
   !
 CONTAINS

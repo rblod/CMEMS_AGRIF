@@ -98,26 +98,25 @@ CONTAINS
          WRITE(numout,*) '   local  domain:   jpi    = ', jpi   , ' jpj    = ', jpj   , ' jpk    = ', jpk
          WRITE(numout,*)
          WRITE(numout,*) '   conversion from local to global domain indices (and vise versa) done'
-         IF( nn_print >= 1 ) THEN
-            WRITE(numout,*)
-            WRITE(numout,*) '          conversion local  ==> global i-index domain (mig)'
-            WRITE(numout,25)              (mig(ji),ji = 1,jpi)
-            WRITE(numout,*)
-            WRITE(numout,*) '          conversion global ==> local  i-index domain'
-            WRITE(numout,*) '             starting index (mi0)'
-            WRITE(numout,25)              (mi0(ji),ji = 1,jpiglo)
-            WRITE(numout,*) '             ending index (mi1)'
-            WRITE(numout,25)              (mi1(ji),ji = 1,jpiglo)
-            WRITE(numout,*)
-            WRITE(numout,*) '          conversion local  ==> global j-index domain (mjg)'
-            WRITE(numout,25)              (mjg(jj),jj = 1,jpj)
-            WRITE(numout,*)
-            WRITE(numout,*) '          conversion global ==> local  j-index domain'
-            WRITE(numout,*) '             starting index (mj0)'
-            WRITE(numout,25)              (mj0(jj),jj = 1,jpjglo)
-            WRITE(numout,*) '             ending index (mj1)'
-            WRITE(numout,25)              (mj1(jj),jj = 1,jpjglo)
-         ENDIF
+
+!            WRITE(numout,*)
+!            WRITE(numout,*) '          conversion local  ==> global i-index domain (mig)'
+!            WRITE(numout,25)              (mig(ji),ji = 1,jpi)
+!            WRITE(numout,*)
+!            WRITE(numout,*) '          conversion global ==> local  i-index domain'
+!            WRITE(numout,*) '             starting index (mi0)'
+!            WRITE(numout,25)              (mi0(ji),ji = 1,jpiglo)
+!            WRITE(numout,*) '             ending index (mi1)'
+!            WRITE(numout,25)              (mi1(ji),ji = 1,jpiglo)
+!            WRITE(numout,*)
+!            WRITE(numout,*) '          conversion local  ==> global j-index domain (mjg)'
+!            WRITE(numout,25)              (mjg(jj),jj = 1,jpj)
+!            WRITE(numout,*)
+!            WRITE(numout,*) '          conversion global ==> local  j-index domain'
+!            WRITE(numout,*) '             starting index (mj0)'
+!            WRITE(numout,25)              (mj0(jj),jj = 1,jpjglo)
+!            WRITE(numout,*) '             ending index (mj1)'
+!            WRITE(numout,25)              (mj1(jj),jj = 1,jpjglo)
       ENDIF
  25   FORMAT( 100(10x,19i4,/) )
       !

@@ -285,10 +285,8 @@ CONTAINS
          glam0 = zlam1 + zcos_alpha * ze1deg * REAL( jpjglo-2 , wp )
          gphi0 = zphi1 + zsin_alpha * ze1deg * REAL( jpjglo-2 , wp )
          !
-         IF( nprint==1 .AND. lwp )   THEN
-            WRITE(numout,*) '          ze1', ze1, 'cosalpha', zcos_alpha, 'sinalpha', zsin_alpha
-            WRITE(numout,*) '          ze1deg', ze1deg, 'glam0', glam0, 'gphi0', gphi0
-         ENDIF
+    !        WRITE(numout,*) '          ze1', ze1, 'cosalpha', zcos_alpha, 'sinalpha', zsin_alpha
+    !        WRITE(numout,*) '          ze1deg', ze1deg, 'glam0', glam0, 'gphi0', gphi0
          !
          DO jj = 1, jpj
             DO ji = 1, jpi
@@ -342,7 +340,7 @@ CONTAINS
       e2_e1u(:,:) = e2u(:,:) / e1u(:,:)
       e1_e2v(:,:) = e1v(:,:) / e2v(:,:)
 
-      IF( lwp .AND. nn_print >=1 .AND. .NOT.ln_rstart ) THEN      ! Control print : Grid informations (if not restart)
+      IF( lwp ) THEN      ! Control print : Grid informations (if not restart)
          WRITE(numout,*)
          WRITE(numout,*) '          longitude and e1 scale factors'
          WRITE(numout,*) '          ------------------------------'

@@ -74,7 +74,7 @@ set -o posix
 # EVOLUTIONS
 # ==========
 #
-# $Id: makenemo 12415 2020-02-19 20:29:26Z smueller $
+# $Id: makenemo 13057 2020-06-07 17:57:15Z rblod $
 #
 #
 #
@@ -351,7 +351,7 @@ export USEBLD=bldxag.cfg
 
 #- We look after agrif
 grep key_agrif ${COMPIL_DIR}/cpp.fcm && export AGRIFUSE=1 && export USEBLD=${USEBLD/xag/}
-. ${COMPIL_DIR}/Fprep_agrif.sh ${NEW_CONF} ${NEMO_TDIR} || exit 3
+. ${COMPIL_DIR}/Fprep_agrif.sh ${NEW_CONF} ${NEMO_TDIR} arch_nemo.fcm || exit 3
 
 #-
 #_ END OF CONFIGURATION PHASE

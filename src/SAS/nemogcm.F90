@@ -60,7 +60,7 @@ MODULE nemogcm
 
    !!----------------------------------------------------------------------
    !! NEMO/SAS 4.0 , NEMO Consortium (2018)
-   !! $Id: nemogcm.F90 12933 2020-05-15 08:06:25Z smasson $
+   !! $Id: nemogcm.F90 13058 2020-06-07 18:13:59Z rblod $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -161,11 +161,12 @@ CONTAINS
          WRITE(ctmp1,*) '   ==>>>   nemo_gcm: a total of ', nstop, ' errors have been found'
          IF( ngrdstop > 0 ) THEN
             WRITE(ctmp9,'(i2)') ngrdstop
-            WRITE(ctmp2,*) '      ==>>>   Error detected in Agrif grid '//TRIM(ctmp9)
-            WRITE(ctmp3,*) '      ==>>>   look for error messages in '//TRIM(ctmp9)//'_ocean_output* files'
-            CALL ctl_stop( ctmp1, ctmp2, ctmp3 )
+            WRITE(ctmp2,*) '           E R R O R detected in Agrif grid '//TRIM(ctmp9)
+            WRITE(ctmp3,*) '           Look for "E R R O R" messages in all existing '//TRIM(ctmp9)//'_ocean_output* files'
+            CALL ctl_stop( ' ', ctmp1, ' ', ctmp2, ' ', ctmp3 )
          ELSE
-            CALL ctl_stop( ctmp1 )
+            WRITE(ctmp2,*) '           Look for "E R R O R" messages in all existing ocean_output* files'
+            CALL ctl_stop( ' ', ctmp1, ' ', ctmp2 )
          ENDIF
       ENDIF
       !

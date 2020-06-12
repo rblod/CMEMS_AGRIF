@@ -115,7 +115,7 @@ MODULE stopar
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: stopar.F90 12933 2020-05-15 08:06:25Z smasson $
+   !! $Id: stopar.F90 13026 2020-06-03 14:30:02Z rblod $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS

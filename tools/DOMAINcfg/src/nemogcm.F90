@@ -55,6 +55,10 @@ MODULE nemogcm
 
    USE lbcnfd , ONLY  : isendto, nsndto, nfsloop, nfeloop   ! Setup of north fold exchanges 
 
+   USE agrif_connect
+   USE agrif_dom_update
+   USE agrif_recompute_scales
+
    IMPLICIT NONE
    PRIVATE
 
@@ -63,10 +67,6 @@ MODULE nemogcm
    PUBLIC   nemo_alloc  ! needed by TAM
 
    CHARACTER(lc) ::   cform_aaa="( /, 'AAAAAAAA', / ) "     ! flag for output listing
-   
-#if defined key_agrif 
-   external agrif_boundary_connections, agrif_update_all, agrif_recompute_scalefactors
-#endif
 
    !!----------------------------------------------------------------------
    !! NEMO/OPA 3.7 , NEMO Consortium (2015)
@@ -143,9 +143,6 @@ CONTAINS
       INTEGER  ::   ios, ilocal_comm   ! local integers
       CHARACTER(len=120), DIMENSION(60) ::   cltxt, cltxt2, clnam
       !!
-      NAMELIST/namctl/ ln_ctl   , sn_cfctl, nn_print, nn_ictls, nn_ictle,   &
-         &             nn_isplt , nn_jsplt, nn_jctls, nn_jctle,             &
-         &             ln_timing, ln_diacfl
       NAMELIST/namcfg/ ln_e3_dep,                                &
          &             cp_cfg, cp_cfz, jp_cfg, jpidta, jpjdta, jpkdta, jpiglo, jpjglo, &
          &             jperio, ln_use_jattr, ln_domclo
@@ -156,13 +153,6 @@ CONTAINS
       !                             ! Open reference namelist and configuration namelist files
       CALL ctl_opn( numnam_ref, 'namelist_ref', 'OLD', 'FORMATTED', 'SEQUENTIAL', -1, 6, .FALSE. )
       CALL ctl_opn( numnam_cfg, 'namelist_cfg', 'OLD', 'FORMATTED', 'SEQUENTIAL', -1, 6, .FALSE. )
-      !
-      REWIND( numnam_ref )              ! Namelist namctl in reference namelist
-      READ  ( numnam_ref, namctl, IOSTAT = ios, ERR = 901 )
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namctl in reference namelist', .TRUE. )
-      REWIND( numnam_cfg )              ! Namelist namctl in confguration namelist
-      READ  ( numnam_cfg, namctl, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namctl in configuration namelist', .TRUE. )
       !
       REWIND( numnam_ref )              ! Namelist namcfg in reference namelist
       READ  ( numnam_ref, namcfg, IOSTAT = ios, ERR = 903 )
@@ -183,13 +173,12 @@ CONTAINS
       narea = narea + 1                                     ! mynode return the rank of proc (0 --> jpnij -1 )
 
       lwm = (narea == 1)                                    ! control of output namelists
-      lwp = (narea == 1) .OR. ln_ctl                        ! control of all listing output print
+      lwp = (narea == 1)                                    ! control of all listing output print
 
       IF(lwm) THEN
          ! write merged namelists from earlier to output namelist now that the
          ! file has been opened in call to mynode. nammpp has already been
          ! written in mynode (if lk_mpp_mpi)
-         WRITE( numond, namctl )
          WRITE( numond, namcfg )
       ENDIF
 
@@ -257,8 +246,6 @@ CONTAINS
       !                             !  NEMO general initialization  !
       !                             !-------------------------------!
 
-      CALL nemo_ctl                          ! Control prints & Benchmark
-
       !                                      ! Domain decomposition
         !
       !                                      ! General initialization
@@ -267,103 +254,6 @@ CONTAINS
                             CALL     dom_init   ! Domain
       !
    END SUBROUTINE nemo_init
-
-
-   SUBROUTINE nemo_ctl
-      !!----------------------------------------------------------------------
-      !!                     ***  ROUTINE nemo_ctl  ***
-      !!
-      !! ** Purpose :   control print setting
-      !!
-      !! ** Method  : - print namctl information and check some consistencies
-      !!----------------------------------------------------------------------
-      !
-      IF(lwp) THEN                  ! control print
-         WRITE(numout,*)
-         WRITE(numout,*) 'nemo_ctl: Control prints'
-         WRITE(numout,*) '~~~~~~~~'
-         WRITE(numout,*) '   Namelist namctl'
-         WRITE(numout,*) '      run control (for debugging)     ln_ctl     = ', ln_ctl
-         WRITE(numout,*) '       finer control over o/p sn_cfctl%l_config  = ', sn_cfctl%l_config
-         WRITE(numout,*) '                              sn_cfctl%l_runstat = ', sn_cfctl%l_runstat
-         WRITE(numout,*) '                              sn_cfctl%l_trcstat = ', sn_cfctl%l_trcstat
-         WRITE(numout,*) '                              sn_cfctl%l_oceout  = ', sn_cfctl%l_oceout
-         WRITE(numout,*) '                              sn_cfctl%l_layout  = ', sn_cfctl%l_layout
-         WRITE(numout,*) '                              sn_cfctl%l_mppout  = ', sn_cfctl%l_mppout
-         WRITE(numout,*) '                              sn_cfctl%l_mpptop  = ', sn_cfctl%l_mpptop
-         WRITE(numout,*) '                              sn_cfctl%procmin   = ', sn_cfctl%procmin  
-         WRITE(numout,*) '                              sn_cfctl%procmax   = ', sn_cfctl%procmax  
-         WRITE(numout,*) '                              sn_cfctl%procincr  = ', sn_cfctl%procincr 
-         WRITE(numout,*) '                              sn_cfctl%ptimincr  = ', sn_cfctl%ptimincr 
-         WRITE(numout,*) '      level of print                  nn_print   = ', nn_print
-         WRITE(numout,*) '      Start i indice for SUM control  nn_ictls   = ', nn_ictls
-         WRITE(numout,*) '      End i indice for SUM control    nn_ictle   = ', nn_ictle
-         WRITE(numout,*) '      Start j indice for SUM control  nn_jctls   = ', nn_jctls
-         WRITE(numout,*) '      End j indice for SUM control    nn_jctle   = ', nn_jctle
-         WRITE(numout,*) '      number of proc. following i     nn_isplt   = ', nn_isplt
-         WRITE(numout,*) '      number of proc. following j     nn_jsplt   = ', nn_jsplt
-         WRITE(numout,*) '      timing by routine               ln_timing  = ', ln_timing
-         WRITE(numout,*) '      CFL diagnostics                 ln_diacfl  = ', ln_diacfl
-      ENDIF
-      !
-      nprint    = nn_print          ! convert DOCTOR namelist names into OLD names
-      nictls    = nn_ictls
-      nictle    = nn_ictle
-      njctls    = nn_jctls
-      njctle    = nn_jctle
-      isplt     = nn_isplt
-      jsplt     = nn_jsplt
-
-      !
-      !                             ! Parameter control
-      !
-      IF( ln_ctl ) THEN                 ! sub-domain area indices for the control prints
-         IF( lk_mpp .AND. jpnij > 1 ) THEN
-            isplt = jpni   ;   jsplt = jpnj   ;   ijsplt = jpni*jpnj   ! the domain is forced to the real split domain
-         ELSE
-            IF( isplt == 1 .AND. jsplt == 1  ) THEN
-               CALL ctl_warn( ' - isplt & jsplt are equal to 1',   &
-                  &           ' - the print control will be done over the whole domain' )
-            ENDIF
-            ijsplt = isplt * jsplt            ! total number of processors ijsplt
-         ENDIF
-         IF(lwp) WRITE(numout,*)'          - The total number of processors over which the'
-         IF(lwp) WRITE(numout,*)'            print control will be done is ijsplt : ', ijsplt
-         !
-         !                              ! indices used for the SUM control
-         IF( nictls+nictle+njctls+njctle == 0 )   THEN    ! print control done over the default area
-            lsp_area = .FALSE.
-         ELSE                                             ! print control done over a specific  area
-            lsp_area = .TRUE.
-            IF( nictls < 1 .OR. nictls > jpiglo )   THEN
-               CALL ctl_warn( '          - nictls must be 1<=nictls>=jpiglo, it is forced to 1' )
-               nictls = 1
-            ENDIF
-            IF( nictle < 1 .OR. nictle > jpiglo )   THEN
-               CALL ctl_warn( '          - nictle must be 1<=nictle>=jpiglo, it is forced to jpiglo' )
-               nictle = jpiglo
-            ENDIF
-            IF( njctls < 1 .OR. njctls > jpjglo )   THEN
-               CALL ctl_warn( '          - njctls must be 1<=njctls>=jpjglo, it is forced to 1' )
-               njctls = 1
-            ENDIF
-            IF( njctle < 1 .OR. njctle > jpjglo )   THEN
-               CALL ctl_warn( '          - njctle must be 1<=njctle>=jpjglo, it is forced to jpjglo' )
-               njctle = jpjglo
-            ENDIF
-         ENDIF
-      ENDIF
-      !
-!      IF( 1._wp /= SIGN(1._wp,-0._wp)  )   CALL ctl_stop( 'nemo_ctl: The intrinsec SIGN function follows f2003 standard.',  &
-!         &                                                'Compile with key_nosignedzero enabled:',   &
-!         &                                                '--> add -Dkey_nosignedzero to the definition of %CPP in your arch file' )
-      !
-#if defined key_agrif
-      IF( ln_timing )   CALL ctl_stop( 'AGRIF not implemented with ln_timing = true')
-#endif
-      !
-   END SUBROUTINE nemo_ctl
-
 
    SUBROUTINE nemo_closefile
       !!----------------------------------------------------------------------
@@ -380,14 +270,7 @@ CONTAINS
       IF( numnam_ref      /= -1 )   CLOSE( numnam_ref      )   ! oce reference namelist
       IF( numnam_cfg      /= -1 )   CLOSE( numnam_cfg      )   ! oce configuration namelist
       IF( lwm.AND.numond  /= -1 )   CLOSE( numond          )   ! oce output namelist
-      IF( numnam_ice_ref  /= -1 )   CLOSE( numnam_ice_ref  )   ! ice reference namelist
-      IF( numnam_ice_cfg  /= -1 )   CLOSE( numnam_ice_cfg  )   ! ice configuration namelist
-      IF( lwm.AND.numoni  /= -1 )   CLOSE( numoni          )   ! ice output namelist
-      IF( numevo_ice      /= -1 )   CLOSE( numevo_ice      )   ! ice variables (temp. evolution)
       IF( numout          /=  6 )   CLOSE( numout          )   ! standard model output file
-      IF( numdct_vol      /= -1 )   CLOSE( numdct_vol      )   ! volume transports
-      IF( numdct_heat     /= -1 )   CLOSE( numdct_heat     )   ! heat transports
-      IF( numdct_salt     /= -1 )   CLOSE( numdct_salt     )   ! salt transports
       !
       numout = 6                                     ! redefine numout in case it is used after this point...
       !

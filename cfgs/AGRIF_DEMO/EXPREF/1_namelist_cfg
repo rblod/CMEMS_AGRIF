@@ -80,8 +80,9 @@
                      ! Type of air-sea fluxes 
    ln_blk      = .true.    !  Bulk formulation                          (T => fill namsbc_blk )
                      ! Sea-ice :
-   nn_ice      = 2         !  =2 or 3 automatically for SI3 or CICE    ("key_si3" or "key_cice")
-                           !          except in AGRIF zoom where it has to be specified
+   nn_ice      = 2         !  =0 no ice boundary condition
+      !                    !  =1 use observed ice-cover                 (  => fill namsbc_iif )
+      !                    !  =2 or 3 for SI3 and CICE, respectively
                      ! Misc. options of sbc : 
    ln_traqsr   = .true.    !  Light penetration in the ocean            (T => fill namtra_qsr)
    ln_rnf      = .true.    !  runoffs                                   (T => fill namsbc_rnf)

@@ -175,7 +175,7 @@ MODULE lib_mpp
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: lib_mpp.F90 12933 2020-05-15 08:06:25Z smasson $
+   !! $Id: lib_mpp.F90 13103 2020-06-12 11:44:47Z rblod $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -1113,22 +1113,19 @@ CONTAINS
       CHARACTER(len=*), INTENT(in   ), OPTIONAL ::   cd6, cd7, cd8, cd9, cd10
       !
       CHARACTER(LEN=8) ::   clfmt            ! writing format
-      INTEGER ::   inum
-      INTEGER ::   idg  ! number of digits
+      INTEGER          ::   inum
       !!----------------------------------------------------------------------
       !
       nstop = nstop + 1
       !
-      IF( numout == 6 ) THEN                          ! force to open ocean.output file if not already opened
-         CALL ctl_opn( numout, 'ocean.output', 'APPEND', 'FORMATTED', 'SEQUENTIAL', -1, 6, .FALSE. )
-      ELSE
-         IF( narea > 1 .AND. cd1 == 'STOP' ) THEN     ! add an error message in ocean.output
-            CALL ctl_opn( inum,'ocean.output', 'APPEND', 'FORMATTED', 'SEQUENTIAL', -1, 6, .FALSE. )
-            WRITE(inum,*)
-            idg = MAX( INT(LOG10(REAL(jpnij-1,wp))) + 1, 4 )        ! how many digits to we need to write? min=4, max=9
-            WRITE(clfmt, "('(a,i', i1, '.', i1, ')')") idg, idg     ! '(a,ix.x)'
-            WRITE(inum,clfmt) ' ===>>> : see E R R O R in ocean.output_', narea - 1
-         ENDIF
+      IF( cd1 == 'STOP' .AND. narea /= 1 ) THEN    ! Immediate stop: add an arror message in 'ocean.output' file
+         CALL ctl_opn( inum, 'ocean.output', 'APPEND', 'FORMATTED', 'SEQUENTIAL', -1, 6, .FALSE. )
+         WRITE(inum,*)
+         WRITE(inum,*) ' ==>>>   Look for "E R R O R" messages in all existing *ocean.output* files'
+         CLOSE(inum)
+      ENDIF
+      IF( numout == 6 ) THEN                       ! force to open ocean.output file if not already opened
+         CALL ctl_opn( numout, 'ocean.output', 'REPLACE', 'FORMATTED', 'SEQUENTIAL', -1, -1, .FALSE., narea )
       ENDIF
       !
                             WRITE(numout,*)
@@ -1223,7 +1220,7 @@ CONTAINS
       CHARACTER(len=80) ::   clfile
       CHARACTER(LEN=10) ::   clfmt            ! writing format
       INTEGER           ::   iost
-      INTEGER           ::   idg  ! number of digits
+      INTEGER           ::   idg              ! number of digits
       !!----------------------------------------------------------------------
       !
       ! adapt filename
@@ -1231,8 +1228,9 @@ CONTAINS
       clfile = TRIM(cdfile)
       IF( PRESENT( karea ) ) THEN
          IF( karea > 1 ) THEN
-            idg = MAX( INT(LOG10(REAL(jpnij-1,wp))) + 1, 4 )        ! how many digits to we need to write? min=4, max=9
-            WRITE(clfmt, "('(a,a,i', i1, '.', i1, ')')") idg, idg   ! '(a,a,ix.x)'
+            ! Warning: jpnij is maybe not already defined when calling ctl_opn -> use mppsize instead of jpnij
+            idg = MAX( INT(LOG10(REAL(MAX(1,mppsize-1),wp))) + 1, 4 )      ! how many digits to we need to write? min=4, max=9
+            WRITE(clfmt, "('(a,a,i', i1, '.', i1, ')')") idg, idg          ! '(a,a,ix.x)'
             WRITE(clfile, clfmt) TRIM(clfile), '_', karea-1
          ENDIF
       ENDIF

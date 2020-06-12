@@ -44,6 +44,7 @@ MODULE domzgr
    USE lib_fortran
    USE dombat
    USE domisf
+   USE agrif_domzgr
 
    IMPLICIT NONE
    PRIVATE
@@ -118,7 +119,7 @@ CONTAINS
       REAL(wp) ::   zrefdep             ! depth of the reference level (~10m)
 
 
-      NAMELIST/namzgr/ ln_zco, ln_zps, ln_sco, ln_isfcav, ln_linssh
+      NAMELIST/namzgr/ ln_zco, ln_zps, ln_sco, ln_isfcav
       !!----------------------------------------------------------------------
       !
       !
@@ -171,10 +172,7 @@ CONTAINS
          WRITE(numout,*) '      z-coordinate - partial steps   ln_zps    = ', ln_zps
          WRITE(numout,*) '      s- or hybrid z-s-coordinate    ln_sco    = ', ln_sco
          WRITE(numout,*) '      ice shelf cavities             ln_isfcav = ', ln_isfcav
-         WRITE(numout,*) '      linear free surface            ln_linssh = ', ln_linssh
       ENDIF
-
-      IF( ln_linssh .AND. lwp) WRITE(numout,*) '   linear free surface: the vertical mesh does not change in time'
 
       ioptio = 0                       ! Check Vertical coordinate options
       IF( ln_zco      )   ioptio = ioptio + 1
@@ -208,7 +206,7 @@ CONTAINS
 
       ENDIF
       !
-      IF( nprint == 1 .AND. lwp )   THEN
+      IF( lwp )   THEN
          WRITE(numout,*) ' MIN val k_top   ', MINVAL(   k_top(:,:) ), ' MAX ', MAXVAL( k_top(:,:) )
          WRITE(numout,*) ' MIN val k_bot   ', MINVAL(   k_bot(:,:) ), ' MAX ', MAXVAL( k_bot(:,:) )
          WRITE(numout,*) ' MIN val depth t ', MINVAL( gdept_0(:,:,:) ),   &
@@ -1534,7 +1532,7 @@ CONTAINS
         hifv(:,:) = MIN( hifv(:,:), hbatv(:,:) )
         hiff(:,:) = MIN( hiff(:,:), hbatf(:,:) )
 
-      IF( nprint == 1 .AND. lwp )   THEN
+      IF( lwp )   THEN
          WRITE(numout,*) ' MAX val hif   t ', MAXVAL( hift (:,:) ), ' f ', MAXVAL( hiff (:,:) ),  &
             &                        ' u ',   MAXVAL( hifu (:,:) ), ' v ', MAXVAL( hifv (:,:) )
          WRITE(numout,*) ' MIN val hif   t ', MINVAL( hift (:,:) ), ' f ', MINVAL( hiff (:,:) ),  &
@@ -1590,10 +1588,10 @@ CONTAINS
             END DO
          END DO
       END DO
-      IF( nprint == 1 .AND. lwp ) WRITE(numout,*) ' MIN val mbathy h90 ', MINVAL( mbathy(:,:) ),   &
+      IF(lwp ) WRITE(numout,*) ' MIN val mbathy h90 ', MINVAL( mbathy(:,:) ),   &
          &                                                       ' MAX ', MAXVAL( mbathy(:,:) )
 
-      IF( nprint == 1  .AND. lwp )   THEN         ! min max values over the local domain
+      IF( lwp )   THEN         ! min max values over the local domain
          WRITE(numout,*) ' MIN val mbathy  ', MINVAL( mbathy(:,:)    ), ' MAX ', MAXVAL( mbathy(:,:) )
          WRITE(numout,*) ' MIN val depth t ', MINVAL( gdept_0(:,:,:) ),   &
             &                          ' w ', MINVAL( gdepw_0(:,:,:) )
@@ -1981,7 +1979,7 @@ CONTAINS
         z_gsigw(jk) = -fssig( REAL(jk,wp)-0.5_wp )
         z_gsigt(jk) = -fssig( REAL(jk,wp)        )
       END DO
-      IF( nprint == 1 .AND. lwp )   WRITE(numout,*) 'z_gsigw 1 jpk    ', z_gsigw(1), z_gsigw(jpk)
+      IF( lwp )   WRITE(numout,*) 'z_gsigw 1 jpk    ', z_gsigw(1), z_gsigw(jpk)
       !
       ! Coefficients for vertical scale factors at w-, t- levels
 !!gm bug :  define it from analytical function, not like juste bellow....

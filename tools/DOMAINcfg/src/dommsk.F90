@@ -26,7 +26,6 @@ MODULE dommsk
    USE domisf         ! domain: ice shelf
    USE domwri         ! domain: write the meshmask file
    USE usrdef_fmask   ! user defined fmask
-   USE bdy_oce        ! open boundary
    !
    USE in_out_manager ! I/O manager
    USE iom            ! IOM library
@@ -96,13 +95,6 @@ CONTAINS
       REAL(wp), ALLOCATABLE, DIMENSION(:,:) ::   zwf   ! 2D workspace
       !!
       NAMELIST/namlbc/ rn_shlat, ln_vorlat
-      NAMELIST/nambdy/ ln_bdy ,nb_bdy, ln_coords_file, cn_coords_file,         &
-         &             ln_mask_file, cn_mask_file, cn_dyn2d, nn_dyn2d_dta,     &
-         &             cn_dyn3d, nn_dyn3d_dta, cn_tra, nn_tra_dta,             &
-         &             ln_tra_dmp, ln_dyn3d_dmp, rn_time_dmp, rn_time_dmp_out, &
-         &             cn_ice, nn_ice_dta,                                     &
-         &             rn_ice_tem, rn_ice_sal, rn_ice_age,                     &
-         &             ln_vol, nn_volctl, nn_rimwidth, nb_jpk_bdy
       !!---------------------------------------------------------------------
       !
       REWIND( numnam_ref )              ! Namelist namlbc in reference namelist : Lateral momentum boundary condition
@@ -182,27 +174,6 @@ CONTAINS
 !!gm I don't understand why...  
       CALL lbc_lnk( 'dommsk', tmask  , 'T', 1._wp )      ! Lateral boundary conditions
 
-     ! Mask corrections for bdy (read in mppini2)
-      REWIND( numnam_ref )              ! Namelist nambdy in reference namelist :Unstructured open boundaries
-      READ  ( numnam_ref, nambdy, IOSTAT = ios, ERR = 903)
-903   IF( ios /= 0 )   CALL ctl_nam ( ios , 'nambdy in reference namelist', lwp )
-      REWIND( numnam_cfg )              ! Namelist nambdy in configuration namelist :Unstructured open boundaries
-      READ  ( numnam_cfg, nambdy, IOSTAT = ios, ERR = 904 )
-904   IF( ios >  0 )   CALL ctl_nam ( ios , 'nambdy in configuration namelist', lwp )
-      ! ------------------------
-      IF ( ln_bdy .AND. ln_mask_file ) THEN
-         CALL iom_open( cn_mask_file, inum )
-         CALL iom_get ( inum, jpdom_data, 'bdy_msk', bdytmask(:,:) )
-         CALL iom_close( inum )
-         DO jk = 1, jpkm1
-            DO jj = 1, jpj
-               DO ji = 1, jpi
-                  tmask(ji,jj,jk) = tmask(ji,jj,jk) * bdytmask(ji,jj)
-               END DO
-            END DO
-         END DO
-      ENDIF
-         
       !  Ocean/land mask at u-, v-, and f-points   (computed from tmask)
       ! ----------------------------------------
       ! NB: at this point, fmask is designed for free slip lateral boundary condition

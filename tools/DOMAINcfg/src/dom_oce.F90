@@ -94,7 +94,6 @@ MODULE dom_oce
    !! time & space domain namelist
    !! ----------------------------
    !                                   !!* Namelist namdom : time & space domain *
-   LOGICAL , PUBLIC ::   ln_linssh      !: =T  linear free surface ==>> model level are fixed in time
    LOGICAL , PUBLIC ::   ln_meshmask    !: =T  create a mesh-mask file (mesh_mask.nc)
    REAL(wp), PUBLIC ::   rn_isfhmin     !: threshold to discriminate grounded ice to floating ice
    REAL(wp), PUBLIC ::   rn_rdt         !: time step for the dynamics and tracer
@@ -145,10 +144,6 @@ MODULE dom_oce
    INTEGER             , PUBLIC ::   nproc            !: number for local processor
    INTEGER             , PUBLIC ::   narea            !: number for local area
    INTEGER             , PUBLIC ::   nbondi, nbondj   !: mark of i- and j-direction local boundaries
-   INTEGER, ALLOCATABLE, PUBLIC ::   nbondi_bdy(:)    !: mark i-direction local boundaries for BDY open boundaries
-   INTEGER, ALLOCATABLE, PUBLIC ::   nbondj_bdy(:)    !: mark j-direction local boundaries for BDY open boundaries
-   INTEGER, ALLOCATABLE, PUBLIC ::   nbondi_bdy_b(:)  !: mark i-direction of neighbours local boundaries for BDY open boundaries  
-   INTEGER, ALLOCATABLE, PUBLIC ::   nbondj_bdy_b(:)  !: mark j-direction of neighbours local boundaries for BDY open boundaries  
 
    INTEGER, PUBLIC ::   npolj             !: north fold mark (0, 3 or 4)
    INTEGER, PUBLIC ::   nlci, nldi, nlei  !: i-dimensions of the local subdomain and its first and last indoor indices

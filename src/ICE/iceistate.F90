@@ -70,7 +70,7 @@ MODULE iceistate
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/ICE 4.0 , NEMO Consortium (2018)
-   !! $Id: iceistate.F90 12736 2020-04-10 14:23:32Z jchanut $
+   !! $Id: iceistate.F90 13026 2020-06-03 14:30:02Z rblod $
    !! Software governed by the CeCILL licence (modipsl/doc/NEMO_CeCILL.txt)
    !!----------------------------------------------------------------------
 CONTAINS

@@ -18,7 +18,6 @@ MODULE depth_e3
    USE in_out_manager    ! I/O manager
    USE lbclnk            ! ocean lateral boundary conditions (or mpp link)
    USE lib_mpp           ! distributed memory computing library
-   USE timing            ! Timing
 
    IMPLICIT NONE
    PRIVATE

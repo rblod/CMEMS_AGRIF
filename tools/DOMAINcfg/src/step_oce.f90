@@ -10,15 +10,9 @@ MODULE step_oce
 
    USE daymod           ! calendar                         (day     routine)
 
-
-   USE prtctl           ! Print control                    (prt_ctl routine)
-
    USE in_out_manager   ! I/O manager
    USE iom              !
    USE lbclnk
-   USE timing           ! Timing
-
-
 
    !!----------------------------------------------------------------------
    !! NEMO/OPA 3.7 , NEMO Consortium (2014)

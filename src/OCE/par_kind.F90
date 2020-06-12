@@ -35,7 +35,7 @@ MODULE par_kind
 
    !!----------------------------------------------------------------------
    !! NEMO 3.3 , NEMO Consortium (2018)
-   !! $Id: par_kind.F90 10068 2018-08-28 14:09:04Z nicolasmartin $ 
+   !! $Id: par_kind.F90 13026 2020-06-03 14:30:02Z rblod $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 END MODULE par_kind

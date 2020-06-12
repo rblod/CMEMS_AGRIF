@@ -200,7 +200,7 @@ MODULE sbccpl
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: sbccpl.F90 12952 2020-05-19 12:34:16Z cetlod $
+   !! $Id: sbccpl.F90 13103 2020-06-12 11:44:47Z rblod $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -1784,9 +1784,8 @@ CONTAINS
                zqns_ice(:,:,jl) = frcv(jpr_qnsice)%z3(:,:,jl)
             ENDDO
          ELSE
-            qns_tot(:,:) = qns_tot(:,:) + picefr(:,:) * frcv(jpr_qnsice)%z3(:,:,1)
+            zqns_tot(:,:) = zqns_tot(:,:) + picefr(:,:) * frcv(jpr_qnsice)%z3(:,:,1)
             DO jl = 1, jpl
-               zqns_tot(:,:   ) = zqns_tot(:,:) + picefr(:,:) * frcv(jpr_qnsice)%z3(:,:,1)
                zqns_ice(:,:,jl) = frcv(jpr_qnsice)%z3(:,:,1)
             END DO
          ENDIF
@@ -1927,9 +1926,8 @@ CONTAINS
                zqsr_ice(:,:,jl) = frcv(jpr_qsrice)%z3(:,:,jl)
             END DO
          ELSE
-            qsr_tot(:,:   ) = qsr_tot(:,:) + picefr(:,:) * frcv(jpr_qsrice)%z3(:,:,1)
+            zqsr_tot(:,:) = zqsr_tot(:,:) + picefr(:,:) * frcv(jpr_qsrice)%z3(:,:,1)
             DO jl = 1, jpl
-               zqsr_tot(:,:   ) = zqsr_tot(:,:) + picefr(:,:) * frcv(jpr_qsrice)%z3(:,:,1)
                zqsr_ice(:,:,jl) = frcv(jpr_qsrice)%z3(:,:,1)
             END DO
          ENDIF

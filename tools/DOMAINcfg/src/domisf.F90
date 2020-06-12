@@ -13,7 +13,7 @@ MODULE domisf
    !!   zgr_isf_e3uv_w : correct e3uw and e3vw in case of 2 cell in water column under an ice shelf
    !!---------------------------------------------------------------------
    USE dom_oce
-   USE domutil           ! flood filling algorithm
+   USE domutl            ! flood filling algorithm
    USE domngb            ! find nearest neighbourg
    USE in_out_manager    ! I/O manager
    USE lbclnk            ! lbclnk and lbclnk_multi

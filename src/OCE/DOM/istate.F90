@@ -23,7 +23,6 @@ MODULE istate
    USE oce            ! ocean dynamics and active tracers 
    USE dom_oce        ! ocean space and time domain 
    USE daymod         ! calendar
-   USE divhor         ! horizontal divergence            (div_hor routine)
    USE dtatsd         ! data temperature and salinity   (dta_tsd routine)
    USE dtauvd         ! data: U & V current             (dta_uvd routine)
    USE domvvl          ! varying vertical mesh
@@ -48,7 +47,7 @@ MODULE istate
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: istate.F90 12489 2020-02-28 15:55:11Z davestorkey $
+   !! $Id: istate.F90 13103 2020-06-12 11:44:47Z rblod $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -130,9 +129,6 @@ CONTAINS
          ssh (:,:,Kmm)     = ssh(:,:,Kbb)   
          uu   (:,:,:,Kmm)   = uu  (:,:,:,Kbb)
          vv   (:,:,:,Kmm)   = vv  (:,:,:,Kbb)
-         hdiv(:,:,jpk) = 0._wp               ! bottom divergence set one for 0 to zero at jpk level
-         CALL div_hor( 0, Kbb, Kmm )         ! compute interior hdiv value  
-!!gm                                    hdiv(:,:,:) = 0._wp
 
 !!gm POTENTIAL BUG :
 !!gm  ISSUE :  if ssh(:,:,Kbb) /= 0  then, in non linear free surface, the e3._n, e3._b should be recomputed

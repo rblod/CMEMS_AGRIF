@@ -1,5 +1,5 @@
 !
-! $Id: modcurgridfunctions.F 774 2007-12-18 16:45:53Z rblod $
+! $Id: modcurgridfunctions.F90 13027 2020-06-03 14:36:09Z rblod $
 !
 !     AGRIF (Adaptive Grid Refinement In Fortran)
 !
