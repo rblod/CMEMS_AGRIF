@@ -212,7 +212,7 @@ CONTAINS
                           k_bot = mbkt
                           CALL zgr_top_level    ! shallowest ocean level for T-, U-, V- points
                           k_top = mikt
-
+                          WHERE( bathy(:,:) <= 0._wp )  k_top(:,:) = 0  ! set k_top to zero over land
       ENDIF
       !
       IF( nprint == 1 .AND. lwp )   THEN
