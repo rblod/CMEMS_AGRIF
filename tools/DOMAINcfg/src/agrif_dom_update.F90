@@ -21,7 +21,7 @@ CONTAINS
       !
       IF( Agrif_Root() ) return
 
-      CALL agrif_update_variable(bottom_level_id,locupdate=(/npt_copy,0/),procname = update_bottom_level)
+      CALL agrif_update_variable(bottom_level_id,procname = update_bottom_level)
       !
       Agrif_UseSpecialValueInUpdate = .TRUE.
       Agrif_SpecialValueFineGrid    = 0._wp         
@@ -40,6 +40,7 @@ CONTAINS
       INTEGER                         , INTENT(in   ) ::   nb , ndir
       !
       !!---------------------------------------------------------------------- 
+      REAL(WP),DIMENSION(jpi,jpj) :: zk
       !
       IF( before) THEN
          ptab(i1:i2,j1:j2) = mbkt(i1:i2,j1:j2)*ssmask(i1:i2,j1:j2)
@@ -48,9 +49,12 @@ CONTAINS
          
          WHERE ( mbkt(i1:i2,j1:j2) .EQ. 0 )
             ssmask(i1:i2,j1:j2) = 0.
+            mbkt(i1:i2,j1:j2)   = 1
          ELSEWHERE
             ssmask(i1:i2,j1:j2) = 1.
-         END WHERE           
+         END WHERE 
+         zk(:,:) = REAL(mbkt(:,:),wp); CALL lbc_lnk('update_bottom',zk,'T',1.); mbkt(:,:) = MAX(NINT(zk(:,:)),1)
+         CALL lbc_lnk('update_bottom',ssmask,'T',1.)          
       ENDIF
       !
    END SUBROUTINE update_bottom_level
@@ -70,7 +74,7 @@ CONTAINS
          DO jk=k1,k2
             DO jj=j1,j2
                DO ji=i1,i2
-                   IF( mbkt(ji,jj) .LE. jk ) THEN
+                   IF( mbkt(ji,jj) .GE. jk ) THEN
                       tabres(ji,jj,jk) = e3t_0(ji,jj,jk)
                    ELSE
                       tabres(ji,jj,jk) = 0.
@@ -82,7 +86,7 @@ CONTAINS
          DO jk=k1,k2
             DO jj=j1,j2
                DO ji=i1,i2
-                   IF( mbkt(ji,jj) .LE.jk ) THEN
+                   IF( mbkt(ji,jj) .GE. jk ) THEN
                       e3t_0(ji,jj,jk) = MAX(tabres(ji,jj,jk),MIN(e3zps_min,e3t_1d(jk)*e3zps_rat))
                    ELSE
                       e3t_0(ji,jj,jk) = e3t_1d(jk)
@@ -90,6 +94,8 @@ CONTAINS
                END DO
             END DO
          END DO
+
+         CALL lbc_lnk('update_e3t',e3t_0,'T',1.)
          !
       ENDIF
       ! 

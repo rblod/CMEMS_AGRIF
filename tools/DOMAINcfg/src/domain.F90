@@ -107,7 +107,7 @@ CONTAINS
          &             ln_mskland  , ln_clobber   , nn_chunksz,     &
          &             ln_cfmeta, ln_iscpl
 
-      NAMELIST/namdom/ nn_bathy, cn_topo, cn_bath, cn_lon, cn_lat, rn_scale, nn_interp, &
+      NAMELIST/namdom/ ln_read_cfg, nn_bathy, cn_domcfg, cn_topo, cn_bath, cn_lon, cn_lat, rn_scale, nn_interp, &
          &              rn_bathy , rn_e3zps_min, rn_e3zps_rat, nn_msh, rn_hmin,            &
          &             rn_atfp , rn_rdt   ,  ln_crs      , jphgr_msh ,                               &
          &             ppglam0, ppgphi0, ppe1_deg, ppe2_deg, ppe1_m, ppe2_m,                         &
@@ -404,7 +404,12 @@ CONTAINS
       CALL iom_rstput( 0, 0, inum, 'bottom_level' , REAL( mbkt, wp )*ssmask , ktype = jp_i4 )   ! nb of ocean T-points
       CALL iom_rstput( 0, 0, inum, 'top_level'    , REAL( mikt, wp )*ssmask , ktype = jp_i4 )   ! nb of ocean T-points (ISF)
       CALL iom_rstput( 0, 0, inum, 'isf_draft'    , risfdep , ktype = jp_r8 )
-      CALL iom_rstput( 0, 0, inum, 'bathy_metry'  , bathy   , ktype = jp_r8 )
+      DO jj = 1,jpj
+         DO ji = 1,jpi
+            z2d (ji,jj) = SUM ( e3t_0(ji,jj, 1:mbkt(ji,jj) ) ) * ssmask(ji,jj) 
+         END DO
+      END DO
+      CALL iom_rstput( 0, 0, inum, 'bathy_metry'   , z2d , ktype = jp_r8 )
       !
       !                              !== closed sea ==!
       IF (ln_domclo) THEN

@@ -28,7 +28,7 @@ CONTAINS
 
       ALLOCATE(e3t_interp(jpi,jpj,jpk))
       e3t_interp = -10.
-      Agrif_UseSpecialValue = .TRUE.
+      Agrif_UseSpecialValue = .FALSE.
       Agrif_SpecialValue = 0.
       CALL Agrif_Bc_variable(e3t_connect_id, procname = connect_e3t_connect)
       Agrif_UseSpecialValue = .FALSE.
@@ -89,7 +89,8 @@ CONTAINS
       !
       !!---------------------------------------------------------------------- 
       INTEGER :: ji, jj, jk 
-      REAL(wp), DIMENSION(i1:i2,j1:j2) :: bathy_local   
+      REAL(wp), DIMENSION(i1:i2,j1:j2) :: bathy_local, bathy_interp
+      REAL(wp) :: zdepth, zmax 
       !
       IF( before) THEN
          DO jk=1,jpk
@@ -113,8 +114,31 @@ CONTAINS
          DO jj=j1,j2
             DO ji=i1,i2
                bathy_local (ji,jj) = SUM ( e3t_0(ji,jj, 1:mbkt(ji,jj) ) ) * ssmask(ji,jj)
+               bathy_interp (ji,jj) = ptab(ji,jj,jpk+1)
+
+        ! Connected bathymetry
+               bathy_local(ji,jj)=(1.-ztabramp(ji,jj))*bathy_local(ji,jj)+ztabramp(ji,jj)*bathy_interp(ji,jj)
             END DO
          END DO
+
+        ! Update mbkt and ssmask
+         zmax = gdepw_1d(jpk) + e3t_1d(jpk)
+         bathy_local(:,:) = MAX(MIN(zmax,bathy_local(:,:)),0._wp)
+         WHERE( bathy_local(i1:i2,j1:j2) == 0._wp); mbathy(i1:i2,j1:j2) = 0
+         ELSE WHERE                       ; mbathy(i1:i2,j1:j2) = jpkm1
+         END WHERE
+
+         DO jk=jpkm1,1,-1
+           zdepth = gdepw_1d(jk)+MIN(e3zps_min,e3t_1d(jk)*e3zps_rat)
+           WHERE( 0._wp < bathy_local(:,:) .AND. bathy_local(:,:) <= zdepth ) mbathy(i1:i2,j1:j2) = jk-1
+         ENDDO
+
+         WHERE (mbathy(i1:i2,j1:j2) == 0); ssmask(i1:i2,j1:j2) = 0
+         ELSE WHERE                      ; ssmask(i1:i2,j1:j2) = 1.
+         END WHERE
+         
+         mbkt(i1:i2,j1:j2) = MAX( mbathy(i1:i2,j1:j2), 1 )
+
          !
          DO jk=1,jpk
             DO jj=j1,j2
@@ -122,7 +146,10 @@ CONTAINS
                   IF( e3t_interp(ji,jj,jk) == -10 ) THEN ! the connection has not yet been done
                      e3t_interp(ji,jj,jk) = MAX( ptab(ji,jj,jk),MIN(e3zps_min, e3t_1d(jk)*e3zps_rat) )
                      e3t_interp(ji,jj,jk) = MIN( e3t_interp(ji,jj,jk),e3t_1d(jk) )
-                     e3t_0(ji,jj,jk) = ( 1. + ztabramp(ji,jj) )*e3t_0(ji,jj,jk) + ztabramp(ji,jj)*e3t_interp(ji,jj,jk)
+                     e3t_0(ji,jj,jk) = ( 1. - ztabramp(ji,jj) )*e3t_0(ji,jj,jk) + ztabramp(ji,jj)*e3t_interp(ji,jj,jk)
+                  ENDIF
+                  IF( jk > mbkt(ji,jj)) THEN
+                    e3t_0(ji,jj,jk) = e3t_1d(jk)
                   ENDIF
              END DO
            END DO
