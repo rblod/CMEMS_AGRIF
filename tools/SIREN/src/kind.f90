@@ -2,25 +2,24 @@
 ! NEMO system team, System and Interface for oceanic RElocable Nesting
 !----------------------------------------------------------------------
 !
-! MODULE: kind
-!
 ! DESCRIPTION:
 !> This module defines the F90 kind parameter for common data types.
 !> 
-!
+!>
 !> @author
 !> G. Madec
 ! REVISION HISTORY:
 !> @date June, 2006 - Initial Version
 !> @date December, 2012 - G. Madec
 !>  - add a standard length of character strings
-!
+!>
 !> @todo
 !> - check i8 max value
-!
-!> @note Software governed by the CeCILL licence     (./LICENSE)
+!>
+!> @note Software governed by the CeCILL licence     (NEMOGCM/NEMO_CeCILL.txt)
 !----------------------------------------------------------------------
 MODULE kind
+
    IMPLICIT NONE
    ! NOTE_avoid_public_variables_if_possible
 

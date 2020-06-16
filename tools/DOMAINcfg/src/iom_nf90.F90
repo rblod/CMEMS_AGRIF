@@ -528,10 +528,23 @@ CONTAINS
       !                                             ! when appropriate (currently chunking is applied to 4d fields only)
       INTEGER               :: idlv                 ! local variable
       INTEGER               :: idim3                ! id of the third dimension
+      !
+    !  INTEGER ::   nldi_save, nlei_save    !:patch before we remove periodicity and close boundaries in output files
+    !  INTEGER ::   nldj_save, nlej_save    !:
       !---------------------------------------------------------------------
       !
       clinfo = '          iom_nf90_rp0123d, file: '//TRIM(iom_file(kiomid)%name)//', var: '//TRIM(cdvar)
       if90id = iom_file(kiomid)%nfid
+      !
+      ! use patch to force the writing off periodicity and close boundaries
+      ! without this, issue in some model decomposition
+      ! seb: patch before we remove periodicity and close boundaries in output files
+    !  nldi_save = nldi   ;   nlei_save = nlei
+    !  nldj_save = nldj   ;   nlej_save = nlej
+    !  IF( nimpp           ==      1 ) nldi = 1
+    !  IF( nimpp + jpi - 1 == jpiglo ) nlei = jpi
+    !  IF( njmpp           ==      1 ) nldj = 1
+    !  IF( njmpp + jpj - 1 == jpjglo ) nlej = jpj
       !
       ! define dimension variables if it is not already done
       ! ==========================
@@ -704,6 +717,9 @@ CONTAINS
                &                            = iom_file(kiomid)%dimsz(iom_file(kiomid)%ndims(idvar), idvar) + 1
          IF(lwp) WRITE(numout,*) TRIM(clinfo)//' written ok'
       ENDIF
+      !
+  !    nldi = nldi_save   ;   nlei = nlei_save
+  !    nldj = nldj_save   ;   nlej = nlej_save
       !     
    END SUBROUTINE iom_nf90_rp0123d
 

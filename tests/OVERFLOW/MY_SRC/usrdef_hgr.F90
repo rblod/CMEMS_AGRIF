@@ -25,9 +25,11 @@ MODULE usrdef_hgr
 
    PUBLIC   usr_def_hgr   ! called by domhgr.F90
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: usrdef_hgr.F90 10074 2018-08-28 16:15:49Z nicolasmartin $ 
+   !! $Id: usrdef_hgr.F90 12740 2020-04-12 09:03:06Z smasson $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -71,19 +73,18 @@ CONTAINS
       !
       !                       !==  grid point position  ==!   (in kilometers)
       zfact = rn_dx * 1.e-3         ! conversion in km
-      DO jj = 1, jpj
-         DO ji = 1, jpi             ! longitude
-            plamt(ji,jj) = zfact * (  - 0.5 + REAL( ji-1 + nimpp-1 , wp )  )  
-            plamu(ji,jj) = zfact * (          REAL( ji-1 + nimpp-1 , wp )  )
-            plamv(ji,jj) = plamt(ji,jj)
-            plamf(ji,jj) = plamu(ji,jj)
-            !                       ! latitude
-            pphit(ji,jj) = zfact * (  - 0.5 + REAL( jj-1 + njmpp-1 , wp )  )
-            pphiu(ji,jj) = pphit(ji,jj)
-            pphiv(ji,jj) = zfact * (          REAL( jj-1 + njmpp-1 , wp )  )
-            pphif(ji,jj) = pphiv(ji,jj)
-         END DO
-      END DO
+      DO_2D_11_11
+         !                       ! longitude
+         plamt(ji,jj) = zfact * (  - 0.5 + REAL( ji-1 + nimpp-1 , wp )  )  
+         plamu(ji,jj) = zfact * (          REAL( ji-1 + nimpp-1 , wp )  )
+         plamv(ji,jj) = plamt(ji,jj)
+         plamf(ji,jj) = plamu(ji,jj)
+         !                       ! latitude
+         pphit(ji,jj) = zfact * (  - 0.5 + REAL( jj-1 + njmpp-1 , wp )  )
+         pphiu(ji,jj) = pphit(ji,jj)
+         pphiv(ji,jj) = zfact * (          REAL( jj-1 + njmpp-1 , wp )  )
+         pphif(ji,jj) = pphiv(ji,jj)
+      END_2D
       !
       !                       !==  Horizontal scale factors  ==!   (in meters) 
       pe1t(:,:) = rn_dx   ;   pe2t(:,:) = rn_dx

@@ -14,6 +14,7 @@
  - see create_bathy.f90 to create fine grid bathymetry
  - see merge_bathy.f90 to merge fine grid bathymetry
  - see create_meshmask.f90 to create mesh mask or domain_cfg file.
+ - see create_layout.f90 to create/compute the domain layout of your configuration.
  - see create_restart.f90 to create initial state file, or other fields.
  - see create_boundary.F90 to create boundary condition
 

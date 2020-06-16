@@ -2,8 +2,6 @@
 ! NEMO system team, System and Interface for oceanic RElocable Nesting
 !----------------------------------------------------------------------
 !
-! MODULE: extrap
-!
 ! DESCRIPTION:
 !> @brief 
 !> This module manage extrapolation.
@@ -54,7 +52,7 @@
 !>
 !> @author
 !> J.Paul
-! REVISION HISTORY:
+!>
 !> @date November, 2013 - Initial Version
 !> @date September, 2014
 !> - add header
@@ -69,9 +67,10 @@
 !> - create module for each extrapolation method
 !> - smooth extrapolated points
 !>
-!> @note Software governed by the CeCILL licence     (./LICENSE)
+!> @note Software governed by the CeCILL licence     (NEMOGCM/NEMO_CeCILL.txt)
 !----------------------------------------------------------------------
 MODULE extrap
+
    USE netcdf                          ! nf90 library
    USE kind                            ! F90 kind parameter
    USE phycst                          ! physical constant
@@ -119,6 +118,9 @@ MODULE extrap
    END INTERFACE extrap_fill_value
    
 CONTAINS
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION extrap__detect(td_var0) &
+         &  RESULT (if_detect)
    !-------------------------------------------------------------------
    !> @brief
    !> This function detected point to be extrapolated, given variable structure.
@@ -139,19 +141,20 @@ CONTAINS
    !> @date November, 2013 - Initial Version
    !> @date June, 2015
    !> - do not use level to select points to be extrapolated
-   !
+   !>
    !> @param[in] td_var0   coarse grid variable to extrapolate
    !> @return array of point to be extrapolated
    !-------------------------------------------------------------------
-   FUNCTION extrap__detect( td_var0 ) 
+
       IMPLICIT NONE
+
       ! Argument
-      TYPE(TVAR) ,                 INTENT(IN   ) :: td_var0
+      TYPE(TVAR) ,                      INTENT(IN   ) :: td_var0
 
       ! function
       INTEGER(i4), DIMENSION(td_var0%t_dim(1)%i_len,&
       &                      td_var0%t_dim(2)%i_len,&
-      &                      td_var0%t_dim(3)%i_len ) :: extrap__detect
+      &                      td_var0%t_dim(3)%i_len ) :: if_detect
 
       ! local variable
       ! loop indices
@@ -161,20 +164,23 @@ CONTAINS
       !----------------------------------------------------------------
 
       ! force to extrapolated all points
-      extrap__detect(:,:,:)=1
+      if_detect(:,:,:)=1
 
       ! do not compute grid point already inform
       DO jk0=1,td_var0%t_dim(3)%i_len
          DO jj0=1,td_var0%t_dim(2)%i_len
             DO ji0=1,td_var0%t_dim(1)%i_len
                IF( td_var0%d_value(ji0,jj0,jk0,1) /= td_var0%d_fill )THEN
-                  extrap__detect(ji0,jj0,jk0)=0
+                  if_detect(ji0,jj0,jk0)=0
                ENDIF
             ENDDO
          ENDDO
       ENDDO
 
    END FUNCTION extrap__detect
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION extrap__detect_wrapper(td_var) &
+         & RESULT (if_detect)
    !-------------------------------------------------------------------
    !> @brief
    !> This function sort variable to be extrapolated, depending on number of
@@ -188,58 +194,60 @@ CONTAINS
    !> @param[in] td_var    coarse grid variable to extrapolate
    !> @return 3D array of point to be extrapolated
    !-------------------------------------------------------------------
-   FUNCTION extrap__detect_wrapper( td_var )
 
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR) ,                 INTENT(IN   ) :: td_var
 
       ! function
       INTEGER(i4), DIMENSION(td_var%t_dim(1)%i_len,&
       &                      td_var%t_dim(2)%i_len,&
-      &                      td_var%t_dim(3)%i_len ) :: extrap__detect_wrapper
+      &                      td_var%t_dim(3)%i_len ) :: if_detect
 
       ! local variable
       ! loop indices
       !----------------------------------------------------------------
       ! init
-      extrap__detect_wrapper(:,:,:)=0
+      if_detect(:,:,:)=0
 
       IF( .NOT. ANY(td_var%t_dim(1:3)%l_use) )THEN
          ! no dimension I-J-K used
          CALL logger_debug(" EXTRAP DETECT: nothing done for variable"//&
-         &              TRIM(td_var%c_name) )
+            &              TRIM(td_var%c_name) )
       ELSE IF( ALL(td_var%t_dim(1:3)%l_use) )THEN
          
          ! detect point to be extrapolated on I-J-K
          CALL logger_debug(" EXTRAP DETECT: detect point "//&
-         &              " for variable "//TRIM(td_var%c_name) )
+            &              " for variable "//TRIM(td_var%c_name) )
          
-         extrap__detect_wrapper(:,:,:)=extrap__detect( td_var )
+      if_detect(:,:,:)=extrap__detect( td_var )
 
       ELSE IF( ALL(td_var%t_dim(1:2)%l_use) )THEN
 
          ! detect point to be extrapolated on I-J
          CALL logger_debug(" EXTRAP DETECT: detect horizontal point "//&
-         &              " for variable "//TRIM(td_var%c_name) )
+            &              " for variable "//TRIM(td_var%c_name) )
          
-         extrap__detect_wrapper(:,:,1:1)=extrap__detect( td_var )
+         if_detect(:,:,1:1)=extrap__detect( td_var )
 
       ELSE IF( td_var%t_dim(3)%l_use )THEN
          
          ! detect point to be extrapolated on K
          CALL logger_debug(" EXTRAP DETECT: detect vertical point "//&
-         &              " for variable "//TRIM(td_var%c_name) )
+            &              " for variable "//TRIM(td_var%c_name) )
          
-         extrap__detect_wrapper(1:1,1:1,:)=extrap__detect( td_var )
+         if_detect(1:1,1:1,:)=extrap__detect( td_var )
 
       ENDIF              
 
       CALL logger_debug(" EXTRAP DETECT: "//&
-      &  TRIM(fct_str(SUM(extrap__detect_wrapper(:,:,:))))//&
-      &  " points to be extrapolated" )
+         &  TRIM(fct_str(SUM(if_detect(:,:,:))))//&
+         &  " points to be extrapolated" )
       
    END FUNCTION extrap__detect_wrapper
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE extrap__fill_value_wrapper(td_var, id_radius)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine select method to be used for extrapolation.
@@ -259,13 +267,13 @@ CONTAINS
    !> @date November, 2013 - Initial Version
    !> @date June, 2015
    !> - select all land points for extrapolation
-   !
+   !>
    !> @param[inout] td_var    variable structure
    !> @param[in] id_radius    radius of the halo used to compute extrapolation 
    !-------------------------------------------------------------------
-   SUBROUTINE extrap__fill_value_wrapper( td_var, & 
-   &                                      id_radius )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR) ,                  INTENT(INOUT) :: td_var
       INTEGER(i4),                  INTENT(IN   ), OPTIONAL :: id_radius
@@ -310,6 +318,8 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE extrap__fill_value_wrapper
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE extrap__fill_value(td_var, cd_method, id_radius)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute point to be extrapolated, then extrapolate point.
@@ -324,14 +334,14 @@ CONTAINS
    !> @date November, 2013 - Initial Version
    !> @date June, 2015
    !> - select all land points for extrapolation
-   !
+   !>
    !> @param[inout] td_var    variable structure
    !> @param[in] cd_method    extrapolation method
    !> @param[in] id_radius    radius of the halo used to compute extrapolation
    !-------------------------------------------------------------------
-   SUBROUTINE extrap__fill_value( td_var, cd_method, &
-   &                              id_radius )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR)      ,                 INTENT(INOUT) :: td_var
       CHARACTER(LEN=*),                 INTENT(IN   ) :: cd_method
@@ -382,6 +392,9 @@ CONTAINS
       DEALLOCATE(il_detect)
 
    END SUBROUTINE extrap__fill_value
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE extrap__3D(dd_value, dd_fill, id_detect,&
+         &               cd_method, id_radius)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute point to be extrapolated in 3D array.
@@ -400,16 +413,16 @@ CONTAINS
    !> @date July, 2015 
    !> - compute coef indices to be used
    !> - bug fix: force coef indice to 1, for dimension lenth equal to 1
-   !
+   !>
    !> @param[inout] dd_value  3D array of variable to be extrapolated
    !> @param[in] dd_fill      FillValue of variable
    !> @param[inout] id_detect array of point to extrapolate
    !> @param[in] cd_method    extrapolation method
    !> @param[in] id_radius    radius of the halo used to compute extrapolation
    !-------------------------------------------------------------------
-   SUBROUTINE extrap__3D( dd_value, dd_fill, id_detect,&
-   &                      cd_method, id_radius )
+
       IMPLICIT NONE
+
       ! Argument
       REAL(dp)   , DIMENSION(:,:,:,:), INTENT(INOUT) :: dd_value
       REAL(dp)   ,                     INTENT(IN   ) :: dd_fill
@@ -460,7 +473,7 @@ CONTAINS
       CASE('min_error')
          DO jl=1,il_shape(4)
 
-            ! intitialise table of poitn to be extrapolated
+            ! initialise table of point to be extrapolated
             il_detect(:,:,:)=id_detect(:,:,:)
 
             il_iter=1
@@ -839,6 +852,9 @@ CONTAINS
       DEALLOCATE( il_detect )
 
    END SUBROUTINE extrap__3D
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   PURE FUNCTION extrap__3D_min_error_coef(dd_value) &
+         & RESULT (df_value)
    !-------------------------------------------------------------------
    !> @brief
    !> This function compute coefficient for min_error extrapolation.
@@ -851,20 +867,20 @@ CONTAINS
    !> @date November, 2013 - Initial Version
    !> @date July, 2015 
    !> - decrease weight of third dimension
-   !
+   !>
    !> @param[in] dd_value  3D array of variable to be extrapolated
    !> @return 3D array of coefficient for minimum error extrapolation
    !-------------------------------------------------------------------
-   PURE FUNCTION extrap__3D_min_error_coef( dd_value )
 
       IMPLICIT NONE
+
       ! Argument
       REAL(dp)   , DIMENSION(:,:,:), INTENT(IN) :: dd_value
 
       ! function
       REAL(dp), DIMENSION(SIZE(dd_value(:,:,:),DIM=1), &
       &                   SIZE(dd_value(:,:,:),DIM=2), &
-      &                   SIZE(dd_value(:,:,:),DIM=3) ) :: extrap__3D_min_error_coef
+      &                   SIZE(dd_value(:,:,:),DIM=3) ) :: df_value
 
       ! local variable
       INTEGER(i4), DIMENSION(3) :: il_shape
@@ -882,7 +898,7 @@ CONTAINS
       !----------------------------------------------------------------
 
       ! init
-      extrap__3D_min_error_coef(:,:,:)=0
+      df_value(:,:,:)=0
 
       il_shape(:)=SHAPE(dd_value(:,:,:))
 
@@ -911,12 +927,17 @@ CONTAINS
       ENDDO
 
       WHERE( dl_dist(:,:,:) /= 0 )
-         extrap__3D_min_error_coef(:,:,:)=dl_dist(:,:,:)
+         df_value(:,:,:)=dl_dist(:,:,:)
       END WHERE
 
       DEALLOCATE( dl_dist )
 
    END FUNCTION extrap__3D_min_error_coef
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   PURE FUNCTION extrap__3D_min_error_fill(dd_value, dd_fill, id_radius,&
+         &                                 dd_dfdx, dd_dfdy, dd_dfdz,   &
+         &                                 dd_coef) &
+         & RESULT (df_value)
    !-------------------------------------------------------------------
    !> @brief
    !> This function compute extrapolatd value by calculated minimum error using
@@ -934,10 +955,9 @@ CONTAINS
    !> @param[in] dd_coef   array of coefficient for min_error extrapolation 
    !> @return extrapolatd value
    !-------------------------------------------------------------------
-   PURE FUNCTION extrap__3D_min_error_fill( dd_value, dd_fill, id_radius, &
-   &                                        dd_dfdx, dd_dfdy, dd_dfdz, &
-   &                                        dd_coef )
+
       IMPLICIT NONE
+
       ! Argument
       REAL(dp)   , DIMENSION(:,:,:), INTENT(IN) :: dd_value
       REAL(dp)   ,                   INTENT(IN) :: dd_fill
@@ -948,7 +968,7 @@ CONTAINS
       REAL(dp)   , DIMENSION(:,:,:), INTENT(IN) :: dd_coef
 
       ! function
-      REAL(dp) :: extrap__3d_min_error_fill
+      REAL(dp)                                  :: df_value
 
       ! local variable
       INTEGER(i4), DIMENSION(3) :: il_shape
@@ -963,7 +983,7 @@ CONTAINS
       !----------------------------------------------------------------
 
       ! init
-      extrap__3D_min_error_fill=dd_fill
+      df_value=dd_fill
 
       il_min=MAX(1,(SIZE(dd_value(:,:,:)))/(1+id_radius*2))
 
@@ -994,7 +1014,7 @@ CONTAINS
 
          ! return value
          IF( ALL(il_ind(:)/=0) )THEN
-            extrap__3D_min_error_fill=dd_value(il_ind(1),il_ind(2),il_ind(3))
+            df_value=dd_value(il_ind(1),il_ind(2),il_ind(3))
          ENDIF
 
          DEALLOCATE( il_mask )
@@ -1003,6 +1023,9 @@ CONTAINS
       ENDIF
 
    END FUNCTION extrap__3D_min_error_fill
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   PURE FUNCTION extrap__3D_dist_weight_coef(dd_value) &
+         & RESULT (df_value)
    !-------------------------------------------------------------------
    !> @brief
    !> This function compute coefficient for inverse distance weighted method 
@@ -1015,20 +1038,20 @@ CONTAINS
    !> @date November, 2013 - Initial Version
    !> @date July, 2015 
    !> - decrease weight of third dimension
-   !
+   !>
    !> @param[in] dd_value  3D array of variable to be extrapolated
    !> @return 3D array of coefficient for inverse distance weighted extrapolation
    !-------------------------------------------------------------------
-   PURE FUNCTION extrap__3D_dist_weight_coef( dd_value )
 
       IMPLICIT NONE
+
       ! Argument
-      REAL(dp)   , DIMENSION(:,:,:), INTENT(IN) :: dd_value
+      REAL(dp), DIMENSION(:,:,:), INTENT(IN) :: dd_value
 
       ! function
       REAL(dp), DIMENSION(SIZE(dd_value(:,:,:),DIM=1), &
       &                   SIZE(dd_value(:,:,:),DIM=2), &
-      &                   SIZE(dd_value(:,:,:),DIM=3) ) :: extrap__3D_dist_weight_coef
+      &                   SIZE(dd_value(:,:,:),DIM=3) ) :: df_value
 
       ! local variable
       INTEGER(i4), DIMENSION(3) :: il_shape
@@ -1046,7 +1069,7 @@ CONTAINS
       !----------------------------------------------------------------
 
       ! init
-      extrap__3D_dist_weight_coef(:,:,:)=0
+      df_value(:,:,:)=0
 
       il_shape(:)=SHAPE(dd_value(:,:,:))
 
@@ -1075,12 +1098,16 @@ CONTAINS
       ENDDO
 
       WHERE( dl_dist(:,:,:) /= 0 ) 
-         extrap__3D_dist_weight_coef(:,:,:)=1./dl_dist(:,:,:)
+         df_value(:,:,:)=1./dl_dist(:,:,:)
       END WHERE
 
       DEALLOCATE( dl_dist )
 
    END FUNCTION extrap__3D_dist_weight_coef
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION extrap__3D_dist_weight_fill(dd_value, dd_fill, id_radius, &
+         &                              dd_coef) &
+         &  RESULT (df_value)
    !-------------------------------------------------------------------
    !> @brief
    !> This function compute extrapolatd value using inverse distance weighted
@@ -1090,16 +1117,16 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] dd_value  3D array of variable to be extrapolated
    !> @param[in] dd_fill   FillValue of variable
    !> @param[in] id_radius radius of the halo used to compute extrapolation
    !> @param[in] dd_coef   3D array of coefficient for inverse distance weighted extrapolation 
    !> @return extrapolatd value
    !-------------------------------------------------------------------
-   FUNCTION extrap__3D_dist_weight_fill( dd_value, dd_fill, id_radius, &
-   &                                     dd_coef )
+
       IMPLICIT NONE
+
       ! Argument
       REAL(dp)   , DIMENSION(:,:,:), INTENT(IN) :: dd_value
       REAL(dp)   ,                   INTENT(IN) :: dd_fill
@@ -1107,7 +1134,7 @@ CONTAINS
       REAL(dp)   , DIMENSION(:,:,:), INTENT(IN) :: dd_coef
 
       ! function
-      REAL(dp) :: extrap__3D_dist_weight_fill
+      REAL(dp)                                  :: df_value
 
       ! local variable
       INTEGER(i4), DIMENSION(3) :: il_shape
@@ -1123,7 +1150,7 @@ CONTAINS
       !----------------------------------------------------------------
 
       ! init
-      extrap__3D_dist_weight_fill=dd_fill
+      df_value=dd_fill
 
       il_min=MAX(1,(SIZE(dd_value(:,:,:)))/(1+id_radius*2))
 
@@ -1153,8 +1180,7 @@ CONTAINS
 
          ! return value
          IF( SUM( dl_coef(:,:,:) ) /= 0 )THEN
-            extrap__3D_dist_weight_fill = &
-            &  SUM( dl_value(:,:,:) )/SUM( dl_coef(:,:,:) )
+            df_value = SUM( dl_value(:,:,:) )/SUM( dl_coef(:,:,:) )
          ENDIF
 
          DEALLOCATE( dl_value )
@@ -1163,6 +1189,8 @@ CONTAINS
       ENDIF
 
    END FUNCTION extrap__3D_dist_weight_fill
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE extrap_add_extrabands(td_var, id_isize, id_jsize)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine add to the variable (to be extrapolated) an 
@@ -1173,15 +1201,16 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial version
-   !
+   !>
    !> @param[inout] td_var variable 
    !> @param[in] id_isize  i-direction size of extra bands (default=im_minext)
    !> @param[in] id_jsize  j-direction size of extra bands (default=im_minext)
    !> @todo
    !> - invalid special case for grid with north fold
    !-------------------------------------------------------------------
-   SUBROUTINE extrap_add_extrabands(td_var, id_isize, id_jsize )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR) , INTENT(INOUT)  :: td_var
       INTEGER(i4), INTENT(IN   ), OPTIONAL :: id_isize
@@ -1265,6 +1294,8 @@ CONTAINS
       DEALLOCATE( dl_value )
 
    END SUBROUTINE extrap_add_extrabands
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE extrap_del_extrabands(td_var, id_isize, id_jsize)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine remove of the variable an extraband 
@@ -1280,8 +1311,9 @@ CONTAINS
    !> @param[in] id_isize  i-direction size of extra bands (default=im_minext)
    !> @param[in] id_jsize  j-direction size of extra bands (default=im_minext)
    !-------------------------------------------------------------------
-   SUBROUTINE extrap_del_extrabands(td_var, id_isize, id_jsize )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR) , INTENT(INOUT) :: td_var
       INTEGER(i4), INTENT(IN   ), OPTIONAL :: id_isize
@@ -1346,4 +1378,5 @@ CONTAINS
       DEALLOCATE( dl_value )
 
    END SUBROUTINE extrap_del_extrabands
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 END MODULE extrap

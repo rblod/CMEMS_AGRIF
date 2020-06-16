@@ -18,7 +18,7 @@ MODULE trcnam_age
 
    !!----------------------------------------------------------------------
    !! NEMO/TOP 4.0 , NEMO Consortium (2018)
-   !! $Id: trcnam_age.F90 10069 2018-08-28 14:12:24Z nicolasmartin $
+   !! $Id: trcnam_age.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -53,12 +53,10 @@ CONTAINS
       ln_trc_cbc(jp_age) = .false.
       ln_trc_obc(jp_age) = .false.
       !
-      REWIND( numnat_ref )              ! Namelist namagedate in reference namelist : AGE parameters
       READ  ( numnat_ref, namage, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namage in reference namelist', lwp )
-      REWIND( numnat_cfg )              ! Namelist namagedate in configuration namelist : AGE parameters
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namage in reference namelist' )
       READ  ( numnat_cfg, namage, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namage in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namage in configuration namelist' )
       IF(lwm) WRITE ( numont, namage )
       !
       IF(lwp) THEN                  ! control print

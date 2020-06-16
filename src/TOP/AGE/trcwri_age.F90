@@ -20,12 +20,13 @@ MODULE trcwri_age
 
 CONTAINS
 
-   SUBROUTINE trc_wri_age
+   SUBROUTINE trc_wri_age( Kmm )
       !!---------------------------------------------------------------------
       !!                     ***  ROUTINE trc_wri_trc  ***
       !!
       !! ** Purpose :   output passive tracers fields 
       !!---------------------------------------------------------------------
+      INTEGER, INTENT(in)  :: Kmm  ! time level indices
       CHARACTER (len=20)   :: cltra
       INTEGER              :: jn
       !!---------------------------------------------------------------------
@@ -33,7 +34,7 @@ CONTAINS
       ! write the tracer concentrations in the file
 
       cltra = TRIM( ctrcnm(jp_age) )                  ! short title for tracer
-      CALL iom_put( cltra, trn(:,:,:,jp_age) )
+      CALL iom_put( cltra, tr(:,:,:,jp_age,Kmm) )
 
       !
    END SUBROUTINE trc_wri_age
@@ -50,7 +51,7 @@ CONTAINS
 
    !!----------------------------------------------------------------------
    !! NEMO/TOP 4.0 , NEMO Consortium (2018)
-   !! $Id: trcwri_age.F90 10070 2018-08-28 14:30:54Z nicolasmartin $ 
+   !! $Id: trcwri_age.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!======================================================================
 END MODULE trcwri_age

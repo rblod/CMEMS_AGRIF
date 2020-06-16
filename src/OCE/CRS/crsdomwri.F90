@@ -26,7 +26,7 @@ MODULE crsdomwri
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: crsdomwri.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: crsdomwri.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -154,7 +154,7 @@ CONTAINS
       CALL iom_rstput( 0, 0, inum, 'gdept', gdept_crs, ktype = jp_r4 ) 
       DO jk = 1,jpk   
          DO jj = 1, jpj_crsm1   
-            DO ji = 1, jpi_crsm1  ! jes what to do for fs_jpim1??vector opt.
+            DO ji = 1, jpi_crsm1  ! jes what to do for jpim1??vector opt.
                zdepu(ji,jj,jk) = MIN( gdept_crs(ji,jj,jk) , gdept_crs(ji+1,jj  ,jk) ) * umask_crs(ji,jj,jk)
                zdepv(ji,jj,jk) = MIN( gdept_crs(ji,jj,jk) , gdept_crs(ji  ,jj+1,jk) ) * vmask_crs(ji,jj,jk)
             END DO   

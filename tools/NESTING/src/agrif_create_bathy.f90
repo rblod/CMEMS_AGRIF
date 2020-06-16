@@ -83,199 +83,84 @@ PROGRAM create_bathy
      WRITE(*,*) 'ERROR ***** one needs at least to define parent_bathy_level or parent_bathy_meter ...'
      STOP
   ENDIF
-  !                                                   ! ------------------------------------------------------------------
-  IF( .NOT.new_topo .AND. .NOT.partial_steps ) THEN   ! **** First option : no new topo file & no partial steps
-     !                                                !                 ==> interpolate levels directly from parent file
-     !                                                ! ------------------------------------------------------------------
-     WRITE(*,*) '*** First option: no new topo file & no partial steps'
-     !      
-     ! read coarse grid coordinates
-     status = Read_Coordinates(TRIM(parent_coordinate_file),G0)    
-
-     ! read coarse grid bathymetry
-     IF( TRIM(parent_bathy_level) /= '' ) THEN
+  !
+  ! read fine and coarse grids coordinates file
+  status = Read_Coordinates(TRIM(parent_coordinate_file),G0)
+  status = Read_Coordinates(TRIM(child_coordinates),G1,Pacifique)
+  !
+  ! check error in size
+  IF( imax > SIZE(G0%nav_lon,1) .OR. jmax > SIZE(G0%nav_lon,2) .OR. imax <= imin .OR. jmax <= jmin ) THEN
+     WRITE(*,*) 'ERROR ***** bad child grid definition ...'
+     WRITE(*,*) 'please check imin,jmin,imax,jmax,jpizoom,jpjzoom values'       
+     STOP
+  ENDIF
+  IF( SIZE(G1%nav_lon,1) .NE. nxfin .OR. SIZE(G1%nav_lon,2) .NE. nyfin ) THEN
+     WRITE(*,*) 'ERROR ***** bad child coordinates file ...'
+     WRITE(*,*) 'please check that child coordinates file has been created with the same namelist'
+     STOP
+  ENDIF
+  !
+  ! read bathymetry data set => G0%bathy_meter
+  IF( new_topo ) THEN                                       ! read G0%bathy_meter (on a reduced grid) and G1 coordinates
+     DEALLOCATE( G0%nav_lon, G0%nav_lat )
+     status = read_bathy_coord(TRIM(elevation_database),G0,G1,Pacifique)
+  ELSE                                                      ! read G0%bathy_meter (on the global grid)
+     IF( TRIM(parent_bathy_meter) /= '') THEN
+        status = read_bathy_meter(TRIM(parent_bathy_meter),G0)
+     ELSE
         status = Read_bathy_level(TRIM(parent_bathy_level),G0)
         CALL levels_to_meter(G0)
-     ELSEIF( TRIM(parent_bathy_level) == '' .AND. TRIM(parent_bathy_meter) /= '') THEN
-        status = read_bathy_meter(TRIM(parent_bathy_meter),G0)
-        CALL meter_to_levels(G0)
-     ENDIF
-     !           
-     ! read fine grid coordinates
-     status = Read_Coordinates(TRIM(child_coordinates),G1,pacifique)
-     !
-     ! stop if error in size
-     IF( imax > SIZE(G0%glamt,1) .OR. jmax > SIZE(G0%glamt,2) .OR. imax <= imin .OR. jmax <= jmin ) THEN                   
-        WRITE(*,*) 'ERROR ***** bad child grid definition ...'
-        WRITE(*,*) 'please check imin,jmin,imax,jmax,jpizoom,jpjzoom values'       
-        STOP
-     ENDIF
-     IF( SIZE(G1%nav_lon,1) .NE. nxfin .OR. SIZE(G1%nav_lon,2) .NE. nyfin ) THEN
-        WRITE(*,*) 'ERROR ***** bad child coordinates file ...'
-        WRITE(*,*) 'please check that child coordinates file has been created with the same namelist'
-        STOP
-     ENDIF
-     !
-     jpj = SIZE(G0%nav_lat,2)
-     jpi = SIZE(G0%nav_lat,1)    
-     !           
-     ! create logical array masksrc
-     ALLOCATE(masksrc(jpi,jpj))
-     WHERE(G0%bathy_level.LE.0)   ;   masksrc = .FALSE.   ;
-     ELSEWHERE                    ;   masksrc = .TRUE.    ;
-     END WHERE
-
+     ENDIF     
      ! change longitudes (from -180:180 to 0:360)
-     IF ( Pacifique ) THEN
+     IF(Pacifique) THEN
         WHERE(G0%nav_lon < 0.001)   G0%nav_lon = G0%nav_lon + 360.
      ENDIF
-     !             
-     ALLOCATE(G1%bathy_meter(nxfin,nyfin))
-     !
-     ! compute remapping matrix thanks to SCRIP package
-     CALL get_remap_matrix(G0%nav_lat,G1%nav_lat,G0%nav_lon,G1%nav_lon,masksrc,matrix,src_add,dst_add)
-     CALL make_remap(G0%bathy_meter,G1%bathy_meter,nxfin,nyfin,matrix,src_add,dst_add)  
-     DEALLOCATE(masksrc)
-     !      
-     ! compute constant bathymetry for Parent-Child bathymetry connection
-     CALL init_constant_bathy(G0%bathy_meter,bathy_fin_constant)
-     !
-     ! replace child bathymetry by parent bathymetry at the boundaries
-     IF( ln_agrif_domain ) THEN
-        boundary = npt_copy*irafx + nbghostcellsfine + 1 
-     ELSE
-        boundary = npt_copy*irafx
-     ENDIF
-     G1%bathy_meter(1:boundary,:) = bathy_fin_constant(1:boundary,:)
-     G1%bathy_meter(:,1:boundary) = bathy_fin_constant(:,1:boundary)
-     G1%bathy_meter(nxfin-boundary+1:nxfin,:) = bathy_fin_constant(nxfin-boundary+1:nxfin,:)
-     G1%bathy_meter(:,nyfin-boundary+1:nyfin) = bathy_fin_constant(:,nyfin-boundary+1:nyfin)
-     DEALLOCATE(bathy_fin_constant)
-     !                  
-     ! bathymetry smoothing (everywhere except at the boundaries) 
-     IF( smoothing ) THEN
-        IF( ln_agrif_domain ) THEN
-           CALL smooth_topo(G1%bathy_meter(boundary:nxfin-boundary+1,boundary:nyfin-boundary+1),nbiter)
-        ELSE
-           CALL smooth_topo(G1%bathy_meter(boundary+1:nxfin-boundary,boundary+1:nyfin-boundary),nbiter)
-        ENDIF
-     ENDIF
-     !
-     ! From meters to levels
-     CALL meter_to_levels(G1)
-     G1%bathy_level=NINT(G1%bathy_level)
-     !	    
-     ! Check errors in bathy
-     DO jj=1,nyfin
-        DO ji=1,nxfin
-           IF (G1%bathy_level(ji,jj).LT.0.) THEN
-              PRINT *,'error in ',ji,jj,G1%bathy_level(ji,jj)
-              STOP
-           ENDIF
-        ENDDO
-     ENDDO
-     WHERE ((G1%bathy_level.LT.3.).AND.(G1%bathy_level.GT.0.))   G1%bathy_level=3
-     !
-     ! remove closed seas
-     IF (removeclosedseas) THEN
-        ALLOCATE(bathy_test(nxfin,nyfin))
+  ENDIF
+  !
+  ! 1st allocation of child grid bathy
+  ALLOCATE(G1%bathy_meter(nxfin,nyfin))
+  G1%bathy_meter(:,:)=0.
 
-        bathy_test=0.
-        WHERE (G1%bathy_level(1,:)     .GT.0.)   bathy_test(1,:)=1
-        WHERE (G1%bathy_level(nxfin,:) .GT.0.)   bathy_test(nxfin,:)=1
-        WHERE (G1%bathy_level(:,1)     .GT.0.)   bathy_test(:,1)=1
-        WHERE (G1%bathy_level(:,nyfin) .GT.0.)   bathy_test(:,nyfin)=1
-
-        nbadd = 1
-        DO WHILE (nbadd.NE.0)
-           nbadd = 0
-           DO jj=2,nyfin-1
-              DO ji=2,nxfin-1
-                 IF (G1%bathy_level(ji,jj).GT.0.) THEN
-                    IF (MAX(bathy_test(ji,jj+1),bathy_test(ji,jj-1),bathy_test(ji-1,jj),bathy_test(ji+1,jj)).EQ.1) THEN
-                       IF (bathy_test(ji,jj).NE.1.) nbadd = nbadd + 1
-                       bathy_test(ji,jj)=1.
-                    ENDIF
-                 ENDIF
-              ENDDO
-           ENDDO
-        ENDDO
-
-        WHERE (bathy_test.EQ.0.)   G1%bathy_level = 0.
-
-        DEALLOCATE(bathy_test)
+  ! check grids: if identical then do not interpolate
+  identical_grids = .FALSE.
+  
+  IF(  SIZE(G0%nav_lat,1) == SIZE(G1%nav_lat,1) .AND. SIZE(G0%nav_lat,2) == SIZE(G1%nav_lat,2) .AND. &
+     & SIZE(G0%nav_lon,1) == SIZE(G1%nav_lon,1) .AND. SIZE(G0%nav_lon,2) == SIZE(G1%nav_lon,2) ) THEN
+     IF(  MAXVAL( ABS(G0%nav_lat(:,:)- G1%nav_lat(:,:)) ) < 0.0001 .AND. &
+        & MAXVAL( ABS(G0%nav_lon(:,:)- G1%nav_lon(:,:)) ) < 0.0001 ) THEN
+        WRITE(*,*) ''
+        WRITE(*,*) 'same grid between parent and child domains => NO INTERPOLATION'
+        WRITE(*,*) ''
+        G1%bathy_meter = G0%bathy_meter
+        identical_grids = .TRUE.
      ENDIF
-     !
-     CALL levels_to_meter(G1) ! needed for domcfg
-     !
-     ! store interpolation result in output file
-     status = Write_Bathy_level(TRIM(child_level),G1)
-     status = write_domcfg(TRIM(child_domcfg),G1)
-     !!status = write_domcfg(TRIM(parent_domcfg_out),G0) ! do not activate it
-
-     WRITE(*,*) '****** Bathymetry successfully created if no new topo ******'
-     STOP
-     !
-     !                                                ! -----------------------------------------------------
-  ELSE                                                ! **** Second option : new topo file or partial steps     
-     !                                                ! ----------------------------------------------------- 
-     WRITE(*,*) '*** Second option : new topo or partial steps'
-
-     ! read fine and coarse grids coordinates file
-     status = Read_Coordinates(TRIM(parent_coordinate_file),G0)
-     status = Read_Coordinates(TRIM(child_coordinates),G1,Pacifique)
-     !
-     ! check error in size
-     IF( imax > SIZE(G0%nav_lon,1) .OR. jmax > SIZE(G0%nav_lon,2) .OR. imax <= imin .OR. jmax <= jmin ) THEN                    
-        WRITE(*,*) 'ERROR ***** bad child grid definition ...'
-        WRITE(*,*) 'please check imin,jmin,imax,jmax,jpizoom,jpjzoom values'       
-        STOP
-     ENDIF
-     IF( SIZE(G1%nav_lon,1) .NE. nxfin .OR. SIZE(G1%nav_lon,2) .NE. nyfin ) THEN
-        WRITE(*,*) 'ERROR ***** bad child coordinates file ...'
-        WRITE(*,*) 'please check that child coordinates file has been created with the same namelist'
-        STOP
-     ENDIF
-     !
-     ! === From here on: G0 is the grid associated with the new topography (as gebco or etopo) ===
-     !
-     ! read bathymetry data set => G0%bathy_meter
-     IF( new_topo ) THEN                                       ! read G0%bathy_meter (on a reduced grid) and G1 coordinates
-        DEALLOCATE( G0%nav_lon, G0%nav_lat )
-        status = read_bathy_coord(TRIM(elevation_database),G0,G1,Pacifique)
-     ELSE                                                      ! read G0%bathy_meter (on the global grid)
-        IF( TRIM(parent_bathy_level) /= '' ) THEN
-           status = Read_bathy_level(TRIM(parent_bathy_level),G0)
-           CALL levels_to_meter(G0)
-        ELSEIF( TRIM(parent_bathy_level) == '' .AND. TRIM(parent_bathy_meter) /= '') THEN
-           status = read_bathy_meter(TRIM(parent_bathy_meter),G0)
-        ENDIF
-        IF(Pacifique) THEN
-           WHERE(G0%nav_lon < 0.0001)   G0%nav_lon = G0%nav_lon + 360.
-        ENDIF
-     ENDIF
-     !               
-     ! what type of interpolation for bathymetry
-     IF( type_bathy_interp == 0 ) THEN
-        WRITE(*,*) 'Interpolation of high resolution bathymetry on child grid: Arithmetic average ...'
-     ELSE IF( type_bathy_interp == 1 ) THEN
-        WRITE(*,*) 'Interpolation of high resolution bathymetry on child grid: Median average ...'
-     ELSE IF( type_bathy_interp == 2 ) THEN     
-        WRITE(*,*) 'Interpolation of high resolution bathymetry on child grid: Bilinear interpolation ...'
-     ELSE     
-        WRITE(*,*) 'bad value for type_bathy_interp variable ( must be 0, 1 or 2 )'
-        STOP 
-     ENDIF
-     !
-     ! 1st allocation of child grid bathy
-     ALLOCATE(G1%bathy_meter(nxfin,nyfin))
-     G1%bathy_meter(:,:)=0.                       
-     !
-     ! ---------------------------------------------------------------------------------
-     ! ===                 Bathymetry of the fine grid (step1)                       ===
-     ! ---------------------------------------------------------------------------------
-     ! ==> It gives G1%bathy_meter from G0%bathy_meter
-     ! ---------------------------------------------------------------------------------
+  ENDIF
+  
+  IF( .NOT.new_topo )   type_bathy_interp = 2   ! only one which works
+  !
+  !
+  ! what type of interpolation for bathymetry
+  IF( type_bathy_interp == 0 ) THEN
+     WRITE(*,*) 'Interpolation of high resolution bathymetry on child grid: Arithmetic average ...'
+  ELSE IF( type_bathy_interp == 1 ) THEN
+     WRITE(*,*) 'Interpolation of high resolution bathymetry on child grid: Median average ...'
+  ELSE IF( type_bathy_interp == 2 ) THEN     
+     WRITE(*,*) 'Interpolation of high resolution bathymetry on child grid: Bilinear interpolation ...'
+  ELSE     
+     WRITE(*,*) 'bad value for type_bathy_interp variable ( must be 0, 1 or 2 )'
+     STOP 
+  ENDIF
+  !
+  !
+  ! ---------------------------------------------------------------------------------
+  ! ===                 Bathymetry of the fine grid (step1)                       ===
+  ! ---------------------------------------------------------------------------------
+  ! ==> It gives G1%bathy_meter from G0%bathy_meter
+  ! ---------------------------------------------------------------------------------
+  
+  ! === Here: G0 is the grid associated with the new topography (as gebco or etopo) ===
+  
+  IF( .NOT. identical_grids ) THEN
      !                                                               ! ----------------------------- 
      IF( type_bathy_interp == 0 .OR. type_bathy_interp == 1 ) THEN   ! arithmetic or median averages
         !                                                            ! ----------------------------- 
@@ -374,260 +259,245 @@ PROGRAM create_bathy
            PRINT*,'too much empty cells, proceed to bilinear interpolation'
            type_bathy_interp = 2
         ENDIF
-           
+
+        DEALLOCATE(trouble_points)
+
      ENDIF
      !                                                       ! ----------------------------- 
      IF( type_bathy_interp == 2) THEN                        ! Bilinear interpolation
         !                                                    ! ----------------------------- 
-        identical_grids = .FALSE.
 
-        IF( SIZE(G0%nav_lat,1) == SIZE(G1%nav_lat,1) .AND. SIZE(G0%nav_lat,2) == SIZE(G1%nav_lat,2)  .AND.   &
-            SIZE(G0%nav_lon,1) == SIZE(G1%nav_lon,1) .AND. SIZE(G0%nav_lon,2) == SIZE(G1%nav_lon,2) ) THEN
-           IF( MAXVAL( ABS(G0%nav_lat(:,:)- G1%nav_lat(:,:)) ) < 0.0001 .AND.   &
-               MAXVAL( ABS(G0%nav_lon(:,:)- G1%nav_lon(:,:)) ) < 0.0001 ) THEN
-              PRINT*,'same grid between ',elevation_database,' and child domain'    
-              G1%bathy_meter = G0%bathy_meter 
-              identical_grids = .TRUE.                          
-           ENDIF
-        ENDIF
-
-        IF( .NOT. identical_grids ) THEN 
-
-           ALLOCATE(masksrc(SIZE(G0%bathy_meter,1),SIZE(G0%bathy_meter,2)))
-           ALLOCATE(bathy_test(nxfin,nyfin))
-           !
-           !Where(G0%bathy_meter.le.0.00001) 
-           !  masksrc = .false.
-           !ElseWhere
-              masksrc = .TRUE.
-           !End where                       
-           !            
-           ! compute remapping matrix thanks to SCRIP package            
-           CALL get_remap_matrix(G0%nav_lat,G1%nav_lat,G0%nav_lon,G1%nav_lon,masksrc,matrix,src_add,dst_add)
-           CALL make_remap(G0%bathy_meter,bathy_test,nxfin,nyfin,matrix,src_add,dst_add)  
-           !                                  
-           G1%bathy_meter = bathy_test               
-           !            
-           DEALLOCATE(masksrc)
-           DEALLOCATE(bathy_test) 
-
-        ENDIF
-        !            
-     ENDIF
-     ! ---
-     ! At this stage bathymetry in meters has already been interpolated on fine grid
-     !                    => G1%bathy_meter(nxfin,nyfin)
-     !
-     ! Also G0 was the grid from the new bathymetry data set (etopo, gebco...) and not the coarse grid
-     ! ---
-     !
-     ! ---------------------------------------------------------------------------------
-     ! ===                 Bathymetry of the fine grid (step2)                       ===
-     ! ---------------------------------------------------------------------------------
-     ! ==> It gives an update of G1%bathy_meter and G1%bathy_level
-     ! ---------------------------------------------------------------------------------
-     ! From here on: G0 is the coarse grid
-     !
-     ! Coarse grid bathymetry : G0%bathy_meter (on the global grid)
-     IF( TRIM(parent_bathy_meter) /= '') THEN
-        status = read_bathy_meter(TRIM(parent_bathy_meter),G0)
-     ELSE
-        status = Read_bathy_level(TRIM(parent_bathy_level),G0)
-        CALL levels_to_meter(G0)
-     ENDIF
-     
-     ! Coarse grid coordinatees : G0 coordinates
-     DEALLOCATE(G0%nav_lat,G0%nav_lon)
-     status = Read_coordinates(TRIM(parent_coordinate_file),G0)
-
-     ! allocate temporary arrays                  
-     IF (.NOT.ASSOCIATED(G0%gdepw_ps))       ALLOCATE(G0%gdepw_ps    (SIZE(G0%bathy_meter,1),SIZE(G0%bathy_meter,2)))
-     IF (.NOT.ASSOCIATED(G1%gdepw_ps))       ALLOCATE(G1%gdepw_ps    (SIZE(G1%bathy_meter,1),SIZE(G1%bathy_meter,2)))                  
-     IF (.NOT.ASSOCIATED(gdepw_ps_interp))   ALLOCATE(gdepw_ps_interp(SIZE(G1%bathy_meter,1),SIZE(G1%bathy_meter,2)))
-     !                       
-     IF( ln_agrif_domain ) THEN
-        boundary = npt_copy*irafx + nbghostcellsfine + 1
-     ELSE
-        boundary = npt_copy*irafx
-     ENDIF
-     !
-     ! compute G0%gdepw_ps and G1%gdepw_ps
-     CALL get_partial_steps(G0) 
-     CALL get_partial_steps(G1)
-     CALL bathymetry_control(G0%Bathy_level)
-
-     ! ---------------------------------------
-     ! Bathymetry at the boundaries (npt_copy)                      
-     ! ---------------------------------------
-     ! 1st step: interpolate coarse bathy on the fine grid (using partial steps or not)
-     IF( partial_steps .AND. ln_agrif_domain ) THEN                   
-        CALL Check_interp(G0,gdepw_ps_interp)
-     ELSE
-        gdepw_ps_interp = 0. * G1%gdepw_ps
-        !!CALL agrif_interp(G0%gdepw_ps,gdepw_ps_interp,'T')
-        CALL init_constant_bathy(G0%gdepw_ps,gdepw_ps_interp)
-     ENDIF
-
-     IF (.NOT.ASSOCIATED(G1%wgt))   ALLOCATE(G1%wgt(SIZE(G1%bathy_meter,1),SIZE(G1%bathy_meter,2)))
-     G1%wgt(:,:) = 0.
-     IF ((.NOT.ASSOCIATED(G0%wgt)).AND.bathy_update) THEN 
-        ALLOCATE(G0%wgt(SIZE(G0%nav_lat,1),SIZE(G0%nav_lat,2)))
-        G0%wgt(:,:) = 0.
-     ENDIF
-     !
-     ! 2nd step: copy parent bathymetry at the boundaries
-     DO jj=1,nyfin   ! West and East
-        IF ( gdepw_ps_interp(nbghostcellsfine+1,jj) > 0. ) THEN
-           G1%gdepw_ps(1:boundary,jj) = gdepw_ps_interp(1:boundary,jj) 
-           G1%wgt(1:boundary,jj) = 1.
-        ELSE
-           G1%gdepw_ps(1:nbghostcellsfine+1,jj)=0. 
-        ENDIF
-        !
-        IF ( gdepw_ps_interp(nxfin-nbghostcellsfine,jj) > 0.) THEN
-           G1%gdepw_ps(nxfin-boundary+1:nxfin,jj)=gdepw_ps_interp(nxfin-boundary+1:nxfin,jj)
-           G1%wgt(nxfin-boundary+1:nxfin,jj) = 1.
-        ELSE
-           G1%gdepw_ps(nxfin-nbghostcellsfine:nxfin,jj) = 0.
-        ENDIF
-     END DO
-     !
-     DO ji=1,nxfin    ! South and North
-        IF (gdepw_ps_interp(ji,nbghostcellsfine+1)>0.) THEN
-           G1%gdepw_ps(ji,1:boundary) = gdepw_ps_interp(ji,1:boundary)
-           G1%wgt(ji,1:boundary) = 1.
-        ELSE
-           G1%gdepw_ps(ji,1:nbghostcellsfine+1)=0. 
-        ENDIF
-        !
-        IF (gdepw_ps_interp(ji,nyfin-nbghostcellsfine)>0.) THEN
-           G1%gdepw_ps(ji,nyfin-boundary+1:nyfin)=gdepw_ps_interp(ji,nyfin-boundary+1:nyfin)
-           G1%wgt(ji,nyfin-boundary+1:nyfin) = 1.
-        ELSE
-           G1%gdepw_ps(ji,nyfin-nbghostcellsfine:nyfin) = 0.
-        ENDIF
-     END DO
-     !
-     !clem: recalculate interpolation everywhere before linear connection (useless to me)
-     IF( partial_steps .AND. ln_agrif_domain ) THEN                
-        gdepw_ps_interp = 0.
-        CALL Check_interp(G0,gdepw_ps_interp)
-     ENDIF
-     !
-     ! -------------------------------------------------------
-     ! Bathymetry between boundaries and interior (npt_connect)                 
-     ! --------------------------------------------------------
-     ! Make linear connection (on npt_connect*irafx points) between the boundaries and the interior
-     IF( ln_agrif_domain ) THEN
-        boundary = (npt_copy + npt_connect)*irafx + nbghostcellsfine + 1
-     ELSE
-        boundary = (npt_copy + npt_connect)*irafx
-     ENDIF
-
-     IF( npt_connect > 0 ) THEN
-        WRITE(*,*) ' linear connection on ',npt_connect,'coarse grid points'
-
-        wghts = 1.
-        DO ji = boundary - npt_connect*irafx + 1 , boundary
-           wghts = wghts - (1. / (npt_connect*irafx + 1. ) )
-           DO jj=1,nyfin
-              IF (G1%gdepw_ps(nbghostcellsfine+1,jj) > 0.)       G1%wgt(ji,jj) = MAX(wghts, G1%wgt(ji,jj))  
-           END DO
-        END DO
-
-        wghts = 1.
-        DO ji = nxfin - (boundary - npt_connect*irafx), nxfin - boundary +1 , -1
-           wghts = wghts - (1. / (npt_connect*irafx + 1. ) )
-           DO jj=1,nyfin
-              IF (G1%gdepw_ps(nxfin-nbghostcellsfine,jj) > 0.)   G1%wgt(ji,jj) = MAX(wghts, G1%wgt(ji,jj))
-           END DO
-        END DO
-
-        wghts = 1.
-        DO jj = boundary - npt_connect*irafy + 1 , boundary
-           wghts = wghts - (1. / (npt_connect*irafy + 1. ) )
-           DO ji=1,nxfin
-              IF (G1%gdepw_ps(ji,nbghostcellsfine+1) > 0.)       G1%wgt(ji,jj) = MAX(wghts, G1%wgt(ji,jj))
-           END DO
-        END DO
-
-        wghts = 1.
-        DO jj = nyfin - (boundary - npt_connect*irafy) , nyfin - boundary +1, -1
-           wghts = wghts - (1. / (npt_connect*irafy + 1. ) )
-           DO ji=1,nxfin
-              IF (G1%gdepw_ps(ji,nyfin-nbghostcellsfine) > 0.)   G1%wgt(ji,jj) = MAX(wghts, G1%wgt(ji,jj))
-           END DO
-        END DO
-        IF (.NOT.identical_grids) THEN
-           G1%gdepw_ps(:,:) = (1.-G1%wgt(:,:)) * G1%gdepw_ps(:,:) + gdepw_ps_interp(:,:)*G1%wgt(:,:)
-        ENDIF
-
-     ENDIF
-
-     ! replace G1%bathy_meter by G1%gdepw_ps
-     G1%bathy_meter = G1%gdepw_ps
-     !                     
-     ! --------------------
-     ! Bathymetry smoothing                 
-     ! --------------------
-     IF( smoothing .AND. (.NOT.identical_grids) ) THEN
-        ! Chanut: smoothing everywhere then discard result in connection zone
-        CALL smooth_topo(G1%gdepw_ps(:,:),nbiter)
-        WHERE (G1%wgt(:,:)==0.) G1%bathy_meter(:,:) = G1%gdepw_ps(:,:)
-     ELSE
-        WRITE(*,*) 'No smoothing process only connection is carried out'
-     ENDIF
-     !
-     ! ------------------
-     ! Remove closed seas
-     ! ------------------
-     IF (removeclosedseas) THEN
+        ALLOCATE(masksrc(SIZE(G0%bathy_meter,1),SIZE(G0%bathy_meter,2)))
         ALLOCATE(bathy_test(nxfin,nyfin))
-        bathy_test=0.
-        WHERE (G1%bathy_meter(1,:)    .GT.0.)   bathy_test(1,:)=1
-        WHERE (G1%bathy_meter(nxfin,:).GT.0.)   bathy_test(nxfin,:)=1
-        WHERE (G1%bathy_meter(:,1)    .GT.0.)   bathy_test(:,1)=1
-        WHERE (G1%bathy_meter(:,nyfin).GT.0.)   bathy_test(:,nyfin)=1
+        !
+        WHERE(G0%bathy_meter.LE.0)   ;   masksrc = .FALSE.   ;
+        ELSEWHERE                    ;   masksrc = .TRUE.    ;
+        END WHERE
+        !            
+        ! compute remapping matrix thanks to SCRIP package            
+        CALL get_remap_matrix(G0%nav_lat,G1%nav_lat,G0%nav_lon,G1%nav_lon,masksrc,matrix,src_add,dst_add)
+        CALL make_remap(G0%bathy_meter,bathy_test,nxfin,nyfin,matrix,src_add,dst_add)  
+        !                                  
+        G1%bathy_meter = bathy_test               
+        !            
+        DEALLOCATE(masksrc)
+        DEALLOCATE(bathy_test) 
 
-        nbadd = 1
-        DO WHILE (nbadd.NE.0)
-           nbadd = 0
-           DO jj=2,nyfin-1
-              DO ji=2,nxfin-1
-                 IF (G1%bathy_meter(ji,jj).GT.0.) THEN
-                    IF (MAX(bathy_test(ji,jj+1),bathy_test(ji,jj-1),bathy_test(ji-1,jj),bathy_test(ji+1,jj)).EQ.1) THEN
-                       IF (bathy_test(ji,jj).NE.1.) nbadd = nbadd + 1
-                       bathy_test(ji,jj)=1.
-                    ENDIF
+     ENDIF
+     !            
+  ENDIF ! not identical grids
+  ! ---
+  ! At this stage bathymetry in meters has already been interpolated on fine grid
+  !                    => G1%bathy_meter(nxfin,nyfin)
+  !
+  ! Also G0 was the grid from the new bathymetry data set (etopo, gebco...) and not the coarse grid
+  ! ---
+  !
+  ! ---------------------------------------------------------------------------------
+  ! ===                 Bathymetry of the fine grid (step2)                       ===
+  ! ---------------------------------------------------------------------------------
+  ! ==> It gives an update of G1%bathy_meter and G1%bathy_level
+  ! ---------------------------------------------------------------------------------
+  ! From here on: G0 is the coarse grid
+  !
+  ! Coarse grid bathymetry : G0%bathy_meter (on the global grid)
+  IF( TRIM(parent_bathy_meter) /= '') THEN
+     status = read_bathy_meter(TRIM(parent_bathy_meter),G0)
+  ELSE
+     status = Read_bathy_level(TRIM(parent_bathy_level),G0)
+     CALL levels_to_meter(G0)
+  ENDIF
 
+  ! Coarse grid coordinatees : G0 coordinates
+  DEALLOCATE(G0%nav_lat,G0%nav_lon)
+  status = Read_coordinates(TRIM(parent_coordinate_file),G0)
+
+  ! allocate temporary arrays                  
+  IF (.NOT.ASSOCIATED(G0%gdepw_ps))       ALLOCATE(G0%gdepw_ps    (SIZE(G0%bathy_meter,1),SIZE(G0%bathy_meter,2)))
+  IF (.NOT.ASSOCIATED(G1%gdepw_ps))       ALLOCATE(G1%gdepw_ps    (SIZE(G1%bathy_meter,1),SIZE(G1%bathy_meter,2)))
+  IF (.NOT.ASSOCIATED(gdepw_ps_interp))   ALLOCATE(gdepw_ps_interp(SIZE(G1%bathy_meter,1),SIZE(G1%bathy_meter,2)))
+  !                       
+  IF( ln_agrif_domain ) THEN
+     boundary = npt_copy*irafx + nbghostcellsfine + 1
+  ELSE
+     boundary = npt_copy*irafx
+  ENDIF
+  !
+  ! compute G0%gdepw_ps and G1%gdepw_ps
+  CALL get_partial_steps(G0) 
+  CALL get_partial_steps(G1)
+  CALL bathymetry_control(G0%Bathy_level)
+  
+  ! ---------------------------------------
+  ! Bathymetry at the boundaries (npt_copy)                      
+  ! ---------------------------------------
+  ! 1st step: interpolate coarse bathy on the fine grid (using partial steps or not)
+  IF( ln_agrif_domain ) THEN                   
+     CALL Check_interp(G0,gdepw_ps_interp)
+  ELSE
+     gdepw_ps_interp = 0. * G1%gdepw_ps
+     !!CALL agrif_interp(G0%gdepw_ps,gdepw_ps_interp,'T')
+     CALL init_constant_bathy(G0%gdepw_ps,gdepw_ps_interp)
+  ENDIF
+
+  IF (.NOT.ASSOCIATED(G1%wgt))   ALLOCATE(G1%wgt(SIZE(G1%bathy_meter,1),SIZE(G1%bathy_meter,2)))
+  G1%wgt(:,:) = 0.
+  IF ((.NOT.ASSOCIATED(G0%wgt)).AND.bathy_update) THEN 
+     ALLOCATE(G0%wgt(SIZE(G0%nav_lat,1),SIZE(G0%nav_lat,2)))
+     G0%wgt(:,:) = 0.
+  ENDIF
+  !
+!!$  IF( new_topo ) THEN ! clem: no, do it even when there is no new topo
+  ! 2nd step: copy parent bathymetry at the boundaries
+  DO jj=1,nyfin   ! West and East
+     IF ( gdepw_ps_interp(nbghostcellsfine+1,jj) > 0. ) THEN
+        G1%gdepw_ps(1:boundary,jj) = gdepw_ps_interp(1:boundary,jj) 
+        G1%wgt(1:boundary,jj) = 1.
+     ELSE
+        G1%gdepw_ps(1:nbghostcellsfine+1,jj)=0. 
+     ENDIF
+     !
+     IF ( gdepw_ps_interp(nxfin-nbghostcellsfine,jj) > 0.) THEN
+        G1%gdepw_ps(nxfin-boundary+1:nxfin,jj)=gdepw_ps_interp(nxfin-boundary+1:nxfin,jj)
+        G1%wgt(nxfin-boundary+1:nxfin,jj) = 1.
+     ELSE
+        G1%gdepw_ps(nxfin-nbghostcellsfine:nxfin,jj) = 0.
+     ENDIF
+  END DO
+  !
+  DO ji=1,nxfin    ! South and North
+     IF (gdepw_ps_interp(ji,nbghostcellsfine+1)>0.) THEN
+        G1%gdepw_ps(ji,1:boundary) = gdepw_ps_interp(ji,1:boundary)
+        G1%wgt(ji,1:boundary) = 1.
+     ELSE
+        G1%gdepw_ps(ji,1:nbghostcellsfine+1)=0. 
+     ENDIF
+     !
+     IF (gdepw_ps_interp(ji,nyfin-nbghostcellsfine)>0.) THEN
+        G1%gdepw_ps(ji,nyfin-boundary+1:nyfin)=gdepw_ps_interp(ji,nyfin-boundary+1:nyfin)
+        G1%wgt(ji,nyfin-boundary+1:nyfin) = 1.
+     ELSE
+        G1%gdepw_ps(ji,nyfin-nbghostcellsfine:nyfin) = 0.
+     ENDIF
+  END DO
+  !
+  !clem: recalculate interpolation everywhere before linear connection (useless to me??)
+  IF( ln_agrif_domain ) THEN                
+     gdepw_ps_interp = 0.
+     CALL Check_interp(G0,gdepw_ps_interp)
+  ENDIF
+  !
+  ! -------------------------------------------------------
+  ! Bathymetry between boundaries and interior (npt_connect)                 
+  ! --------------------------------------------------------
+  ! Make linear connection (on npt_connect*irafx points) between the boundaries and the interior
+  IF( ln_agrif_domain ) THEN
+     boundary = (npt_copy + npt_connect)*irafx + nbghostcellsfine + 1
+  ELSE
+     boundary = (npt_copy + npt_connect)*irafx
+  ENDIF
+
+  IF( npt_connect > 0 ) THEN
+     WRITE(*,*) ' linear connection on ',npt_connect,'coarse grid points'
+
+     wghts = 1.
+     DO ji = boundary - npt_connect*irafx + 1 , boundary
+        wghts = wghts - (1. / (npt_connect*irafx + 1. ) )
+        DO jj=1,nyfin
+           IF (G1%gdepw_ps(nbghostcellsfine+1,jj) > 0.)       G1%wgt(ji,jj) = MAX(wghts, G1%wgt(ji,jj))  
+        END DO
+     END DO
+
+     wghts = 1.
+     DO ji = nxfin - (boundary - npt_connect*irafx), nxfin - boundary +1 , -1
+        wghts = wghts - (1. / (npt_connect*irafx + 1. ) )
+        DO jj=1,nyfin
+           IF (G1%gdepw_ps(nxfin-nbghostcellsfine,jj) > 0.)   G1%wgt(ji,jj) = MAX(wghts, G1%wgt(ji,jj))
+        END DO
+     END DO
+
+     wghts = 1.
+     DO jj = boundary - npt_connect*irafy + 1 , boundary
+        wghts = wghts - (1. / (npt_connect*irafy + 1. ) )
+        DO ji=1,nxfin
+           IF (G1%gdepw_ps(ji,nbghostcellsfine+1) > 0.)       G1%wgt(ji,jj) = MAX(wghts, G1%wgt(ji,jj))
+        END DO
+     END DO
+
+     wghts = 1.
+     DO jj = nyfin - (boundary - npt_connect*irafy) , nyfin - boundary +1, -1
+        wghts = wghts - (1. / (npt_connect*irafy + 1. ) )
+        DO ji=1,nxfin
+           IF (G1%gdepw_ps(ji,nyfin-nbghostcellsfine) > 0.)   G1%wgt(ji,jj) = MAX(wghts, G1%wgt(ji,jj))
+        END DO
+     END DO
+     IF (.NOT.identical_grids) THEN
+        G1%gdepw_ps(:,:) = (1.-G1%wgt(:,:)) * G1%gdepw_ps(:,:) + gdepw_ps_interp(:,:)*G1%wgt(:,:)
+     ENDIF
+
+  ENDIF
+!!$  ENDIF
+
+  ! replace G1%bathy_meter by G1%gdepw_ps
+  G1%bathy_meter = G1%gdepw_ps
+  !                     
+  ! --------------------
+  ! Bathymetry smoothing                 
+  ! --------------------
+  IF( smoothing .AND. (.NOT.identical_grids) ) THEN
+     ! Chanut: smoothing everywhere then discard result in connection zone
+     CALL smooth_topo(G1%gdepw_ps(:,:),nbiter)
+     WHERE (G1%wgt(:,:)==0.) G1%bathy_meter(:,:) = G1%gdepw_ps(:,:)
+  ELSE
+     WRITE(*,*) 'No smoothing process only connection is carried out'
+  ENDIF
+  !
+  ! ------------------
+  ! Remove closed seas
+  ! ------------------
+  IF (removeclosedseas) THEN
+     ALLOCATE(bathy_test(nxfin,nyfin))
+     bathy_test=0.
+     WHERE (G1%bathy_meter(1,:)    .GT.0.)   bathy_test(1,:)=1
+     WHERE (G1%bathy_meter(nxfin,:).GT.0.)   bathy_test(nxfin,:)=1
+     WHERE (G1%bathy_meter(:,1)    .GT.0.)   bathy_test(:,1)=1
+     WHERE (G1%bathy_meter(:,nyfin).GT.0.)   bathy_test(:,nyfin)=1
+
+     nbadd = 1
+     DO WHILE (nbadd.NE.0)
+        nbadd = 0
+        DO jj=2,nyfin-1
+           DO ji=2,nxfin-1
+              IF (G1%bathy_meter(ji,jj).GT.0.) THEN
+                 IF (MAX(bathy_test(ji,jj+1),bathy_test(ji,jj-1),bathy_test(ji-1,jj),bathy_test(ji+1,jj)).EQ.1) THEN
+                    IF (bathy_test(ji,jj).NE.1.) nbadd = nbadd + 1
+                    bathy_test(ji,jj)=1.
                  ENDIF
-              ENDDO
+
+              ENDIF
            ENDDO
         ENDDO
-        WHERE (bathy_test.EQ.0.)   G1%bathy_meter = 0.
-        DEALLOCATE(bathy_test)
-     ENDIF
-     !
-     IF( partial_steps ) THEN
-        CALL get_partial_steps(G1)  ! recompute bathy_level and gdepw_ps for G1 (and correct bathy_meter)
-     ELSE
-        CALL meter_to_levels(G1)    ! convert bathymetry from meters to levels
-     ENDIF
-     !
-     ! update parent grid
-     IF(bathy_update)   CALL Update_Parent_Bathy( G0,G1 ) 
-     
-     IF(bathy_update)   status = Write_Bathy_meter(TRIM(parent_bathy_meter_updated),G0)
-     IF(bathy_update)   status = write_domcfg(TRIM(parent_domcfg_updated),G0)
-     
-     ! store interpolation result in output file
-     IF( TRIM(parent_bathy_level) /= '' )   status = Write_Bathy_level(TRIM(child_level),G1)
-     IF( TRIM(parent_bathy_meter) /= '' )   status = Write_Bathy_meter(TRIM(child_meter),G1)
-     IF( TRIM(parent_domcfg_out)  /= '' )   status = write_domcfg(TRIM(child_domcfg),G1)
-     !
-     WRITE(*,*) '****** Bathymetry successfully created ******'
-     STOP
+     ENDDO
+     WHERE (bathy_test.EQ.0.)   G1%bathy_meter = 0.
+     DEALLOCATE(bathy_test)
   ENDIF
+  !
+  CALL get_partial_steps(G1)  ! recompute bathy_level and gdepw_ps for G1 (and correct bathy_meter)
+  !
+  ! update parent grid
+  IF(bathy_update) THEN
+     CALL Update_Parent_Bathy( G0,G1 ) 
+     status = Write_Bathy_meter(TRIM(parent_bathy_meter_updated),G0)
+     status = write_domcfg(TRIM(parent_domcfg_updated),G0)
+  ENDIF
+  !
+  ! store interpolation result in output file
+  IF( TRIM(parent_bathy_level) /= '' )   status = Write_Bathy_level(TRIM(child_level),G1)
+  IF( TRIM(parent_bathy_meter) /= '' )   status = Write_Bathy_meter(TRIM(child_meter),G1)
+  IF( TRIM(parent_domcfg_out)  /= '' )   status = write_domcfg(TRIM(child_domcfg),G1)
+  !
+  WRITE(*,*) '****** Bathymetry successfully created ******'
+  STOP
   !
 END PROGRAM create_bathy
 

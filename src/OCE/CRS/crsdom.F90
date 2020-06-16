@@ -53,7 +53,7 @@ MODULE crsdom
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: crsdom.F90 10068 2018-08-28 14:09:04Z nicolasmartin $
+   !! $Id: crsdom.F90 11536 2019-09-11 13:54:18Z smasson $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -295,8 +295,8 @@ CONTAINS
          ENDDO
       ENDDO
 
-      CALL crs_lbc_lnk( p_e1_crs, cd_type, 1.0, pval=1.0 )
-      CALL crs_lbc_lnk( p_e2_crs, cd_type, 1.0, pval=1.0 )
+      CALL crs_lbc_lnk( p_e1_crs, cd_type, 1.0, pfillval=1.0 )
+      CALL crs_lbc_lnk( p_e2_crs, cd_type, 1.0, pfillval=1.0 )
 
    END SUBROUTINE crs_dom_hgr
 
@@ -578,7 +578,7 @@ CONTAINS
                      ENDDO
                   ENDDO  
                CASE DEFAULT
-                    STOP
+                  CALL ctl_stop( 'STOP', 'error from crs_dom_ope_3d, you should not be there...' )
                END SELECT
 
               DEALLOCATE( zsurf, zsurfmsk )
@@ -1747,8 +1747,8 @@ CONTAINS
           ENDDO
        ENDDO
                   
-       CALL crs_lbc_lnk( p_e3_crs    , cd_type, 1.0, pval=1.0 )  
-       CALL crs_lbc_lnk( p_e3_max_crs, cd_type, 1.0, pval=1.0 )  
+       CALL crs_lbc_lnk( p_e3_crs    , cd_type, 1.0, pfillval=1.0 )  
+       CALL crs_lbc_lnk( p_e3_max_crs, cd_type, 1.0, pfillval=1.0 )  
        !              
        !
    END SUBROUTINE crs_dom_e3
@@ -1856,8 +1856,8 @@ CONTAINS
          ENDDO
       ENDDO   
 
-      CALL crs_lbc_lnk( p_surf_crs    , cd_type, 1.0, pval=1.0 )
-      CALL crs_lbc_lnk( p_surf_crs_msk, cd_type, 1.0, pval=1.0 )
+      CALL crs_lbc_lnk( p_surf_crs    , cd_type, 1.0, pfillval=1.0 )
+      CALL crs_lbc_lnk( p_surf_crs_msk, cd_type, 1.0, pfillval=1.0 )
 
    END SUBROUTINE crs_dom_sfc
    
@@ -1946,7 +1946,7 @@ CONTAINS
                 nldjt_crs(jn) = nldjt(jn)
                 
               CASE DEFAULT
-                 STOP
+                 CALL ctl_stop( 'STOP', 'error from crs_dom_def, you should not be there (1) ...' )
            END SELECT
            IF( nlcjt_crs(jn) > jpj_crs )     jpj_crs = jpj_crs + 1
 
@@ -1995,7 +1995,7 @@ CONTAINS
                  nldit_crs(jn) = nldit(jn) 
 
               CASE DEFAULT
-                 STOP
+                 CALL ctl_stop( 'STOP', 'error from crs_dom_def, you should not be there (2) ...' )
            END SELECT
 
            nimppt_crs(jn) = ANINT( REAL( (nimppt(jn) + 1 ) / nn_factx, wp ) ) + 1

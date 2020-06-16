@@ -163,7 +163,12 @@ const char *vargridnametabvars (const variable * var, int iorindice)
     else if (!strcasecmp(var->v_typevar, "character"))
     {
         WARNING_CharSize(var);
+        if (!strcasecmp(var->v_dimchar  ,":") && var->v_nbdim == 0 )
+        {
+        sprintf (tname_2, "%% carrayu");
+        } else {
         sprintf (tname_2, "%% carray%d", var->v_nbdim);
+        }
     }
 
     strcat(tname_1, tname_2);
@@ -218,7 +223,19 @@ const char *vargridcurgridtabvars(const variable *var, int which_grid)
         {
             WARNING_CharSize(var);
             sprintf(tname_2, "carray%d", var->v_nbdim);
+      
+
+            if (!strcasecmp(var->v_dimchar  ,":") && var->v_nbdim == 0 )
+            {
+            sprintf (tname_2, "carrayu");
+            } else {
+            sprintf (tname_2, "carray%d", var->v_nbdim);
+            }
+
         }
+
+
+
         if (var->v_pointerdeclare)
         {
                 strcat(tname_1,"%p");

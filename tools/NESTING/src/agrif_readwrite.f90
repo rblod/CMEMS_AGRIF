@@ -240,7 +240,7 @@ CONTAINS
     !      
     CALL write_ncdf_var('nav_lon'        ,dimnames,name,Grid%nav_lon    ,'float')
     CALL write_ncdf_var('nav_lat'        ,dimnames,name,Grid%nav_lat    ,'float')
-    CALL write_ncdf_var(parent_level_name,dimnames,name,Grid%bathy_level,'float')
+    CALL write_ncdf_var(parent_level_name,dimnames,name,NINT(Grid%bathy_level),'integer')
     !
     CALL copy_ncdf_att('nav_lon'        ,TRIM(parent_bathy_level),name,MINVAL(Grid%nav_lon),MAXVAL(Grid%nav_lon))
     CALL copy_ncdf_att('nav_lat'        ,TRIM(parent_bathy_level),name,MINVAL(Grid%nav_lat),MAXVAL(Grid%nav_lat))
@@ -544,37 +544,44 @@ CONTAINS
      ! logicals and others
      ln_sco = 0
      ln_isfcav = 0
-     IF( partial_steps ) THEN
+!!$     IF( partial_steps ) THEN
         ln_zps = 1
         ln_zco = 0
-        CALL zgr_zps( nx, ny, gdept_1d, gdepw_1d, e3t_1d, e3w_1d, zbathy, &        ! input
-        &             mbathy, e3t_0, e3u_0, e3v_0, e3f_0, e3w_0, e3uw_0, e3vw_0 )  ! output
-     ELSE
-        ln_zps = 0
-        ln_zco = 1
-     ENDIF
+!!$     ELSE
+!!$        ln_zps = 0
+!!$        ln_zco = 1
+!!$     ENDIF
+
+     CALL zgr_zps( nx, ny, gdept_1d, gdepw_1d, e3t_1d, e3w_1d, zbathy, &        ! input
+        &          mbathy, e3t_0, e3u_0, e3v_0, e3f_0, e3w_0, e3uw_0, e3vw_0 )  ! output
 
      ! top/bottom levels
      bottom_level(:,:) = mbathy(:,:)
      top_level(:,:)    = MIN( 1, mbathy(:,:) )
 
-     ! closed domain (agrif)
-     jperio = 0
+     ! closed domain for child grid and namelist defined domain for parent grid
+     IF( TRIM(name) == TRIM(parent_domcfg_updated) .OR. TRIM(name) == TRIM(parent_domcfg_out) ) THEN
+        jperio = parent_jperio
+     ELSE
+        jperio = 0
+     ENDIF
 
-     bottom_level(1:nx,1   ) = 0
-     bottom_level(1:nx,  ny) = 0
-     bottom_level(1   ,1:ny) = 0
-     bottom_level(  nx,1:ny) = 0
+     !IF( .NOT.ln_agrif_domain ) THEN
+     !   bottom_level(1:nx,1   ) = 0
+     !   bottom_level(1:nx,  ny) = 0
+     !   bottom_level(1   ,1:ny) = 0
+     !   bottom_level(  nx,1:ny) = 0
 
-     top_level(1:nx,1   ) = 0
-     top_level(1:nx,  ny) = 0
-     top_level(1   ,1:ny) = 0
-     top_level(  nx,1:ny) = 0
+     !   top_level(1:nx,1   ) = 0
+     !   top_level(1:nx,  ny) = 0
+     !   top_level(1   ,1:ny) = 0
+     !   top_level(  nx,1:ny) = 0
 
-     zbathy(1:nx,1   ) = 0.
-     zbathy(1:nx,  ny) = 0.
-     zbathy(1   ,1:ny) = 0.
-     zbathy(  nx,1:ny) = 0.     
+     !   zbathy(1:nx,1   ) = 0.
+     !   zbathy(1:nx,  ny) = 0.
+     !   zbathy(1   ,1:ny) = 0.
+     !   zbathy(  nx,1:ny) = 0.     
+     !ENDIF
      
      ! -------------------
      ! write domain_cfg.nc
@@ -858,19 +865,25 @@ CONTAINS
       ! ===================
       zmax = gdepw_1d(N) + e3t_1d(N)        ! maximum depth (i.e. the last ocean level thickness <= 2*e3t_1d(N-1) )
       zbathy(:,:) = MIN( zmax ,  zbathy(:,:) )    ! bounded value of bathy (min already set at the end of zgr_bat)
-      WHERE( zbathy(:,:) == 0. )   ;   mbathy(:,:) = 0       ! land  : set mbathy to 0
+      WHERE( zbathy(:,:) == 0. )   ;   mbathy(:,:) = 0     ! land  : set mbathy to 0
       ELSEWHERE                    ;   mbathy(:,:) = N-1   ! ocean : initialize mbathy to the max ocean level
       END WHERE
 
-      ! Compute mbathy for ocean points (i.e. the number of ocean levels)
-      ! find the number of ocean levels such that the last level thickness
-      ! is larger than the minimum of e3zps_min and e3zps_rat * e3t_1d (where
-      ! e3t_1d is the reference level thickness
-      DO jk = N-1, 1, -1
-         zdepth = gdepw_1d(jk) + MIN( e3zps_min, e3t_1d(jk)*e3zps_rat )
-         WHERE( 0. < zbathy(:,:) .AND. zbathy(:,:) <= zdepth )   mbathy(:,:) = jk-1
-      END DO
-
+!!$      IF( partial_steps ) THEN
+         ! Compute mbathy for ocean points (i.e. the number of ocean levels)
+         ! find the number of ocean levels such that the last level thickness
+         ! is larger than the minimum of e3zps_min and e3zps_rat * e3t_1d (where
+         ! e3t_1d is the reference level thickness
+         DO jk = N-1, 1, -1
+            zdepth = gdepw_1d(jk) + MIN( e3zps_min, e3t_1d(jk)*e3zps_rat )
+            WHERE( 0. < zbathy(:,:) .AND. zbathy(:,:) <= zdepth )   mbathy(:,:) = jk-1
+         END DO
+!!$      ELSE
+!!$         DO jk = 1, N
+!!$            WHERE( 0. < zbathy(:,:) .AND. zbathy(:,:) >= gdepw_1d(jk) )   mbathy(:,:) = jk-1
+!!$         END DO        
+!!$      ENDIF
+      
       ! Scale factors and depth at T- and W-points
       DO jk = 1, N                        ! intitialization to the reference z-coordinate
          gdept_0(:,:,jk) = gdept_1d(jk)
@@ -884,56 +897,56 @@ CONTAINS
       !!      IF ( ln_isfcav == 1 ) CALL zgr_isf
       !
       ! Scale factors and depth at T- and W-points
-!      IF ( ln_isfcav == 0 ) THEN
-         DO jj = 1, ny
-            DO ji = 1, nx
-               ik = mbathy(ji,jj)
-               IF( ik > 0 ) THEN               ! ocean point only
-                  ! max ocean level case
-                  IF( ik == N-1 ) THEN
-                     zdepwp = zbathy(ji,jj)
-                     ze3tp  = zbathy(ji,jj) - gdepw_1d(ik)
-                     ze3wp = 0.5 * e3w_1d(ik) * ( 1. + ( ze3tp/e3t_1d(ik) ) )
-                     e3t_0(ji,jj,ik  ) = ze3tp
-                     e3t_0(ji,jj,ik+1) = ze3tp
-                     e3w_0(ji,jj,ik  ) = ze3wp
-                     e3w_0(ji,jj,ik+1) = ze3tp
-                     gdepw_0(ji,jj,ik+1) = zdepwp
-                     gdept_0(ji,jj,ik  ) = gdept_1d(ik-1) + ze3wp
-                     gdept_0(ji,jj,ik+1) = gdept_0(ji,jj,ik) + ze3tp
-                     !
-                  ELSE                         ! standard case
-                     IF( zbathy(ji,jj) <= gdepw_1d(ik+1) ) THEN  ;   gdepw_0(ji,jj,ik+1) = zbathy(ji,jj)
-                     ELSE                                        ;   gdepw_0(ji,jj,ik+1) = gdepw_1d(ik+1)
-                     ENDIF
-   !gm Bug?  check the gdepw_1d
-                     !       ... on ik
-                     gdept_0(ji,jj,ik) = gdepw_1d(ik) + ( gdepw_0(ji,jj,ik+1) - gdepw_1d(ik) )   &
-                        &                             * ((gdept_1d(     ik  ) - gdepw_1d(ik) )   &
-                        &                             / ( gdepw_1d(     ik+1) - gdepw_1d(ik) ))
-                     e3t_0  (ji,jj,ik) = e3t_1d  (ik) * ( gdepw_0 (ji,jj,ik+1) - gdepw_1d(ik) )   & 
-                        &                             / ( gdepw_1d(      ik+1) - gdepw_1d(ik) ) 
-                     e3w_0(ji,jj,ik) = 0.5 * ( gdepw_0(ji,jj,ik+1) + gdepw_1d(ik+1) - 2. * gdepw_1d(ik) )   &
-                        &                     * ( e3w_1d(ik) / ( gdepw_1d(ik+1) - gdepw_1d(ik) ) )
-                     !       ... on ik+1
-                     e3w_0  (ji,jj,ik+1) = e3t_0  (ji,jj,ik)
-                     e3t_0  (ji,jj,ik+1) = e3t_0  (ji,jj,ik)
-                     gdept_0(ji,jj,ik+1) = gdept_0(ji,jj,ik) + e3t_0(ji,jj,ik)
+      ! IF ( ln_isfcav == 0 ) THEN
+      DO jj = 1, ny
+         DO ji = 1, nx
+            ik = mbathy(ji,jj)
+            IF( ik > 0 ) THEN               ! ocean point only
+               ! max ocean level case
+               IF( ik == N-1 ) THEN
+                  zdepwp = zbathy(ji,jj)
+                  ze3tp  = zbathy(ji,jj) - gdepw_1d(ik)
+                  ze3wp = 0.5 * e3w_1d(ik) * ( 1. + ( ze3tp/e3t_1d(ik) ) )
+                  e3t_0(ji,jj,ik  ) = ze3tp
+                  e3t_0(ji,jj,ik+1) = ze3tp
+                  e3w_0(ji,jj,ik  ) = ze3wp
+                  e3w_0(ji,jj,ik+1) = ze3tp
+                  gdepw_0(ji,jj,ik+1) = zdepwp
+                  gdept_0(ji,jj,ik  ) = gdept_1d(ik-1) + ze3wp
+                  gdept_0(ji,jj,ik+1) = gdept_0(ji,jj,ik) + ze3tp
+                  !
+               ELSE                         ! standard case
+                  IF( zbathy(ji,jj) <= gdepw_1d(ik+1) ) THEN  ;   gdepw_0(ji,jj,ik+1) = zbathy(ji,jj)
+                  ELSE                                        ;   gdepw_0(ji,jj,ik+1) = gdepw_1d(ik+1)
                   ENDIF
+                  !gm Bug?  check the gdepw_1d
+                  !       ... on ik
+                  gdept_0(ji,jj,ik) = gdepw_1d(ik) + ( gdepw_0(ji,jj,ik+1) - gdepw_1d(ik) )   &
+                     &                             * ((gdept_1d(     ik  ) - gdepw_1d(ik) )   &
+                     &                             / ( gdepw_1d(     ik+1) - gdepw_1d(ik) ))
+                  e3t_0  (ji,jj,ik) = e3t_1d  (ik) * ( gdepw_0 (ji,jj,ik+1) - gdepw_1d(ik) )   & 
+                     &                             / ( gdepw_1d(      ik+1) - gdepw_1d(ik) ) 
+                  e3w_0(ji,jj,ik) = 0.5 * ( gdepw_0(ji,jj,ik+1) + gdepw_1d(ik+1) - 2. * gdepw_1d(ik) )   &
+                     &                     * ( e3w_1d(ik) / ( gdepw_1d(ik+1) - gdepw_1d(ik) ) )
+                  !       ... on ik+1
+                  e3w_0  (ji,jj,ik+1) = e3t_0  (ji,jj,ik)
+                  e3t_0  (ji,jj,ik+1) = e3t_0  (ji,jj,ik)
+                  gdept_0(ji,jj,ik+1) = gdept_0(ji,jj,ik) + e3t_0(ji,jj,ik)
                ENDIF
-            END DO
+            ENDIF
          END DO
-         !
-!         DO jj = 1, ny
-!            DO ji = 1, nx
-!               ik = mbathy(ji,jj)
-!               IF( ik > 0 ) THEN               ! ocean point only
-!                  e3tp (ji,jj) = e3t_0(ji,jj,ik)
-!                  e3wp (ji,jj) = e3w_0(ji,jj,ik)
-!               ENDIF
-!            END DO
-!         END DO
-!      END IF
+      END DO
+      !
+      ! DO jj = 1, ny
+      !    DO ji = 1, nx
+      !       ik = mbathy(ji,jj)
+      !       IF( ik > 0 ) THEN               ! ocean point only
+      !          e3tp (ji,jj) = e3t_0(ji,jj,ik)
+      !          e3wp (ji,jj) = e3w_0(ji,jj,ik)
+      !       ENDIF
+      !    END DO
+      ! END DO
+      ! END IF
       !
       ! Scale factors and depth at U-, V-, UW and VW-points
       DO jk = 1, N                        ! initialisation to z-scale factors

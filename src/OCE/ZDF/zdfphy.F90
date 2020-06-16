@@ -55,12 +55,12 @@ MODULE zdfphy
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: zdfphy.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: zdfphy.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE zdf_phy_init
+   SUBROUTINE zdf_phy_init( Kmm )
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE zdf_phy_init  ***
       !! 
@@ -69,6 +69,8 @@ CONTAINS
       !! ** Method  :   Read namelist namzdf, control logicals 
       !!                set horizontal shape and vertical profile of background mixing coef.
       !!----------------------------------------------------------------------
+      INTEGER, INTENT(in)    :: Kmm ! time level index (middle)
+      !
       INTEGER ::   jk            ! dummy loop indices
       INTEGER ::   ioptio, ios   ! local integers
       !!
@@ -90,13 +92,11 @@ CONTAINS
       ENDIF
       !
       !                           !==  Namelist  ==!
-      REWIND( numnam_ref )              ! Namelist namzdf in reference namelist : Vertical mixing parameters
       READ  ( numnam_ref, namzdf, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namzdf in reference namelist', lwp )
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namzdf in reference namelist' )
       !
-      REWIND( numnam_cfg )              ! Namelist namzdf in reference namelist : Vertical mixing parameters
       READ  ( numnam_cfg, namzdf, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namzdf in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namzdf in configuration namelist' )
       IF(lwm)   WRITE ( numond, namzdf )
       !
       IF(lwp) THEN                      ! Parameter print
@@ -131,8 +131,9 @@ CONTAINS
 
       IF( ln_zad_Aimp ) THEN
          IF( zdf_phy_alloc() /= 0 )   &
-        &       CALL ctl_stop( 'STOP', 'zdf_phy_init : unable to allocate adaptive-implicit z-advection arrays' )
-         wi(:,:,:) = 0._wp
+            &       CALL ctl_stop( 'STOP', 'zdf_phy_init : unable to allocate adaptive-implicit z-advection arrays' )
+         Cu_adv(:,:,:) = 0._wp
+         wi    (:,:,:) = 0._wp
       ENDIF
       !                          !==  Background eddy viscosity and diffusivity  ==!
       IF( nn_avb == 0 ) THEN             ! Define avmb, avtb from namelist parameter
@@ -189,10 +190,10 @@ CONTAINS
       !                          !==  type of vertical turbulent closure  ==!    (set nzdf_phy)
       ioptio = 0 
       IF( ln_zdfcst ) THEN   ;   ioptio = ioptio + 1   ;    nzdf_phy = np_CST   ;   ENDIF
-      IF( ln_zdfric ) THEN   ;   ioptio = ioptio + 1   ;    nzdf_phy = np_RIC   ;   CALL zdf_ric_init   ;   ENDIF
-      IF( ln_zdftke ) THEN   ;   ioptio = ioptio + 1   ;    nzdf_phy = np_TKE   ;   CALL zdf_tke_init   ;   ENDIF
-      IF( ln_zdfgls ) THEN   ;   ioptio = ioptio + 1   ;    nzdf_phy = np_GLS   ;   CALL zdf_gls_init   ;   ENDIF
-      IF( ln_zdfosm ) THEN   ;   ioptio = ioptio + 1   ;    nzdf_phy = np_OSM   ;   CALL zdf_osm_init   ;   ENDIF
+      IF( ln_zdfric ) THEN   ;   ioptio = ioptio + 1   ;    nzdf_phy = np_RIC   ;   CALL zdf_ric_init          ;   ENDIF
+      IF( ln_zdftke ) THEN   ;   ioptio = ioptio + 1   ;    nzdf_phy = np_TKE   ;   CALL zdf_tke_init( Kmm )   ;   ENDIF
+      IF( ln_zdfgls ) THEN   ;   ioptio = ioptio + 1   ;    nzdf_phy = np_GLS   ;   CALL zdf_gls_init          ;   ENDIF
+      IF( ln_zdfosm ) THEN   ;   ioptio = ioptio + 1   ;    nzdf_phy = np_OSM   ;   CALL zdf_osm_init( Kmm )   ;   ENDIF
       !
       IF( ioptio /= 1 )    CALL ctl_stop( 'zdf_phy_init: one and only one vertical diffusion option has to be defined ' )
       IF( ln_isfcav ) THEN
@@ -217,7 +218,7 @@ CONTAINS
    END SUBROUTINE zdf_phy_init
 
 
-   SUBROUTINE zdf_phy( kt )
+   SUBROUTINE zdf_phy( kt, Kbb, Kmm, Krhs )
       !!----------------------------------------------------------------------
       !!                     ***  ROUTINE zdf_phy  ***
       !!
@@ -229,7 +230,8 @@ CONTAINS
       !!                nmld ??? mixed layer depth in level and meters   <<<<====verifier !
       !!                bottom stress.....                               <<<<====verifier !
       !!----------------------------------------------------------------------
-      INTEGER, INTENT(in) ::   kt   ! ocean time-step index
+      INTEGER, INTENT(in) ::   kt         ! ocean time-step index
+      INTEGER, INTENT(in) ::   Kbb, Kmm, Krhs   ! ocean time level indices
       !
       INTEGER ::   ji, jj, jk   ! dummy loop indice
       REAL(wp), DIMENSION(jpi,jpj,jpk) ::   zsh2   ! shear production
@@ -240,11 +242,11 @@ CONTAINS
       IF( l_zdfdrg ) THEN     !==  update top/bottom drag  ==!   (non-linear cases)
          !
          !                       !* bottom drag
-         CALL zdf_drg( kt, mbkt    , r_Cdmin_bot, r_Cdmax_bot,   &   ! <<== in 
+         CALL zdf_drg( kt, Kmm, mbkt , r_Cdmin_bot, r_Cdmax_bot,   &   ! <<== in 
             &              r_z0_bot,   r_ke0_bot,    rCd0_bot,   &
             &                                        rCdU_bot  )     ! ==>> out : bottom drag [m/s]
          IF( ln_isfcav ) THEN    !* top drag   (ocean cavities)
-            CALL zdf_drg( kt, mikt    , r_Cdmin_top, r_Cdmax_top,   &   ! <<== in 
+            CALL zdf_drg( kt, Kmm, mikt , r_Cdmin_top, r_Cdmax_top,   &   ! <<== in 
                &              r_z0_top,   r_ke0_top,    rCd0_top,   &
                &                                        rCdU_top  )     ! ==>> out : bottom drag [m/s]
          ENDIF
@@ -253,14 +255,14 @@ CONTAINS
       !                       !==  Kz from chosen turbulent closure  ==!   (avm_k, avt_k)
       !
       IF( l_zdfsh2 )   &         !* shear production at w-points (energy conserving form)
-         CALL zdf_sh2( ub, vb, un, vn, avm_k,   &     ! <<== in
-            &                           zsh2    )     ! ==>> out : shear production
+         CALL zdf_sh2( Kbb, Kmm, avm_k,   &     ! <<== in
+            &                     zsh2    )     ! ==>> out : shear production
       !
       SELECT CASE ( nzdf_phy )                  !* Vertical eddy viscosity and diffusivity coefficients at w-points
-      CASE( np_RIC )   ;   CALL zdf_ric( kt, gdept_n, zsh2, avm_k, avt_k )    ! Richardson number dependent Kz
-      CASE( np_TKE )   ;   CALL zdf_tke( kt         , zsh2, avm_k, avt_k )    ! TKE closure scheme for Kz
-      CASE( np_GLS )   ;   CALL zdf_gls( kt         , zsh2, avm_k, avt_k )    ! GLS closure scheme for Kz
-      CASE( np_OSM )   ;   CALL zdf_osm( kt               , avm_k, avt_k )    ! OSMOSIS closure scheme for Kz
+      CASE( np_RIC )   ;   CALL zdf_ric( kt,      Kmm, zsh2, avm_k, avt_k )    ! Richardson number dependent Kz
+      CASE( np_TKE )   ;   CALL zdf_tke( kt, Kbb, Kmm, zsh2, avm_k, avt_k )    ! TKE closure scheme for Kz
+      CASE( np_GLS )   ;   CALL zdf_gls( kt, Kbb, Kmm, zsh2, avm_k, avt_k )    ! GLS closure scheme for Kz
+      CASE( np_OSM )   ;   CALL zdf_osm( kt, Kbb, Kmm, Krhs, avm_k, avt_k )    ! OSMOSIS closure scheme for Kz
 !     CASE( np_CST )                                  ! Constant Kz (reset avt, avm to the background value)
 !         ! avt_k and avm_k set one for all at initialisation phase
 !!gm         avt(2:jpim1,2:jpjm1,1:jpkm1) = rn_avt0 * wmask(2:jpim1,2:jpjm1,1:jpkm1)
@@ -279,18 +281,18 @@ CONTAINS
          END DO
       ENDIF
       !
-      IF( ln_zdfevd )   CALL zdf_evd( kt, avm, avt )  !* convection: enhanced vertical eddy diffusivity
+      IF( ln_zdfevd )   CALL zdf_evd( kt, Kmm, Krhs, avm, avt )  !* convection: enhanced vertical eddy diffusivity
       !
       !                                         !* double diffusive mixing
       IF( ln_zdfddm ) THEN                            ! update avt and compute avs
-                        CALL zdf_ddm( kt, avm, avt, avs )
+                        CALL zdf_ddm( kt, Kmm,  avm, avt, avs )
       ELSE                                            ! same mixing on all tracers
          avs(2:jpim1,2:jpjm1,1:jpkm1) = avt(2:jpim1,2:jpjm1,1:jpkm1)
       ENDIF
       !
       !                                         !* wave-induced mixing 
-      IF( ln_zdfswm )   CALL zdf_swm( kt, avm, avt, avs )   ! surface  wave (Qiao et al. 2004) 
-      IF( ln_zdfiwm )   CALL zdf_iwm( kt, avm, avt, avs )   ! internal wave (de Lavergne et al 2017)
+      IF( ln_zdfswm )   CALL zdf_swm( kt, Kmm, avm, avt, avs )   ! surface  wave (Qiao et al. 2004) 
+      IF( ln_zdfiwm )   CALL zdf_iwm( kt, Kmm, avm, avt, avs )   ! internal wave (de Lavergne et al 2017)
 
 #if defined key_agrif 
       ! interpolation parent grid => child grid for avm_k ( ex : at west border: update column 1 and 2)
@@ -311,13 +313,13 @@ CONTAINS
          ENDIF
       ENDIF
       !
-      CALL zdf_mxl( kt )                        !* mixed layer depth, and level
+      CALL zdf_mxl( kt, Kmm )                        !* mixed layer depth, and level
       !
       IF( lrst_oce ) THEN                       !* write TKE, GLS or RIC fields in the restart file
          IF( ln_zdftke )   CALL tke_rst( kt, 'WRITE' )
          IF( ln_zdfgls )   CALL gls_rst( kt, 'WRITE' )
          IF( ln_zdfric )   CALL ric_rst( kt, 'WRITE' ) 
-         ! NB. OSMOSIS restart (osm_rst) will be called in step.F90 after wn has been updated
+         ! NB. OSMOSIS restart (osm_rst) will be called in step.F90 after ww has been updated
       ENDIF
       !
       IF( ln_timing )   CALL timing_stop('zdf_phy')

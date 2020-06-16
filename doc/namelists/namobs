@@ -18,6 +18,7 @@
    ln_ignmis   = .true.              ! Logical switch for ignoring missing files
    ln_s_at_t   = .false.             ! Logical switch for computing model S at T obs if not there
    ln_sstnight = .false.             ! Logical switch for calculating night-time average for SST obs
+   ln_bound_reject  = .false.        ! Logical to remove obs near boundaries in LAMs.
    ln_sla_fp_indegs = .true.         ! Logical for SLA: T=> averaging footprint is in degrees, F=> in metres
    ln_sst_fp_indegs = .true.         ! Logical for SST: T=> averaging footprint is in degrees, F=> in metres
    ln_sss_fp_indegs = .true.         ! Logical for SSS: T=> averaging footprint is in degrees, F=> in metres

@@ -5,13 +5,8 @@ MODULE ioipsl
 ! This software is governed by the CeCILL license
 ! See IOIPSL/IOIPSL_License_CeCILL.txt
 !
-  USE errioipsl 
-  USE stringop
-  USE mathelp    
-  USE getincom
+  USE errioipsl   
   USE calendar   
-  USE fliocom    
-  USE flincom    
-  USE histcom    
-  USE restcom
+  USE stringop
+
 END MODULE ioipsl

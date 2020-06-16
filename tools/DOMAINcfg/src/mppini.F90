@@ -16,13 +16,11 @@ MODULE mppini
    !!----------------------------------------------------------------------
    !!  mpp_init          : Lay out the global domain over processors with/without land processor elimination
    !!  mpp_init_mask     : Read global bathymetric information to facilitate land suppression
-   !!  mpp_init_ioipsl   : IOIPSL initialization in mpp 
    !!  mpp_init_partition: Calculate MPP domain decomposition
    !!  factorise         : Calculate the factors of the no. of MPI processes
    !!  mpp_init_nfdcom   : Setup for north fold exchanges with explicit point-to-point messaging
    !!----------------------------------------------------------------------
    USE dom_oce        ! ocean space and time domain
-   USE bdy_oce        ! open BounDarY  
    !
    USE lbcnfd  , ONLY : isendto, nsndto, nfsloop, nfeloop   ! Setup of north fold exchanges 
    USE lib_mpp        ! distribued memory computing library
@@ -36,7 +34,6 @@ MODULE mppini
    PUBLIC mpp_init       ! called by opa.F90
 
    INTEGER :: numbot = -1  ! 'bottom_level' local logical unit
-   INTEGER :: numbdy = -1  ! 'bdy_msk'      local logical unit
    
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
@@ -82,7 +79,6 @@ CONTAINS
       nlej   = jpj
       nbondi = 2
       nbondj = 2
-      nidom  = FLIO_DOM_NONE
       npolj = jperio
       l_Iperio = jpni == 1 .AND. (jperio == 1 .OR. jperio == 4 .OR. jperio == 6 .OR. jperio == 7)
       l_Jperio = jpnj == 1 .AND. (jperio == 2 .OR. jperio == 7)
@@ -185,26 +181,11 @@ CONTAINS
       INTEGER, ALLOCATABLE, DIMENSION(:,:) ::   ilei, ildi, iono, ioea         !  -     -
       INTEGER, ALLOCATABLE, DIMENSION(:,:) ::   ilej, ildj, ioso, iowe         !  -     -
       LOGICAL, ALLOCATABLE, DIMENSION(:,:) ::   llisoce                        !  -     -
-      NAMELIST/nambdy/ ln_bdy, nb_bdy, ln_coords_file, cn_coords_file,           &
-           &             ln_mask_file, cn_mask_file, cn_dyn2d, nn_dyn2d_dta,     &
-           &             cn_dyn3d, nn_dyn3d_dta, cn_tra, nn_tra_dta,             &  
-           &             ln_tra_dmp, ln_dyn3d_dmp, rn_time_dmp, rn_time_dmp_out, &
-           &             cn_ice, nn_ice_dta,                                     &
-           &             rn_ice_tem, rn_ice_sal, rn_ice_age,                     &
-           &             ln_vol, nn_volctl, nn_rimwidth, nb_jpk_bdy
       !!----------------------------------------------------------------------
 
-      llwrtlay = lwp .OR. ln_ctl .OR. sn_cfctl%l_layout
-      ! do we need to take into account bdy_msk?
-      REWIND( numnam_ref )              ! Namelist nambdy in reference namelist : BDY
-      READ  ( numnam_ref, nambdy, IOSTAT = ios, ERR = 903)
-903   IF( ios /= 0 )   CALL ctl_nam ( ios , 'nambdy in reference namelist (mppini)', lwp )
-      REWIND( numnam_cfg )              ! Namelist nambdy in configuration namelist : BDY
-      READ  ( numnam_cfg, nambdy, IOSTAT = ios, ERR = 904 )
-904   IF( ios >  0 )   CALL ctl_nam ( ios , 'nambdy in configuration namelist (mppini)', lwp )
+      llwrtlay = lwp 
       !
       IF(               ln_read_cfg ) CALL iom_open( cn_domcfg,    numbot )
-      IF( ln_bdy .AND. ln_mask_file ) CALL iom_open( cn_mask_file, numbdy )
       !
       !  1. Dimension arrays for subdomains
       ! -----------------------------------
@@ -279,7 +260,6 @@ CONTAINS
 9003  FORMAT (a, i5)
 
       IF( numbot /= -1 )   CALL iom_close( numbot )
-      IF( numbdy /= -1 )   CALL iom_close( numbdy )
     
       ALLOCATE(  nfiimpp(jpni,jpnj), nfipproc(jpni,jpnj), nfilcit(jpni,jpnj) ,    &
          &       nimppt(jpnij) , ibonit(jpnij) , nlcit(jpnij) , nlcjt(jpnij) ,    &
@@ -667,8 +647,6 @@ CONTAINS
          ENDIF
       ENDIF
       !
-      CALL mpp_init_ioipsl       ! Prepare NetCDF output file (if necessary)
-      !
       IF( ln_nnogather ) THEN
          CALL mpp_init_nfdcom     ! northfold neighbour lists
          IF (llwrtlay) THEN
@@ -903,7 +881,7 @@ CONTAINS
       iszij1(:) = iszi1(:) * iszj1(:)
 
       ! if therr is no land and no print
-      IF( .NOT. llist .AND. numbot == -1 .AND. numbdy == -1 ) THEN
+      IF( .NOT. llist .AND. numbot == -1 ) THEN
          ! get the smaller partition which gives the smallest subdomain size
          ii = MINLOC(inbij1, mask = iszij1 == MINVAL(iszij1), dim = 1)
          knbi = inbi1(ii)
@@ -998,7 +976,7 @@ CONTAINS
       LOGICAL, ALLOCATABLE, DIMENSION(:,:) ::   lloce
       !!----------------------------------------------------------------------
       ! do nothing if there is no land-sea mask
-      IF( numbot == -1 .and. numbdy == -1 ) THEN
+      IF( numbot == -1 ) THEN
          propland = 0.
          RETURN
       ENDIF
@@ -1054,7 +1032,7 @@ CONTAINS
       INTEGER, ALLOCATABLE, DIMENSION(:,:) ::   ijmppt, ilcj
       !!----------------------------------------------------------------------
       ! do nothing if there is no land-sea mask
-      IF( numbot == -1 .AND. numbdy == -1 ) THEN
+      IF( numbot == -1  ) THEN
          ldisoce(:,:) = .TRUE.
          RETURN
       ENDIF
@@ -1109,7 +1087,7 @@ CONTAINS
       LOGICAL, DIMENSION(jpiglo,kjcnt), INTENT(  out) :: ldoce       ! ldoce(i,j) = .true. if the point (i,j) is ocean 
       !
       INTEGER                           ::   inumsave                ! local logical unit
-      REAL(wp), DIMENSION(jpiglo,kjcnt) ::   zbot, zbdy 
+      REAL(wp), DIMENSION(jpiglo,kjcnt) ::   zbot
       !!----------------------------------------------------------------------
       !
       inumsave = numout   ;   numout = numnul   !   redirect all print to /dev/null
@@ -1120,62 +1098,11 @@ CONTAINS
          zbot(:,:) = 1.                         ! put a non-null value
       ENDIF
 
-       IF( numbdy /= -1 ) THEN                  ! Adjust with bdy_msk if it exists    
-         CALL iom_get ( numbdy, jpdom_unknown, 'bdy_msk', zbdy, kstart = (/1,kjstr/), kcount = (/jpiglo, kjcnt/) )
-         zbot(:,:) = zbot(:,:) * zbdy(:,:)
-      ENDIF
       !
       ldoce(:,:) = zbot(:,:) > 0.
       numout = inumsave
       !
    END SUBROUTINE mpp_init_readbot_strip
-
-
-   SUBROUTINE mpp_init_ioipsl
-      !!----------------------------------------------------------------------
-      !!                  ***  ROUTINE mpp_init_ioipsl  ***
-      !!
-      !! ** Purpose :   
-      !!
-      !! ** Method  :   
-      !!
-      !! History :
-      !!   9.0  !  04-03  (G. Madec )  MPP-IOIPSL 
-      !!   " "  !  08-12  (A. Coward)  addition in case of jpni*jpnj < jpnij
-      !!----------------------------------------------------------------------
-      INTEGER, DIMENSION(2) ::   iglo, iloc, iabsf, iabsl, ihals, ihale, idid
-      !!----------------------------------------------------------------------
-
-      ! The domain is split only horizontally along i- or/and j- direction
-      ! So we need at the most only 1D arrays with 2 elements.
-      ! Set idompar values equivalent to the jpdom_local_noextra definition
-      ! used in IOM. This works even if jpnij .ne. jpni*jpnj.
-      iglo(1) = jpiglo
-      iglo(2) = jpjglo
-      iloc(1) = nlci
-      iloc(2) = nlcj
-      iabsf(1) = nimppt(narea)
-      iabsf(2) = njmppt(narea)
-      iabsl(:) = iabsf(:) + iloc(:) - 1
-      ihals(1) = nldi - 1
-      ihals(2) = nldj - 1
-      ihale(1) = nlci - nlei
-      ihale(2) = nlcj - nlej
-      idid(1) = 1
-      idid(2) = 2
-
-      IF(lwp) THEN
-          WRITE(numout,*)
-          WRITE(numout,*) 'mpp_init_ioipsl :   iloc  = ', iloc (1), iloc (2)
-          WRITE(numout,*) '~~~~~~~~~~~~~~~     iabsf = ', iabsf(1), iabsf(2)
-          WRITE(numout,*) '                    ihals = ', ihals(1), ihals(2)
-          WRITE(numout,*) '                    ihale = ', ihale(1), ihale(2)
-      ENDIF
-      !
-      CALL flio_dom_set ( jpnij, nproc, idid, iglo, iloc, iabsf, iabsl, ihals, ihale, 'BOX', nidom)
-      !
-   END SUBROUTINE mpp_init_ioipsl  
-
 
    SUBROUTINE mpp_init_nfdcom
       !!----------------------------------------------------------------------

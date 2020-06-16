@@ -6,7 +6,7 @@ MODULE lbclnk
    !! History :  OPA  ! 1997-06  (G. Madec)  Original code
    !!   NEMO     1.0  ! 2002-09  (G. Madec)  F90: Free form and module
    !!            3.2  ! 2009-03  (R. Benshila)  External north fold treatment  
-   !!            3.5  ! 2012     (S.Mocavero, I. Epicoco)  optimization of BDY comm. via lbc_bdy_lnk and lbc_obc_lnk
+   !!            3.5  ! 2012     (S.Mocavero, I. Epicoco)  optimization of BDY comm.
    !!            3.4  ! 2012-12  (R. Bourdalle-Badie, G. Reffray)  add a C1D case  
    !!            3.6  ! 2015-06  (O. Tintó and M. Castrillo)  add lbc_lnk_multi  
    !!            4.0  ! 2017-03  (G. Madec) automatique allocation of array size (use with any 3rd dim size)
@@ -20,7 +20,6 @@ MODULE lbclnk
    !!           define the generic interfaces of lib_mpp routines
    !!----------------------------------------------------------------------
    !!   lbc_lnk       : generic interface for mpp_lnk_3d and mpp_lnk_2d routines defined in lib_mpp
-   !!   lbc_bdy_lnk   : generic interface for mpp_lnk_bdy_2d and mpp_lnk_bdy_3d routines defined in lib_mpp
    !!----------------------------------------------------------------------
    USE par_oce        ! ocean dynamics and tracers   
    USE lib_mpp        ! distributed memory computing library
@@ -36,17 +35,12 @@ MODULE lbclnk
       MODULE PROCEDURE   lbc_lnk_2d_multi, lbc_lnk_3d_multi, lbc_lnk_4d_multi
    END INTERFACE
    !
-   INTERFACE lbc_bdy_lnk
-      MODULE PROCEDURE mpp_lnk_bdy_2d, mpp_lnk_bdy_3d, mpp_lnk_bdy_4d
-   END INTERFACE
-   !
    INTERFACE lbc_lnk_icb
       MODULE PROCEDURE mpp_lnk_2d_icb
    END INTERFACE
 
    PUBLIC   lbc_lnk       ! ocean/ice lateral boundary conditions
    PUBLIC   lbc_lnk_multi ! modified ocean/ice lateral boundary conditions
-   PUBLIC   lbc_bdy_lnk   ! ocean lateral BDY boundary conditions
    PUBLIC   lbc_lnk_icb   ! iceberg lateral boundary conditions
 
    !!----------------------------------------------------------------------
@@ -68,9 +62,7 @@ CONTAINS
    !!   lbc_lnk       : generic interface for lbc_lnk_3d and lbc_lnk_2d
    !!   lbc_lnk_3d    : set the lateral boundary condition on a 3D variable on ocean mesh
    !!   lbc_lnk_2d    : set the lateral boundary condition on a 2D variable on ocean mesh
-   !!   lbc_bdy_lnk   : set the lateral BDY boundary condition
    !!----------------------------------------------------------------------
-   USE oce            ! ocean dynamics and tracers   
    USE dom_oce        ! ocean space and time domain 
    USE in_out_manager ! I/O manager
    USE lbcnfd         ! north fold
@@ -88,17 +80,12 @@ CONTAINS
       MODULE PROCEDURE   lbc_lnk_2d_multi, lbc_lnk_3d_multi, lbc_lnk_4d_multi
    END INTERFACE
    !
-   INTERFACE lbc_bdy_lnk
-      MODULE PROCEDURE lbc_bdy_lnk_2d, lbc_bdy_lnk_3d, lbc_bdy_lnk_4d
-   END INTERFACE
-   !
    INTERFACE lbc_lnk_icb
       MODULE PROCEDURE lbc_lnk_2d_icb
    END INTERFACE
    
    PUBLIC   lbc_lnk       ! ocean/ice  lateral boundary conditions
    PUBLIC   lbc_lnk_multi ! modified ocean/ice lateral boundary conditions
-   PUBLIC   lbc_bdy_lnk   ! ocean lateral BDY boundary conditions
    PUBLIC   lbc_lnk_icb   ! iceberg lateral boundary conditions
    
    !!----------------------------------------------------------------------
@@ -172,46 +159,6 @@ CONTAINS
    !!======================================================================
 
    !!----------------------------------------------------------------------
-   !!                   ***  routine lbc_bdy_lnk_(2,3,4)d  ***
-   !!
-   !!   wrapper rountine to 'lbc_lnk_3d'. This wrapper is used
-   !!   to maintain the same interface with regards to the mpp case
-   !!----------------------------------------------------------------------
-   
-   SUBROUTINE lbc_bdy_lnk_4d( cdname, pt4d, cd_type, psgn, ib_bdy )
-      !!----------------------------------------------------------------------
-      CHARACTER(len=*)          , INTENT(in   ) ::   cdname      ! name of the calling subroutine
-      REAL(wp), DIMENSION(:,:,:,:), INTENT(inout) ::   pt4d      ! 3D array on which the lbc is applied
-      CHARACTER(len=1)          , INTENT(in   ) ::   cd_type   ! nature of pt3d grid-points
-      REAL(wp)                  , INTENT(in   ) ::   psgn      ! sign used across north fold 
-      INTEGER                   , INTENT(in   ) ::   ib_bdy    ! BDY boundary set
-      !!----------------------------------------------------------------------
-      CALL lbc_lnk_4d( cdname, pt4d, cd_type, psgn)
-   END SUBROUTINE lbc_bdy_lnk_4d
-
-   SUBROUTINE lbc_bdy_lnk_3d( cdname, pt3d, cd_type, psgn, ib_bdy )
-      !!----------------------------------------------------------------------
-      CHARACTER(len=*)          , INTENT(in   ) ::   cdname      ! name of the calling subroutine
-      REAL(wp), DIMENSION(:,:,:), INTENT(inout) ::   pt3d      ! 3D array on which the lbc is applied
-      CHARACTER(len=1)          , INTENT(in   ) ::   cd_type   ! nature of pt3d grid-points
-      REAL(wp)                  , INTENT(in   ) ::   psgn      ! sign used across north fold 
-      INTEGER                   , INTENT(in   ) ::   ib_bdy    ! BDY boundary set
-      !!----------------------------------------------------------------------
-      CALL lbc_lnk_3d( cdname, pt3d, cd_type, psgn)
-   END SUBROUTINE lbc_bdy_lnk_3d
-
-
-   SUBROUTINE lbc_bdy_lnk_2d( cdname, pt2d, cd_type, psgn, ib_bdy )
-      !!----------------------------------------------------------------------
-      CHARACTER(len=*)        , INTENT(in   ) ::   cdname      ! name of the calling subroutine
-      REAL(wp), DIMENSION(:,:), INTENT(inout) ::   pt2d      ! 3D array on which the lbc is applied
-      CHARACTER(len=1)        , INTENT(in   ) ::   cd_type   ! nature of pt3d grid-points
-      REAL(wp)                , INTENT(in   ) ::   psgn      ! sign used across north fold 
-      INTEGER                 , INTENT(in   ) ::   ib_bdy    ! BDY boundary set
-      !!----------------------------------------------------------------------
-      CALL lbc_lnk_2d( cdname, pt2d, cd_type, psgn)
-   END SUBROUTINE lbc_bdy_lnk_2d
-
 
 !!gm  This routine should be removed with an optional halos size added in argument of generic routines
 

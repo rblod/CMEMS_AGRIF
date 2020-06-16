@@ -47,7 +47,7 @@ MODULE icbtrj
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: icbtrj.F90 10068 2018-08-28 14:09:04Z nicolasmartin $
+   !! $Id: icbtrj.F90 13103 2020-06-12 11:44:47Z rblod $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -61,9 +61,11 @@ CONTAINS
       INTEGER, INTENT(in) ::   ktend   ! time step index
       !
       INTEGER                ::   iret, iyear, imonth, iday
+      INTEGER                ::   idg  ! number of digits
       REAL(wp)               ::   zfjulday, zsec
       CHARACTER(len=80)      ::   cl_filename
-      CHARACTER(LEN=20)      ::   cldate_ini, cldate_end
+      CHARACTER(LEN=12)      ::   clfmt            ! writing format
+      CHARACTER(LEN=8 )      ::   cldate_ini, cldate_end
       TYPE(iceberg), POINTER ::   this
       TYPE(point)  , POINTER ::   pt
       !!----------------------------------------------------------------------
@@ -73,16 +75,19 @@ CONTAINS
       WRITE(cldate_ini, '(i4.4,2i2.2)') iyear, imonth, iday
 
       ! compute end time step date
-      zfjulday = fjulday + rdt / rday * REAL( nitend - nit000 + 1 , wp)
+      zfjulday = fjulday + rn_Dt / rday * REAL( nitend - nit000 + 1 , wp)
       IF( ABS(zfjulday - REAL(NINT(zfjulday),wp)) < 0.1 / rday )   zfjulday = REAL(NINT(zfjulday),wp)   ! avoid truncation error
       CALL ju2ymds( zfjulday, iyear, imonth, iday, zsec )
       WRITE(cldate_end, '(i4.4,2i2.2)') iyear, imonth, iday
 
       ! define trajectory output name
-      IF ( lk_mpp ) THEN   ;   WRITE(cl_filename,'("trajectory_icebergs_",A,"-",A,"_",I4.4,".nc")')   &
-         &                        TRIM(ADJUSTL(cldate_ini)), TRIM(ADJUSTL(cldate_end)), narea-1
-      ELSE                 ;   WRITE(cl_filename,'("trajectory_icebergs_",A,"-",A         ,".nc")')   &
-         &                        TRIM(ADJUSTL(cldate_ini)), TRIM(ADJUSTL(cldate_end))
+      cl_filename = 'trajectory_icebergs_'//cldate_ini//'-'//cldate_end
+      IF ( lk_mpp ) THEN
+         idg = MAX( INT(LOG10(REAL(MAX(1,jpnij-1),wp))) + 1, 4 )          ! how many digits to we need to write? min=4, max=9
+         WRITE(clfmt, "('(a,a,i', i1, '.', i1, ',a)')") idg, idg          ! '(a,a,ix.x,a)'
+         WRITE(cl_filename,  clfmt) TRIM(cl_filename), '_', narea-1, '.nc'
+      ELSE
+         WRITE(cl_filename,'(a,a)') TRIM(cl_filename),               '.nc'
       ENDIF
       IF( lwp .AND. nn_verbose_level >= 0 )   WRITE(numout,'(2a)') 'icebergs, icb_trj_init: creating ',TRIM(cl_filename)
 

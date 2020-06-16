@@ -26,7 +26,7 @@ MODULE trdmxl_rst
 
    !!---------------------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: trdmxl_rst.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: trdmxl_rst.F90 11536 2019-09-11 13:54:18Z smasson $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!---------------------------------------------------------------------------------
 CONTAINS
@@ -46,10 +46,12 @@ CONTAINS
       CHARACTER(LEN=256)  ::   clpath   ! full path to restart file
       !!--------------------------------------------------------------------------------
 
+      IF( .NOT. ln_rst_list .AND. nn_stock == -1 )   RETURN   ! we will never do any restart
+
       ! to get better performances with NetCDF format:
       ! we open and define the ocean restart_mxl file one time step before writing the data (-> at nitrst - 1)
       ! except if we write ocean restart_mxl files every time step or if an ocean restart_mxl file was writen at nitend - 1
-      IF( kt == nitrst - 1 .OR. nstock == 1 .OR. ( kt == nitend .AND. MOD( nitend - 1, nstock ) == 0 ) ) THEN
+      IF( kt == nitrst - 1 .OR. nn_stock == 1 .OR. ( kt == nitend .AND. MOD( nitend - 1, nn_stock ) == 0 ) ) THEN
          ! beware of the format used to write kt (default is i8.8, that should be large enough...)
          IF( nitrst > 999999999 ) THEN   ;   WRITE(clkt, *       ) nitrst
          ELSE                            ;   WRITE(clkt, '(i8.8)') nitrst

@@ -35,7 +35,7 @@ MODULE agrif_ice_update
 
    !!----------------------------------------------------------------------
    !! NEMO/NST 4.0 , NEMO Consortium (2018)
-   !! $Id: agrif_ice_update.F90 10069 2018-08-28 14:12:24Z nicolasmartin $
+   !! $Id: agrif_ice_update.F90 13026 2020-06-03 14:30:02Z rblod $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -61,7 +61,6 @@ CONTAINS
       Agrif_SpecialValueFineGrid    = -9999.
       Agrif_UseSpecialValueInUpdate = .TRUE.
 
-# if defined TWO_WAY
 # if ! defined DECAL_FEEDBACK
       CALL Agrif_Update_Variable( tra_ice_id , procname = update_tra_ice  )
 #else
@@ -81,7 +80,6 @@ CONTAINS
 !      CALL Agrif_Update_Variable( tra_ice_id , locupdate=(/0,2/), procname = update_tra_ice  )
 !      CALL Agrif_Update_Variable( u_ice_id   , locupdate=(/0,1/), procname = update_u_ice    )
 !      CALL Agrif_Update_Variable( v_ice_id   , locupdate=(/0,1/), procname = update_v_ice    )
-# endif
       Agrif_SpecialValueFineGrid    = 0.
       Agrif_UseSpecialValueInUpdate = .FALSE.
       !

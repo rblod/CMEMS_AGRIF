@@ -19,12 +19,12 @@ MODULE trcsms_pisces
    PUBLIC   trc_sms_pisces    ! called in trcsms.F90
    !!----------------------------------------------------------------------
    !! NEMO/TOP 4.0 , NEMO Consortium (2018)
-   !! $Id: trcsms_pisces.F90 10068 2018-08-28 14:09:04Z nicolasmartin $ 
+   !! $Id: trcsms_pisces.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE trc_sms_pisces( kt )
+   SUBROUTINE trc_sms_pisces( kt, Kbb, Kmm, Krhs )
       !!---------------------------------------------------------------------
       !!                     ***  ROUTINE trc_sms_pisces  ***
       !!
@@ -33,11 +33,12 @@ CONTAINS
       !!
       !!---------------------------------------------------------------------
       !
-      INTEGER, INTENT( in ) ::   kt      ! ocean time-step index      
+      INTEGER, INTENT( in ) ::   kt               ! ocean time-step index      
+      INTEGER, INTENT( in ) ::   Kbb, Kmm, Krhs   ! time level index
       !!---------------------------------------------------------------------
       !
-      IF( ln_p4z .OR. ln_p5z ) THEN  ;   CALL p4z_sms( kt )   !  PISCES
-      ELSE                           ;   CALL p2z_sms( kt )   !  LOBSTER
+      IF( ln_p4z .OR. ln_p5z ) THEN  ;   CALL p4z_sms( kt, Kbb, Kmm, Krhs )   !  PISCES
+      ELSE                           ;   CALL p2z_sms( kt,      Kmm, Krhs )   !  LOBSTER
       ENDIF
 
       !

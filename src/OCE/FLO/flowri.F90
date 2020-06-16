@@ -10,10 +10,6 @@ MODULE flowri
    !!   NEMO      1.0  !  2002-10  (A. Bozec)  F90 : Free form and module
    !!             3.2  !  2010-08  (slaw, cbricaud): netcdf outputs and others 
    !!----------------------------------------------------------------------
-#if   defined key_floats
-   !!----------------------------------------------------------------------
-   !!   'key_floats'                                     float trajectories
-   !!----------------------------------------------------------------------
    USE flo_oce         ! ocean drifting floats
    USE oce             ! ocean dynamics and tracers
    USE dom_oce         ! ocean space and time domain
@@ -38,7 +34,7 @@ MODULE flowri
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: flowri.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: flowri.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -54,7 +50,7 @@ CONTAINS
       IF( flo_wri_alloc /= 0 )   CALL ctl_stop( 'STOP', 'flo_wri_alloc: failed to allocate arrays.' )
    END FUNCTION flo_wri_alloc
 
-   SUBROUTINE flo_wri( kt )
+   SUBROUTINE flo_wri( kt, Kmm )
       !!---------------------------------------------------------------------
       !!                  ***  ROUTINE flo_wri ***
       !!             
@@ -67,7 +63,8 @@ CONTAINS
       !!      
       !!----------------------------------------------------------------------
       !! * Arguments
-      INTEGER  :: kt                               ! time step
+      INTEGER, INTENT(in)  :: kt                 ! time step
+      INTEGER, INTENT(in)  :: Kmm                ! time level index
 
       !! * Local declarations
       INTEGER  :: iafl , ibfl , icfl             ! temporary integer
@@ -119,12 +116,12 @@ CONTAINS
                      +     zafl *(1.-zbfl)*gphit(ia1floc,ibfloc ) +     zafl  * zbfl * gphit(ia1floc,ib1floc)   
                zlon(jfl) = (1.-zafl)*(1.-zbfl)*glamt(iafloc ,ibfloc ) + (1.-zafl) * zbfl * glamt(iafloc ,ib1floc)   &
                      +     zafl *(1.-zbfl)*glamt(ia1floc,ibfloc ) +     zafl  * zbfl * glamt(ia1floc,ib1floc)
-               zdep(jfl) = (1.-zcfl)*gdepw_n(iafloc,ibfloc,icfl ) + zcfl * gdepw_n(iafloc,ibfloc,ic1fl)     
+               zdep(jfl) = (1.-zcfl)*gdepw(iafloc,ibfloc,icfl ,Kmm) + zcfl * gdepw(iafloc,ibfloc,ic1fl,Kmm)     
 
                !save temperature, salinity and density at this position
-               ztem(jfl) = tsn(iafloc,ibfloc,icfl,jp_tem)
-               zsal (jfl) = tsn(iafloc,ibfloc,icfl,jp_sal)
-               zrho (jfl) = (rhd(iafloc,ibfloc,icfl)+1)*rau0
+               ztem(jfl) = ts(iafloc,ibfloc,icfl,jp_tem,Kmm)
+               zsal (jfl) = ts(iafloc,ibfloc,icfl,jp_sal,Kmm)
+               zrho (jfl) = (rhd(iafloc,ibfloc,icfl)+1)*rho0
 
             ENDIF
 
@@ -140,11 +137,11 @@ CONTAINS
                       +     zafl *(1.-zbfl)*gphit(ia1floc,ibfloc ) +     zafl  * zbfl * gphit(ia1floc,ib1floc)
             zlon(jfl) = (1.-zafl)*(1.-zbfl)*glamt(iafloc ,ibfloc ) + (1.-zafl) * zbfl * glamt(iafloc ,ib1floc)   &
                       +     zafl *(1.-zbfl)*glamt(ia1floc,ibfloc ) +     zafl  * zbfl * glamt(ia1floc,ib1floc)
-            zdep(jfl) = (1.-zcfl)*gdepw_n(iafloc,ibfloc,icfl ) + zcfl * gdepw_n(iafloc,ibfloc,ic1fl)
+            zdep(jfl) = (1.-zcfl)*gdepw(iafloc,ibfloc,icfl ,Kmm) + zcfl * gdepw(iafloc,ibfloc,ic1fl,Kmm)
 
-            ztem(jfl) = tsn(iafloc,ibfloc,icfl,jp_tem)
-            zsal(jfl) = tsn(iafloc,ibfloc,icfl,jp_sal)
-            zrho(jfl) = (rhd(iafloc,ibfloc,icfl)+1)*rau0
+            ztem(jfl) = ts(iafloc,ibfloc,icfl,jp_tem,Kmm)
+            zsal(jfl) = ts(iafloc,ibfloc,icfl,jp_sal,Kmm)
+            zrho(jfl) = (rhd(iafloc,ibfloc,icfl)+1)*rho0
           
          ENDIF
 
@@ -178,7 +175,7 @@ CONTAINS
             IF( kt == nn_it000 ) THEN
                CALL ctl_opn( numflo, 'trajec_float', 'REPLACE', 'FORMATTED', 'SEQUENTIAL', -1, numout, .FALSE. )
                irecflo = NINT( (nitend-nn_it000) / FLOAT(nn_writefl) )
-               WRITE(numflo,*)cexper,no,irecflo,jpnfl,nn_writefl
+               WRITE(numflo,*) cexper, irecflo, jpnfl, nn_writefl
             ENDIF
 
             !II-1-b Write in ascii file
@@ -224,7 +221,7 @@ CONTAINS
                CALL dia_nam( clname, nn_writefl, 'trajec_float' )
                clname=TRIM(clname)//".nc"
 
-               CALL fliocrfd( clname , (/ 'ntraj' , 't' /), (/ jpnfl , -1  /) , numflo )
+               CALL fliocrfd( clname , (/'ntraj' , '    t' /), (/ jpnfl , -1/) , numflo )
    
                CALL fliodefv( numflo, 'traj_lon'    , (/1,2/), v_t=flio_r8, long_name="Longitude"           , units="degrees_east"  )
                CALL fliodefv( numflo, 'traj_lat'    , (/1,2/), v_t=flio_r8, long_name="Latitude"            , units="degrees_north" )
@@ -247,21 +244,20 @@ CONTAINS
             !II-2-b-2 Write in  netcdf file
             !-------------------------------
             irec =  INT( (kt-nn_it000+1)/nn_writefl ) +1
-            ztime = ( kt-nn_it000 + 1 ) * rdt
+            ztime = ( kt-nn_it000 + 1 ) * rn_Dt
 
             CALL flioputv( numflo , 'time_counter', ztime , start=(/irec/) )
 
             DO jfl = 1, jpnfl
 
                istart = (/jfl,irec/)
-               icfl   = INT( tpkfl(jfl) )            ! K-index of the nearest point before
 
-               CALL flioputv( numflo , 'traj_lon'    , zlon(jfl)        , start=istart )
-               CALL flioputv( numflo , 'traj_lat'    , zlat(jfl)        , start=istart )  
-               CALL flioputv( numflo , 'traj_depth'  , zdep(jfl)        , start=istart )  
-               CALL flioputv( numflo , 'traj_temp'   , ztemp(icfl,jfl)  , start=istart )  
-               CALL flioputv( numflo , 'traj_salt'   , zsal(icfl,jfl)   , start=istart )  
-               CALL flioputv( numflo , 'traj_dens'   , zrho(icfl,jfl)   , start=istart )  
+               CALL flioputv( numflo , 'traj_lon'    , zlon(jfl), start=istart )
+               CALL flioputv( numflo , 'traj_lat'    , zlat(jfl), start=istart )  
+               CALL flioputv( numflo , 'traj_depth'  , zdep(jfl), start=istart )  
+               CALL flioputv( numflo , 'traj_temp'   , ztem(jfl), start=istart )  
+               CALL flioputv( numflo , 'traj_salt'   , zsal(jfl), start=istart )  
+               CALL flioputv( numflo , 'traj_dens'   , zrho(jfl), start=istart )  
 
             ENDDO
 
@@ -275,16 +271,6 @@ CONTAINS
       ENDIF ! netcdf writing
    
    END SUBROUTINE flo_wri
-
-
-#  else
-   !!----------------------------------------------------------------------
-   !!   Default option                                         Empty module
-   !!----------------------------------------------------------------------
-CONTAINS
-   SUBROUTINE flo_wri                 ! Empty routine
-   END SUBROUTINE flo_wri
-#endif
 
    !!=======================================================================
 END MODULE flowri

@@ -49,10 +49,10 @@ MODULE zdfric
    LOGICAL  ::   ln_mldw     ! Use or not the MLD parameters
 
    !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: zdfric.F90 10068 2018-08-28 14:09:04Z nicolasmartin $
+   !! $Id: zdfric.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -77,13 +77,11 @@ CONTAINS
          &                rn_mldmin, rn_mldmax, rn_wtmix, rn_wvmix, ln_mldw
       !!----------------------------------------------------------------------
       !
-      REWIND( numnam_ref )              ! Namelist namzdf_ric in reference namelist : Vertical diffusion Kz depends on Richardson number
       READ  ( numnam_ref, namzdf_ric, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 ) CALL ctl_nam ( ios , 'namzdf_ric in reference namelist', lwp )
+901   IF( ios /= 0 ) CALL ctl_nam ( ios , 'namzdf_ric in reference namelist' )
 
-      REWIND( numnam_cfg )              ! Namelist namzdf_ric in configuration namelist : Vertical diffusion Kz depends on Richardson number
       READ  ( numnam_cfg, namzdf_ric, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 ) CALL ctl_nam ( ios , 'namzdf_ric in configuration namelist', lwp )
+902   IF( ios >  0 ) CALL ctl_nam ( ios , 'namzdf_ric in configuration namelist' )
       IF(lwm) WRITE ( numond, namzdf_ric )
       !
       IF(lwp) THEN                   ! Control print
@@ -111,7 +109,7 @@ CONTAINS
    END SUBROUTINE zdf_ric_init
 
 
-   SUBROUTINE zdf_ric( kt, pdept, p_sh2, p_avm, p_avt )
+   SUBROUTINE zdf_ric( kt, Kmm, p_sh2, p_avm, p_avt )
       !!----------------------------------------------------------------------
       !!                 ***  ROUTINE zdfric  ***
       !!                    
@@ -124,7 +122,7 @@ CONTAINS
       !!                    avm = avm0 + avmb
       !!                    avt = avm0 / (1 + rn_alp*ri)
       !!                with ri  = N^2 / dz(u)**2
-      !!                         = e3w**2 * rn2/[ mi( dk(ub) )+mj( dk(vb) ) ]
+      !!                         = e3w**2 * rn2/[ mi( dk(uu(:,:,:,Kbb)) )+mj( dk(vv(:,:,:,Kbb)) ) ]
       !!                    avm0= rn_avmri / (1 + rn_alp*Ri)**nn_ric
       !!                where ri is the before local Richardson number,
       !!                rn_avmri is the maximum value reaches by avm and avt 
@@ -151,7 +149,7 @@ CONTAINS
       !!              PFJ Lermusiaux 2001.
       !!----------------------------------------------------------------------
       INTEGER                   , INTENT(in   ) ::   kt             ! ocean time-step
-      REAL(wp), DIMENSION(:,:,:), INTENT(in   ) ::   pdept          ! depth of t-point  [m]
+      INTEGER                   , INTENT(in   ) ::   Kmm            ! ocean time level index
       REAL(wp), DIMENSION(:,:,:), INTENT(in   ) ::   p_sh2          ! shear production term
       REAL(wp), DIMENSION(:,:,:), INTENT(inout) ::   p_avm, p_avt   ! momentum and tracer Kz (w-points)
       !!
@@ -161,40 +159,30 @@ CONTAINS
       !!----------------------------------------------------------------------
       !
       !                       !==  avm and avt = F(Richardson number)  ==!
-      DO jk = 2, jpkm1
-         DO jj = 1, jpjm1
-            DO ji = 1, jpim1              ! coefficient = F(richardson number) (avm-weighted Ri)
-               zcfRi = 1._wp / (  1._wp + rn_alp * MAX(  0._wp , avm(ji,jj,jk) * rn2(ji,jj,jk) / ( p_sh2(ji,jj,jk) + 1.e-20 ) )  )
-               zav   = rn_avmri * zcfRi**nn_ric
-               !                          ! avm and avt coefficients
-               p_avm(ji,jj,jk) = MAX(  zav         , avmb(jk)  ) * wmask(ji,jj,jk)
-               p_avt(ji,jj,jk) = MAX(  zav * zcfRi , avtb(jk)  ) * wmask(ji,jj,jk)
-            END DO
-         END DO
-      END DO
+      DO_3D_10_10( 2, jpkm1 )
+         zcfRi = 1._wp / (  1._wp + rn_alp * MAX(  0._wp , avm(ji,jj,jk) * rn2(ji,jj,jk) / ( p_sh2(ji,jj,jk) + 1.e-20 ) )  )
+         zav   = rn_avmri * zcfRi**nn_ric
+         !                          ! avm and avt coefficients
+         p_avm(ji,jj,jk) = MAX(  zav         , avmb(jk)  ) * wmask(ji,jj,jk)
+         p_avt(ji,jj,jk) = MAX(  zav * zcfRi , avtb(jk)  ) * wmask(ji,jj,jk)
+      END_3D
       !
 !!gm BUG <<<<====  This param can't work at low latitude 
 !!gm               it provides there much to thick mixed layer ( summer 150m in GYRE configuration !!! )
       !
       IF( ln_mldw ) THEN      !==  set a minimum value in the Ekman layer  ==!
          !
-         DO jj = 2, jpjm1        !* Ekman depth
-            DO ji = 2, jpim1
-               zustar = SQRT( taum(ji,jj) * r1_rau0 )
-               zhek   = rn_ekmfc * zustar / ( ABS( ff_t(ji,jj) ) + rsmall )   ! Ekman depth
-               zh_ekm(ji,jj) = MAX(  rn_mldmin , MIN( zhek , rn_mldmax )  )   ! set allowed range
-            END DO
-         END DO
-         DO jk = 2, jpkm1        !* minimum mixing coeff. within the Ekman layer
-            DO jj = 2, jpjm1
-               DO ji = 2, jpim1
-                  IF( pdept(ji,jj,jk) < zh_ekm(ji,jj) ) THEN
-                     p_avm(ji,jj,jk) = MAX(  p_avm(ji,jj,jk), rn_wvmix  ) * wmask(ji,jj,jk)
-                     p_avt(ji,jj,jk) = MAX(  p_avt(ji,jj,jk), rn_wtmix  ) * wmask(ji,jj,jk)
-                  ENDIF
-               END DO
-            END DO
-         END DO
+         DO_2D_00_00
+            zustar = SQRT( taum(ji,jj) * r1_rho0 )
+            zhek   = rn_ekmfc * zustar / ( ABS( ff_t(ji,jj) ) + rsmall )   ! Ekman depth
+            zh_ekm(ji,jj) = MAX(  rn_mldmin , MIN( zhek , rn_mldmax )  )   ! set allowed range
+         END_2D
+         DO_3D_00_00( 2, jpkm1 )
+            IF( gdept(ji,jj,jk,Kmm) < zh_ekm(ji,jj) ) THEN
+               p_avm(ji,jj,jk) = MAX(  p_avm(ji,jj,jk), rn_wvmix  ) * wmask(ji,jj,jk)
+               p_avt(ji,jj,jk) = MAX(  p_avt(ji,jj,jk), rn_wtmix  ) * wmask(ji,jj,jk)
+            ENDIF
+         END_3D
       ENDIF
       !
    END SUBROUTINE zdf_ric

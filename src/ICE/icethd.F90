@@ -52,10 +52,10 @@ MODULE icethd
    LOGICAL ::   ln_icedS         ! activate gravity drainage and flushing (T) or not (F)
 
    !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/ICE 4.0 , NEMO Consortium (2018)
-   !! $Id: icethd.F90 10534 2019-01-16 16:49:45Z clem $
+   !! $Id: icethd.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -94,6 +94,7 @@ CONTAINS
       ! controls
       IF( ln_timing    )   CALL timing_start('icethd')                                                             ! timing
       IF( ln_icediachk )   CALL ice_cons_hsm(0, 'icethd', rdiag_v, rdiag_s, rdiag_t, rdiag_fv, rdiag_fs, rdiag_ft) ! conservation
+      IF( ln_icediachk )   CALL ice_cons2D  (0, 'icethd',  diag_v,  diag_s,  diag_t,  diag_fv,  diag_fs,  diag_ft) ! conservation
 
       IF( kt == nit000 .AND. lwp ) THEN
          WRITE(numout,*)
@@ -101,85 +102,77 @@ CONTAINS
          WRITE(numout,*) '~~~~~~~'
       ENDIF
       
-      CALL ice_var_glo2eqv
-
       !---------------------------------------------!
       ! computation of friction velocity at T points
       !---------------------------------------------!
       IF( ln_icedyn ) THEN
          zu_io(:,:) = u_ice(:,:) - ssu_m(:,:)
          zv_io(:,:) = v_ice(:,:) - ssv_m(:,:)
-         DO jj = 2, jpjm1 
-            DO ji = fs_2, fs_jpim1
-               zfric(ji,jj) = rn_cio * ( 0.5_wp *  &
-                  &                    (  zu_io(ji,jj) * zu_io(ji,jj) + zu_io(ji-1,jj) * zu_io(ji-1,jj)   &
-                  &                     + zv_io(ji,jj) * zv_io(ji,jj) + zv_io(ji,jj-1) * zv_io(ji,jj-1) ) ) * tmask(ji,jj,1)
-            END DO
-         END DO
+         DO_2D_00_00
+            zfric(ji,jj) = rn_cio * ( 0.5_wp *  &
+               &                    (  zu_io(ji,jj) * zu_io(ji,jj) + zu_io(ji-1,jj) * zu_io(ji-1,jj)   &
+               &                     + zv_io(ji,jj) * zv_io(ji,jj) + zv_io(ji,jj-1) * zv_io(ji,jj-1) ) ) * tmask(ji,jj,1)
+         END_2D
       ELSE      !  if no ice dynamics => transmit directly the atmospheric stress to the ocean
-         DO jj = 2, jpjm1
-            DO ji = fs_2, fs_jpim1
-               zfric(ji,jj) = r1_rau0 * SQRT( 0.5_wp *  &
-                  &                         (  utau(ji,jj) * utau(ji,jj) + utau(ji-1,jj) * utau(ji-1,jj)   &
-                  &                          + vtau(ji,jj) * vtau(ji,jj) + vtau(ji,jj-1) * vtau(ji,jj-1) ) ) * tmask(ji,jj,1)
-            END DO
-         END DO
+         DO_2D_00_00
+            zfric(ji,jj) = r1_rho0 * SQRT( 0.5_wp *  &
+               &                         (  utau(ji,jj) * utau(ji,jj) + utau(ji-1,jj) * utau(ji-1,jj)   &
+               &                          + vtau(ji,jj) * vtau(ji,jj) + vtau(ji,jj-1) * vtau(ji,jj-1) ) ) * tmask(ji,jj,1)
+         END_2D
       ENDIF
       CALL lbc_lnk( 'icethd', zfric, 'T',  1. )
       !
       !--------------------------------------------------------------------!
       ! Partial computation of forcing for the thermodynamic sea ice model
       !--------------------------------------------------------------------!
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-            rswitch  = tmask(ji,jj,1) * MAX( 0._wp , SIGN( 1._wp , at_i(ji,jj) - epsi10 ) ) ! 0 if no ice
-            !
-            !           !  solar irradiance transmission at the mixed layer bottom and used in the lead heat budget
-            !           !  practically no "direct lateral ablation"
-            !           
-            !           !  net downward heat flux from the ice to the ocean, expressed as a function of ocean 
-            !           !  temperature and turbulent mixing (McPhee, 1992)
-            !
-            ! --- Energy received in the lead from atm-oce exchanges, zqld is defined everywhere (J.m-2) --- !
-            zqld =  tmask(ji,jj,1) * rdt_ice *  &
-               &    ( ( 1._wp - at_i_b(ji,jj) ) * qsr_oce(ji,jj) * frq_m(ji,jj) +  &
-               &      ( 1._wp - at_i_b(ji,jj) ) * qns_oce(ji,jj) + qemp_oce(ji,jj) )
+      DO_2D_11_11
+         rswitch  = tmask(ji,jj,1) * MAX( 0._wp , SIGN( 1._wp , at_i(ji,jj) - epsi10 ) ) ! 0 if no ice
+         !
+         !           !  solar irradiance transmission at the mixed layer bottom and used in the lead heat budget
+         !           !  practically no "direct lateral ablation"
+         !           
+         !           !  net downward heat flux from the ice to the ocean, expressed as a function of ocean 
+         !           !  temperature and turbulent mixing (McPhee, 1992)
+         !
+         ! --- Energy received in the lead from atm-oce exchanges, zqld is defined everywhere (J.m-2) --- !
+         zqld =  tmask(ji,jj,1) * rDt_ice *  &
+            &    ( ( 1._wp - at_i_b(ji,jj) ) * qsr_oce(ji,jj) * frq_m(ji,jj) +  &
+            &      ( 1._wp - at_i_b(ji,jj) ) * qns_oce(ji,jj) + qemp_oce(ji,jj) )
 
-            ! --- Energy needed to bring ocean surface layer until its freezing (mostly<0 but >0 if supercooling, J.m-2) --- !
-            zqfr     = rau0 * rcp * e3t_m(ji,jj) * ( t_bo(ji,jj) - ( sst_m(ji,jj) + rt0 ) ) * tmask(ji,jj,1)  ! both < 0 (t_bo < sst) and > 0 (t_bo > sst)
-            zqfr_neg = MIN( zqfr , 0._wp )                                                                    ! only < 0
+         ! --- Energy needed to bring ocean surface layer until its freezing (mostly<0 but >0 if supercooling, J.m-2) --- !
+         zqfr     = rho0 * rcp * e3t_m(ji,jj) * ( t_bo(ji,jj) - ( sst_m(ji,jj) + rt0 ) ) * tmask(ji,jj,1)  ! both < 0 (t_bo < sst) and > 0 (t_bo > sst)
+         zqfr_neg = MIN( zqfr , 0._wp )                                                                    ! only < 0
 
-            ! --- Sensible ocean-to-ice heat flux (mostly>0 but <0 if supercooling, W/m2)
-            zfric_u            = MAX( SQRT( zfric(ji,jj) ), zfric_umin ) 
-            qsb_ice_bot(ji,jj) = rswitch * rau0 * rcp * zch * zfric_u * ( ( sst_m(ji,jj) + rt0 ) - t_bo(ji,jj) ) ! W.m-2
+         ! --- Sensible ocean-to-ice heat flux (mostly>0 but <0 if supercooling, W/m2)
+         zfric_u            = MAX( SQRT( zfric(ji,jj) ), zfric_umin ) 
+         qsb_ice_bot(ji,jj) = rswitch * rho0 * rcp * zch * zfric_u * ( ( sst_m(ji,jj) + rt0 ) - t_bo(ji,jj) ) ! W.m-2
 
-            qsb_ice_bot(ji,jj) = rswitch * MIN( qsb_ice_bot(ji,jj), - zqfr_neg * r1_rdtice / MAX( at_i(ji,jj), epsi10 ) )
-            ! upper bound for qsb_ice_bot: the heat retrieved from the ocean must be smaller than the heat necessary to reach 
-            !                              the freezing point, so that we do not have SST < T_freeze
-            !                              This implies: - ( qsb_ice_bot(ji,jj) * at_i(ji,jj) * rtdice ) - zqfr >= 0
+         qsb_ice_bot(ji,jj) = rswitch * MIN( qsb_ice_bot(ji,jj), - zqfr_neg * r1_Dt_ice / MAX( at_i(ji,jj), epsi10 ) )
+         ! upper bound for qsb_ice_bot: the heat retrieved from the ocean must be smaller than the heat necessary to reach 
+         !                              the freezing point, so that we do not have SST < T_freeze
+         !                              This implies: - ( qsb_ice_bot(ji,jj) * at_i(ji,jj) * rtdice ) - zqfr >= 0
 
-            !-- Energy Budget of the leads (J.m-2), source of ice growth in open water. Must be < 0 to form ice
-            qlead(ji,jj) = MIN( 0._wp , zqld - ( qsb_ice_bot(ji,jj) * at_i(ji,jj) * rdt_ice ) - zqfr )
+         !-- Energy Budget of the leads (J.m-2), source of ice growth in open water. Must be < 0 to form ice
+         qlead(ji,jj) = MIN( 0._wp , zqld - ( qsb_ice_bot(ji,jj) * at_i(ji,jj) * rDt_ice ) - zqfr )
 
-            ! If there is ice and leads are warming, then transfer energy from the lead budget and use it for bottom melting 
-            IF( zqld > 0._wp ) THEN
-               fhld (ji,jj) = rswitch * zqld * r1_rdtice / MAX( at_i(ji,jj), epsi10 ) ! divided by at_i since this is (re)multiplied by a_i in icethd_dh.F90
-               qlead(ji,jj) = 0._wp
-            ELSE
-               fhld (ji,jj) = 0._wp
-            ENDIF
-            !
-            ! Net heat flux on top of the ice-ocean [W.m-2]
-            ! ---------------------------------------------
-            qt_atm_oi(ji,jj) = qns_tot(ji,jj) + qsr_tot(ji,jj) 
-         END DO
-      END DO
+         ! If there is ice and leads are warming => transfer energy from the lead budget and use it for bottom melting 
+         ! If the grid cell is fully covered by ice (no leads) => transfer energy from the lead budget to the ice bottom budget
+         IF( ( zqld >= 0._wp .AND. at_i(ji,jj) > 0._wp ) .OR. at_i(ji,jj) >= (1._wp - epsi10) ) THEN
+            fhld (ji,jj) = rswitch * zqld * r1_Dt_ice / MAX( at_i(ji,jj), epsi10 ) ! divided by at_i since this is (re)multiplied by a_i in icethd_dh.F90
+            qlead(ji,jj) = 0._wp
+         ELSE
+            fhld (ji,jj) = 0._wp
+         ENDIF
+         !
+         ! Net heat flux on top of the ice-ocean [W.m-2]
+         ! ---------------------------------------------
+         qt_atm_oi(ji,jj) = qns_tot(ji,jj) + qsr_tot(ji,jj) 
+      END_2D
       
       ! In case we bypass open-water ice formation
       IF( .NOT. ln_icedO )  qlead(:,:) = 0._wp
-      ! In case we bypass growing/melting from top and bottom: we suppose ice is impermeable => ocean is isolated from atmosphere
+      ! In case we bypass growing/melting from top and bottom
       IF( .NOT. ln_icedH ) THEN
-         qt_atm_oi  (:,:) = ( 1._wp - at_i_b(:,:) ) * ( qns_oce(:,:) + qsr_oce(:,:) ) + qemp_oce(:,:)
          qsb_ice_bot(:,:) = 0._wp
          fhld       (:,:) = 0._wp
       ENDIF
@@ -191,7 +184,7 @@ CONTAINS
       !     Second step in icethd_dh      :  heat remaining if total melt (zq_rema) 
       !     Third  step in iceupdate.F90  :  heat from ice-ocean mass exchange (zf_mass) + solar
       qt_oce_ai(:,:) = ( 1._wp - at_i_b(:,:) ) * qns_oce(:,:) + qemp_oce(:,:)  &  ! Non solar heat flux received by the ocean               
-         &             - qlead(:,:) * r1_rdtice                                &  ! heat flux taken from the ocean where there is open water ice formation
+         &             - qlead(:,:) * r1_Dt_ice                                &  ! heat flux taken from the ocean where there is open water ice formation
          &             - at_i (:,:) * qsb_ice_bot(:,:)                         &  ! heat flux taken by sensible flux
          &             - at_i (:,:) * fhld       (:,:)                            ! heat flux taken during bottom growth/melt 
       !                                                                           !    (fhld should be 0 while bott growth)
@@ -202,14 +195,12 @@ CONTAINS
 
          ! select ice covered grid points
          npti = 0 ; nptidx(:) = 0
-         DO jj = 1, jpj
-            DO ji = 1, jpi
-               IF ( a_i(ji,jj,jl) > epsi10 ) THEN     
-                  npti         = npti  + 1
-                  nptidx(npti) = (jj - 1) * jpi + ji
-               ENDIF
-            END DO
-         END DO
+         DO_2D_11_11
+            IF ( a_i(ji,jj,jl) > epsi10 ) THEN     
+               npti         = npti  + 1
+               nptidx(npti) = (jj - 1) * jpi + ji
+            ENDIF
+         END_2D
 
          IF( npti > 0 ) THEN  ! If there is no ice, do nothing.
             !                                                                
@@ -220,44 +211,40 @@ CONTAINS
             dh_i_sum  (1:npti) = 0._wp ; dh_i_bom(1:npti) = 0._wp ; dh_i_itm  (1:npti) = 0._wp 
             dh_i_sub  (1:npti) = 0._wp ; dh_i_bog(1:npti) = 0._wp
             dh_snowice(1:npti) = 0._wp ; dh_s_mlt(1:npti) = 0._wp
+            !                                      
+                              CALL ice_thd_zdf                      ! --- Ice-Snow temperature --- !
             !
-            IF( ln_icedH ) THEN                                     ! --- growing/melting --- !
-                              CALL ice_thd_zdf                             ! Ice/Snow Temperature profile
-                              CALL ice_thd_dh                              ! Ice/Snow thickness   
-                              CALL ice_thd_pnd                             ! Melt ponds formation
-                              CALL ice_thd_ent( e_i_1d(1:npti,:) )         ! Ice enthalpy remapping
+            IF( ln_icedH ) THEN                                     ! --- Growing/Melting --- !
+                              CALL ice_thd_dh                           ! Ice-Snow thickness   
+                              CALL ice_thd_pnd                          ! Melt ponds formation
+                              CALL ice_thd_ent( e_i_1d(1:npti,:) )      ! Ice enthalpy remapping
             ENDIF
-            !
                               CALL ice_thd_sal( ln_icedS )          ! --- Ice salinity --- !    
             !
-                              CALL ice_thd_temp                     ! --- temperature update --- !
+                              CALL ice_thd_temp                     ! --- Temperature update --- !
             !
             IF( ln_icedH .AND. ln_virtual_itd ) &
-               &              CALL ice_thd_mono                     ! --- extra lateral melting if virtual_itd --- !
+               &              CALL ice_thd_mono                     ! --- Extra lateral melting if virtual_itd --- !
             !
-            IF( ln_icedA )    CALL ice_thd_da                       ! --- lateral melting --- !
+            IF( ln_icedA )    CALL ice_thd_da                       ! --- Lateral melting --- !
             !
                               CALL ice_thd_1d2d( jl, 2 )            ! --- Change units of e_i, e_s from J/m3 to J/m2 --- !
             !                                                       ! --- & Move to 2D arrays --- !
-            !
          ENDIF
          !
       END DO
-      ! update ice age (in case a_i changed, i.e. becomes 0 or lateral melting)
-      oa_i(:,:,:) = o_i(:,:,:) * a_i(:,:,:)
-
+      !
       IF( ln_icediachk )   CALL ice_cons_hsm(1, 'icethd', rdiag_v, rdiag_s, rdiag_t, rdiag_fv, rdiag_fs, rdiag_ft)
-      !
-                           CALL ice_var_zapsmall           ! --- remove very small ice concentration (<1e-10) --- !
-      !                                                    !     & make sure at_i=SUM(a_i) & ato_i=1 where at_i=0
+      IF( ln_icediachk )   CALL ice_cons2D  (1, 'icethd',  diag_v,  diag_s,  diag_t,  diag_fv,  diag_fs,  diag_ft)
       !                   
-      IF( jpl > 1      )   CALL ice_itd_rem( kt )          ! --- Transport ice between thickness categories --- !
+      IF( jpl > 1  )          CALL ice_itd_rem( kt )                ! --- Transport ice between thickness categories --- !
       !
-      IF( ln_icedO     )   CALL ice_thd_do                 ! --- frazil ice growing in leads --- !
+      IF( ln_icedO )          CALL ice_thd_do                       ! --- Frazil ice growth in leads --- !
       !
       ! controls
       IF( ln_icectl )   CALL ice_prt    (kt, iiceprt, jiceprt, 1, ' - ice thermodyn. - ') ! prints
-      IF( ln_ctl    )   CALL ice_prt3D  ('icethd')                                        ! prints
+      IF( sn_cfctl%l_prtctl )   &
+        &               CALL ice_prt3D  ('icethd')                                        ! prints
       IF( ln_timing )   CALL timing_stop('icethd')                                        ! timing
       !
    END SUBROUTINE ice_thd 
@@ -417,7 +404,11 @@ CONTAINS
          ! ocean surface fields
          CALL tab_2d_1d( npti, nptidx(1:npti), sst_1d(1:npti), sst_m )
          CALL tab_2d_1d( npti, nptidx(1:npti), sss_1d(1:npti), sss_m )
-
+         !
+         ! to update ice age
+         CALL tab_2d_1d( npti, nptidx(1:npti), o_i_1d (1:npti), o_i (:,:,kl) )
+         CALL tab_2d_1d( npti, nptidx(1:npti), oa_i_1d(1:npti), oa_i(:,:,kl) )
+         !
          ! --- Change units of e_i, e_s from J/m2 to J/m3 --- !
          DO jk = 1, nlay_i
             WHERE( h_i_1d(1:npti)>0._wp ) e_i_1d(1:npti,jk) = e_i_1d(1:npti,jk) / (h_i_1d(1:npti) * a_i_1d(1:npti)) * nlay_i
@@ -442,6 +433,7 @@ CONTAINS
          v_s_1d (1:npti) = h_s_1d (1:npti) * a_i_1d (1:npti)
          sv_i_1d(1:npti) = s_i_1d (1:npti) * v_i_1d (1:npti)
          v_ip_1d(1:npti) = h_ip_1d(1:npti) * a_ip_1d(1:npti)
+         oa_i_1d(1:npti) = o_i_1d (1:npti) * a_i_1d (1:npti)
          
          CALL tab_1d_2d( npti, nptidx(1:npti), at_i_1d(1:npti), at_i             )
          CALL tab_1d_2d( npti, nptidx(1:npti), a_i_1d (1:npti), a_i (:,:,kl)     )
@@ -515,6 +507,7 @@ CONTAINS
          CALL tab_1d_2d( npti, nptidx(1:npti), v_s_1d (1:npti), v_s (:,:,kl) )
          CALL tab_1d_2d( npti, nptidx(1:npti), sv_i_1d(1:npti), sv_i(:,:,kl) )
          CALL tab_1d_2d( npti, nptidx(1:npti), v_ip_1d(1:npti), v_ip(:,:,kl) )
+         CALL tab_1d_2d( npti, nptidx(1:npti), oa_i_1d(1:npti), oa_i(:,:,kl) )
          !
       END SELECT
       !
@@ -538,12 +531,10 @@ CONTAINS
       NAMELIST/namthd/ ln_icedH, ln_icedA, ln_icedO, ln_icedS
       !!-------------------------------------------------------------------
       !
-      REWIND( numnam_ice_ref )              ! Namelist namthd in reference namelist : Ice thermodynamics
       READ  ( numnam_ice_ref, namthd, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namthd in reference namelist', lwp )
-      REWIND( numnam_ice_cfg )              ! Namelist namthd in configuration namelist : Ice thermodynamics
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namthd in reference namelist' )
       READ  ( numnam_ice_cfg, namthd, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namthd in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namthd in configuration namelist' )
       IF(lwm) WRITE( numoni, namthd )
       !
       IF(lwp) THEN                          ! control print

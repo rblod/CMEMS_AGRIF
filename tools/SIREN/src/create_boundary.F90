@@ -2,9 +2,6 @@
 ! NEMO system team, System and Interface for oceanic RElocable Nesting
 !----------------------------------------------------------------------
 !
-!
-! PROGRAM: create_boundary
-!
 ! DESCRIPTION:
 !> @file
 !> @brief 
@@ -18,173 +15,478 @@
 !> @note 
 !>    method could be different for each variable.
 !>
-!> @section sec2 how to 
-!>    to create boundaries files:<br/>
-!> @code{.sh}
-!>    ./SIREN/bin/create_boundary create_boundary.nam
-!> @endcode
 !>  <br/> 
-!> \image html  boundary_NEATL36_70.png 
-!> <center>\image latex boundary_NEATL36_70.png
+!> @image html  boundary_NEATL36_70.png 
+!> <center>@image latex boundary_NEATL36_70.png
 !> </center>
 !>
-!> @note 
-!>    you could find a template of the namelist in templates directory.
+!> @section sec2 how to
+!> USAGE: create_boundary create_bounary.nam [-v] [-h]<br/>
+!>    - positional arguments:<br/>
+!>       - create_boundary.nam<br/>
+!>          namelist of create_boundary
+!>          @note
+!>             a template of the namelist could be created running (in templates directory):
+!>             @code{.sh}
+!>                python create_templates.py create_boundary
+!>             @endcode
 !>
+!>    - optional arguments:<br/>
+!>       - -h, --help<br/>
+!>          show this help message (and exit)<br/>
+!>       - -v, --version<br/>
+!>          show Siren's version   (and exit)<br/>
+!>    @note 
+!>       compiled with @a key_mpp_mpi, could be run on multi processor :<br/>
+!>       USAGE: create_boundary create_bounary.nam create_bounary2.nam ... [-v] [-h]<br/>
+!>
+!> @section sec_boundary create_boundary.nam
 !>    create_boundary.nam contains 9 namelists:<br/>
-!>       - logger namelist (namlog)
-!>       - config namelist (namcfg)
-!>       - coarse grid namelist (namcrs)
-!>       - fine grid namelist (namfin)
-!>       - variable namelist (namvar)
-!>       - nesting namelist (namnst)
-!>       - boundary namelist (nambdy)
-!>       - vertical grid namelist (namzgr)
-!>       - output namelist (namout)
-!>    
-!>    * _logger namelist (namlog)_:<br/>
-!>       - cn_logfile   : log filename
-!>       - cn_verbosity : verbosity ('trace','debug','info',
-!> 'warning','error','fatal','none')
-!>       - in_maxerror  : maximum number of error allowed
+!>       - **namlog** to set logger parameters
+!>       - **namcfg** to set configuration file parameters
+!>       - **namsrc** to set source/coarse grid parameters
+!>       - **namtgt** to set target/fine grid parameters
+!>       - **namvar** to set variable parameters
+!>       - **namnst** to set sub domain and nesting paramters
+!>       - **nambdy** to set boundary parameters
+!>       - **namzgr** to set vertical grid parameters
+!>       - **namout** to set output parameters
 !>
-!>    * _config namelist (namcfg)_:<br/>
-!>       - cn_varcfg : variable configuration file
-!> (see ./SIREN/cfg/variable.cfg)
-!>       - cn_dimcfg : dimension configuration file. define dimensions allowed
-!> (see ./SIREN/cfg/dimension.cfg).
-!>       - cn_dumcfg : useless (dummy) configuration file, for useless 
-!> dimension or variable (see ./SIREN/cfg/dummy.cfg).
+!>    here after, each sub-namelist parameters is detailed.
+!>    @note 
+!>       default values are specified between brackets
 !>
-!>    * _coarse grid namelist (namcrs)_:<br/>
-!>       - cn_coord0 : coordinate file
-!>       - in_perio0 : NEMO periodicity index (see Model Boundary Condition in
-!> [NEMO documentation](http://www.nemo-ocean.eu/About-NEMO/Reference-manuals))
+!> @subsection sublog namlog
+!>    the logger sub-namelist parameters are :
 !>
-!>    * _fine grid namelist (namfin)_:<br/>
-!>       - cn_coord1 : coordinate file
-!>       - cn_bathy1 : bathymetry file
-!>       - in_perio1 : periodicity index
+!>    - **cn_logfile** [@a create_boundary.log]<br/>
+!>       logger filename
 !>
-!>    * _vertical grid namelist (namzgr)_:<br/>
-!>       - dn_ppsur              :
-!>       - dn_ppa0               :
-!>       - dn_ppa1               :
-!>       - dn_ppa2               : 
-!>       - dn_ppkth              :
-!>       - dn_ppkth2             :
-!>       - dn_ppacr              :
-!>       - dn_ppacr2             :
-!>       - dn_ppdzmin            :
-!>       - dn_pphmax             :
-!>       - in_nlevel             : number of vertical level
+!>    - **cn_verbosity** [@a warning]<br/>
+!>       verbosity level, choose between :
+!>          - trace
+!>          - debug
+!>          - info
+!>          - warning
+!>          - error
+!>          - fatal
+!>          - none
 !>
-!>    * _partial step namelist (namzps)_:<br/>
-!>       - dn_e3zps_min          :
-!>       - dn_e3zps_rat          : 
+!>    - **in_maxerror** [@a 5]<br/> 
+!>       maximum number of error allowed
 !>
-!>    * _variable namelist (namvar)_:<br/>
-!>       - cn_varfile : list of variable, and associated file<br/> 
-!>          *cn_varfile* is the path and filename of the file where find
-!>          variable.<br/> 
-!>          @note 
-!>             *cn_varfile* could be a matrix of value, if you want to filled
-!>             manually variable value.<br/>
-!>             the variable array of value is split into equal subdomain.<br/>
-!>             Each subdomain is filled with the corresponding value 
-!>             of the matrix.<br/>          
-!>             separators used to defined matrix are:
-!>                - ',' for line
-!>                - '/' for row
-!>                - '\' for level<br/>
-!>                Example:<br/>
-!>                   3,2,3/1,4,5  =>  @f$ \left( \begin{array}{ccc}
-!>                                         3 & 2 & 3 \\\\
-!>                                         1 & 4 & 5 \end{array} \right) @f$
+!> @subsection subcfg namcfg
+!>    the configuration sub-namelist parameters are :
+!>
+!>    - **cn_varcfg** [@a ./cfg/variable.cfg]<br/>
+!>       path to the variable configuration file.<br/>
+!>       the variable configuration file defines standard name, 
+!>       default interpolation method, axis,... 
+!>       to be used for some known variables.<br/> 
+!>
+!>    - **cn_dimcfg** [@a ./cfg/dimension.cfg]<br/> 
+!>       path to the dimension configuration file.<br/> 
+!>       the dimension configuration file defines dimensions allowed.<br/> 
+!>
+!>    - **cn_dumcfg** [@a ./cfg/dummy.cfg]<br/> 
+!>       path to the useless (dummy) configuration file.<br/>
+!>       the dummy configuration file defines useless 
+!>       dimension or variable. these dimension(s) or variable(s) will not be
+!>       processed.<br/>
+!>
+!> @subsection subcrs namcrs 
+!>    the coarse grid sub-namelist parameters are :
+!>
+!>    - **cn_coord0** [@a ]<br/> 
+!>       path to the coordinate file
+!>
+!>    - **in_perio0** [@a ]<br/> 
+!>       NEMO periodicity index<br/> 
+!>       the NEMO periodicity could be choose between 0 to 6:
+!>       <dl>
+!>          <dt>in_perio=0</dt>
+!>          <dd>standard regional model</dd>
+!>          <dt>in_perio=1</dt>
+!>          <dd>east-west cyclic model</dd>
+!>          <dt>in_perio=2</dt>
+!>          <dd>model with symmetric boundary condition across the equator</dd>
+!>          <dt>in_perio=3</dt>
+!>          <dd>regional model with North fold boundary and T-point pivot</dd>
+!>          <dt>in_perio=4</dt>
+!>          <dd>global model with a T-point pivot.<br/>
+!>          example: ORCA2, ORCA025, ORCA12</dd>
+!>          <dt>in_perio=5</dt>
+!>          <dd>regional model with North fold boundary and F-point pivot</dd>
+!>          <dt>in_perio=6</dt>
+!>          <dd>global model with a F-point pivot<br/>
+!>          example: ORCA05</dd>
+!>          </dd>
+!>       </dl>
+!>       @sa For more information see @ref md_src_docsrc_6_perio
+!>       and Model Boundary Condition paragraph in the 
+!>       [NEMO documentation](https://forge.ipsl.jussieu.fr/nemo/chrome/site/doc/NEMO/manual/pdf/NEMO_manual.pdf)
+!>
+!> @subsection subfin namfin 
+!>    the fine grid sub-namelist parameters are :
+!>
+!>    - **cn_coord1** [@a ]<br/> 
+!>       path to coordinate file
+!>
+!>    - **cn_bathy1** [@a ]<br/> 
+!>       path to bathymetry file
+!>       @warning 
+!>
+!>    - **in_perio1** [@a ]<br/>
+!>       NEMO periodicity index (see above)
+!>    @note if the fine/target coordinates file (cn_coord1) was created by SIREN, you do
+!>    not need to fill this parameter. SIREN will read it on the global attributes of
+!>    the coordinates file.
+!>
+!> @subsection subzgr namzgr
+!>    the vertical grid sub-namelist parameters are :
+!>
+!>    - **dn_pp_to_be_computed** [@a 0]<br/>
+!>
+!>    - **dn_ppsur** [@a -3958.951371276829]<br/>
+!>       coefficient to compute vertical grid
+!>
+!>    - **dn_ppa0** [@a 103.953009600000]<br/>
+!>       coefficient to compute vertical grid
+!>
+!>    - **dn_ppa1** [@a 2.415951269000]<br/>
+!>       coefficient to compute vertical grid
+!>
+!>    - **dn_ppa2** [@a 100.760928500000]<br/>
+!>       double tanh function parameter
+!>
+!>    - **dn_ppkth** [@a 15.351013700000]<br/>
+!>       coefficient to compute vertical grid
+!>
+!>    - **dn_ppkth2** [@a 48.029893720000]<br/>
+!>       double tanh function parameter
+!>
+!>    - **dn_ppacr** [@a 7.000000000000]<br/>
+!>       coefficient to compute vertical grid
+!>
+!>    - **dn_ppacr2** [@a 13.000000000000]<br/>
+!>       double tanh function parameter
+!>
+!>    - **dn_ppdzmin** [@a 6.]<br/>
+!>       minimum vertical spacing
+!>
+!>    - **dn_pphmax** [@a 5750.]<br/>
+!>       maximum depth
+!>
+!>    - **in_nlevel** [@a 75]<br/>
+!>       number of vertical level
+!>
+!>     @note 
+!>       If *dn_ppa1*, *dn_ppa0* and *dn_ppsur* are undefined,
+!>       NEMO will compute them from *dn_ppdzmin, dn_pphmax, dn_ppkth, dn_ppacr*
+!>
+!> @subsection subzps namzps
+!>    the partial step sub-namelist parameters are :
+!>
+!>    - **dn_e3zps_min** [@a 25.]<br/>
+!>       minimum thickness of partial step level (meters)
+!>    - **dn_e3zps_rat** [@a 0.2]<br/>
+!>       minimum thickness ratio of partial step level
+!>
+!> @subsection subvar namvar 
+!>    the variable sub-namelist parameters are :
+!>
+!>    - **cn_varfile** [@a ]<br/> 
+!>       list of variable, and associated file 
+!>
+!>       *cn_varfile* is the path and filename of the file where find
+!>       variable.
+!>       @note 
+!>          *cn_varfile* could be a matrix of value, if you want to handwrite
+!>          variable value.<br/>
+!>          the variable array of value is split into equal subdomain.<br/>
+!>          each subdomain is filled with the corresponding value 
+!>          of the matrix.<br/>          
+!>          separators used to defined matrix are:
+!>             - ',' for line
+!>             - '/' for row
+!>             - '\' for level<br/>
+!>             Example:<br/>
+!>                3,2,3/1,4,5  =>  @f$ \left( \begin{array}{ccc}
+!>                                      3 & 2 & 3 \\
+!>                                      1 & 4 & 5 \end{array} \right) @f$
+!>
 !>          @warning 
 !>             the same matrix is used for all boundaries.
 !>
 !>       Examples: 
 !>          - 'votemper:gridT.nc', 'vozocrtx:gridU.nc'
-!>          - 'votemper:10\25', 'vozocrtx:gridU.nc'
+!>          - 'votemper:10\25', 'vozocrtx:gridU.nc'<br/>
 !>
-!>       - cn_varinfo : list of variable and extra information about request(s)
-!>          to be used (separated by ',').<br/>
-!>          each elements of *cn_varinfo* is a string character.<br/>
-!>          it is composed of the variable name follow by ':', 
-!>          then request(s) to be used on this variable.<br/> 
-!>          request could be:
-!>             - int = interpolation method
-!>             - ext = extrapolation method
-!>             - flt = filter method
-!>             - min = minimum value
-!>             - max = maximum value
-!>             - unt = new units
-!>             - unf = unit scale factor (linked to new units)
+!>       @note 
+!>          Optionnaly, NEMO periodicity could be added following the filename.
+!>          the periodicity must be separated by ';'
 !>
-!>                requests must be separated by ';'.<br/>
-!>                order of requests does not matter.
+!>       Example:
+!>          - 'votemper:gridT.nc ; perio=4'
 !>
-!>          informations about available method could be find in @ref interp,
-!>          @ref extrap and @ref filter.<br/>
+!>    - **cn_varinfo** [@a ]<br/> 
+!>       list of variable and extra information about request(s) to be used<br/>
 !>
-!>          Example: 'votemper:int=linear;flt=hann;ext=dist_weight', 
-!>                   'vosaline:int=cubic'
-!>          @note 
-!>             If you do not specify a method which is required, 
-!>             default one is apply.
+!>       each elements of *cn_varinfo* is a string character (separated by ',').<br/>
+!>       it is composed of the variable name follow by ':', 
+!>       then request(s) to be used on this variable.<br/> 
+!>       request could be:
+!>          - int = interpolation method
+!>          - ext = extrapolation method
+!>          - flt = filter method
+!>          - min = minimum value
+!>          - max = maximum value
+!>          - unt = new units
+!>          - unf = unit scale factor (linked to new units)
 !>
-!>    * _nesting namelist (namnst)_:<br/>
-!>       - in_rhoi  : refinement factor in i-direction
-!>       - in_rhoj  : refinement factor in j-direction
+!>             requests must be separated by ';'.<br/>
+!>             order of requests does not matter.<br/>
 !>
-!>    * _boundary namelist (nambdy)_:<br/>
-!>       - ln_north  : use north boundary
-!>       - ln_south  : use south boundary
-!>       - ln_east   : use east  boundary
-!>       - ln_west   : use west  boundary
-!>       - cn_north  : north boundary indices on fine grid
-!>          *cn_north* is a string character defining boundary
-!>          segmentation.<br/>
-!>          segments are separated by '|'.<br/>
-!>          each segments of the boundary is composed of:
-!>             - indice of velocity (orthogonal to boundary .ie. 
-!>                for north boundary, J-indice). 
-!>             - indice of segment start (I-indice for north boundary) 
-!>             - indice of segment end   (I-indice for north boundary)<br/>
-!>                indices must be separated by ':' .<br/>
-!>             - optionally, boundary size could be added between '(' and ')' 
-!>             in the definition of the first segment.
-!>                @note 
-!>                   boundary width is the same for all segments of one boundary.
+!>       informations about available method could be find in @ref interp,
+!>       @ref extrap and @ref filter modules.<br/>
+!>       Example: 
+!>          - 'votemper: int=linear; flt=hann; ext=dist_weight',
+!>            'vosaline: int=cubic'
 !>
-!>          Examples:
-!>             - cn_north='index1,first1:last1(width)'
-!>             - cn_north='index1(width),first1:last1|index2,first2:last2'
-!>             \image html  boundary_50.png 
-!>             <center>\image latex boundary_50.png
-!>             </center>
-!>       - cn_south  : south boundary indices on fine grid
-!>       - cn_east   : east  boundary indices on fine grid
-!>       - cn_west   : west  boundary indices on fine grid
-!>       - ln_oneseg : force to use only one segment for each boundary or not
+!>       @note 
+!>          If you do not specify a method which is required, 
+!>          default one is apply.
 !>
-!>    * _output namelist (namout)_:<br/>
-!>       - cn_fileout : fine grid boundary basename
-!>         (cardinal point and segment number will be automatically added)
-!>       - dn_dayofs  : date offset in day (change only ouput file name)
-!>       - ln_extrap  : extrapolate land point or not
+!> @subsection subnst namnst 
+!>    the nesting sub-namelist parameters are :
 !>
-!>          Examples: 
-!>             - cn_fileout='boundary.nc'<br/>
-!>                if time_counter (16/07/2015 00h) is read on input file (see varfile), 
-!>                west boundary will be named boundary_west_y2015m07d16
-!>             - dn_dayofs=-2.<br/>
-!>                if you use day offset you get boundary_west_y2015m07d14
-!>       
+!>    - **in_rhoi**  [@a 1]<br/> 
+!>       refinement factor in i-direction
 !>
+!>    - **in_rhoj**  [@a 1]<br/> 
+!>       refinement factor in j-direction
+!>
+!>    @note 
+!>       coarse grid indices will be deduced from fine grid
+!>       coordinate file.
+!>
+!> @subsection subbdy nambdy
+!>    the boundary sub-namelist parameters are :
+!>
+!>    - **ln_north** [@a .TRUE.]<br/> 
+!>       logical to use north boundary or not
+!>    - **ln_south** [@a .TRUE.]<br/>
+!>       logical to use south boundary or not
+!>    - **ln_east**  [@a .TRUE.]<br/>
+!>       logical to use east boundary or not
+!>    - **ln_west**  [@a .TRUE.]<br/>
+!>       logical to use west  boundary or not
+!>    <br/> <br/>
+!>    - **cn_north** [@a ]<br/>
+!>       north boundary indices on fine grid<br/>
+!>    - **cn_south** [@a ]<br/>
+!>       south boundary indices on fine grid<br/>
+!>    - **cn_east**  [@a ]<br/>
+!>       east  boundary indices on fine grid<br/>
+!>    - **cn_west**  [@a ]<br/>
+!>       west  boundary indices on fine grid<br/>
+!>
+!>       *cn_north* is a string character defining boundary
+!>       segmentation.<br/>
+!>       segments are separated by '|'.<br/>
+!>       each segments of the boundary is composed of:
+!>          - indice of velocity (orthogonal to boundary .ie. 
+!>             for north boundary, J-indice). 
+!>          - indice of segment start (I-indice for north boundary) 
+!>          - indice of segment end   (I-indice for north boundary)<br/>
+!>             indices must be separated by ':' .<br/>
+!>          - optionally, boundary size could be added between '(' and ')' 
+!>          in the first segment defined.
+!>             @note 
+!>                boundary size is the same for all segments of one boundary.
+!>
+!>       Examples:
+!>          - cn_north='index1,first1:last1(width)'
+!>          - cn_north='index1(width),first1:last1|index2,first2:last2'
+!>
+!>       @image html  boundary_50.png 
+!>       <center>@image latex boundary_50.png
+!>       </center>
+!>
+!>    - **ln_oneseg** [@a .TRUE.]<br/>
+!>       logical to use only one segment for each boundary or not
+!>
+!>    @note
+!>       the number of point(s) with coarse value save at boundaries is
+!>       defined with the *weight* variable (see @ref merge_bathy)
+!>
+!> @subsection subout namout 
+!>    the output sub-namelist parameter is :
+!>
+!>    - **cn_fileout** [@a boundary.nc]<br/>
+!>       output bathymetry filename
+!>
+!>       @note
+!>          cardinal point and segment number will be automatically added
+!>
+!>    - **ln_extrap** [@a .FALSE.]<br/>
+!>       extrapolate on land point
+!>
+!>    - **dn_dayofs** [@a 0]<br/>
+!>       date offset in day (change only ouput file name)
+!>
+!>       Examples: 
+!>          - cn_fileout='boundary.nc'<br/>
+!>             if time_counter (16/07/2015 00h) is read on input file (see varfile), 
+!>             west boundary will be named boundary_west_y2015m07d16
+!>          - dn_dayofs=-2.<br/>
+!>             if you use day offset you get boundary_west_y2015m07d14
+!>
+!> @subsection sub_nambdy How to fill Lateral Boundary Condition in NEMO namelist
+!>    To use boundary condition within NEMO, you need to fill the NEMO namelist.<br/>
+!>    As this is a little bit messy for lateral boundary condition, here after
+!>    is an explanation of how to do it.
+!>
+!>    This will be done in 3 steps.
+!>
+!>    @subsubsection ss_nambdy nambdy
+!>       The *nambdy* NEMO sub-namelist defines open boundaries.<br/>
+!>       Here we indicate the number of open boundary (**nb_bdy**).
+!>
+!>       @note
+!>          we have to fill most of the parameters with as many elements as there are open boundaries
+!> 
+!>       Regarding the width of the relaxation zone **nn_rimwidth**,
+!>       this information is available as a global attribute (**bdy_width**) 
+!>       in the metadata of boundary files created with SIREN 
+!>
+!> @code{.sh}
+!>    ncdump -h boundary_east.nc
+!> @endcode
+!>       @warning
+!>          The order of the boundaries must stay unchanged, in parameters list as well as 
+!>          in the next sub-namelsits 
+!>
+!>    Example:<br/>
+!>       here is an example for a domain with two boundaries East and North
+!>
+!> @code{.sh}
+!> !-----------------------------------------------------------------------
+!> &nambdy        !  unstructured open boundaries                          ("key_bdy")
+!> !-----------------------------------------------------------------------
+!>   nb_bdy         = 2                    !  number of open boundary sets
+!>   ln_coords_file = .false.,.false.      !  =T : read bdy coordinates from file
+!>   cn_coords_file = '',''                !  bdy coordinates files
+!>   ln_mask_file   = .false.              !  =T : read mask from file
+!>   cn_mask_file   = ''                   !  name of mask file (if ln_mask_file=.TRUE.)
+!>   cn_dyn2d       = 'flather','flather'  !
+!>   nn_dyn2d_dta   = 1,1                  !  = 0, bdy data are equal to the initial state
+!>                                         !  = 1, bdy data are read in 'bdydata   .nc' files
+!>                                         !  = 2, use tidal harmonic forcing data from files
+!>                                         !  = 3, use external data AND tidal harmonic forcing
+!>   cn_dyn3d       = 'specified','specified' !  
+!>   nn_dyn3d_dta   = 1,1                  !  = 0, bdy data are equal to the initial state
+!>                                         !  = 1, bdy data are read in 'bdydata   .nc' files
+!>   cn_tra         = 'specified','specified' ! 
+!>   nn_tra_dta     = 1,1                  !  = 0, bdy data are equal to the initial state
+!>                                         !  = 1, bdy data are read in 'bdydata   .nc' files
+!>                                         !
+!>   ln_tra_dmp    =.true.,.true.          !  open boudaries conditions for tracers
+!>   ln_dyn3d_dmp  =.true.,.true.          !  open boundary condition for baroclinic velocities
+!>   rn_time_dmp     =  1.,1.              ! Damping time scale in days 
+!>   rn_time_dmp_out =  1.,1.              ! Outflow damping time scale
+!>   nn_rimwidth   = 10,10                 !  width of the relaxation zone
+!>   ln_vol        = .false.               !  total volume correction (see nn_volctl parameter)
+!>   nn_volctl     = 1                     !  = 0, the total water flux across open boundaries is zero
+!> /
+!> @endcode
+!>
+!>    @subsubsection ss_nambdy_index nambdy_index
+!>       The *nambdy_index* NEMO sub-namelist describes the boundaries we will use.
+!>
+!>       @warning
+!>          We have to add as many as sub namelist *nambdy_index* than open boundaries (nb_bdy),
+!>          and keep them in the same order as above
+!>
+!>          Here we indicate if the open boundary is North, South, East, or West (**ctypebdy**).<br/>
+!>          We also indicate indice of segment start and end (respectively **nbdybeg**  and **nbdyend**)
+!>          as well as indice of velocity row or column (**nbdyind**).<br/>
+!>
+!>          Those informations are available as global attributes 
+!>          (respectively **bdy_deb, bdy_end, bdy_ind**) in the metadata of our boundary files 
+!>          created with SIREN.
+!>
+!>    Example:<br/>
+!>       here is an example for a domain with two boundaries East and North
+!>
+!> @code{.sh}
+!>    !-----------------------------------------------------------------------
+!>    &nambdy_index  !  structured open boundaries definition     ("key_bdy")
+!>    !-----------------------------------------------------------------------
+!>      ctypebdy ='E'                   ! Open boundary type (W,E,S or N)
+!>      nbdyind  = 407                  ! indice of velocity row or column
+!>                                      ! if ==-1, set obc at the domain boundary
+!>                                      !        , discard start and end indices
+!>      nbdybeg  = 32                   ! indice of segment start
+!>      nbdyend  = 300                  ! indice of segment end
+!>    /
+!>    !-----------------------------------------------------------------------
+!>    &nambdy_index  !  structured open boundaries definition     ("key_bdy")
+!>    !-----------------------------------------------------------------------
+!>      ctypebdy ='N'                   ! Open boundary type (W,E,S or N)
+!>      nbdyind  = 299                  ! indice of velocity row or column
+!>                                      ! if ==-1, set obc at the domain boundary
+!>                                      !        , discard start and end indices
+!>      nbdybeg  = 200                  ! indice of segment start
+!>      nbdyend  = 408                  ! indice of segment end
+!>    /
+!> @endcode
+!>
+!>    @subsubsection ss_nambdy_dat nambdy_dta
+!>       The *nambdy_dta* NEMO sub-namelists describes the boundary data and files to be used.<br/>
+!>       @warning
+!>          We have to add as many as sub namelist *nambdy_dta* than open boundaries (nb_bdy),
+!>          and keep them in the same order as above
+!>
+!>    Example:<br/>
+!>       here is an example for a domain with two boundaries East and North
+!>
+!> @code{.sh}
+!> !-----------------------------------------------------------------------
+!> &nambdy_dta      !  open boundaries - external data           ("key_bdy")
+!> !-----------------------------------------------------------------------
+!> !          ! file name !  freq (hours)   ! variable ! time interp. ! clim  ! 'yearly'/ ! weights...
+!> !          !           ! (if < 0 months) !   name   !   (logical)  ! (T/F) ! 'monthly' ! filename
+!>   bn_ssh = 'boundary_east' , -12   , 'sossheig' , .false. , .true. , 'yearly' , '', '', ''
+!>   bn_u2d = 'boundary_east' , -12   , 'vobtcrtx' , .false. , .true. , 'yearly' , '', '', ''
+!>   bn_v2d = 'boundary_east' , -12   , 'vobtcrty' , .false. , .true. , 'yearly' , '', '', ''
+!>   bn_u3d = 'boundary_east' , -12   , 'vozocrtx' , .false. , .true. , 'yearly' , '', '', ''
+!>   bn_v3d = 'boundary_east' , -12   , 'vomecrty' , .false. , .true. , 'yearly' , '', '', ''
+!>   bn_tem = 'boundary_east' , -12   , 'votemper' , .false. , .true. , 'yearly' , '', '', ''
+!>   bn_sal = 'boundary_east' , -12   , 'vosaline' , .false. , .true. , 'yearly' , '', '', ''
+!>   cn_dir = './'
+!>   ln_full_vel = .true.
+!> /
+!> !-----------------------------------------------------------------------
+!> &nambdy_dta      !  open boundaries - external data           ("key_bdy")
+!> !-----------------------------------------------------------------------
+!> !          ! file name !  freq (hours)   ! variable ! time interp. ! clim  ! 'yearly'/ ! weights...
+!> !          !           ! (if < 0 months) !   name   !   (logical)  ! (T/F) ! 'monthly' ! filename
+!>   bn_ssh = 'boundary_north' , -12   , 'sossheig' ,  .false. , .true. , 'yearly' , '', '', ''
+!>   bn_u2d = 'boundary_north' , -12   , 'vobtcrtx' ,  .false. , .true. , 'yearly' , '', '', ''
+!>   bn_v2d = 'boundary_north' , -12   , 'vobtcrty' ,  .false. , .true. , 'yearly' , '', '', ''
+!>   bn_u3d = 'boundary_north' , -12   , 'vozocrtx' ,  .false. , .true. , 'yearly' , '', '', ''
+!>   bn_v3d = 'boundary_north' , -12   , 'vomecrty' ,  .false. , .true. , 'yearly' , '', '', ''
+!>   bn_tem = 'boundary_north' , -12   , 'votemper' ,  .false. , .true. , 'yearly' , '', '', ''
+!>   bn_sal = 'boundary_north' , -12   , 'vosaline' ,  .false. , .true. , 'yearly' , '', '', ''
+!>   cn_dir = './'
+!>   ln_full_vel = .true.
+!> /
+!> @endcode
+!>
+!> <hr>
 !> @author J.Paul
-! REVISION HISTORY:
+!>
 !> @date November, 2013 - Initial Version
 !> @date September, 2014
 !> - add header for user
@@ -202,11 +504,22 @@
 !> - same process use for variable extracted or interpolated from input file.
 !> @date October, 2016
 !> - dimension to be used select from configuration file
+!> @date January, 2019
+!> - add url path to global attributes of output file(s)
+!> - create and clean file structure to avoid memory leaks
+!> - explain how to fill Lateral Boundary Condition in NEMO namelist
+!> @date February, 2019
+!> - rename sub namelist namcrs to namsrc
+!> - rename sub namelist namfin to namtgt
+!> @date August, 2019
+!> - use periodicity read from namelist, and store in multi structure
+!> @date Ocober, 2019
+!> - add help and version optional arguments
 !>
 !> @todo
 !> - rewitre using meshmask instead of bathymetry and coordinates files.
 !>
-!> @note Software governed by the CeCILL licence     (./LICENSE)
+!> @note Software governed by the CeCILL licence     (NEMOGCM/NEMO_CeCILL.txt)
 !----------------------------------------------------------------------
 PROGRAM create_boundary
 
@@ -234,12 +547,19 @@ PROGRAM create_boundary
 
    IMPLICIT NONE
 
+   ! parameters
+   CHARACTER(LEN=lc), PARAMETER  :: cp_myname = "create_boundary"
+
    ! local variable
+   CHARACTER(LEN=lc)                                  :: cl_arg
+   CHARACTER(LEN=lc)                                  :: cl_errormsg
+
    INTEGER(i4)                                        :: il_narg
 
 #if defined key_mpp_mpi
    ! mpp variable
-   CHARACTER(LEN=lc), DIMENSION(:)      , ALLOCATABLE :: cl_namelist
+   CHARACTER(LEN=lc), DIMENSION(:)      , ALLOCATABLE :: cl_args
+
    INTEGER(i4)                                        :: ierror
    INTEGER(i4)                                        :: iproc
    INTEGER(i4)                                        :: nproc
@@ -256,18 +576,43 @@ PROGRAM create_boundary
 #endif
    !-------------------------------------------------------------------
 
+   !
+   ! Initialisation
+   ! --------------
+   !
    il_narg=COMMAND_ARGUMENT_COUNT() !f03 intrinsec
+
 #if ! defined key_mpp_mpi
 
-   IF( il_narg/=1 )THEN
-      PRINT *,"CREATE BOUNDARY: ERROR. need one namelist"
-      STOP
+   ! Traitement des arguments fournis
+   ! --------------------------------
+   IF( il_narg /= 1 )THEN
+      WRITE(cl_errormsg,*) ' ERROR : one argument is needed '
+      CALL fct_help(cp_myname,cl_errormsg) 
+      CALL EXIT(1)
    ELSE
-      CALL GET_COMMAND_ARGUMENT(1,cl_namelist) !f03 intrinsec
+
+      CALL GET_COMMAND_ARGUMENT(1,cl_arg) !f03 intrinsec
+      SELECT CASE (cl_arg)
+         CASE ('-v', '--version')
+
+            CALL fct_version(cp_myname)
+            CALL EXIT(0)
+
+         CASE ('-h', '--help')
+
+            CALL fct_help(cp_myname)
+            CALL EXIT(0)
+
+         CASE DEFAULT
+
+            cl_namelist=cl_arg
+            
+            CALL GET_COMMAND_ARGUMENT(1,cl_namelist) !f03 intrinsec
+            CALL create_boundary__mono(cl_namelist)
+
+      END SELECT
    ENDIF
-
-   CALL create__boundary(cl_namelist)
-
 #else
 
    ! Initialize MPI
@@ -275,13 +620,34 @@ PROGRAM create_boundary
    CALL mpi_comm_rank(mpi_comm_world,iproc,ierror)
    CALL mpi_comm_size(mpi_comm_world,nproc,ierror)
 
-   IF( il_narg==0 )THEN
-      PRINT *,"CREATE BOUNDARY: ERROR. need at least one namelist"
-      STOP
+   ! Traitement des arguments fournis
+   ! --------------------------------
+   IF( il_narg == 0 )THEN
+      WRITE(cl_errormsg,*) ' ERROR : at least one argument is needed '
+      CALL fct_help(cp_myname,cl_errormsg) 
+      CALL EXIT(1)
    ELSE
-      ALLOCATE(cl_namelist(il_narg))
+
+      ALLOCATE(cl_args(il_narg))
       DO jm=1,il_narg
-         CALL GET_COMMAND_ARGUMENT(jm,cl_namelist(jm))
+
+         CALL GET_COMMAND_ARGUMENT(jm,cl_arg) !f03 intrinsec
+         SELECT CASE (cl_arg)
+            CASE ('-v', '--version')
+
+               CALL fct_version(cp_myname)
+               CALL EXIT(0)
+
+            CASE ('-h', '--help')
+
+               CALL fct_help(cp_myname)
+               CALL EXIT(0)
+
+            CASE DEFAULT
+
+               cl_args(jm)=TRIM(cl_arg)
+
+         END SELECT
       ENDDO
    ENDIF
 
@@ -292,18 +658,19 @@ PROGRAM create_boundary
 
    DO jm=1, il_narg
       IF ( il_nprog(jm) .eq. iproc ) THEN
-         CALL create__boundary(cl_namelist(jm))
+         CALL create_boundary__mono(cl_args(jm))
       ENDIF
    ENDDO
 
    CALL mpi_finalize(ierror)
 
-   DEALLOCATE(cl_namelist)
+   DEALLOCATE(cl_args)
    DEALLOCATE(il_nprog)
 #endif
 
 CONTAINS
-SUBROUTINE create__boundary(cd_namelist)
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE create_boundary__mono(cd_namelist)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine create boundary files.
@@ -329,6 +696,7 @@ SUBROUTINE create__boundary(cd_namelist)
    CHARACTER(LEN=lc)                                  :: cl_data
    CHARACTER(LEN=lc)                                  :: cl_dimorder
    CHARACTER(LEN=lc)                                  :: cl_fmt
+   CHARACTER(LEN=lc)                                  :: cl_url
 
    INTEGER(i4)                                        :: il_status
    INTEGER(i4)                                        :: il_fileid
@@ -366,6 +734,7 @@ SUBROUTINE create__boundary(cd_namelist)
    TYPE(TDOM)                                         :: tl_dom1
    TYPE(TDOM)       , DIMENSION(:,:,:)  , ALLOCATABLE :: tl_segdom1
 
+   TYPE(TFILE)                                        :: tl_file
    TYPE(TFILE)                                        :: tl_fileout
    
    TYPE(TMPP)                                         :: tl_coord0
@@ -385,25 +754,26 @@ SUBROUTINE create__boundary(cd_namelist)
 
    ! namelist variable
    ! namlog
-   CHARACTER(LEN=lc)                       :: cn_logfile = 'create_boundary.log' 
-   CHARACTER(LEN=lc)                       :: cn_verbosity = 'warning' 
-   INTEGER(i4)                             :: in_maxerror = 5
+   CHARACTER(LEN=lc)                       :: cn_logfile    = 'create_boundary.log' 
+   CHARACTER(LEN=lc)                       :: cn_verbosity  = 'warning' 
+   INTEGER(i4)                             :: in_maxerror   = 5
 
    ! namcfg
-   CHARACTER(LEN=lc)                       :: cn_varcfg = './cfg/variable.cfg' 
-   CHARACTER(LEN=lc)                       :: cn_dimcfg = './cfg/dimension.cfg'
-   CHARACTER(LEN=lc)                       :: cn_dumcfg = './cfg/dummy.cfg'
+   CHARACTER(LEN=lc)                       :: cn_varcfg  = './cfg/variable.cfg' 
+   CHARACTER(LEN=lc)                       :: cn_dimcfg  = './cfg/dimension.cfg'
+   CHARACTER(LEN=lc)                       :: cn_dumcfg  = './cfg/dummy.cfg'
 
-   ! namcrs
-   CHARACTER(LEN=lc)                       :: cn_coord0 = '' 
-   INTEGER(i4)                             :: in_perio0 = -1
+   ! namsrc
+   CHARACTER(LEN=lc)                       :: cn_coord0  = '' 
+   INTEGER(i4)                             :: in_perio0  = -1
 
-   ! namfin
-   CHARACTER(LEN=lc)                       :: cn_coord1 = '' 
-   CHARACTER(LEN=lc)                       :: cn_bathy1 = '' 
-   INTEGER(i4)                             :: in_perio1 = -1
+   ! namtgt
+   CHARACTER(LEN=lc)                       :: cn_coord1  = '' 
+   CHARACTER(LEN=lc)                       :: cn_bathy1  = '' 
+   INTEGER(i4)                             :: in_perio1  = -1
 
    !namzgr
+   REAL(dp)                                :: dn_pp_to_be_computed = 0._dp
    REAL(dp)                                :: dn_ppsur   = -3958.951371276829_dp
    REAL(dp)                                :: dn_ppa0    =   103.953009600000_dp
    REAL(dp)                                :: dn_ppa1    =     2.415951269000_dp
@@ -417,16 +787,16 @@ SUBROUTINE create__boundary(cd_namelist)
    INTEGER(i4)                             :: in_nlevel  = 75
 
    !namzps
-   REAL(dp)                                :: dn_e3zps_min = 25._dp
-   REAL(dp)                                :: dn_e3zps_rat = 0.2_dp
+   REAL(dp)                                :: dn_e3zps_min  = 25._dp
+   REAL(dp)                                :: dn_e3zps_rat  = 0.2_dp
 
    ! namvar
    CHARACTER(LEN=lc), DIMENSION(ip_maxvar) :: cn_varfile = ''
    CHARACTER(LEN=lc), DIMENSION(ip_maxvar) :: cn_varinfo = ''
 
    ! namnst
-   INTEGER(i4)                             :: in_rhoi  = 0
-   INTEGER(i4)                             :: in_rhoj  = 0
+   INTEGER(i4)                             :: in_rhoi    = 1
+   INTEGER(i4)                             :: in_rhoj    = 1
 
    ! nambdy
    LOGICAL                                 :: ln_north   = .TRUE.
@@ -448,41 +818,42 @@ SUBROUTINE create__boundary(cd_namelist)
    NAMELIST /namlog/ &  !< logger namelist
    &  cn_logfile,    &  !< log file
    &  cn_verbosity,  &  !< log verbosity
-   &  in_maxerror
+   &  in_maxerror       !< logger maximum error
 
-   NAMELIST /namcfg/ &  !< config namelist
-   &  cn_varcfg, &       !< variable configuration file
-   &  cn_dimcfg, &       !< dimension configuration file
-   &  cn_dumcfg          !< dummy configuration file
+   NAMELIST /namcfg/ &  !< configuration namelist
+   &  cn_varcfg,     &  !< variable configuration file
+   &  cn_dimcfg,     &  !< dimension configuration file
+   &  cn_dumcfg         !< dummy configuration file
 
-   NAMELIST /namcrs/ &  !< coarse grid namelist
+   NAMELIST /namsrc/ &  !< source/coarse grid namelist
    &  cn_coord0,     &  !< coordinate file
    &  in_perio0         !< periodicity index
- 
-   NAMELIST /namfin/ &  !< fine grid namelist
+
+   NAMELIST /namtgt/ &  !< target/fine grid namelist
    &  cn_coord1,     &  !< coordinate file
    &  cn_bathy1,     &  !< bathymetry file
    &  in_perio1         !< periodicity index
  
    NAMELIST /namzgr/ &
-   &  dn_ppsur,     &
-   &  dn_ppa0,      &
-   &  dn_ppa1,      &
-   &  dn_ppa2,      &
-   &  dn_ppkth,     &
-   &  dn_ppkth2,    &
-   &  dn_ppacr,     &
-   &  dn_ppacr2,    &
-   &  dn_ppdzmin,   &
-   &  dn_pphmax,    &
+   &  dn_pp_to_be_computed, &
+   &  dn_ppsur,      &
+   &  dn_ppa0,       &
+   &  dn_ppa1,       &
+   &  dn_ppa2,       &
+   &  dn_ppkth,      &
+   &  dn_ppkth2,     &
+   &  dn_ppacr,      &
+   &  dn_ppacr2,     &
+   &  dn_ppdzmin,    &
+   &  dn_pphmax,     &
    &  in_nlevel         !< number of vertical level
 
    NAMELIST /namzps/ &
-   &  dn_e3zps_min, &
+   &  dn_e3zps_min,  &
    &  dn_e3zps_rat
 
    NAMELIST /namvar/ &  !< variable namelist
-   &  cn_varfile, &     !< list of variable and file where find it. (ex: 'votemper:GLORYS_gridT.nc' ) 
+   &  cn_varfile,    &  !< list of variable and file where find it. (ex: 'votemper:GLORYS_gridT.nc' ) 
    &  cn_varinfo        !< list of variable and method to apply on. (ex: 'votemper:linear','vosaline:cubic' )
  
    NAMELIST /namnst/ &  !< nesting namelist
@@ -544,8 +915,8 @@ SUBROUTINE create__boundary(cd_namelist)
       ! get dummy attribute
       CALL att_get_dummy(TRIM(cn_dumcfg))
 
-      READ( il_fileid, NML = namcrs )
-      READ( il_fileid, NML = namfin )
+      READ( il_fileid, NML = namsrc )
+      READ( il_fileid, NML = namtgt )
       READ( il_fileid, NML = namzgr )
       READ( il_fileid, NML = namvar )
       ! add user change in extra information
@@ -565,12 +936,14 @@ SUBROUTINE create__boundary(cd_namelist)
 
    ELSE
 
-      PRINT *,"CREATE BOUNDARY: ERROR. can not find "//TRIM(cd_namelist)
-      STOP
+      WRITE(cl_errormsg,*) " ERROR : can't find "//TRIM(cd_namelist)
+      CALL fct_help(cp_myname,cl_errormsg) 
+      CALL EXIT(1)
 
    ENDIF
 
    CALL multi_print(tl_multi)
+
    IF( tl_multi%i_nvar <= 0 )THEN
       CALL logger_fatal("CREATE BOUNDARY: no variable to be used."//&
       &  " check namelist.")
@@ -578,7 +951,10 @@ SUBROUTINE create__boundary(cd_namelist)
 
    ! open files
    IF( TRIM(cn_coord0) /= '' )THEN
-      tl_coord0=mpp_init( file_init(TRIM(cn_coord0)), id_perio=in_perio0)
+      tl_file= file_init(TRIM(cn_coord0))
+      tl_coord0=mpp_init( tl_file, id_perio=in_perio0)
+      ! clean
+      CALL file_clean(tl_file)
       CALL grid_get_info(tl_coord0)
    ELSE
       CALL logger_fatal("CREATE BOUNDARY: can not find coarse grid "//&
@@ -586,7 +962,10 @@ SUBROUTINE create__boundary(cd_namelist)
    ENDIF
 
    IF( TRIM(cn_coord1) /= '' )THEN
-      tl_coord1=mpp_init( file_init(TRIM(cn_coord1)), id_perio=in_perio1)
+      tl_file=file_init(TRIM(cn_coord1))
+      tl_coord1=mpp_init( tl_file, id_perio=in_perio1)
+      ! clean
+      CALL file_clean(tl_file)
       CALL grid_get_info(tl_coord1)
    ELSE
       CALL logger_fatal("CREATE BOUNDARY: can not find fine grid coordinate "//&
@@ -594,7 +973,10 @@ SUBROUTINE create__boundary(cd_namelist)
    ENDIF
 
    IF( TRIM(cn_bathy1) /= '' )THEN
-      tl_bathy1=mpp_init( file_init(TRIM(cn_bathy1)), id_perio=in_perio1)
+      tl_file=file_init(TRIM(cn_bathy1))
+      tl_bathy1=mpp_init( tl_file, id_perio=in_perio1)
+      ! clean
+      CALL file_clean(tl_file)
       CALL grid_get_info(tl_bathy1)
    ELSE
       CALL logger_fatal("CREATE BOUNDARY: can not find fine grid bathymetry "//&
@@ -614,7 +996,7 @@ SUBROUTINE create__boundary(cd_namelist)
       ENDIF
 
       cl_bdyout=boundary_set_filename( TRIM(cn_fileout), &
-      &                                TRIM(cp_card(jk)) )
+         &                             TRIM(cp_card(jk)) )
       INQUIRE(FILE=TRIM(cl_bdyout), EXIST=ll_exist)
       IF( ll_exist )THEN
          CALL logger_fatal("CREATE BOUNDARY: output file "//TRIM(cl_bdyout)//&
@@ -627,7 +1009,7 @@ SUBROUTINE create__boundary(cd_namelist)
    il_rho(:)=1
    IF( in_rhoi < 1 .OR. in_rhoj < 1 )THEN
       CALL logger_error("CREATE BOUNDARY: invalid refinement factor."//&
-      &  " check namelist "//TRIM(cd_namelist))
+         &  " check namelist "//TRIM(cd_namelist))
    ELSE
       il_rho(jp_I)=in_rhoi
       il_rho(jp_J)=in_rhoj
@@ -636,7 +1018,7 @@ SUBROUTINE create__boundary(cd_namelist)
    !
    ! compute coarse grid indices around fine grid
    il_ind(:,:)=grid_get_coarse_index(tl_coord0, tl_coord1, &
-   &                                 id_rho=il_rho(:))
+      &                              id_rho=il_rho(:))
 
    il_imin0=il_ind(1,1) ; il_imax0=il_ind(1,2)
    il_jmin0=il_ind(2,1) ; il_jmax0=il_ind(2,2)
@@ -646,9 +1028,9 @@ SUBROUTINE create__boundary(cd_namelist)
 
    ! check coordinate file
    CALL grid_check_coincidence( tl_coord0, tl_coord1, &
-   &                            il_imin0, il_imax0, &
-   &                            il_jmin0, il_jmax0, &
-   &                            il_rho(:) )      
+      &                         il_imin0, il_imax0, &
+      &                         il_jmin0, il_jmax0, &
+      &                         il_rho(:) )      
 
    ! read or compute boundary
    CALL mpp_get_contour(tl_bathy1)
@@ -661,8 +1043,8 @@ SUBROUTINE create__boundary(cd_namelist)
 
    ! get boundaries indices
    tl_bdy(:)=boundary_init(tl_var1, ln_north, ln_south, ln_east, ln_west, &
-   &                                cn_north, cn_south, cn_east, cn_west, &
-   &                                ln_oneseg ) 
+      &                             cn_north, cn_south, cn_east, cn_west, &
+      &                             ln_oneseg ) 
 
 
    CALL var_clean(tl_var1)
@@ -681,7 +1063,7 @@ SUBROUTINE create__boundary(cd_namelist)
 
             ! get fine grid segment domain
             tl_segdom1(:,jk,jl)=create_boundary_get_dom( tl_bathy1, &
-            &                                            tl_bdy(jl), jk )
+               &                                         tl_bdy(jl), jk )
 
             IF( .NOT. ln_extrap )THEN
                ! get fine grid level
@@ -694,7 +1076,7 @@ SUBROUTINE create__boundary(cd_namelist)
             ! to avoid dimension of one and so be able to compute offset
             DO jj=1,ip_npoint
                CALL dom_add_extra(tl_segdom1(jj,jk,jl), &
-               &                  il_rho(jp_I), il_rho(jp_J))
+                  &               il_rho(jp_I), il_rho(jp_J))
             ENDDO
 
          ENDDO
@@ -712,7 +1094,7 @@ SUBROUTINE create__boundary(cd_namelist)
    ! compute boundary for variable to be used (see namelist)
    IF( .NOT. ASSOCIATED(tl_multi%t_mpp) )THEN
       CALL logger_error("CREATE BOUNDARY: no file to work on. "//&
-      &                 "check cn_varfile in namelist.")
+         &              "check cn_varfile in namelist.")
    ELSE
 
       jvar=0
@@ -720,12 +1102,11 @@ SUBROUTINE create__boundary(cd_namelist)
       DO ji=1,tl_multi%i_nmpp
 
          WRITE(cl_data,'(a,i2.2)') 'data-',jvar+1
-
          IF( .NOT. ASSOCIATED(tl_multi%t_mpp(ji)%t_proc(1)%t_var) )THEN
 
             CALL logger_error("CREATE BOUNDARY: no variable to work on for "//&
-            &                 "mpp "//TRIM(tl_multi%t_mpp(ji)%c_name)//&
-            &                 ". check cn_varfile in namelist.")
+               &              "mpp "//TRIM(tl_multi%t_mpp(ji)%c_name)//&
+               &              ". check cn_varfile in namelist.")
 
          ELSEIF( TRIM(tl_multi%t_mpp(ji)%c_name) == TRIM(cl_data) )THEN
          !- use input matrix to fill variable
@@ -759,19 +1140,19 @@ SUBROUTINE create__boundary(cd_namelist)
 
                         ! fill value with matrix data
                         tl_segvar1(jvar,jk,jl)=create_boundary_matrix( &
-                        &                          tl_var1, &
-                        &                          tl_segdom1(jpoint,jk,jl), &
-                        &                          in_nlevel )
+                           &                          tl_var1, &
+                           &                          tl_segdom1(jpoint,jk,jl), &
+                           &                          in_nlevel )
 
                         !del extra
                         CALL dom_del_extra( tl_segvar1(jvar,jk,jl), &
-                        &                   tl_segdom1(jpoint,jk,jl) )
+                           &                tl_segdom1(jpoint,jk,jl) )
 
                      ENDDO
 
                   ENDIF
                ENDDO
-               
+
                ! clean
                CALL var_clean(tl_var1)
 
@@ -783,7 +1164,12 @@ SUBROUTINE create__boundary(cd_namelist)
 
             WRITE(*,'(a)') "work on file "//TRIM(tl_multi%t_mpp(ji)%c_name)
             ! 
-            tl_mpp=mpp_init(file_init(TRIM(tl_multi%t_mpp(ji)%t_proc(1)%c_name)))
+            tl_file=file_init(TRIM(tl_multi%t_mpp(ji)%t_proc(1)%c_name), &
+               &              id_perio=tl_multi%t_mpp(ji)%i_perio)
+            tl_mpp=mpp_init( tl_file )
+            !tl_mpp=mpp_init( tl_file, id_perio=tl_multi%t_mpp(ji)%t_proc(1)%i_perio)
+            ! clean
+            CALL file_clean(tl_file)
             CALL grid_get_info(tl_mpp)
 
             DO jl=1,ip_ncard
@@ -889,6 +1275,7 @@ SUBROUTINE create__boundary(cd_namelist)
                         ! del extra point on fine grid
                         CALL dom_del_extra( tl_segvar1(jvar+jj,jk,jl), &
                         &                   tl_dom1 )
+
                         ! clean extra point information on coarse grid domain
                         CALL dom_clean_extra( tl_dom0 )
 
@@ -963,7 +1350,7 @@ SUBROUTINE create__boundary(cd_namelist)
          DO jk=1,tl_bdy(jl)%i_nseg
             !- 
             CALL create_boundary_get_coord( tl_coord1, tl_segdom1(jp_T,jk,jl),&
-            &                               'T', tl_lon1, tl_lat1 )
+               &                           'T', tl_lon1, tl_lat1 )
 
             ! force to use nav_lon, nav_lat as variable name
             tl_lon1%c_name='nav_lon'
@@ -1101,6 +1488,12 @@ SUBROUTINE create__boundary(cd_namelist)
             tl_att=att_init("Created_by","SIREN create_boundary")
             CALL file_add_att(tl_fileout, tl_att)
 
+            !add source url
+            cl_url=fct_split(fct_split(cp_url,2,'$'),2,'URL:')
+            tl_att=att_init("SIREN_url",cl_url)
+            CALL file_add_att(tl_fileout, tl_att)
+
+            ! add date of creation
             cl_date=date_print(date_now())
             tl_att=att_init("Creation_date",cl_date)
             CALL file_add_att(tl_fileout, tl_att)
@@ -1170,7 +1563,10 @@ SUBROUTINE create__boundary(cd_namelist)
    CALL logger_close()
    CALL logger_clean()
 
-END SUBROUTINE create__boundary
+   END SUBROUTINE create_boundary__mono
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION create_boundary_get_dom(td_bathy1, td_bdy, id_seg) &
+         & RESULT (tf_dom)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute boundary domain for each grid point (T,U,V,F) 
@@ -1185,7 +1581,6 @@ END SUBROUTINE create__boundary
    !> @param[in] id_seg    segment indice 
    !> @return array of domain structure 
    !-------------------------------------------------------------------
-   FUNCTION create_boundary_get_dom( td_bathy1, td_bdy, id_seg )
 
       IMPLICIT NONE
 
@@ -1195,7 +1590,7 @@ END SUBROUTINE create__boundary
       INTEGER(i4), INTENT(IN   ) :: id_seg
 
       ! function
-      TYPE(TDOM), DIMENSION(ip_npoint) :: create_boundary_get_dom
+      TYPE(TDOM), DIMENSION(ip_npoint) :: tf_dom
 
       ! local variable
       INTEGER(i4) :: il_imin1
@@ -1270,14 +1665,17 @@ END SUBROUTINE create__boundary
          il_jmax=il_jmax1+il_jshift(ji)
 
          ! compute domain
-         create_boundary_get_dom(ji)=dom_init( td_bathy1,       &
-         &                                     il_imin, il_imax,&
-         &                                     il_jmin, il_jmax,&
-         &                                     TRIM(td_bdy%c_card) )
+         tf_dom(ji)=dom_init(td_bathy1,         &
+            &                il_imin, il_imax,  &
+            &                il_jmin, il_jmax,  &
+            &                TRIM(td_bdy%c_card))
 
       ENDDO
 
    END FUNCTION create_boundary_get_dom
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE create_boundary_get_coord(td_coord1, td_dom1, cd_point, &
+      &                                 td_lon1, td_lat1)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine get coordinates over boundary domain
@@ -1293,10 +1691,9 @@ END SUBROUTINE create__boundary
    !> @param[out] td_lon1  longitude variable structure
    !> @param[out] td_lat1  latitude variable structure
    !-------------------------------------------------------------------
-   SUBROUTINE create_boundary_get_coord( td_coord1, td_dom1, cd_point, &
-   &                                     td_lon1, td_lat1 )
 
       IMPLICIT NONE
+
       ! Argument
       TYPE(TMPP)      , INTENT(IN   ) :: td_coord1
       TYPE(TDOM)      , INTENT(IN   ) :: td_dom1
@@ -1330,6 +1727,9 @@ END SUBROUTINE create__boundary
       CALL mpp_clean(tl_coord1)
 
    END SUBROUTINE create_boundary_get_coord
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE create_boundary_interp(td_var, id_rho, id_offset, &
+         &                           id_iext, id_jext)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine interpolate variable on boundary
@@ -1345,10 +1745,6 @@ END SUBROUTINE create__boundary
    !> @param[in] id_iext   i-direction size of extra bands (default=im_minext)
    !> @param[in] id_jext   j-direction size of extra bands (default=im_minext)
    !-------------------------------------------------------------------
-   SUBROUTINE create_boundary_interp( td_var,           &
-   &                                  id_rho,           &
-   &                                  id_offset,        &
-   &                                  id_iext, id_jext )
 
       IMPLICIT NONE
 
@@ -1393,7 +1789,7 @@ END SUBROUTINE create__boundary
       ! extrapolate variable
       CALL extrap_fill_value( td_var )
 
-      ! interpolate Bathymetry
+      ! interpolate variable
       CALL interp_fill_value( td_var, id_rho(:), &
       &                       id_offset=id_offset(:,:) )
 
@@ -1402,6 +1798,9 @@ END SUBROUTINE create__boundary
          &                               il_jext*id_rho(jp_J))
 
    END SUBROUTINE create_boundary_interp
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION create_boundary_matrix(td_var, td_dom, id_nlevel) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief
    !> This function create variable, filled with matrix value
@@ -1420,15 +1819,16 @@ END SUBROUTINE create__boundary
    !> @param[in] id_nlevel number of levels 
    !> @return variable structure 
    !-------------------------------------------------------------------
-   FUNCTION create_boundary_matrix(td_var, td_dom, id_nlevel)
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR) , INTENT(IN) :: td_var
       TYPE(TDOM) , INTENT(IN) :: td_dom
       INTEGER(i4), INTENT(IN) :: id_nlevel
 
       ! function
-      TYPE(TVAR) :: create_boundary_matrix
+      TYPE(TVAR)              :: tf_var
 
       ! local variable
       INTEGER(i4)      , DIMENSION(3)                    :: il_dim
@@ -1506,11 +1906,13 @@ END SUBROUTINE create__boundary
       ENDDO
 
       ! initialise variable with value
-      create_boundary_matrix=var_init(TRIM(td_var%c_name),dl_value(:,:,:,:))
+      tf_var=var_init(TRIM(td_var%c_name),dl_value(:,:,:,:))
 
       DEALLOCATE(dl_value)
 
    END FUNCTION create_boundary_matrix
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE create_boundary_use_mask(td_var, td_mask)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine use mask to filled land point with _FillValue
@@ -1523,7 +1925,6 @@ END SUBROUTINE create__boundary
    !> @param[inout] td_var variable structure 
    !> @param[in] td_mask   mask variable structure
    !-------------------------------------------------------------------
-   SUBROUTINE create_boundary_use_mask( td_var, td_mask )
 
       IMPLICIT NONE
 
@@ -1565,6 +1966,9 @@ END SUBROUTINE create__boundary
       DEALLOCATE( il_mask )
 
    END SUBROUTINE create_boundary_use_mask
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION create_boundary_get_level(td_level, td_dom) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief
    !> This function extract level over domain on each grid point, and return
@@ -1577,18 +1981,17 @@ END SUBROUTINE create__boundary
    !> @param[in] td_dom    array of domain structure
    !> @return array of variable structure
    !-------------------------------------------------------------------
-   FUNCTION create_boundary_get_level(td_level, td_dom)
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR), DIMENSION(:), INTENT(IN) :: td_level
       TYPE(TDOM), DIMENSION(:), INTENT(IN) :: td_dom
 
       ! function
-      TYPE(TVAR), DIMENSION(ip_npoint) :: create_boundary_get_level
+      TYPE(TVAR), DIMENSION(ip_npoint)     :: tf_var
 
       ! local variable
-      TYPE(TVAR), DIMENSION(ip_npoint) :: tl_var
-
       ! loop indices
       INTEGER(i4) :: ji
       !----------------------------------------------------------------
@@ -1601,31 +2004,28 @@ END SUBROUTINE create__boundary
 
          DO ji=1,ip_npoint
 
-            tl_var(ji)=var_copy(td_level(ji))
+            tf_var(ji)=var_copy(td_level(ji))
 
-            IF( ASSOCIATED(tl_var(ji)%d_value) ) DEALLOCATE(tl_var(ji)%d_value)
+            IF( ASSOCIATED(tf_var(ji)%d_value) ) DEALLOCATE(tf_var(ji)%d_value)
 
-            tl_var(ji)%t_dim(1)%i_len=td_dom(ji)%t_dim(1)%i_len
-            tl_var(ji)%t_dim(2)%i_len=td_dom(ji)%t_dim(2)%i_len
-            ALLOCATE(tl_var(ji)%d_value(tl_var(ji)%t_dim(1)%i_len, &
-            &                           tl_var(ji)%t_dim(2)%i_len, &
-            &                           tl_var(ji)%t_dim(3)%i_len, &
-            &                           tl_var(ji)%t_dim(4)%i_len) )
+            tf_var(ji)%t_dim(1)%i_len=td_dom(ji)%t_dim(1)%i_len
+            tf_var(ji)%t_dim(2)%i_len=td_dom(ji)%t_dim(2)%i_len
+            ALLOCATE(tf_var(ji)%d_value(tf_var(ji)%t_dim(1)%i_len, &
+            &                           tf_var(ji)%t_dim(2)%i_len, &
+            &                           tf_var(ji)%t_dim(3)%i_len, &
+            &                           tf_var(ji)%t_dim(4)%i_len) )
 
-            tl_var(ji)%d_value(:,:,:,:) = &
+            tf_var(ji)%d_value(:,:,:,:) = &
             &  td_level(ji)%d_value( td_dom(ji)%i_imin:td_dom(ji)%i_imax, &
             &                        td_dom(ji)%i_jmin:td_dom(ji)%i_jmax, :, : )
 
          ENDDO
-         ! save result
-         create_boundary_get_level(:)=var_copy(tl_var(:))
-
-         ! clean
-         CALL var_clean(tl_var(:))
 
       ENDIF
 
    END FUNCTION create_boundary_get_level
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE create_boundary_check_depth(td_var, td_mpp, id_nlevel, td_depth)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine check if variable need depth dimension, 
@@ -1644,7 +2044,6 @@ END SUBROUTINE create__boundary
    !> @param[in] id_nlevel    mpp structure
    !> @param[inout] td_depth  depth variable structure 
    !-------------------------------------------------------------------
-   SUBROUTINE create_boundary_check_depth( td_var, td_mpp, id_nlevel, td_depth )
 
       IMPLICIT NONE
 
@@ -1704,6 +2103,8 @@ END SUBROUTINE create__boundary
       ENDIF
       
    END SUBROUTINE create_boundary_check_depth
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE create_boundary_check_time(td_var, td_mpp, td_time)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine check if variable need time dimension, 
@@ -1721,7 +2122,6 @@ END SUBROUTINE create__boundary
    !> @param[in] td_mpp      mpp structure
    !> @param[inout] td_time  time variable structure 
    !-------------------------------------------------------------------
-   SUBROUTINE create_boundary_check_time( td_var, td_mpp, td_time )
 
       IMPLICIT NONE
 
@@ -1743,7 +2143,7 @@ END SUBROUTINE create__boundary
       &     INDEX(TRIM(td_var%c_axis),'T') /= 0 )&
       & )THEN
 
-         ! get or check depth value
+         ! get or check time value
          IF( td_mpp%t_proc(1)%i_timeid /= 0 )THEN
 
             il_varid=td_mpp%t_proc(1)%i_timeid
@@ -1774,4 +2174,5 @@ END SUBROUTINE create__boundary
       ENDIF
 
    END SUBROUTINE create_boundary_check_time
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 END PROGRAM create_boundary

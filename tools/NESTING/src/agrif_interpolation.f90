@@ -197,12 +197,15 @@ CONTAINS
     INTEGER :: i_min,j_min
     CHARACTER(*) :: typevar   
 
-    INTEGER :: nxf,nyf,zx,zy
-    INTEGER :: ji,jj,jif,jjf,jic,jjc,jdecx,jdecy
+    INTEGER :: nxf,nyf,nxc,nyc,zx,zy
+    INTEGER :: ji,jj,jif,jjf,jic,jjc,jic1,jjc1,jdecx,jdecy
     REAL*8 :: Ax, Bx, Ay, By
 
     nxf = SIZE(tabout,1)
     nyf = SIZE(tabout,2)
+
+    nxc = SIZE(tabin,1)
+    nyc = SIZE(tabin,2)
 
     SELECT CASE(typevar)
     CASE('T')
@@ -247,8 +250,11 @@ CONTAINS
           Ax = 1. - Bx
           Ay = 1. - By
 
-          tabout(ji,jj) = ( Bx * tabin(jic+1,jjc  ) + Ax * tabin(jic,jjc  ) ) * Ay + &
-             &            ( Bx * tabin(jic+1,jjc+1) + Ax * tabin(jic,jjc+1) ) * By
+          jic1 = MIN( nxc, jic+1 ) ! avoid out of bounds for tabin below
+          jjc1 = MIN( nyc, jjc+1 ) !             --
+
+          tabout(ji,jj) = ( Bx * tabin(jic1,jjc ) + Ax * tabin(jic,jjc ) ) * Ay + &
+             &            ( Bx * tabin(jic1,jjc1) + Ax * tabin(jic,jjc1) ) * By
        END DO
     END DO
     

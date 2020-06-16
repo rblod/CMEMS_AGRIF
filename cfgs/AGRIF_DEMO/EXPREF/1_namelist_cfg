@@ -21,7 +21,7 @@
 !-----------------------------------------------------------------------
    cn_exp      = "Pacific" !  experience name
    nn_it000    =       1   !  first time step
-   nn_itend    =      75   !  last  time step (std 5475)
+   nn_itend    =      80   !  last  time step (std 5475)
    nn_istate   =       0   !  output the initial state (1) or not (0)
 /
 !-----------------------------------------------------------------------
@@ -29,7 +29,7 @@
 !-----------------------------------------------------------------------
    ln_linssh   = .false.   !  =T  linear free surface  ==>>  model level are fixed in time
    !
-   rn_rdt      = 5760.     !  time step for the dynamics and tracer
+   rn_Dt      = 5400.     !  time step for the dynamics and tracer
 /
 !-----------------------------------------------------------------------
 &namcfg        !   parameters of the configuration                      (default: user defined GYRE)
@@ -51,8 +51,8 @@
    !___________!_________________________!___________________!___________!_____________!________!___________!__________________!__________!_______________!
    !           !  file name              ! frequency (hours) ! variable  ! time interp.!  clim  ! 'yearly'/ ! weights filename ! rotation ! land/sea mask !
    !           !                         !  (if <0  months)  !   name    !   (logical) !  (T/F) ! 'monthly' !                  ! pairing  !    filename   !
-   sn_tem = 'data_1m_potential_temperature_nomask',     -1      ,'votemper',   .true.    , .true. , 'yearly'  ,    ''    ,    ''    ,    ''
-   sn_sal = 'data_1m_salinity_nomask'             ,     -1      ,'vosaline',   .true.    , .true. , 'yearly'  ,    ''    ,    ''    ,    ''
+   sn_tem = 'data_1m_potential_temperature_nomask',     -1.     ,'votemper',   .true.    , .true. , 'yearly'  ,    ''    ,    ''    ,    ''
+   sn_sal = 'data_1m_salinity_nomask'             ,     -1.     ,'vosaline',   .true.    , .true. , 'yearly'  ,    ''    ,    ''    ,    ''
 /
 !!======================================================================
 !!            ***  Surface Boundary Condition namelists  ***          !!
@@ -80,8 +80,9 @@
                      ! Type of air-sea fluxes 
    ln_blk      = .true.    !  Bulk formulation                          (T => fill namsbc_blk )
                      ! Sea-ice :
-   nn_ice      = 2         !  =2 or 3 automatically for SI3 or CICE    ("key_si3" or "key_cice")
-                           !          except in AGRIF zoom where it has to be specified
+   nn_ice      = 2         !  =0 no ice boundary condition
+      !                    !  =1 use observed ice-cover                 (  => fill namsbc_iif )
+      !                    !  =2 or 3 for SI3 and CICE, respectively
                      ! Misc. options of sbc : 
    ln_traqsr   = .true.    !  Light penetration in the ocean            (T => fill namtra_qsr)
    ln_rnf      = .true.    !  runoffs                                   (T => fill namsbc_rnf)
@@ -92,22 +93,39 @@
 &namsbc_blk   !   namsbc_blk  generic Bulk formula                      (ln_blk =T)
 !-----------------------------------------------------------------------
    !                    !  bulk algorithm :
-   ln_NCAR    = .true.     ! "NCAR"      algorithm   (Large and Yeager 2008)
-
+   ln_NCAR      = .true.    ! "NCAR"      algorithm   (Large and Yeager 2008)
+   ln_COARE_3p0 = .false.   ! "COARE 3.0" algorithm   (Fairall et al. 2003)
+   ln_COARE_3p6 = .false.   ! "COARE 3.6" algorithm   (Edson et al. 2013)
+   ln_ECMWF     = .false.   ! "ECMWF"     algorithm   (IFS cycle 31)
+      !
+      rn_zqt      = 10.       !  Air temperature & humidity reference height (m)
+      rn_zu       = 10.       !  Wind vector reference height (m)
+      ln_Cd_L12   = .false.   !  air-ice drags = F(ice concentration) (Lupkes et al. 2012)
+      ln_Cd_L15   = .false.   !  air-ice drags = F(ice concentration) (Lupkes et al. 2015)
+      rn_pfac     = 1.        !  multiplicative factor for precipitation (total & snow)
+      rn_efac     = 1.        !  multiplicative factor for evaporation (0. or 1.)
+      rn_vfac     = 0.        !  multiplicative factor for ocean & ice velocity used to
+      !                       !  calculate the wind stress (0.=absolute or 1.=relative winds)
+      ln_skin_cs = .false.  !  use the cool-skin parameterization (only available in ECMWF and COARE algorithms) !LB
+      ln_skin_wl = .false.  !  use the warm-layer        "               "                    "
+      !
+      ln_humi_sph = .true.     !  humidity specified below in "sn_humi" is specific humidity     [kg/kg] if .true.
+      ln_humi_dpt = .false.    !  humidity specified below in "sn_humi" is dew-point temperature   [K]   if .true.
+      ln_humi_rlh = .false.    !  humidity specified below in "sn_humi" is relative humidity       [%]   if .true.
+   !
    cn_dir = './'  !  root directory for the bulk data location
    !___________!_________________________!___________________!___________!_____________!________!___________!______________________________________!__________!_______________!
    !           !  file name              ! frequency (hours) ! variable  ! time interp.!  clim  ! 'yearly'/ !          weights filename            ! rotation ! land/sea mask !
    !           !                         !  (if <0  months)  !   name    !   (logical) !  (T/F) ! 'monthly' !                                      ! pairing  !    filename   !
-   sn_wndi     = 'u_10.15JUNE2009_fill'       ,    6         , 'U_10_MOD',   .false.   , .true. , 'yearly'  , 'weights_core_orca2_bicubic_noc.nc'  , 'Uwnd'   , ''
-   sn_wndj     = 'v_10.15JUNE2009_fill'       ,    6         , 'V_10_MOD',   .false.   , .true. , 'yearly'  , 'weights_core_orca2_bicubic_noc.nc'  , 'Vwnd'   , ''
-   sn_qsr      = 'ncar_rad.15JUNE2009_fill'   ,   24         , 'SWDN_MOD',   .false.   , .true. , 'yearly'  , 'weights_core_orca2_bilinear_noc.nc' , ''       , ''
-   sn_qlw      = 'ncar_rad.15JUNE2009_fill'   ,   24         , 'LWDN_MOD',   .false.   , .true. , 'yearly'  , 'weights_core_orca2_bilinear_noc.nc' , ''       , ''
-   sn_tair     = 't_10.15JUNE2009_fill'       ,    6         , 'T_10_MOD',   .false.   , .true. , 'yearly'  , 'weights_core_orca2_bilinear_noc.nc' , ''       , ''
-   sn_humi     = 'q_10.15JUNE2009_fill'       ,    6         , 'Q_10_MOD',   .false.   , .true. , 'yearly'  , 'weights_core_orca2_bilinear_noc.nc' , ''       , ''
-   sn_prec     = 'ncar_precip.15JUNE2009_fill',   -1         , 'PRC_MOD1',   .false.   , .true. , 'yearly'  , 'weights_core_orca2_bilinear_noc.nc' , ''       , ''
-   sn_snow     = 'ncar_precip.15JUNE2009_fill',   -1         , 'SNOW'    ,   .false.   , .true. , 'yearly'  , 'weights_core_orca2_bilinear_noc.nc' , ''       , ''
-   sn_slp      = 'slp.15JUNE2009_fill'        ,    6         , 'SLP'     ,   .false.   , .true. , 'yearly'  , 'weights_core_orca2_bilinear_noc.nc' , ''       , ''
-   sn_tdif     = 'taudif_core'                ,   24         , 'taudif'  ,   .false.   , .true. , 'yearly'  , 'weights_core_orca2_bilinear_noc.nc' , ''       , ''
+   sn_wndi     = 'u_10.15JUNE2009_fill'       ,    6.        , 'U_10_MOD',   .false.   , .true. , 'yearly'  , 'weights_core_orca2_bicubic_noc.nc'  , 'Uwnd'   , ''
+   sn_wndj     = 'v_10.15JUNE2009_fill'       ,    6.        , 'V_10_MOD',   .false.   , .true. , 'yearly'  , 'weights_core_orca2_bicubic_noc.nc'  , 'Vwnd'   , ''
+   sn_qsr      = 'ncar_rad.15JUNE2009_fill'   ,   24.        , 'SWDN_MOD',   .false.   , .true. , 'yearly'  , 'weights_core_orca2_bilinear_noc.nc' , ''       , ''
+   sn_qlw      = 'ncar_rad.15JUNE2009_fill'   ,   24.        , 'LWDN_MOD',   .false.   , .true. , 'yearly'  , 'weights_core_orca2_bilinear_noc.nc' , ''       , ''
+   sn_tair     = 't_10.15JUNE2009_fill'       ,    6.        , 'T_10_MOD',   .false.   , .true. , 'yearly'  , 'weights_core_orca2_bilinear_noc.nc' , ''       , ''
+   sn_humi     = 'q_10.15JUNE2009_fill'       ,    6.        , 'Q_10_MOD',   .false.   , .true. , 'yearly'  , 'weights_core_orca2_bilinear_noc.nc' , ''       , ''
+   sn_prec     = 'ncar_precip.15JUNE2009_fill',   -1.        , 'PRC_MOD1',   .false.   , .true. , 'yearly'  , 'weights_core_orca2_bilinear_noc.nc' , ''       , ''
+   sn_snow     = 'ncar_precip.15JUNE2009_fill',   -1.        , 'SNOW'    ,   .false.   , .true. , 'yearly'  , 'weights_core_orca2_bilinear_noc.nc' , ''       , ''
+   sn_slp      = 'slp.15JUNE2009_fill'        ,    6.        , 'SLP'     ,   .false.   , .true. , 'yearly'  , 'weights_core_orca2_bilinear_noc.nc' , ''       , ''
 /
 !-----------------------------------------------------------------------
 &namtra_qsr    !   penetrative solar radiation                          (ln_traqsr =T)
@@ -121,7 +139,7 @@
    !___________!_________________________!___________________!___________!_____________!________!___________!__________________!__________!_______________!
    !           !  file name              ! frequency (hours) ! variable  ! time interp.!  clim  ! 'yearly'/ ! weights filename ! rotation ! land/sea mask !
    !           !                         !  (if <0  months)  !   name    !   (logical) !  (T/F) ! 'monthly' !                  ! pairing  !    filename   !
-   sn_chl      ='chlorophyll'            ,        -1         , 'CHLA'    ,   .true.    , .true. , 'yearly'  , ''               , ''       , ''
+   sn_chl      ='chlorophyll'            ,        -1.        , 'CHLA'    ,   .true.    , .true. , 'yearly'  , ''               , ''       , ''
 /
 !-----------------------------------------------------------------------
 &namsbc_rnf    !   runoffs                                              (ln_rnf =T)
@@ -134,11 +152,11 @@
    !___________!_____________!___________________!___________!_____________!_________!___________!__________!__________!_______________!
    !           !  file name  ! frequency (hours) ! variable  ! time interp. !  clim  ! 'yearly'/ ! weights  ! rotation ! land/sea mask !
    !           !             !  (if <0  months)  !   name    !   (logical)  !  (T/F) ! 'monthly' ! filename ! pairing  ! filename      !
-   sn_rnf      = 'runoff_core_monthly',    -1    , 'sorunoff',   .true.     , .true. , 'yearly'  , ''       , ''       , ''
-   sn_cnf      = 'runoff_core_monthly',     0    , 'socoefr0',   .false.    , .true. , 'yearly'  , ''       , ''       , ''
-   sn_s_rnf    = 'runoffs'            ,    24    , 'rosaline',   .true.     , .true. , 'yearly'  , ''       , ''       , ''
-   sn_t_rnf    = 'runoffs'            ,    24    , 'rotemper',   .true.     , .true. , 'yearly'  , ''       , ''       , ''
-   sn_dep_rnf  = 'runoffs'            ,     0    , 'rodepth' ,   .false.    , .true. , 'yearly'  , ''       , ''       , ''
+   sn_rnf      = 'runoff_core_monthly',    -1.   , 'sorunoff',   .true.     , .true. , 'yearly'  , ''       , ''       , ''
+   sn_cnf      = 'runoff_core_monthly',     0.   , 'socoefr0',   .false.    , .true. , 'yearly'  , ''       , ''       , ''
+   sn_s_rnf    = 'runoffs'            ,    24.   , 'rosaline',   .true.     , .true. , 'yearly'  , ''       , ''       , ''
+   sn_t_rnf    = 'runoffs'            ,    24.   , 'rotemper',   .true.     , .true. , 'yearly'  , ''       , ''       , ''
+   sn_dep_rnf  = 'runoffs'            ,     0.   , 'rodepth' ,   .false.    , .true. , 'yearly'  , ''       , ''       , ''
 /
 !-----------------------------------------------------------------------
 &namsbc_ssr    !   surface boundary condition : sea surface restoring   (ln_ssr =T)
@@ -362,10 +380,8 @@
 !!   namhsb       Heat and salt budgets                                 (default: OFF)
 !!   namdiu       Cool skin and warm layer models                       (default: OFF)
 !!   namdiu       Cool skin and warm layer models                       (default: OFF)
-!!   namflo       float parameters                                      ("key_float")
-!!   nam_diaharm  Harmonic analysis of tidal constituents               ("key_diaharm")
-!!   namdct       transports through some sections                      ("key_diadct")
-!!   nam_diatmb   Top Middle Bottom Output                              (default: OFF)
+!!   namflo       float parameters                                      (default: OFF)
+!!   nam_diadct   transports through some sections                      (default: OFF)
 !!   nam_dia25h   25h Mean Output                                       (default: OFF)
 !!   namnc4       netcdf4 chunking and compression settings             ("key_netcdf4")
 !!======================================================================

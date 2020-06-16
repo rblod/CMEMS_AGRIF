@@ -25,12 +25,12 @@ MODULE trcini_c14
 
    !!----------------------------------------------------------------------
    !! NEMO/TOP 4.0 , NEMO Consortium (2018)
-   !! $Id: trcini_c14.F90 10069 2018-08-28 14:12:24Z nicolasmartin $ 
+   !! $Id: trcini_c14.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE trc_ini_c14
+   SUBROUTINE trc_ini_c14( Kmm )
       !!----------------------------------------------------------------------
       !!                     ***  trc_ini_c14  ***  
       !!
@@ -39,6 +39,7 @@ CONTAINS
       !! ** Method  : 
       !!----------------------------------------------------------------------
       !
+      INTEGER, INTENT(in)  ::  Kmm  ! time level indices
       REAL(wp) :: ztrai
       INTEGER  :: jn
       CHARACTER(len = 20)  ::  cltra
@@ -56,7 +57,7 @@ CONTAINS
          IF(lwp) WRITE(numout,*) '                      ==>    PRESCRIBED initial VALUES'
          IF(lwp) WRITE(numout,*) '                      ==>    Ocean C14/C :', rc14init 
          !
-         trn(:,:,:,jp_c14) = rc14init * tmask(:,:,:)
+         tr(:,:,:,jp_c14,Kmm) = rc14init * tmask(:,:,:)
          !
          qtr_c14(:,:) = 0._wp           ! Init of air-sea BC
          !

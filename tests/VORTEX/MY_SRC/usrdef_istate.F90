@@ -27,9 +27,11 @@ MODULE usrdef_istate
 
    PUBLIC   usr_def_istate   ! called by istate.F90
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: usrdef_istate.F90 10425 2018-12-19 21:54:16Z smasson $ 
+   !! $Id: usrdef_istate.F90 12740 2020-04-12 09:03:06Z smasson $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -68,75 +70,66 @@ CONTAINS
       zn2 = 3.e-3**2
       zH = 0.5_wp * 5000._wp
       !
-      zP0 = rau0 * zf0 * zumax * zlambda * SQRT(EXP(1._wp)/2._wp)
+      zP0 = rho0 * zf0 * zumax * zlambda * SQRT(EXP(1._wp)/2._wp)
       !
       ! Sea level:
       za = -zP0 * (1._wp-EXP(-zH)) / (grav*(zH-1._wp + EXP(-zH)))
-      DO ji=1, jpi
-         DO jj=1, jpj
-            zx = glamt(ji,jj) * 1.e3
-            zy = gphit(ji,jj) * 1.e3
-            zrho1 = rau0 + za * EXP(-(zx**2+zy**2)/zlambda**2)
-            pssh(ji,jj) = zP0 * EXP(-(zx**2+zy**2)/zlambda**2)/(zrho1*grav) * ptmask(ji,jj,1)
-         END DO
-      END DO
+      DO_2D_11_11
+         zx = glamt(ji,jj) * 1.e3
+         zy = gphit(ji,jj) * 1.e3
+         zrho1 = rho0 + za * EXP(-(zx**2+zy**2)/zlambda**2)
+         pssh(ji,jj) = zP0 * EXP(-(zx**2+zy**2)/zlambda**2)/(zrho1*grav) * ptmask(ji,jj,1)
+      END_2D
       !
       ! temperature:         
-      DO ji=1, jpi
-         DO jj=1, jpj
-            zx = glamt(ji,jj) * 1.e3
-            zy = gphit(ji,jj) * 1.e3
-            DO jk=1,jpk
-               zdt =  pdept(ji,jj,jk) 
-               zrho1 = rau0 * (1._wp + zn2*zdt/grav)
-               IF (zdt < zH) THEN
-                  zrho1 = zrho1 - zP0 * (1._wp-EXP(zdt-zH)) &
-                          & * EXP(-(zx**2+zy**2)/zlambda**2) / (grav*(zH -1._wp + exp(-zH)));
-               ENDIF
-               pts(ji,jj,jk,jp_tem) = (20._wp + (rau0-zrho1) / 0.28_wp) * ptmask(ji,jj,jk)
-            END DO
+      DO_2D_11_11
+         zx = glamt(ji,jj) * 1.e3
+         zy = gphit(ji,jj) * 1.e3
+         DO jk=1,jpk
+            zdt =  pdept(ji,jj,jk) 
+            zrho1 = rho0 * (1._wp + zn2*zdt/grav)
+            IF (zdt < zH) THEN
+               zrho1 = zrho1 - zP0 * (1._wp-EXP(zdt-zH)) &
+                  & * EXP(-(zx**2+zy**2)/zlambda**2) / (grav*(zH -1._wp + EXP(-zH)));
+            ENDIF
+            pts(ji,jj,jk,jp_tem) = (20._wp + (rho0-zrho1) / 0.28_wp) * ptmask(ji,jj,jk)
          END DO
-      END DO
+      END_2D
       !
       ! salinity:  
       pts(:,:,:,jp_sal) = 35._wp 
       !
       ! velocities:
-      za = 2._wp * zP0 / (zf0 * rau0 * zlambda**2)
-      DO ji=1, jpim1
-         DO jj=1, jpj
-            zx = glamu(ji,jj) * 1.e3
-            zy = gphiu(ji,jj) * 1.e3
-            DO jk=1, jpk
-               zdu = 0.5_wp * (pdept(ji  ,jj,jk) + pdept(ji+1,jj,jk))
-               IF (zdu < zH) THEN
-                  zf = (zH-1._wp-zdu+EXP(zdu-zH)) / (zH-1._wp+EXP(-zH))
-                  pu(ji,jj,jk) = (za * zf * zy * EXP(-(zx**2+zy**2)/zlambda**2)) * ptmask(ji,jj,jk) * ptmask(ji+1,jj,jk)
-               ELSE
-                  pu(ji,jj,jk) = 0._wp
-               ENDIF
-            END DO
+      za = 2._wp * zP0 / (zf0 * rho0 * zlambda**2)
+      DO_2D_00_00
+         zx = glamu(ji,jj) * 1.e3
+         zy = gphiu(ji,jj) * 1.e3
+         DO jk=1, jpk
+            zdu = 0.5_wp * (pdept(ji  ,jj,jk) + pdept(ji+1,jj,jk))
+            IF (zdu < zH) THEN
+               zf = (zH-1._wp-zdu+EXP(zdu-zH)) / (zH-1._wp+EXP(-zH))
+               pu(ji,jj,jk) = (za * zf * zy * EXP(-(zx**2+zy**2)/zlambda**2)) * ptmask(ji,jj,jk) * ptmask(ji+1,jj,jk)
+            ELSE
+               pu(ji,jj,jk) = 0._wp
+            ENDIF
          END DO
-      END DO
+      END_2D
       !
-      DO ji=1, jpi
-         DO jj=1, jpjm1
-            zx = glamv(ji,jj) * 1.e3
-            zy = gphiv(ji,jj) * 1.e3
-            DO jk=1, jpk
-               zdv = 0.5_wp * (pdept(ji  ,jj,jk) + pdept(ji,jj+1,jk))
-               IF (zdv < zH) THEN
-                  zf = (zH-1._wp-zdv+EXP(zdv-zH)) / (zH-1._wp+EXP(-zH))
-                  pv(ji,jj,jk) = -(za * zf * zx * EXP(-(zx**2+zy**2)/zlambda**2)) * ptmask(ji,jj,jk) * ptmask(ji,jj+1,jk)
-               ELSE
-                  pv(ji,jj,jk) = 0._wp
-               ENDIF
-            END DO
+      DO_2D_00_00
+         zx = glamv(ji,jj) * 1.e3
+         zy = gphiv(ji,jj) * 1.e3
+         DO jk=1, jpk
+            zdv = 0.5_wp * (pdept(ji  ,jj,jk) + pdept(ji,jj+1,jk))
+            IF (zdv < zH) THEN
+               zf = (zH-1._wp-zdv+EXP(zdv-zH)) / (zH-1._wp+EXP(-zH))
+               pv(ji,jj,jk) = -(za * zf * zx * EXP(-(zx**2+zy**2)/zlambda**2)) * ptmask(ji,jj,jk) * ptmask(ji,jj+1,jk)
+            ELSE
+               pv(ji,jj,jk) = 0._wp
+            ENDIF
          END DO
-      END DO
-
-      CALL lbc_lnk( 'usrdef_istate', pu, 'U', -1. )
-      CALL lbc_lnk( 'usrdef_istate', pv, 'V', -1. )
+      END_2D
+      !
+      CALL lbc_lnk_multi( 'usrdef_istate', pu, 'U', -1., pv, 'V', -1. )
       !   
    END SUBROUTINE usr_def_istate
 

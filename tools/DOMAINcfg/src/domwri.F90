@@ -153,14 +153,18 @@ CONTAINS
       CALL iom_rstput( 0, 0, inum, 'ff_f', ff_f, ktype = jp_r8 )       !    ! coriolis factor
       CALL iom_rstput( 0, 0, inum, 'ff_t', ff_t, ktype = jp_r8 )
       
-      ! note that mbkt is set to 1 over land ==> use surface tmask
+      ! note that mbkt and mikt is set to 1 over land ==> use surface tmask
       zprt(:,:) = ssmask(:,:) * REAL( mbkt(:,:) , wp )
-      CALL iom_rstput( 0, 0, inum, 'mbathy', zprt, ktype = jp_i4 )     !    ! nb of ocean T-points
+      CALL iom_rstput( 0, 0, inum, 'mbathy', zprt, ktype = jp_i4 )                              !    ! nb of ocean T-points
+      CALL iom_rstput( 0, 0, inum, 'bathy_metry', bathy(:,:)   * ssmask(:,:), ktype = jp_r8 )   !    ! bathymetry
       zprt(:,:) = ssmask(:,:) * REAL( mikt(:,:) , wp )
-      CALL iom_rstput( 0, 0, inum, 'misf', zprt, ktype = jp_i4 )       !    ! nb of ocean T-points
-      zprt(:,:) = ssmask(:,:) * REAL( risfdep(:,:) , wp )
-      CALL iom_rstput( 0, 0, inum, 'isfdraft', zprt, ktype = jp_r8 )   !    ! nb of ocean T-points
-      !															             ! vertical mesh
+      CALL iom_rstput( 0, 0, inum, 'misf', zprt, ktype = jp_i4 )                                !    ! first wet level
+      CALL iom_rstput( 0, 0, inum, 'isfdraft'   , risfdep(:,:) * ssmask(:,:), ktype = jp_r8 )   !    ! ice shelf draft
+      zprt(:,:) = ssmask(:,:) * REAL( mbkt(:,:) - mikt(:,:) + 1, wp )
+      CALL iom_rstput( 0, 0, inum, 'mhw',zprt, ktype = jp_i4 )
+      CALL iom_rstput( 0, 0, inum, 'hw' ,(bathy-risfdep)*ssmask, ktype = jp_r8 )
+
+      !		             ! vertical mesh
       CALL iom_rstput( 0, 0, inum, 'e3t_0', e3t_0, ktype = jp_r8  )    !    ! scale factors
       CALL iom_rstput( 0, 0, inum, 'e3u_0', e3u_0, ktype = jp_r8  )
       CALL iom_rstput( 0, 0, inum, 'e3v_0', e3v_0, ktype = jp_r8  )
@@ -176,8 +180,6 @@ CONTAINS
          CALL iom_rstput( 0, 0, inum, 'stiffness', zprt )       ! Max. grid stiffness ratio
       ENDIF
       !
-   !   IF( ll_wd ) CALL iom_rstput( 0, 0, inum, 'ht_0'   , ht_0   , ktype = jp_r8 )
-
       !                                     ! ============================
       CALL iom_close( inum )                !        close the files 
       !                                     ! ============================

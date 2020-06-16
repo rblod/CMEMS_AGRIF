@@ -37,10 +37,10 @@ MODULE sbcflx
    TYPE(FLD), ALLOCATABLE, DIMENSION(:) ::   sf    ! structure of input fields (file informations, fields read)
 
    !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: sbcflx.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: sbcflx.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -90,17 +90,15 @@ CONTAINS
       !
       IF( kt == nit000 ) THEN                ! First call kt=nit000  
          ! set file information
-         REWIND( numnam_ref )              ! Namelist namsbc_flx in reference namelist : Files for fluxes
          READ  ( numnam_ref, namsbc_flx, IOSTAT = ios, ERR = 901)
-901      IF( ios /= 0 )   CALL ctl_nam ( ios , 'namsbc_flx in reference namelist', lwp )
+901      IF( ios /= 0 )   CALL ctl_nam ( ios , 'namsbc_flx in reference namelist' )
 
-         REWIND( numnam_cfg )              ! Namelist namsbc_flx in configuration namelist : Files for fluxes
          READ  ( numnam_cfg, namsbc_flx, IOSTAT = ios, ERR = 902 )
-902      IF( ios >  0 )   CALL ctl_nam ( ios , 'namsbc_flx in configuration namelist', lwp )
+902      IF( ios >  0 )   CALL ctl_nam ( ios , 'namsbc_flx in configuration namelist' )
          IF(lwm) WRITE ( numond, namsbc_flx ) 
          !
          !                                         ! check: do we plan to use ln_dm2dc with non-daily forcing?
-         IF( ln_dm2dc .AND. sn_qsr%nfreqh /= 24 )   &
+         IF( ln_dm2dc .AND. sn_qsr%freqh /= 24. )   &
             &   CALL ctl_stop( 'sbc_blk_core: ln_dm2dc can be activated only with daily short-wave forcing' ) 
          !
          !                                         ! store namelist information in an array
@@ -130,14 +128,12 @@ CONTAINS
          IF( ln_dm2dc ) THEN   ;   qsr(:,:) = sbc_dcy( sf(jp_qsr)%fnow(:,:,1) )   ! modify now Qsr to include the diurnal cycle
          ELSE                  ;   qsr(:,:) =          sf(jp_qsr)%fnow(:,:,1)
          ENDIF
-         DO jj = 1, jpj                                           ! set the ocean fluxes from read fields
-            DO ji = 1, jpi
-               utau(ji,jj) = sf(jp_utau)%fnow(ji,jj,1)
-               vtau(ji,jj) = sf(jp_vtau)%fnow(ji,jj,1)
-               qns (ji,jj) = sf(jp_qtot)%fnow(ji,jj,1) - sf(jp_qsr)%fnow(ji,jj,1)
-               emp (ji,jj) = sf(jp_emp )%fnow(ji,jj,1)
-            END DO
-         END DO
+         DO_2D_11_11
+            utau(ji,jj) = sf(jp_utau)%fnow(ji,jj,1)
+            vtau(ji,jj) = sf(jp_vtau)%fnow(ji,jj,1)
+            qns (ji,jj) = sf(jp_qtot)%fnow(ji,jj,1) - sf(jp_qsr)%fnow(ji,jj,1)
+            emp (ji,jj) = sf(jp_emp )%fnow(ji,jj,1)
+         END_2D
          !                                                        ! add to qns the heat due to e-p
          qns(:,:) = qns(:,:) - emp(:,:) * sst_m(:,:) * rcp        ! mass flux is at SST
          !
@@ -146,15 +142,13 @@ CONTAINS
          !
          !                                                        ! module of wind stress and wind speed at T-point
          zcoef = 1. / ( zrhoa * zcdrag )
-         DO jj = 2, jpjm1
-            DO ji = fs_2, fs_jpim1   ! vect. opt.
-               ztx = utau(ji-1,jj  ) + utau(ji,jj) 
-               zty = vtau(ji  ,jj-1) + vtau(ji,jj) 
-               zmod = 0.5 * SQRT( ztx * ztx + zty * zty )
-               taum(ji,jj) = zmod
-               wndm(ji,jj) = SQRT( zmod * zcoef )
-            END DO
-         END DO
+         DO_2D_00_00
+            ztx = utau(ji-1,jj  ) + utau(ji,jj) 
+            zty = vtau(ji  ,jj-1) + vtau(ji,jj) 
+            zmod = 0.5 * SQRT( ztx * ztx + zty * zty )
+            taum(ji,jj) = zmod
+            wndm(ji,jj) = SQRT( zmod * zcoef )
+         END_2D
          taum(:,:) = taum(:,:) * tmask(:,:,1) ; wndm(:,:) = wndm(:,:) * tmask(:,:,1)
          CALL lbc_lnk( 'sbcflx', taum(:,:), 'T', 1. )   ;   CALL lbc_lnk( 'sbcflx', wndm(:,:), 'T', 1. )
 

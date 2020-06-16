@@ -2,8 +2,6 @@
 ! NEMO system team, System and Interface for oceanic RElocable Nesting
 !----------------------------------------------------------------------
 !
-! MODULE: iom
-!
 ! DESCRIPTION:
 !> @brief Input/Output manager :  Library to read input files
 !>
@@ -79,16 +77,19 @@
 !>
 !> @author
 !> J.Paul
-! REVISION HISTORY:
+!>
 !> @date November, 2013 - Initial Version
+!> @date August, 2017
+!> - permit to write header and variable independantly
 !>
 !> @todo
 !> - see lbc_lnk
 !> - see goup netcdf4
 !>
-!> @note Software governed by the CeCILL licence     (./LICENSE)
+!> @note Software governed by the CeCILL licence     (NEMOGCM/NEMO_CeCILL.txt)
 !----------------------------------------------------------------------
 MODULE iom
+
    USE netcdf                          ! nf90 library
    USE global                          ! global parameter
    USE kind                            ! F90 kind parameter
@@ -100,6 +101,7 @@ MODULE iom
    USE file                            ! file manager
    USE iom_cdf                         ! netcdf I/O manager
    USE iom_rstdimg                     ! restart dimg I/O manager
+
    IMPLICIT NONE
    ! NOTE_avoid_public_variables_if_possible
 
@@ -111,6 +113,8 @@ MODULE iom
    PUBLIC :: iom_read_att    !< read one attribute in an opened file
    PUBLIC :: iom_read_var    !< read one variable  in an opened file   
    PUBLIC :: iom_write_file  !< write file structure contents in an opened file
+   PUBLIC :: iom_write_header!< write header in an opened file
+   PUBLIC :: iom_write_var   !< write variable an opened file
 
                                           ! read variable or global attribute in an opened file
    PRIVATE :: iom__read_att_varname_id   ! given variable name or standard name and attribute id.
@@ -141,6 +145,8 @@ MODULE iom
    END INTERFACE iom_read_att
 
 CONTAINS
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_open(td_file)
    !-------------------------------------------------------------------
    !> @brief This function open a file in read or write mode
    !> @details
@@ -159,8 +165,9 @@ CONTAINS
    !>
    !> @param[inout] td_file file structure
    !-------------------------------------------------------------------
-   SUBROUTINE iom_open(td_file)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TFILE), INTENT(INOUT)  :: td_file
       !----------------------------------------------------------------
@@ -173,6 +180,7 @@ CONTAINS
 
          CASE('cdf')
             CALL iom_cdf_open(td_file)
+         !CASE('cdf4')
          CASE('dimg')
             CALL iom_rstdimg_open(td_file)
          CASE DEFAULT
@@ -181,16 +189,19 @@ CONTAINS
       END SELECT
 
    END SUBROUTINE iom_open
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_create(td_file)
    !-------------------------------------------------------------------
-   !> @brief This function create a file.
+   !> @brief This subroutine create a file.
    !> 
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] td_file file structure
    !-------------------------------------------------------------------
-   SUBROUTINE iom_create(td_file)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TFILE), INTENT(INOUT)  :: td_file
 
@@ -218,16 +229,19 @@ CONTAINS
       END SELECT
 
    END SUBROUTINE iom_create
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_close(td_file)
    !-------------------------------------------------------------------
    !> @brief This subroutine close file
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] td_file file structure
    !-------------------------------------------------------------------
-   SUBROUTINE iom_close(td_file)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TFILE), INTENT(INOUT) :: td_file
       !----------------------------------------------------------------
@@ -239,33 +253,40 @@ CONTAINS
          CASE('dimg')
             CALL iom_rstdimg_close(td_file)
          CASE DEFAULT
+            CALL logger_debug( "IOM CLOSE: type "//TRIM(td_file%c_type))
             CALL logger_error( "IOM CLOSE: can't close file "//&
             &               TRIM(td_file%c_name)//": type unknown " )
       END SELECT
 
    END SUBROUTINE iom_close
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION iom__read_att_varname_id(td_file, cd_varname, id_attid) &
+         & RESULT (tf_att)
    !-------------------------------------------------------------------
    !> @brief This function read attribute (of variable or global) in an opened 
    !> file, given variable name or standard name and attribute id.
    !> @details
    !>  - to get global attribute use 'GLOBAL' as variable name. 
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] td_file      file structure
    !> @param[in] cd_varname   variable name. use 'GLOBAL' to read global 
    !> attribute in a file
    !> @param[in] id_attid     attribute id
    !> @return  attribute structure 
    !-------------------------------------------------------------------
-   TYPE(TATT) FUNCTION iom__read_att_varname_id( td_file, cd_varname, &
-   &                                             id_attid)
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TFILE),       INTENT(IN) :: td_file
       CHARACTER(LEN=lc), INTENT(IN) :: cd_varname
       INTEGER(i4),       INTENT(IN) :: id_attid
+
+      ! function
+      TYPE(TATT)                    :: tf_att
 
       ! local variable
       INTEGER(i4) :: il_varid
@@ -282,8 +303,7 @@ CONTAINS
          ! open file
          SELECT CASE(TRIM(td_file%c_type))
             CASE('cdf')
-               iom__read_att_varname_id=iom_read_att( td_file, il_varid, &
-               &                                       id_attid)
+               tf_att=iom_read_att( td_file, il_varid, id_attid)
             CASE('dimg')
                CALL logger_warn( " IOM READ ATT: can't read attribute "//&
                &              "in dimg file : "//TRIM(td_file%c_name) )
@@ -294,33 +314,38 @@ CONTAINS
       ENDIF
 
    END FUNCTION iom__read_att_varname_id
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION iom__read_att_varid_id(td_file, id_varid, id_attid) &
+         & RESULT (tf_att)
    !-------------------------------------------------------------------
    !> @brief This function read attribute (of variable or global) in an opened 
    !> file, given variable id and attribute id.
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] td_file   file structure
    !> @param[in] id_varid  variable id. use NF90_GLOBAL to read global 
    !> attribute in a file
    !> @param[in] id_attid  attribute id
    !> @return  attribute structure 
    !-------------------------------------------------------------------
-   TYPE(TATT) FUNCTION iom__read_att_varid_id( td_file, id_varid, &
-   &                                            id_attid)
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TFILE), INTENT(IN) :: td_file
       INTEGER(i4), INTENT(IN) :: id_varid
       INTEGER(i4), INTENT(IN) :: id_attid
+
+      ! function
+      TYPE(TATT)              :: tf_att
       !----------------------------------------------------------------
 
       ! open file
       SELECT CASE(TRIM(td_file%c_type))
          CASE('cdf')
-            iom__read_att_varid_id=iom_cdf_read_att( td_file, id_varid, &
-            &                                         id_attid)
+            tf_att=iom_cdf_read_att(td_file, id_varid, id_attid)
          CASE('dimg')
             CALL logger_warn( " IOM READ ATT: can't read attribute in dimg file "//&
             &              TRIM(td_file%c_name) )
@@ -330,28 +355,34 @@ CONTAINS
       END SELECT
 
    END FUNCTION iom__read_att_varid_id
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION iom__read_att_varname_name(td_file, cd_varname, cd_attname) &
+         & RESULT (tf_att)
    !-------------------------------------------------------------------
    !> @brief This function read attribute (of variable or global) in an opened 
    !> file, given variable name or standard name, and attribute name.
    !> @details
    !> - to get global attribute use 'GLOBAL' as variable name.
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] td_file      file structure
    !> @param[in] cd_varname   variable name or standard name. use 'GLOBAL' to read global
    !> attribute in a file
    !> @param[in] cd_attname   attribute name
    !> @return  attribute structure    
    !-------------------------------------------------------------------
-   TYPE(TATT) FUNCTION iom__read_att_varname_name( td_file, cd_varname, &
-   &                                                cd_attname)
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TFILE),      INTENT(IN) :: td_file
       CHARACTER(LEN=*), INTENT(IN) :: cd_varname
       CHARACTER(LEN=*), INTENT(IN) :: cd_attname
+
+      ! function
+      TYPE(TATT)                   :: tf_att
 
       ! local variable
       INTEGER(i4) :: il_varid
@@ -368,8 +399,7 @@ CONTAINS
          ! open file
          SELECT CASE(TRIM(td_file%c_type))
             CASE('cdf')
-               iom__read_att_varname_name=iom_cdf_read_att( td_file, il_varid, &
-               &                                             cd_attname)
+               tf_att=iom_cdf_read_att(td_file, il_varid, cd_attname)
             CASE('dimg')
                CALL logger_warn( " IOM READ ATT: can't read attribute "//&
                &              "in dimg file :"//TRIM(td_file%c_name) )
@@ -380,33 +410,38 @@ CONTAINS
       ENDIF
 
    END FUNCTION iom__read_att_varname_name
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION iom__read_att_varid_name(td_file, id_varid, cd_attname) &
+         & RESULT (tf_att)
    !-------------------------------------------------------------------
    !> @brief This function read attribute (of variable or global) in an opened 
    !> file, given variable id and attribute name.
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] td_file      file structure
    !> @param[in] id_varid     variable id. use NF90_GLOBAL to read global
    !> attribute in a file
    !> @param[in] cd_attname   attribute name
    !> @return  attribute structure    
    !-------------------------------------------------------------------
-   TYPE(TATT) FUNCTION iom__read_att_varid_name( td_file, id_varid, &
-   &                                              cd_attname)
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TFILE), INTENT(IN) :: td_file
       INTEGER(i4), INTENT(IN) :: id_varid
       CHARACTER(LEN=*), INTENT(IN) :: cd_attname
+
+      ! function
+      TYPE(TATT)              :: tf_att
       !----------------------------------------------------------------
 
       ! open file
       SELECT CASE(TRIM(td_file%c_type))
          CASE('cdf')
-            iom__read_att_varid_name=iom_cdf_read_att( td_file, id_varid, &
-            &                                           cd_attname)
+            tf_att=iom_cdf_read_att(td_file, id_varid, cd_attname)
          CASE('dimg')
             CALL logger_warn( " IOM READ ATT: can't read attribute in dimg file :"&
             &              //TRIM(td_file%c_name) )
@@ -416,76 +451,93 @@ CONTAINS
       END SELECT
 
    END FUNCTION iom__read_att_varid_name
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION iom__read_dim_id(td_file, id_dimid) &
+         & RESULT (tf_dim)
    !-------------------------------------------------------------------
    !> @brief This function read one dimension in an opened file, 
    !> given dimension id.
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] td_file   file structure
    !> @param[in] id_dimid  dimension id
    !> @return  dimension structure 
    !-------------------------------------------------------------------
-   TYPE(TDIM) FUNCTION iom__read_dim_id(td_file, id_dimid)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TFILE), INTENT(IN) :: td_file
       INTEGER(i4), INTENT(IN) :: id_dimid
+
+      ! function
+      TYPE(TDIM)              :: tf_dim
       !----------------------------------------------------------------
 
       ! open file
       SELECT CASE(TRIM(td_file%c_type))
          CASE('cdf')
-            iom__read_dim_id=iom_cdf_read_dim(td_file, id_dimid)
+            tf_dim=iom_cdf_read_dim(td_file, id_dimid)
          CASE('dimg')
-            iom__read_dim_id=iom_rstdimg_read_dim(td_file, id_dimid)
+            tf_dim=iom_rstdimg_read_dim(td_file, id_dimid)
          CASE DEFAULT
             CALL logger_error( " IOM READ DIM: can't read dimension in file "//&
             &               TRIM(td_file%c_name)//" : type unknown " )
       END SELECT      
 
    END FUNCTION iom__read_dim_id
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION iom__read_dim_name(td_file, cd_name) &
+         & RESULT(tf_dim)
    !-------------------------------------------------------------------
    !> @brief This function read one dimension in an opened netcdf file, 
    !> given dimension name.
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] td_file   file structure
    !> @param[in] cd_name   dimension name
    !> @return  dimension structure 
    !-------------------------------------------------------------------
-   TYPE(TDIM) FUNCTION iom__read_dim_name(td_file, cd_name)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TFILE),      INTENT(IN) :: td_file
       CHARACTER(LEN=*), INTENT(IN) :: cd_name
+
+      ! function
+      TYPE(TDIM)                   :: tf_dim
       !----------------------------------------------------------------
 
       ! open file
       SELECT CASE(TRIM(td_file%c_type))
          CASE('cdf')
-            iom__read_dim_name=iom_cdf_read_dim(td_file, cd_name)
+            tf_dim=iom_cdf_read_dim(td_file, cd_name)
          CASE('dimg')
-            iom__read_dim_name=iom_rstdimg_read_dim(td_file, cd_name)
+            tf_dim=iom_rstdimg_read_dim(td_file, cd_name)
          CASE DEFAULT
             CALL logger_error( " IOM READ DIM: can't read dimension in file "//&
             &               TRIM(td_file%c_name)//" : type unknown " )
       END SELECT      
 
    END FUNCTION iom__read_dim_name
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION iom__read_var_id(td_file, id_varid, id_start, id_count) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function read variable value in an opened 
    !> file, given variable id.
    !> @details
    !> start indices and number of indices selected along each dimension 
    !> could be specify in a 4 dimension array (/'x','y','z','t'/)
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] td_file   file structure
    !> @param[in] id_varid  variable id
    !> @param[in] id_start  index in the variable from which the data values 
@@ -493,30 +545,34 @@ CONTAINS
    !> @param[in] id_count  number of indices selected along each dimension
    !> @return  variable structure 
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION iom__read_var_id( td_file, id_varid,&
-   &                                     id_start, id_count)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TFILE),                       INTENT(IN) :: td_file
       INTEGER(i4),                       INTENT(IN) :: id_varid
       INTEGER(i4), DIMENSION(ip_maxdim), INTENT(IN), OPTIONAL :: id_start
       INTEGER(i4), DIMENSION(ip_maxdim), INTENT(IN), OPTIONAL :: id_count
+
+      ! function
+      TYPE(TVAR)                                    :: tf_var
       !----------------------------------------------------------------
 
       ! open file
       SELECT CASE(TRIM(td_file%c_type))
          CASE('cdf')
-            iom__read_var_id=iom_cdf_read_var(td_file, id_varid, &
-            &                                 id_start, id_count)
+            tf_var=iom_cdf_read_var(td_file, id_varid, id_start, id_count)
          CASE('dimg')
-            iom__read_var_id=iom_rstdimg_read_var(td_file, id_varid, &
-            &                                     id_start, id_count)
+            tf_var=iom_rstdimg_read_var(td_file, id_varid, id_start, id_count)
          CASE DEFAULT
             CALL logger_error( " IOM READ VAR: can't read variable in file "//&
             &               TRIM(td_file%c_name)//" : type unknown " )
       END SELECT
 
    END FUNCTION iom__read_var_id
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION iom__read_var_name(td_file, cd_name, id_start, id_count) &
+      & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function read variable value in an opened 
    !> file, given variable name or standard name.
@@ -526,10 +582,10 @@ CONTAINS
    !>
    !> look first for variable name. If it doesn't
    !> exist in file, look for variable standard name.<br/>
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] td_file   file structure
    !> @param[in] cd_name   variable name or standard name
    !> @param[in] id_start  index in the variable from which the data values
@@ -537,30 +593,33 @@ CONTAINS
    !> @param[in] id_count  number of indices selected along each dimension
    !> @return  variable structure 
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION iom__read_var_name(td_file, cd_name,   &
-   &                                      id_start, id_count  )
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TFILE)                   , INTENT(IN) :: td_file
       CHARACTER(LEN=*)              , INTENT(IN) :: cd_name
       INTEGER(i4)     , DIMENSION(:), INTENT(IN), OPTIONAL :: id_start
       INTEGER(i4)     , DIMENSION(:), INTENT(IN), OPTIONAL :: id_count
+
+      ! function
+      TYPE(TVAR)                                 :: tf_var
       !----------------------------------------------------------------
       
       ! open file
       SELECT CASE(TRIM(td_file%c_type))
          CASE('cdf')
-            iom__read_var_name=iom_cdf_read_var(td_file, cd_name, &
-            &                                   id_start, id_count )
+            tf_var=iom_cdf_read_var(td_file, cd_name, id_start, id_count )
          CASE('dimg')
-            iom__read_var_name=iom_rstdimg_read_var(td_file, cd_name, &
-            &                                   id_start, id_count )
+            tf_var=iom_rstdimg_read_var(td_file, cd_name, id_start, id_count )
          CASE DEFAULT
             CALL logger_error( " IOM READ VAR: can't read variable in file "//&
             &               TRIM(td_file%c_name)//" : type unknown " )
       END SELECT
 
    END FUNCTION iom__read_var_name
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_write_file(td_file, cd_dimorder)
    !-------------------------------------------------------------------
    !> @brief This subroutine write file structure in an opened file.
    !>
@@ -570,28 +629,105 @@ CONTAINS
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date July, 2015 - add dimension order option
-   !
+   !> @date August, 2017
+   !> - split in write_header and write_var
+   !>
    !> @param[in] td_file   file structure
    !-------------------------------------------------------------------
-   SUBROUTINE iom_write_file(td_file, cd_dimorder)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TFILE)     , INTENT(INOUT) :: td_file
       CHARACTER(LEN=*), INTENT(IN   ), OPTIONAL :: cd_dimorder
       !----------------------------------------------------------------
 
+      CALL iom_write_header(td_file, cd_dimorder)
+
+      CALL iom_write_var(td_file)
+
+   END SUBROUTINE iom_write_file
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_write_header(td_file, cd_dimorder, td_dim)
+   !-------------------------------------------------------------------
+   !> @brief This subroutine write header from file structure
+   !> of an opened file.
+   !>
+   !> @details
+   !> optionally, you could specify dimension order (default 'xyzt'), 
+   !> and dimension structure for netcdf case.
+   !>
+   !> @author J.Paul
+   !> @date August, 2017 - Initial Version
+   !>
+   !> @param[inout] td_file      file structure
+   !> @param[in] cd_dimorder  dimension order
+   !> @param[in] td_dim       array of dimension structure
+   !-------------------------------------------------------------------
+
+      IMPLICIT NONE
+
+      ! Argument      
+      TYPE(TFILE)                           , INTENT(INOUT) :: td_file
+      CHARACTER(LEN=*)                      , INTENT(IN   ), OPTIONAL :: cd_dimorder
+      TYPE(TDIM)      , DIMENSION(ip_maxdim), INTENT(IN   ), OPTIONAL :: td_dim
+      !----------------------------------------------------------------
+
       ! open file
       SELECT CASE(TRIM(td_file%c_type))
          CASE('cdf')
-            CALL iom_cdf_write_file(td_file, cd_dimorder)
+            CALL iom_cdf_write_header(td_file, cd_dimorder, td_dim)
          CASE('dimg')
             ! note: can not change dimension order in restart dimg file
-            CALL iom_rstdimg_write_file(td_file)
+            CALL iom_rstdimg_write_header(td_file)
          CASE DEFAULT
-            CALL logger_error( " IOM WRITE: can't write file "//&
+            CALL logger_error( " IOM WRITE HEADER: can't write header&
+            &                  , file "//TRIM(td_file%c_name)//" : &
+            &                  type unknown " )
+      END SELECT
+
+   END SUBROUTINE iom_write_header
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_write_var(td_file, cd_dimorder, id_start, id_count)
+   !-------------------------------------------------------------------
+   !> @brief This subroutine write variables from file structure 
+   !> in an opened file.
+   !>
+   !> @details
+   !>
+   !> @author J.Paul
+   !> @date August, 2017 - Initial Version
+   !>
+   !> @param[inout] td_file   file structure
+   !> @param[in] cd_dimorder  dimension order
+   !> @param[in] id_start  index in the variable from which the data values
+   !> will be read
+   !> @param[in] id_count  number of indices selected along each dimension
+   !-------------------------------------------------------------------
+
+      IMPLICIT NONE
+
+      ! Argument      
+      TYPE(TFILE)                   , INTENT(INOUT) :: td_file
+      CHARACTER(LEN=*)              , INTENT(IN   ), OPTIONAL :: cd_dimorder
+      INTEGER(i4)     , DIMENSION(:), INTENT(IN   ), OPTIONAL :: id_start
+      INTEGER(i4)     , DIMENSION(:), INTENT(IN   ), OPTIONAL :: id_count
+      !----------------------------------------------------------------
+
+      ! open file
+      SELECT CASE(TRIM(td_file%c_type))
+         CASE('cdf')
+            CALL iom_cdf_write_var(td_file, cd_dimorder, &
+                 &                 id_start, id_count)
+         CASE('dimg')
+            ! note: can not change dimension order in restart dimg file
+            CALL iom_rstdimg_write_var(td_file)
+         CASE DEFAULT
+            CALL logger_error( " IOM WRITE VAR: can't write variable, file "//&
             &               TRIM(td_file%c_name)//" : type unknown " )
       END SELECT
 
-   END SUBROUTINE iom_write_file
+   END SUBROUTINE iom_write_var
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 END MODULE iom
 

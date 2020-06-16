@@ -173,21 +173,42 @@ CONTAINS
        END DO
     END DO
     !
+!!$    IF( partial_steps ) THEN
     ! Compute bathy_level for ocean points (i.e. the number of ocean levels)
     ! find the number of ocean levels such that the last level thickness
     ! is larger than the minimum of e3zps_min and e3zps_rat * e3t (where
     ! e3t is the reference level thickness   
-    !     
     DO jk = N-1, 1, -1
        zdepth = gdepw(jk) + MIN( e3zps_min, e3t(jk)*e3zps_rat )
        DO jj = 1, jpj
           DO ji = 1, jpi
              IF( 0. < Grid%bathy_meter(ji,jj) .AND. Grid%bathy_meter(ji,jj) <= zdepth ) &
-                  Grid%bathy_level(ji,jj) = jk-1
+                Grid%bathy_level(ji,jj) = jk-1
           END DO
        END DO
     END DO
-
+!!$    ELSE
+!!$       DO jj = 1,jpj
+!!$          DO ji = 1,jpi
+!!$             !
+!!$             IF (Grid%bathy_meter(ji,jj) .EQ. 0.0 ) THEN
+!!$                Grid%bathy_level(ji,jj)=0
+!!$             ELSE
+!!$                !	
+!!$                k1=2  ! clem: minimum levels = 2 ???
+!!$                DO WHILE (k1 .LT. (N-1))
+!!$                   IF ((Grid%bathy_meter(ji,jj).GE.gdepw(k1)) &
+!!$                      .AND.(Grid%bathy_meter(ji,jj).LE.gdepw(k1+1))) EXIT
+!!$                   k1=k1+1
+!!$                END DO
+!!$                Grid%bathy_level(ji,jj)=k1
+!!$                !
+!!$             ENDIF
+!!$             !
+!!$          END DO
+!!$       END DO
+!!$
+!!$    ENDIF
 
     CALL bathymetry_control(grid%bathy_level)
     !
@@ -674,7 +695,7 @@ CONTAINS
 
   SUBROUTINE bathymetry_control(mbathy)
 
-    INTEGER ::   i, j, jl           
+    INTEGER ::   ji, jj, jl           
     INTEGER ::   icompt, ibtest, ikmax          
     REAL*8, DIMENSION(:,:) :: mbathy     
 
@@ -691,15 +712,15 @@ CONTAINS
 
     DO jl = 1, 2
        !
-       DO j = 2, SIZE(mbathy,2)-1
-          DO i = 2, SIZE(mbathy,1)-1
+       DO jj = 2, SIZE(mbathy,2)-1
+          DO ji = 2, SIZE(mbathy,1)-1
 
-             ibtest = MAX( mbathy(i-1,j), mbathy(i+1,j),mbathy(i,j-1),mbathy(i,j+1) )
+             ibtest = MAX( mbathy(ji-1,jj), mbathy(ji+1,jj),mbathy(ji,jj-1),mbathy(ji,jj+1) )
              !               
-             IF( ibtest < mbathy(i,j) ) THEN
+             IF( ibtest < mbathy(ji,jj) ) THEN
                 !                  
-                WRITE(*,*) 'grid-point(i,j)= ',i,j,'is changed from',mbathy(i,j),' to ', ibtest
-                mbathy(i,j) = ibtest
+                WRITE(*,*) 'grid-point(i,j)= ',ji,jj,'is changed from',mbathy(ji,jj),' to ', ibtest
+                mbathy(ji,jj) = ibtest
                 icompt = icompt + 1
                 !
              ENDIF
@@ -719,9 +740,9 @@ CONTAINS
     ! Number of ocean level inferior or equal to jpkm1
 
     ikmax = 0
-    DO j = 1, SIZE(mbathy,2)
+    DO jj = 1, SIZE(mbathy,2)
        DO ji = 1, SIZE(mbathy,1)
-          ikmax = MAX( ikmax, NINT(mbathy(i,j)) )
+          ikmax = MAX( ikmax, NINT(mbathy(ji,jj)) )
        END DO
     END DO
     !

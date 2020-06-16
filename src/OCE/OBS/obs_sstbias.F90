@@ -27,7 +27,7 @@ MODULE obs_sstbias
       & gphit, &
       & glamt
    USE oce, ONLY : &           ! Model variables
-      & sshn
+      & ssh
    USE obs_inter_h2d
    USE obs_utils               ! Various observation tools
    USE obs_inter_sup

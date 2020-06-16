@@ -34,7 +34,6 @@ MODULE iom
 #endif
    USE domngb          ! ocean space and time domain
    USE phycst          ! physical constants
-   USE dianam          ! build name of file
    USE xios
 # endif
    USE ioipsl, ONLY :  ju2ymds    ! for calendar
@@ -63,7 +62,7 @@ MODULE iom
    PRIVATE set_grid, set_grid_bounds, set_scalar, set_xmlatt, set_mooring, iom_update_file_name, iom_sdate
    PRIVATE iom_set_rst_context, iom_set_rstw_active, iom_set_rstr_active
 # endif
-   PUBLIC iom_set_rstw_var_active, iom_set_rstw_core, iom_set_rst_vars
+   PUBLIC iom_set_rstw_var_active, iom_set_rst_vars
 
    INTERFACE iom_get
       MODULE PROCEDURE iom_g0d, iom_g1d, iom_g2d, iom_g3d
@@ -348,54 +347,6 @@ CONTAINS
 #endif
    END SUBROUTINE iom_set_rstr_active
 
-   SUBROUTINE iom_set_rstw_core(cdmdl)
-      !!---------------------------------------------------------------------
-      !!                   ***  SUBROUTINE  iom_set_rstw_core  ***
-      !!
-      !! ** Purpose :  set variables which are always in restart file 
-      !!---------------------------------------------------------------------
-   CHARACTER (len=*), INTENT (IN) :: cdmdl ! model OPA or SAS
-   CHARACTER(LEN=256)             :: clinfo    ! info character
-#if defined key_iomput
-   IF(cdmdl == "OPA") THEN
-!from restart.F90
-   CALL iom_set_rstw_var_active("rdt")
-   IF ( .NOT. ln_diurnal_only ) THEN
-        CALL iom_set_rstw_var_active('ub'  )
-        CALL iom_set_rstw_var_active('vb'  )
-        CALL iom_set_rstw_var_active('tb'  )
-        CALL iom_set_rstw_var_active('sb'  )
-        CALL iom_set_rstw_var_active('sshb')
-        !
-        CALL iom_set_rstw_var_active('un'  )
-        CALL iom_set_rstw_var_active('vn'  )
-        CALL iom_set_rstw_var_active('tn'  )
-        CALL iom_set_rstw_var_active('sn'  )
-        CALL iom_set_rstw_var_active('sshn')
-        CALL iom_set_rstw_var_active('rhop')
-     ! extra variable needed for the ice sheet coupling
-        IF ( ln_iscpl ) THEN
-             CALL iom_set_rstw_var_active('tmask')
-             CALL iom_set_rstw_var_active('umask')
-             CALL iom_set_rstw_var_active('vmask')
-             CALL iom_set_rstw_var_active('smask')
-             CALL iom_set_rstw_var_active('e3t_n')
-             CALL iom_set_rstw_var_active('e3u_n')
-             CALL iom_set_rstw_var_active('e3v_n')
-             CALL iom_set_rstw_var_active('gdepw_n')
-        END IF
-      ENDIF
-      IF(ln_diurnal) CALL iom_set_rstw_var_active('Dsst')
-!from trasbc.F90
-         CALL iom_set_rstw_var_active('sbc_hc_b')
-         CALL iom_set_rstw_var_active('sbc_sc_b')
-   ENDIF
-#else
-        clinfo = 'iom_set_rstw_core: key_iomput is needed to use XIOS restart read/write functionality'
-        CALL ctl_stop('STOP', TRIM(clinfo))
-#endif
-   END SUBROUTINE iom_set_rstw_core
-
    SUBROUTINE iom_set_rst_vars(fields)
       !!---------------------------------------------------------------------
       !!                   ***  SUBROUTINE iom_set_rst_vars   ***
@@ -661,12 +612,27 @@ CONTAINS
       ! position of last local point for x,y dimensions
       ! start halo size for x,y dimensions
       ! end halo size for x,y dimensions
+      !
+      INTEGER ::   nldi_save, nlei_save    !:patch before we remove periodicity and close boundaries in output files
+      INTEGER ::   nldj_save, nlej_save    !:
+      !
       !---------------------------------------------------------------------
       ! Initializations and control
       ! =============
       kiomid = -1
       clinfo = '                    iom_open ~~~  '
       istop = nstop
+
+      ! use patch to force the writing off periodicity and close boundaries
+      ! without this, issue in some model decomposition
+      ! seb: patch before we remove periodicity and close boundaries in output files
+      nldi_save = nldi   ;   nlei_save = nlei
+      nldj_save = nldj   ;   nlej_save = nlej
+      IF( nimpp           ==      1 ) nldi = 1
+      IF( nimpp + jpi - 1 == jpiglo ) nlei = jpi
+      IF( njmpp           ==      1 ) nldj = 1
+      IF( njmpp + jpj - 1 == jpjglo ) nlej = jpj
+
       ! if iom_open is called for the first time: initialize iom_file(:)%nfid to 0
       ! (could be done when defining iom_file in f95 but not in f90)
       IF( Agrif_Root() ) THEN
@@ -693,7 +659,9 @@ CONTAINS
       ENDIF
       ! do we read the overlap 
       ! ugly patch SM+JMM+RB to overwrite global definition in some cases
-      llnoov = (jpni * jpnj ) == jpnij .AND. .NOT. lk_agrif
+      !llnoov = (jpni * jpnj ) == jpnij .AND. .NOT. lk_agrif
+      ! for domain_cfg, force to read the full domain
+      llnoov = .FALSE.
       ! create the file name by added, if needed, TRIM(Agrif_CFixed()) and TRIM(clsuffix)
       ! =============
       clname   = trim(cdname)
@@ -791,6 +759,9 @@ CONTAINS
       IF( istop == nstop ) THEN   ! no error within this routine
          CALL iom_nf90_open( clname, kiomid, llwrt, llok, idompar, kdlev = kdlev )
       ENDIF
+
+      nldi = nldi_save   ;   nlei = nlei_save
+      nldj = nldj_save   ;   nlej = nlej_save
       !
    END SUBROUTINE iom_open
 
@@ -1082,7 +1053,10 @@ CONTAINS
          ! local definition of the domain ?
          ! do we read the overlap 
          ! ugly patch SM+JMM+RB to overwrite global definition in some cases
-         llnoov = (jpni * jpnj ) == jpnij .AND. .NOT. lk_agrif 
+         ! 
+         !llnoov = (jpni * jpnj ) == jpnij .AND. .NOT. lk_agrif 
+         ! for domain_cfg tools force to read the full domain
+         llnoov = .FALSE.
          ! check kcount and kstart optionals parameters...
          IF( PRESENT(kcount) .AND. (.NOT. PRESENT(kstart)) ) CALL ctl_stop(trim(clinfo), 'kcount present needs kstart present')
          IF( PRESENT(kstart) .AND. (.NOT. PRESENT(kcount)) ) CALL ctl_stop(trim(clinfo), 'kstart present needs kcount present')
@@ -1263,7 +1237,7 @@ CONTAINS
                ELSE                               ;   ix1 = 1      ;   ix2 = icnt(1)   ;   iy1 = 1      ;   iy2 = icnt(2)
                ENDIF
             ENDIF
-      
+
             CALL iom_nf90_get( kiomid, idvar, inbdim, istart, icnt, ix1, ix2, iy1, iy2, pv_r1d, pv_r2d, pv_r3d )
 
             IF( istop == nstop ) THEN   ! no additional errors until this point...

@@ -29,13 +29,14 @@ MODULE trcwri
 
 CONTAINS
 
-   SUBROUTINE trc_wri( kt )
+   SUBROUTINE trc_wri( kt, Kmm )
       !!---------------------------------------------------------------------
       !!                     ***  ROUTINE trc_wri  ***
       !! 
       !! ** Purpose :   output passive tracers fields and dynamical trends
       !!---------------------------------------------------------------------
       INTEGER, INTENT( in )     :: kt
+      INTEGER, INTENT( in )     :: Kmm  ! time level indices
       !
       INTEGER                   :: jn
       CHARACTER (len=20)        :: cltra
@@ -45,19 +46,31 @@ CONTAINS
       !
       IF( ln_timing )   CALL timing_start('trc_wri')
       !
-      IF( l_offline .AND. kt == nittrc000 .AND. lwp ) THEN    ! WRITE root name in date.file for use by postpro
-         CALL dia_nam( clhstnam, nn_writetrc,' ' )
-         CALL ctl_opn( inum, 'date.file', 'REPLACE', 'FORMATTED', 'SEQUENTIAL', -1, numout, lwp, narea )
-         WRITE(inum,*) clhstnam
-         CLOSE(inum)
+      IF( l_offline ) THEN    ! WRITE root name in date.file for use by postpro
+         IF(  kt == nittrc000 .AND. lwp ) THEN    ! WRITE root name in date.file for use by postpro
+           CALL dia_nam( clhstnam, nn_writetrc,' ' )
+           CALL ctl_opn( inum, 'date.file', 'REPLACE', 'FORMATTED', 'SEQUENTIAL', -1, numout, lwp, narea )
+           WRITE(inum,*) clhstnam
+           CLOSE(inum)
+        ENDIF
+
+       ! Output of initial vertical scale factor
+       CALL iom_put( "e3t_0", e3t_0(:,:,:) )
+       CALL iom_put( "e3u_0", e3u_0(:,:,:) )
+       CALL iom_put( "e3v_0", e3v_0(:,:,:) )
+       !
+       CALL iom_put( "e3t" , e3t(:,:,:,Kmm) )
+       CALL iom_put( "e3u" , e3u(:,:,:,Kmm) )
+       CALL iom_put( "e3v" , e3v(:,:,:,Kmm) )
+       !
       ENDIF
       ! write the tracer concentrations in the file
       ! ---------------------------------------
-      IF( ln_pisces  )   CALL trc_wri_pisces     ! PISCES 
-      IF( ll_cfc     )   CALL trc_wri_cfc        ! surface fluxes of CFC
-      IF( ln_c14     )   CALL trc_wri_c14        ! surface fluxes of C14
-      IF( ln_age     )   CALL trc_wri_age        ! AGE tracer
-      IF( ln_my_trc  )   CALL trc_wri_my_trc     ! MY_TRC  tracers
+      IF( ln_pisces  )   CALL trc_wri_pisces( Kmm )     ! PISCES 
+      IF( ll_cfc     )   CALL trc_wri_cfc   ( Kmm )     ! surface fluxes of CFC
+      IF( ln_c14     )   CALL trc_wri_c14   ( Kmm )     ! surface fluxes of C14
+      IF( ln_age     )   CALL trc_wri_age   ( Kmm )     ! AGE tracer
+      IF( ln_my_trc  )   CALL trc_wri_my_trc( Kmm )     ! MY_TRC  tracers
       !
       IF( ln_timing )   CALL timing_stop('trc_wri')
       !
@@ -69,14 +82,15 @@ CONTAINS
    !!----------------------------------------------------------------------
    PUBLIC trc_wri
 CONTAINS
-   SUBROUTINE trc_wri( kt )                     ! Empty routine   
+   SUBROUTINE trc_wri( kt, Kmm )                     ! Empty routine   
    INTEGER, INTENT(in) :: kt
+   INTEGER, INTENT(in) :: Kmm  ! time level indices
    END SUBROUTINE trc_wri
 #endif
 
    !!----------------------------------------------------------------------
    !! NEMO/TOP 4.0 , NEMO Consortium (2018)
-   !! $Id: trcwri.F90 10068 2018-08-28 14:09:04Z nicolasmartin $ 
+   !! $Id: trcwri.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!======================================================================
 END MODULE trcwri

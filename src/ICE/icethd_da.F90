@@ -34,7 +34,7 @@ MODULE icethd_da
 
    !!----------------------------------------------------------------------
    !! NEMO/ICE 4.0 , NEMO Consortium (2018)
-   !! $Id: icethd_da.F90 10069 2018-08-28 14:12:24Z nicolasmartin $
+   !! $Id: icethd_da.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -127,7 +127,7 @@ CONTAINS
          !                                                                         !    = N*pi*D = (A/cs*D^2)*pi*D
          zwlat  = zm1 * ( MAX( 0._wp, sst_1d(ji) - ( t_bo_1d(ji) - rt0 ) ) )**zm2  ! Melt speed rate [m/s]
          !
-         zda_tot(ji) = MIN( zwlat * zperi * rdt_ice, at_i_1d(ji) )                 ! sea ice concentration decrease (>0)
+         zda_tot(ji) = MIN( zwlat * zperi * rDt_ice, at_i_1d(ji) )                 ! sea ice concentration decrease (>0)
       
          ! --- Distribute reduction among ice categories and calculate associated ice-ocean fluxes --- !
          IF( a_i_1d(ji) > 0._wp ) THEN
@@ -136,14 +136,14 @@ CONTAINS
             zda = MIN( a_i_1d(ji), zda_tot(ji) * a_i_1d(ji) / at_i_1d(ji) )
             
             ! Contribution to salt flux
-            sfx_lam_1d(ji) = sfx_lam_1d(ji) + rhoi *  h_i_1d(ji) * zda * s_i_1d(ji) * r1_rdtice
+            sfx_lam_1d(ji) = sfx_lam_1d(ji) + rhoi *  h_i_1d(ji) * zda * s_i_1d(ji) * r1_Dt_ice
             
             ! Contribution to heat flux into the ocean [W.m-2], (<0)  
-            hfx_thd_1d(ji) = hfx_thd_1d(ji) - zda * r1_rdtice * ( h_i_1d(ji) * r1_nlay_i * SUM( e_i_1d(ji,1:nlay_i) )  &
+            hfx_thd_1d(ji) = hfx_thd_1d(ji) - zda * r1_Dt_ice * ( h_i_1d(ji) * r1_nlay_i * SUM( e_i_1d(ji,1:nlay_i) )  &
                                                                 + h_s_1d(ji) * r1_nlay_s * SUM( e_s_1d(ji,1:nlay_s) ) ) 
             
             ! Contribution to mass flux
-            wfx_lam_1d(ji) =  wfx_lam_1d(ji) + zda * r1_rdtice * ( rhoi * h_i_1d(ji) + rhos * h_s_1d(ji) )
+            wfx_lam_1d(ji) =  wfx_lam_1d(ji) + zda * r1_Dt_ice * ( rhoi * h_i_1d(ji) + rhos * h_s_1d(ji) )
             
             ! new concentration
             a_i_1d(ji) = a_i_1d(ji) - zda
@@ -176,12 +176,10 @@ CONTAINS
       NAMELIST/namthd_da/ rn_beta, rn_dmin
       !!-------------------------------------------------------------------
       !
-      REWIND( numnam_ice_ref )              ! Namelist namthd_da in reference namelist : Ice thermodynamics
       READ  ( numnam_ice_ref, namthd_da, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namthd_da in reference namelist', lwp )
-      REWIND( numnam_ice_cfg )              ! Namelist namthd_da in configuration namelist : Ice thermodynamics
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namthd_da in reference namelist' )
       READ  ( numnam_ice_cfg, namthd_da, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namthd_da in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namthd_da in configuration namelist' )
       IF(lwm) WRITE( numoni, namthd_da )
       !
       IF(lwp) THEN                          ! control print

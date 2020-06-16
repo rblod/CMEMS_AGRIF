@@ -13,7 +13,6 @@ MODULE bdydyn2d
    !!   bdy_dyn2d_orlanski : Orlanski Radiation
    !!   bdy_ssh            : Duplicate sea level across open boundaries
    !!----------------------------------------------------------------------
-   USE oce             ! ocean dynamics and tracers 
    USE dom_oce         ! ocean space and time domain
    USE bdy_oce         ! ocean open boundary conditions
    USE bdylib          ! BDY library routines
@@ -31,7 +30,7 @@ MODULE bdydyn2d
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: bdydyn2d.F90 10529 2019-01-16 10:40:44Z smasson $ 
+   !! $Id: bdydyn2d.F90 11536 2019-09-11 13:54:18Z smasson $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -49,28 +48,67 @@ CONTAINS
       REAL(wp), DIMENSION(jpi,jpj), INTENT(in   ) :: phur, phvr
       REAL(wp), DIMENSION(jpi,jpj), INTENT(in   ) :: pssh
       !!
-      INTEGER                                  ::   ib_bdy ! Loop counter
-
-      DO ib_bdy=1, nb_bdy
-
-         SELECT CASE( cn_dyn2d(ib_bdy) )
-         CASE('none')
-            CYCLE
-         CASE('frs')
-            CALL bdy_dyn2d_frs( idx_bdy(ib_bdy), dta_bdy(ib_bdy), ib_bdy, pua2d, pva2d )
-         CASE('flather')
-            CALL bdy_dyn2d_fla( idx_bdy(ib_bdy), dta_bdy(ib_bdy), ib_bdy, pua2d, pva2d, pssh, phur, phvr )
-         CASE('orlanski')
-            CALL bdy_dyn2d_orlanski( idx_bdy(ib_bdy), dta_bdy(ib_bdy), ib_bdy, &
-                                     & pua2d, pva2d, pub2d, pvb2d, ll_npo=.false.)
-         CASE('orlanski_npo')
-            CALL bdy_dyn2d_orlanski( idx_bdy(ib_bdy), dta_bdy(ib_bdy), ib_bdy, &
-                                     & pua2d, pva2d, pub2d, pvb2d, ll_npo=.true. )
-         CASE DEFAULT
-            CALL ctl_stop( 'bdy_dyn2d : unrecognised option for open boundaries for barotropic variables' )
-         END SELECT
-      ENDDO
-
+      INTEGER  ::   ib_bdy, ir     ! BDY set index, rim index
+      LOGICAL  ::   llrim0         ! indicate if rim 0 is treated
+      LOGICAL, DIMENSION(4) :: llsend2, llrecv2, llsend3, llrecv3  ! indicate how communications are to be carried out
+      
+      llsend2(:) = .false.   ;   llrecv2(:) = .false.
+      llsend3(:) = .false.   ;   llrecv3(:) = .false.
+      DO ir = 1, 0, -1   ! treat rim 1 before rim 0
+         IF( ir == 0 ) THEN   ;   llrim0 = .TRUE.
+         ELSE                 ;   llrim0 = .FALSE.
+         END IF
+         DO ib_bdy=1, nb_bdy
+            SELECT CASE( cn_dyn2d(ib_bdy) )
+            CASE('none')
+               CYCLE
+            CASE('frs')   ! treat the whole boundary at once
+               IF( llrim0 )   CALL bdy_dyn2d_frs( idx_bdy(ib_bdy), dta_bdy(ib_bdy), ib_bdy, pua2d, pva2d )
+            CASE('flather')
+               CALL bdy_dyn2d_fla( idx_bdy(ib_bdy), dta_bdy(ib_bdy), ib_bdy, pua2d, pva2d, pssh, phur, phvr, llrim0 )
+            CASE('orlanski')
+               CALL bdy_dyn2d_orlanski( idx_bdy(ib_bdy), dta_bdy(ib_bdy), ib_bdy, &
+                    & pua2d, pva2d, pub2d, pvb2d, llrim0, ll_npo=.false. )
+            CASE('orlanski_npo')
+               CALL bdy_dyn2d_orlanski( idx_bdy(ib_bdy), dta_bdy(ib_bdy), ib_bdy, &
+                    & pua2d, pva2d, pub2d, pvb2d, llrim0, ll_npo=.true.  )
+            CASE DEFAULT
+               CALL ctl_stop( 'bdy_dyn2d : unrecognised option for open boundaries for barotropic variables' )
+            END SELECT
+         ENDDO
+         !
+         IF( nn_hls > 1 .AND. ir == 1 ) CYCLE   ! at least 2 halos will be corrected -> no need to correct rim 1 before rim 0
+         IF( nn_hls == 1 ) THEN
+            llsend2(:) = .false.   ;   llrecv2(:) = .false.
+            llsend3(:) = .false.   ;   llrecv3(:) = .false.
+         END IF
+         DO ib_bdy=1, nb_bdy
+            SELECT CASE( cn_dyn2d(ib_bdy) )
+            CASE('flather')
+               llsend2(1:2) = llsend2(1:2) .OR. lsend_bdyint(ib_bdy,2,1:2,ir)   ! west/east, U points
+               llsend2(1)   = llsend2(1)   .OR. lsend_bdyext(ib_bdy,2,1,ir)     ! neighbour might search point towards its east bdy
+               llrecv2(1:2) = llrecv2(1:2) .OR. lrecv_bdyint(ib_bdy,2,1:2,ir)   ! west/east, U points
+               llrecv2(2)   = llrecv2(2)   .OR. lrecv_bdyext(ib_bdy,2,2,ir)     ! might search point towards bdy on the east
+               llsend3(3:4) = llsend3(3:4) .OR. lsend_bdyint(ib_bdy,3,3:4,ir)   ! north/south, V points
+               llsend3(3)   = llsend3(3)   .OR. lsend_bdyext(ib_bdy,3,3,ir)     ! neighbour might search point towards its north bdy 
+               llrecv3(3:4) = llrecv3(3:4) .OR. lrecv_bdyint(ib_bdy,3,3:4,ir)   ! north/south, V points
+               llrecv3(4)   = llrecv3(4)   .OR. lrecv_bdyext(ib_bdy,3,4,ir)     ! might search point towards bdy on the north
+            CASE('orlanski', 'orlanski_npo')
+               llsend2(:) = llsend2(:) .OR. lsend_bdy(ib_bdy,2,:,ir)   ! possibly every direction, U points
+               llrecv2(:) = llrecv2(:) .OR. lrecv_bdy(ib_bdy,2,:,ir)   ! possibly every direction, U points
+               llsend3(:) = llsend3(:) .OR. lsend_bdy(ib_bdy,3,:,ir)   ! possibly every direction, V points
+               llrecv3(:) = llrecv3(:) .OR. lrecv_bdy(ib_bdy,3,:,ir)   ! possibly every direction, V points
+            END SELECT
+         END DO
+         IF( ANY(llsend2) .OR. ANY(llrecv2) ) THEN   ! if need to send/recv in at least one direction
+            CALL lbc_lnk( 'bdydyn2d', pua2d, 'U', -1., kfillmode=jpfillnothing ,lsend=llsend2, lrecv=llrecv2 )
+         END IF
+         IF( ANY(llsend3) .OR. ANY(llrecv3) ) THEN   ! if need to send/recv in at least one direction
+            CALL lbc_lnk( 'bdydyn2d', pva2d, 'V', -1., kfillmode=jpfillnothing ,lsend=llsend3, lrecv=llrecv3 )
+         END IF
+         !
+      END DO   ! ir
+      !
    END SUBROUTINE bdy_dyn2d
 
    SUBROUTINE bdy_dyn2d_frs( idx, dta, ib_bdy, pua2d, pva2d )
@@ -89,7 +127,7 @@ CONTAINS
       INTEGER,         INTENT(in) ::   ib_bdy  ! BDY set index
       REAL(wp), DIMENSION(jpi,jpj), INTENT(inout) :: pua2d, pva2d 
       !!
-      INTEGER  ::   jb, jk         ! dummy loop indices
+      INTEGER  ::   jb             ! dummy loop indices
       INTEGER  ::   ii, ij, igrd   ! local integers
       REAL(wp) ::   zwgt           ! boundary weight
       !!----------------------------------------------------------------------
@@ -109,13 +147,11 @@ CONTAINS
          zwgt = idx%nbw(jb,igrd)
          pva2d(ii,ij) = ( pva2d(ii,ij) + zwgt * ( dta%v2d(jb) - pva2d(ii,ij) ) ) * vmask(ii,ij,1)
       END DO 
-      CALL lbc_bdy_lnk( 'bdydyn2d', pua2d, 'U', -1., ib_bdy ) 
-      CALL lbc_bdy_lnk( 'bdydyn2d', pva2d, 'V', -1., ib_bdy)   ! Boundary points should be updated
       !
    END SUBROUTINE bdy_dyn2d_frs
 
 
-   SUBROUTINE bdy_dyn2d_fla( idx, dta, ib_bdy, pua2d, pva2d, pssh, phur, phvr )
+   SUBROUTINE bdy_dyn2d_fla( idx, dta, ib_bdy, pua2d, pva2d, pssh, phur, phvr, llrim0 )
       !!----------------------------------------------------------------------
       !!                 ***  SUBROUTINE bdy_dyn2d_fla  ***
       !!             
@@ -138,82 +174,96 @@ CONTAINS
       TYPE(OBC_DATA),               INTENT(in) ::   dta  ! OBC external data
       INTEGER,                      INTENT(in) ::   ib_bdy  ! BDY set index
       REAL(wp), DIMENSION(jpi,jpj), INTENT(inout) :: pua2d, pva2d
-      REAL(wp), DIMENSION(jpi,jpj), INTENT(in) ::   pssh, phur, phvr 
-
+      REAL(wp), DIMENSION(jpi,jpj), INTENT(in) ::   pssh, phur, phvr
+      LOGICAL                     , INTENT(in) ::   llrim0   ! indicate if rim 0 is treated
+      INTEGER  ::   ibeg, iend                       ! length of rim to be treated (rim 0 or rim 1)
       INTEGER  ::   jb, igrd                         ! dummy loop indices
-      INTEGER  ::   ii, ij, iim1, iip1, ijm1, ijp1   ! 2D addresses
-      REAL(wp), POINTER :: flagu, flagv              ! short cuts
-      REAL(wp) ::   zcorr                            ! Flather correction
-      REAL(wp) ::   zforc                            ! temporary scalar
-      REAL(wp) ::   zflag, z1_2                      !    "        "
+      INTEGER  ::   ii, ij                           ! 2D addresses
+      INTEGER  ::   iiTrim, ijTrim                   ! T pts i/j-indice on the rim
+      INTEGER  ::   iiToce, ijToce, iiUoce, ijVoce   ! T, U and V pts i/j-indice of the ocean next to the rim
+      REAL(wp) ::   flagu, flagv                     ! short cuts
+      REAL(wp) ::   zfla                             ! Flather correction
+      REAL(wp) ::   z1_2                             ! 
+      REAL(wp), DIMENSION(jpi,jpj) ::   sshdta       ! 2D version of dta%ssh
       !!----------------------------------------------------------------------
 
       z1_2 = 0.5_wp
 
       ! ---------------------------------!
       ! Flather boundary conditions     :!
-      ! ---------------------------------! 
-     
-!!! REPLACE spgu with nemo_wrk work space
+      ! ---------------------------------!
 
-      ! Fill temporary array with ssh data (here spgu):
+      ! Fill temporary array with ssh data (here we use spgu with the alias sshdta):
       igrd = 1
-      spgu(:,:) = 0.0
-      DO jb = 1, idx%nblenrim(igrd)
+      IF( llrim0 ) THEN   ;   ibeg = 1                       ;   iend = idx%nblenrim0(igrd)
+      ELSE                ;   ibeg = idx%nblenrim0(igrd)+1   ;   iend = idx%nblenrim(igrd)
+      END IF
+      !
+      DO jb = ibeg, iend
          ii = idx%nbi(jb,igrd)
          ij = idx%nbj(jb,igrd)
-         IF( ll_wd ) THEN
-            spgu(ii, ij) = dta%ssh(jb)  - ssh_ref 
-         ELSE
-            spgu(ii, ij) = dta%ssh(jb)
+         IF( ll_wd ) THEN   ;   sshdta(ii, ij) = dta%ssh(jb) - ssh_ref 
+         ELSE               ;   sshdta(ii, ij) = dta%ssh(jb)
          ENDIF
       END DO
-
-      CALL lbc_bdy_lnk( 'bdydyn2d', spgu(:,:), 'T', 1., ib_bdy )
       !
-      igrd = 2      ! Flather bc on u-velocity; 
+      igrd = 2      ! Flather bc on u-velocity
       !             ! remember that flagu=-1 if normal velocity direction is outward
       !             ! I think we should rather use after ssh ?
-      DO jb = 1, idx%nblenrim(igrd)
-         ii  = idx%nbi(jb,igrd)
-         ij  = idx%nbj(jb,igrd) 
-         flagu => idx%flagu(jb,igrd)
-         iim1 = ii + MAX( 0, INT( flagu ) )   ! T pts i-indice inside the boundary
-         iip1 = ii - MIN( 0, INT( flagu ) )   ! T pts i-indice outside the boundary 
-         !
-         zcorr = - flagu * SQRT( grav * phur(ii, ij) ) * ( pssh(iim1, ij) - spgu(iip1,ij) )
-
-         ! jchanut tschanges: Set zflag to 0 below to revert to Flather scheme
-         ! Use characteristics method instead
-         zflag = ABS(flagu)
-         zforc = dta%u2d(jb) * (1._wp - z1_2*zflag) + z1_2 * zflag * pua2d(iim1,ij)
-         pua2d(ii,ij) = zforc + (1._wp - z1_2*zflag) * zcorr * umask(ii,ij,1) 
+      IF( llrim0 ) THEN   ;   ibeg = 1                       ;   iend = idx%nblenrim0(igrd)
+      ELSE                ;   ibeg = idx%nblenrim0(igrd)+1   ;   iend = idx%nblenrim(igrd)
+      END IF
+      DO jb = ibeg, iend
+         ii    = idx%nbi(jb,igrd)
+         ij    = idx%nbj(jb,igrd)
+         flagu = idx%flagu(jb,igrd)
+         IF( flagu == 0. ) THEN
+            pua2d(ii,ij) = dta%u2d(jb)
+         ELSE      ! T pts j-indice       on the rim          on the ocean next to the rim on T and U points
+            IF( flagu ==  1. ) THEN   ;   iiTrim = ii     ;   iiToce = ii+1   ;   iiUoce = ii+1   ;   ENDIF
+            IF( flagu == -1. ) THEN   ;   iiTrim = ii+1   ;   iiToce = ii     ;   iiUoce = ii-1   ;   ENDIF
+            !
+            ! Rare case : rim is parallel to the mpi subdomain border and on the halo : point will be received
+            IF( iiTrim > jpi .OR. iiToce > jpi .OR. iiUoce > jpi .OR. iiUoce < 1 )   CYCLE   
+            !
+            zfla = dta%u2d(jb) - flagu * SQRT( grav * phur(ii, ij) ) * ( pssh(iiToce,ij) - sshdta(iiTrim,ij) )
+            !
+            ! jchanut tschanges, use characteristics method (Blayo et Debreu, 2005) :
+            ! mix Flather scheme with velocity of the ocean next to the rim
+            pua2d(ii,ij) =  z1_2 * ( pua2d(iiUoce,ij) + zfla )
+         END IF
       END DO
       !
       igrd = 3      ! Flather bc on v-velocity
       !             ! remember that flagv=-1 if normal velocity direction is outward
-      DO jb = 1, idx%nblenrim(igrd)
-         ii  = idx%nbi(jb,igrd)
-         ij  = idx%nbj(jb,igrd) 
-         flagv => idx%flagv(jb,igrd)
-         ijm1 = ij + MAX( 0, INT( flagv ) )   ! T pts j-indice inside the boundary
-         ijp1 = ij - MIN( 0, INT( flagv ) )   ! T pts j-indice outside the boundary 
-         !
-         zcorr = - flagv * SQRT( grav * phvr(ii, ij) ) * ( pssh(ii, ijm1) - spgu(ii,ijp1) )
-
-         ! jchanut tschanges: Set zflag to 0 below to revert to std Flather scheme
-         ! Use characteristics method instead
-         zflag = ABS(flagv)
-         zforc  = dta%v2d(jb) * (1._wp - z1_2*zflag) + z1_2 * zflag * pva2d(ii,ijm1)
-         pva2d(ii,ij) = zforc + (1._wp - z1_2*zflag) * zcorr * vmask(ii,ij,1)
+      IF( llrim0 ) THEN   ;   ibeg = 1                       ;   iend = idx%nblenrim0(igrd)
+      ELSE                ;   ibeg = idx%nblenrim0(igrd)+1   ;   iend = idx%nblenrim(igrd)
+      END IF
+      DO jb = ibeg, iend
+         ii    = idx%nbi(jb,igrd)
+         ij    = idx%nbj(jb,igrd)
+         flagv = idx%flagv(jb,igrd)
+         IF( flagv == 0. ) THEN
+            pva2d(ii,ij) = dta%v2d(jb)
+         ELSE      ! T pts j-indice       on the rim          on the ocean next to the rim on T and V points
+            IF( flagv ==  1. ) THEN   ;   ijTrim = ij     ;   ijToce = ij+1   ;   ijVoce = ij+1   ;   ENDIF
+            IF( flagv == -1. ) THEN   ;   ijTrim = ij+1   ;   ijToce = ij     ;   ijVoce = ij-1   ;   ENDIF
+            !
+            ! Rare case : rim is parallel to the mpi subdomain border and on the halo : point will be received
+            IF( ijTrim > jpj .OR. ijToce > jpj .OR. ijVoce > jpj .OR. ijVoce < 1 )   CYCLE
+            !
+            zfla = dta%v2d(jb) - flagv * SQRT( grav * phvr(ii, ij) ) * ( pssh(ii,ijToce) - sshdta(ii,ijTrim) )
+            !
+            ! jchanut tschanges, use characteristics method (Blayo et Debreu, 2005) :
+            ! mix Flather scheme with velocity of the ocean next to the rim
+            pva2d(ii,ij) =  z1_2 * ( pva2d(ii,ijVoce) + zfla )
+         END IF
       END DO
-      CALL lbc_bdy_lnk( 'bdydyn2d', pua2d, 'U', -1., ib_bdy )   ! Boundary points should be updated
-      CALL lbc_bdy_lnk( 'bdydyn2d', pva2d, 'V', -1., ib_bdy )   !
       !
    END SUBROUTINE bdy_dyn2d_fla
 
 
-   SUBROUTINE bdy_dyn2d_orlanski( idx, dta, ib_bdy, pua2d, pva2d, pub2d, pvb2d, ll_npo )
+   SUBROUTINE bdy_dyn2d_orlanski( idx, dta, ib_bdy, pua2d, pva2d, pub2d, pvb2d, llrim0, ll_npo )
       !!----------------------------------------------------------------------
       !!                 ***  SUBROUTINE bdy_dyn2d_orlanski  ***
       !!             
@@ -230,21 +280,18 @@ CONTAINS
       REAL(wp), DIMENSION(jpi,jpj), INTENT(inout) :: pua2d, pva2d
       REAL(wp), DIMENSION(jpi,jpj), INTENT(in) :: pub2d, pvb2d 
       LOGICAL,                      INTENT(in) ::   ll_npo  ! flag for NPO version
-
+      LOGICAL,                      INTENT(in) ::   llrim0   ! indicate if rim 0 is treated
       INTEGER  ::   ib, igrd                               ! dummy loop indices
       INTEGER  ::   ii, ij, iibm1, ijbm1                   ! indices
       !!----------------------------------------------------------------------
       !
       igrd = 2      ! Orlanski bc on u-velocity; 
       !            
-      CALL bdy_orlanski_2d( idx, igrd, pub2d, pua2d, dta%u2d, ll_npo )
+      CALL bdy_orlanski_2d( idx, igrd, pub2d, pua2d, dta%u2d, llrim0, ll_npo )
 
       igrd = 3      ! Orlanski bc on v-velocity
       !  
-      CALL bdy_orlanski_2d( idx, igrd, pvb2d, pva2d, dta%v2d, ll_npo )
-      !
-      CALL lbc_bdy_lnk( 'bdydyn2d', pua2d, 'U', -1., ib_bdy )   ! Boundary points should be updated
-      CALL lbc_bdy_lnk( 'bdydyn2d', pva2d, 'V', -1., ib_bdy )   !
+      CALL bdy_orlanski_2d( idx, igrd, pvb2d, pva2d, dta%v2d, llrim0, ll_npo )
       !
    END SUBROUTINE bdy_dyn2d_orlanski
 
@@ -256,38 +303,30 @@ CONTAINS
       !! ** Purpose : Duplicate sea level across open boundaries
       !!
       !!----------------------------------------------------------------------
-      REAL(wp), DIMENSION(jpi,jpj), INTENT(inout) ::   zssh ! Sea level
+      REAL(wp), DIMENSION(jpi,jpj,1), INTENT(inout) ::   zssh ! Sea level, need 3 dimensions to be used by bdy_nmn
       !!
-      INTEGER  ::   ib_bdy, ib, igrd                        ! local integers
-      INTEGER  ::   ii, ij, zcoef, zcoef1, zcoef2, ip, jp   !   "       "
-
-      igrd = 1                       ! Everything is at T-points here
-
-      DO ib_bdy = 1, nb_bdy
-         DO ib = 1, idx_bdy(ib_bdy)%nblenrim(igrd)
-            ii = idx_bdy(ib_bdy)%nbi(ib,igrd)
-            ij = idx_bdy(ib_bdy)%nbj(ib,igrd)
-            ! Set gradient direction:
-            zcoef1 = bdytmask(ii-1,ij  ) +  bdytmask(ii+1,ij  )
-            zcoef2 = bdytmask(ii  ,ij-1) +  bdytmask(ii  ,ij+1)
-            IF ( zcoef1+zcoef2 == 0 ) THEN   ! corner
-               zcoef = bdytmask(ii-1,ij-1) + bdytmask(ii+1,ij+1) + bdytmask(ii+1,ij-1) + bdytmask(ii-1,ij+1)
-               zssh(ii,ij) = zssh( ii-1, ij-1 ) * bdytmask( ii-1, ij-1) + &
-                 &           zssh( ii+1, ij+1 ) * bdytmask( ii+1, ij+1) + &
-                 &           zssh( ii+1, ij-1 ) * bdytmask( ii+1, ij-1) + &
-                 &           zssh( ii-1, ij+1 ) * bdytmask( ii-1, ij+1)
-               zssh(ii,ij) = ( zssh(ii,ij) / MAX( 1, zcoef) ) * tmask(ii,ij,1)
-            ELSE
-               ip = bdytmask(ii+1,ij  ) - bdytmask(ii-1,ij  )
-               jp = bdytmask(ii  ,ij+1) - bdytmask(ii  ,ij-1)
-               zssh(ii,ij) = zssh(ii+ip,ij+jp) * tmask(ii+ip,ij+jp,1)
-            ENDIF
+      INTEGER ::   ib_bdy, ir      ! bdy index, rim index
+      INTEGER ::   ibeg, iend      ! length of rim to be treated (rim 0 or rim 1)
+      LOGICAL ::   llrim0          ! indicate if rim 0 is treated
+      LOGICAL, DIMENSION(4) :: llsend1, llrecv1  ! indicate how communications are to be carried out
+      !!----------------------------------------------------------------------
+      llsend1(:) = .false.   ;   llrecv1(:) = .false.
+      DO ir = 1, 0, -1   ! treat rim 1 before rim 0
+         IF( nn_hls == 1 ) THEN   ;   llsend1(:) = .false.   ;   llrecv1(:) = .false.   ;   END IF
+         IF( ir == 0 ) THEN   ;   llrim0 = .TRUE.
+         ELSE                 ;   llrim0 = .FALSE.
+         END IF
+         DO ib_bdy = 1, nb_bdy
+            CALL bdy_nmn( idx_bdy(ib_bdy), 1, zssh, llrim0 )   ! zssh is masked
+            llsend1(:) = llsend1(:) .OR. lsend_bdyint(ib_bdy,1,:,ir)   ! possibly every direction, T points
+            llrecv1(:) = llrecv1(:) .OR. lrecv_bdyint(ib_bdy,1,:,ir)   ! possibly every direction, T points
          END DO
-
-         ! Boundary points should be updated
-         CALL lbc_bdy_lnk( 'bdydyn2d', zssh(:,:), 'T', 1., ib_bdy )
+         IF( nn_hls > 1 .AND. ir == 1 ) CYCLE   ! at least 2 halos will be corrected -> no need to correct rim 1 before rim 0
+         IF( ANY(llsend1) .OR. ANY(llrecv1) ) THEN   ! if need to send/recv in at least one direction
+            CALL lbc_lnk( 'bdydyn2d', zssh(:,:,1), 'T',  1., kfillmode=jpfillnothing ,lsend=llsend1, lrecv=llrecv1 )
+         END IF
       END DO
-
+      !
    END SUBROUTINE bdy_ssh
 
    !!======================================================================

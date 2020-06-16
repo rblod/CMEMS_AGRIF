@@ -30,7 +30,7 @@ MODULE icethd_zdf_BL99
 
    !!----------------------------------------------------------------------
    !! NEMO/ICE 4.0 , NEMO Consortium (2018)
-   !! $Id: icethd_zdf_bl99.F90 10534 2019-01-16 16:49:45Z clem $
+   !! $Id: icethd_zdf_bl99.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -205,13 +205,13 @@ CONTAINS
       iconv    = 0          ! number of iterations
       !
       l_T_converged(:) = .FALSE.
-      !                                                          !============================!
       ! Convergence calculated until all sub-domain grid points have converged
       ! Calculations keep going for all grid points until sub-domain convergence (vectorisation optimisation)
       ! but values are not taken into account (results independant of MPI partitioning)
       !
+      !                                                                            !============================!
       DO WHILE ( ( .NOT. ALL (l_T_converged(1:npti)) ) .AND. iconv < iconv_max )   ! Iterative procedure begins !
-         !                                                       !============================!
+         !                                                                         !============================!
          iconv = iconv + 1
          !
          ztib(1:npti,:) = t_i_1d(1:npti,:)
@@ -319,13 +319,13 @@ CONTAINS
          DO jk = 1, nlay_i
             DO ji = 1, npti
                zcpi = rcpi + zgamma * sz_i_1d(ji,jk) / MAX( ( t_i_1d(ji,jk) - rt0 ) * ( ztiold(ji,jk) - rt0 ), epsi10 )
-               zeta_i(ji,jk) = rdt_ice * r1_rhoi * z1_h_i(ji) / MAX( epsi10, zcpi ) 
+               zeta_i(ji,jk) = rDt_ice * r1_rhoi * z1_h_i(ji) / MAX( epsi10, zcpi ) 
             END DO
          END DO
 
          DO jk = 1, nlay_s
             DO ji = 1, npti
-               zeta_s(ji,jk) = rdt_ice * r1_rhos * r1_rcpi * z1_h_s(ji)
+               zeta_s(ji,jk) = rDt_ice * r1_rhos * r1_rcpi * z1_h_s(ji)
             END DO
          END DO
          !
@@ -741,7 +741,7 @@ CONTAINS
                   t_s_1d(ji,1:nlay_s) = MAX( MIN( t_s_1d(ji,1:nlay_s), rt0 ), rt0 - 100._wp )
                   zdti_max = MAX ( zdti_max , MAXVAL( ABS( t_s_1d(ji,1:nlay_s) - ztsb(ji,1:nlay_s) ) ) )
                   ! t_i
-                  DO jk = 0, nlay_i
+                  DO jk = 1, nlay_i
                      ztmelts       = -rTmlt * sz_i_1d(ji,jk) + rt0 
                      t_i_1d(ji,jk) =  MAX( MIN( t_i_1d(ji,jk), ztmelts ), rt0 - 100._wp )
                      zdti_max      =  MAX ( zdti_max, ABS( t_i_1d(ji,jk) - ztib(ji,jk) ) )
@@ -768,15 +768,37 @@ CONTAINS
       !-----------------------------
       !
       ! --- calculate conduction fluxes (positive downward)
-
+      !     bottom ice conduction flux
       DO ji = 1, npti
-         !                                ! surface ice conduction flux
-         qcn_ice_top_1d(ji) =  -           isnow(ji)   * zkappa_s(ji,0)      * zg1s * ( t_s_1d(ji,1) - t_su_1d(ji) )  &
-            &                  - ( 1._wp - isnow(ji) ) * zkappa_i(ji,0)      * zg1  * ( t_i_1d(ji,1) - t_su_1d(ji) )
-         !                                ! bottom ice conduction flux
-         qcn_ice_bot_1d(ji) =                          - zkappa_i(ji,nlay_i) * zg1  * ( t_bo_1d(ji ) - t_i_1d (ji,nlay_i) )
+         qcn_ice_bot_1d(ji) = - zkappa_i(ji,nlay_i) * zg1  * ( t_bo_1d(ji ) - t_i_1d (ji,nlay_i) )
       END DO
-      
+      !     surface ice conduction flux
+      IF( k_cnd == np_cnd_OFF .OR. k_cnd == np_cnd_EMU ) THEN
+         !
+         DO ji = 1, npti
+            qcn_ice_top_1d(ji) =  -           isnow(ji)   * zkappa_s(ji,0) * zg1s * ( t_s_1d(ji,1) - t_su_1d(ji) )  &
+               &                  - ( 1._wp - isnow(ji) ) * zkappa_i(ji,0) * zg1  * ( t_i_1d(ji,1) - t_su_1d(ji) )
+         END DO
+         !
+      ELSEIF( k_cnd == np_cnd_ON ) THEN
+         !
+         DO ji = 1, npti
+            qcn_ice_top_1d(ji) = qcn_ice_1d(ji)
+         END DO
+         !
+      ENDIF
+      !     surface ice temperature
+      IF( k_cnd == np_cnd_ON .AND. ln_cndemulate ) THEN
+         !
+         DO ji = 1, npti
+            t_su_1d(ji) = (  qcn_ice_top_1d(ji) &            ! calculate surface temperature
+               &           +           isnow(ji)   * zkappa_s(ji,0) * zg1s * t_s_1d(ji,1) &
+               &           + ( 1._wp - isnow(ji) ) * zkappa_i(ji,0) * zg1  * t_i_1d(ji,1) &
+               &          ) / MAX( epsi10, isnow(ji) * zkappa_s(ji,0) * zg1s + ( 1._wp - isnow(ji) ) * zkappa_i(ji,0) * zg1 )
+            t_su_1d(ji) = MAX( MIN( t_su_1d(ji), rt0 ), rt0 - 100._wp )  ! cap t_su
+         END DO
+         !
+      ENDIF
       !
       ! --- Diagnose the heat loss due to changing non-solar / conduction flux --- !
       !
@@ -786,14 +808,7 @@ CONTAINS
             hfx_err_dif_1d(ji) = hfx_err_dif_1d(ji) - ( qns_ice_1d(ji) - zqns_ice_b(ji) ) * a_i_1d(ji) 
          END DO
          !
-      ELSEIF( k_cnd == np_cnd_ON ) THEN
-         !
-         DO ji = 1, npti
-            hfx_err_dif_1d(ji) = hfx_err_dif_1d(ji) - ( qcn_ice_top_1d(ji) - qcn_ice_1d(ji) ) * a_i_1d(ji) 
-         END DO
-         !
       ENDIF
-      
       !
       ! --- Diagnose the heat loss due to non-fully converged temperature solution (should not be above 10-4 W-m2) --- !
       !
@@ -810,16 +825,16 @@ CONTAINS
                
                IF( t_su_1d(ji) < rt0 ) THEN  ! case T_su < 0degC
                   zhfx_err = ( qns_ice_1d(ji)     + qsr_ice_1d(ji)     - zradtr_i(ji,nlay_i) - qcn_ice_bot_1d(ji)  &
-                     &       + zdq * r1_rdtice ) * a_i_1d(ji)
+                     &       + zdq * r1_Dt_ice ) * a_i_1d(ji)
                ELSE                          ! case T_su = 0degC
                   zhfx_err = ( qcn_ice_top_1d(ji) + qtr_ice_top_1d(ji) - zradtr_i(ji,nlay_i) - qcn_ice_bot_1d(ji)  &
-                     &       + zdq * r1_rdtice ) * a_i_1d(ji)
+                     &       + zdq * r1_Dt_ice ) * a_i_1d(ji)
                ENDIF
                
             ELSEIF( k_cnd == np_cnd_ON ) THEN
             
                zhfx_err    = ( qcn_ice_top_1d(ji) + qtr_ice_top_1d(ji) - zradtr_i(ji,nlay_i) - qcn_ice_bot_1d(ji)  &
-                  &          + zdq * r1_rdtice ) * a_i_1d(ji)
+                  &          + zdq * r1_Dt_ice ) * a_i_1d(ji)
             
             ENDIF
             !
@@ -827,7 +842,7 @@ CONTAINS
             hfx_err_dif_1d(ji) = hfx_err_dif_1d(ji) + zhfx_err
             !
             ! hfx_dif = Heat flux diagnostic of sensible heat used to warm/cool ice in W.m-2   
-            hfx_dif_1d(ji) = hfx_dif_1d(ji) - zdq * r1_rdtice * a_i_1d(ji)
+            hfx_dif_1d(ji) = hfx_dif_1d(ji) - zdq * r1_Dt_ice * a_i_1d(ji)
             !
          END DO
          !

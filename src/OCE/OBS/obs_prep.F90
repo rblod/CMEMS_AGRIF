@@ -34,7 +34,7 @@ MODULE obs_prep
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: obs_prep.F90 10068 2018-08-28 14:09:04Z nicolasmartin $
+   !! $Id: obs_prep.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 
@@ -243,7 +243,7 @@ CONTAINS
    SUBROUTINE obs_pre_prof( profdata, prodatqc, ld_var1, ld_var2, &
       &                     kpi, kpj, kpk, &
       &                     zmask1, pglam1, pgphi1, zmask2, pglam2, pgphi2,  &
-      &                     ld_nea, ld_bound_reject, kdailyavtypes,  kqc_cutoff )
+      &                     ld_nea, ld_bound_reject, Kmm, kdailyavtypes,  kqc_cutoff )
 
 !!----------------------------------------------------------------------
       !!                    ***  ROUTINE obs_pre_prof  ***
@@ -273,6 +273,7 @@ CONTAINS
       LOGICAL, INTENT(IN) :: ld_nea               ! Switch for rejecting observation near land
       LOGICAL, INTENT(IN) :: ld_bound_reject      ! Switch for rejecting observations near the boundary
       INTEGER, INTENT(IN) :: kpi, kpj, kpk        ! Local domain sizes
+      INTEGER, INTENT(IN) :: Kmm                  ! time-level index
       INTEGER, DIMENSION(imaxavtypes), OPTIONAL :: &
          & kdailyavtypes                          ! Types for daily averages
       REAL(wp), INTENT(IN), DIMENSION(kpi,kpj,kpk) :: &
@@ -419,7 +420,7 @@ CONTAINS
          &                 iosdv1obs,             ilanv1obs,            &
          &                 inlav1obs,             ld_nea,               &
          &                 ibdyv1obs,             ld_bound_reject,      &
-         &                 iqc_cutoff       )
+         &                 iqc_cutoff,            Kmm                 )
 
       CALL obs_mpp_sum_integer( iosdv1obs, iosdv1obsmpp )
       CALL obs_mpp_sum_integer( ilanv1obs, ilanv1obsmpp )
@@ -441,7 +442,7 @@ CONTAINS
          &                 iosdv2obs,             ilanv2obs,            &
          &                 inlav2obs,             ld_nea,               &
          &                 ibdyv2obs,             ld_bound_reject,      &
-         &                 iqc_cutoff       )
+         &                 iqc_cutoff,            Kmm                 )
 
       CALL obs_mpp_sum_integer( iosdv2obs, iosdv2obsmpp )
       CALL obs_mpp_sum_integer( ilanv2obs, ilanv2obsmpp )
@@ -611,7 +612,7 @@ CONTAINS
       !!----------------------------------------------------------------------
       !! * Modules used
       USE dom_oce, ONLY : &  ! Geographical information
-         & rdt
+         & rn_Dt
       USE phycst, ONLY : &   ! Physical constants
          & rday,  &             
          & rmmss, &             
@@ -660,7 +661,7 @@ CONTAINS
       !-----------------------------------------------------------------------
 
       ! Intialize the number of time steps per day
-      idaystp = NINT( rday / rdt )
+      idaystp = NINT( rday / rn_Dt )
 
       !---------------------------------------------------------------------
       ! Locate the model time coordinates for interpolation
@@ -730,7 +731,7 @@ CONTAINS
          END DO
 
          ! Add in the number of time steps to the observation minute
-         zminstp = rmmss / rdt
+         zminstp = rmmss / rn_Dt
          zhoustp = rhhmm * zminstp
 
          zobsstp =   REAL( kobsmin(jobs) - kmin0, KIND=wp ) * zminstp &
@@ -1093,7 +1094,7 @@ CONTAINS
       &                       kpobsqc, kobsqc,  kosdobs,        &
       &                       klanobs, knlaobs, ld_nea,         &
       &                       kbdyobs, ld_bound_reject,         &
-      &                       kqc_cutoff                        )
+      &                       kqc_cutoff,       Kmm             )
       !!----------------------------------------------------------------------
       !!                    ***  ROUTINE obs_coo_spc_3d  ***
       !!
@@ -1115,11 +1116,11 @@ CONTAINS
       !!        !  2007-06  (K. Mogensen et al) Reject obs. near land.
       !!----------------------------------------------------------------------
       !! * Modules used
-      USE dom_oce, ONLY : &       ! Geographical information
+      USE dom_oce, ONLY : &       ! Geographical information 
          & gdepw_1d,      &
          & gdepw_0,       &                       
-         & gdepw_n,       &
-         & gdept_n,       &
+         & gdepw,         &
+         & gdept,         &
          & ln_zco,        &
          & ln_zps             
 
@@ -1159,6 +1160,7 @@ CONTAINS
       LOGICAL, INTENT(IN) :: ld_nea         ! Flag observations near land
       LOGICAL, INTENT(IN) :: ld_bound_reject  ! Flag observations near open boundary
       INTEGER, INTENT(IN) :: kqc_cutoff     ! Cutoff QC value
+      INTEGER, INTENT(IN) :: Kmm            ! time-level index
 
       !! * Local declarations
       REAL(KIND=wp), DIMENSION(2,2,kpk,kprofno) :: &
@@ -1229,7 +1231,7 @@ CONTAINS
       CALL obs_int_comm_3d( 2, 2, kprofno, kpi, kpj, kpk, igrdi, igrdj, pmask, zgmsk )
       CALL obs_int_comm_2d( 2, 2, kprofno, kpi, kpj, igrdi, igrdj, plam, zglam )
       CALL obs_int_comm_2d( 2, 2, kprofno, kpi, kpj, igrdi, igrdj, pphi, zgphi )
-      CALL obs_int_comm_3d( 2, 2, kprofno, kpi, kpj, kpk, igrdi, igrdj, gdepw_n(:,:,:), &
+      CALL obs_int_comm_3d( 2, 2, kprofno, kpi, kpj, kpk, igrdi, igrdj, gdepw(:,:,:,Kmm), &
         &                     zgdepw )
 
       DO jobs = 1, kprofno

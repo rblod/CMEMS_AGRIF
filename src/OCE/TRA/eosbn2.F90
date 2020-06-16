@@ -28,7 +28,8 @@ MODULE eosbn2
    !!   eos_insitu    : Compute the in situ density
    !!   eos_insitu_pot: Compute the insitu and surface referenced potential volumic mass
    !!   eos_insitu_2d : Compute the in situ density for 2d fields
-   !!   bn2           : Compute the Brunt-Vaisala frequency
+   !!   bn2           : compute the Brunt-Vaisala frequency
+   !!   eos_pt_from_ct: compute the potential temperature from the Conservative Temperature
    !!   eos_rab       : generic interface of in situ thermal/haline expansion ratio 
    !!   eos_rab_3d    : compute in situ thermal/haline expansion ratio
    !!   eos_rab_2d    : compute in situ thermal/haline expansion ratio for 2d fields
@@ -73,9 +74,9 @@ MODULE eosbn2
    PUBLIC   eos_init       ! called by istate module
 
    !                               !!** Namelist nameos **
-   LOGICAL , PUBLIC ::   ln_TEOS10   ! determine if eos_pt_from_ct is used to compute sst_m
-   LOGICAL , PUBLIC ::   ln_EOS80   ! determine if eos_pt_from_ct is used to compute sst_m
-   LOGICAL , PUBLIC ::   ln_SEOS   ! determine if eos_pt_from_ct is used to compute sst_m
+   LOGICAL , PUBLIC ::   ln_TEOS10
+   LOGICAL , PUBLIC ::   ln_EOS80
+   LOGICAL , PUBLIC ::   ln_SEOS
 
    ! Parameters
    LOGICAL , PUBLIC    ::   l_useCT         ! =T in ln_TEOS10=T (i.e. use eos_pt_from_ct to compute sst_m), =F otherwise
@@ -177,10 +178,10 @@ MODULE eosbn2
    REAL(wp) ::   BPE002
 
    !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: eosbn2.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: eosbn2.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -189,17 +190,17 @@ CONTAINS
       !!----------------------------------------------------------------------
       !!                   ***  ROUTINE eos_insitu  ***
       !!
-      !! ** Purpose :   Compute the in situ density (ratio rho/rau0) from
+      !! ** Purpose :   Compute the in situ density (ratio rho/rho0) from
       !!       potential temperature and salinity using an equation of state
       !!       selected in the nameos namelist
       !!
-      !! ** Method  :   prd(t,s,z) = ( rho(t,s,z) - rau0 ) / rau0
+      !! ** Method  :   prd(t,s,z) = ( rho(t,s,z) - rho0 ) / rho0
       !!         with   prd    in situ density anomaly      no units
       !!                t      TEOS10: CT or EOS80: PT      Celsius
       !!                s      TEOS10: SA or EOS80: SP      TEOS10: g/kg or EOS80: psu
       !!                z      depth                        meters
       !!                rho    in situ density              kg/m^3
-      !!                rau0   reference density            kg/m^3
+      !!                rho0   reference density            kg/m^3
       !!
       !!     ln_teos10 : polynomial TEOS-10 equation of state is used for rho(t,s,z).
       !!         Check value: rho = 1028.21993233072 kg/m^3 for z=3000 dbar, ct=3 Celsius, sa=35.5 g/kg
@@ -208,7 +209,7 @@ CONTAINS
       !!         Check value: rho = 1028.35011066567 kg/m^3 for z=3000 dbar, pt=3 Celsius, sp=35.5 psu
       !!
       !!     ln_seos : simplified equation of state
-      !!              prd(t,s,z) = ( -a0*(1+lambda/2*(T-T0)+mu*z+nu*(S-S0))*(T-T0) + b0*(S-S0) ) / rau0
+      !!              prd(t,s,z) = ( -a0*(1+lambda/2*(T-T0)+mu*z+nu*(S-S0))*(T-T0) + b0*(S-S0) ) / rho0
       !!              linear case function of T only: rn_alpha<>0, other coefficients = 0
       !!              linear eos function of T and S: rn_alpha and rn_beta<>0, other coefficients=0
       !!              Vallis like equation: use default values of coefficients
@@ -235,66 +236,58 @@ CONTAINS
       !
       CASE( np_teos10, np_eos80 )                !==  polynomial TEOS-10 / EOS-80 ==!
          !
-         DO jk = 1, jpkm1
-            DO jj = 1, jpj
-               DO ji = 1, jpi
-                  !
-                  zh  = pdep(ji,jj,jk) * r1_Z0                                  ! depth
-                  zt  = pts (ji,jj,jk,jp_tem) * r1_T0                           ! temperature
-                  zs  = SQRT( ABS( pts(ji,jj,jk,jp_sal) + rdeltaS ) * r1_S0 )   ! square root salinity
-                  ztm = tmask(ji,jj,jk)                                         ! tmask
-                  !
-                  zn3 = EOS013*zt   &
-                     &   + EOS103*zs+EOS003
-                     !
-                  zn2 = (EOS022*zt   &
-                     &   + EOS112*zs+EOS012)*zt   &
-                     &   + (EOS202*zs+EOS102)*zs+EOS002
-                     !
-                  zn1 = (((EOS041*zt   &
-                     &   + EOS131*zs+EOS031)*zt   &
-                     &   + (EOS221*zs+EOS121)*zs+EOS021)*zt   &
-                     &   + ((EOS311*zs+EOS211)*zs+EOS111)*zs+EOS011)*zt   &
-                     &   + (((EOS401*zs+EOS301)*zs+EOS201)*zs+EOS101)*zs+EOS001
-                     !
-                  zn0 = (((((EOS060*zt   &
-                     &   + EOS150*zs+EOS050)*zt   &
-                     &   + (EOS240*zs+EOS140)*zs+EOS040)*zt   &
-                     &   + ((EOS330*zs+EOS230)*zs+EOS130)*zs+EOS030)*zt   &
-                     &   + (((EOS420*zs+EOS320)*zs+EOS220)*zs+EOS120)*zs+EOS020)*zt   &
-                     &   + ((((EOS510*zs+EOS410)*zs+EOS310)*zs+EOS210)*zs+EOS110)*zs+EOS010)*zt   &
-                     &   + (((((EOS600*zs+EOS500)*zs+EOS400)*zs+EOS300)*zs+EOS200)*zs+EOS100)*zs+EOS000
-                     !
-                  zn  = ( ( zn3 * zh + zn2 ) * zh + zn1 ) * zh + zn0
-                  !
-                  prd(ji,jj,jk) = (  zn * r1_rau0 - 1._wp  ) * ztm  ! density anomaly (masked)
-                  !
-               END DO
-            END DO
-         END DO
+         DO_3D_11_11( 1, jpkm1 )
+            !
+            zh  = pdep(ji,jj,jk) * r1_Z0                                  ! depth
+            zt  = pts (ji,jj,jk,jp_tem) * r1_T0                           ! temperature
+            zs  = SQRT( ABS( pts(ji,jj,jk,jp_sal) + rdeltaS ) * r1_S0 )   ! square root salinity
+            ztm = tmask(ji,jj,jk)                                         ! tmask
+            !
+            zn3 = EOS013*zt   &
+               &   + EOS103*zs+EOS003
+               !
+            zn2 = (EOS022*zt   &
+               &   + EOS112*zs+EOS012)*zt   &
+               &   + (EOS202*zs+EOS102)*zs+EOS002
+               !
+            zn1 = (((EOS041*zt   &
+               &   + EOS131*zs+EOS031)*zt   &
+               &   + (EOS221*zs+EOS121)*zs+EOS021)*zt   &
+               &   + ((EOS311*zs+EOS211)*zs+EOS111)*zs+EOS011)*zt   &
+               &   + (((EOS401*zs+EOS301)*zs+EOS201)*zs+EOS101)*zs+EOS001
+               !
+            zn0 = (((((EOS060*zt   &
+               &   + EOS150*zs+EOS050)*zt   &
+               &   + (EOS240*zs+EOS140)*zs+EOS040)*zt   &
+               &   + ((EOS330*zs+EOS230)*zs+EOS130)*zs+EOS030)*zt   &
+               &   + (((EOS420*zs+EOS320)*zs+EOS220)*zs+EOS120)*zs+EOS020)*zt   &
+               &   + ((((EOS510*zs+EOS410)*zs+EOS310)*zs+EOS210)*zs+EOS110)*zs+EOS010)*zt   &
+               &   + (((((EOS600*zs+EOS500)*zs+EOS400)*zs+EOS300)*zs+EOS200)*zs+EOS100)*zs+EOS000
+               !
+            zn  = ( ( zn3 * zh + zn2 ) * zh + zn1 ) * zh + zn0
+            !
+            prd(ji,jj,jk) = (  zn * r1_rho0 - 1._wp  ) * ztm  ! density anomaly (masked)
+            !
+         END_3D
          !
       CASE( np_seos )                !==  simplified EOS  ==!
          !
-         DO jk = 1, jpkm1
-            DO jj = 1, jpj
-               DO ji = 1, jpi
-                  zt  = pts  (ji,jj,jk,jp_tem) - 10._wp
-                  zs  = pts  (ji,jj,jk,jp_sal) - 35._wp
-                  zh  = pdep (ji,jj,jk)
-                  ztm = tmask(ji,jj,jk)
-                  !
-                  zn =  - rn_a0 * ( 1._wp + 0.5_wp*rn_lambda1*zt + rn_mu1*zh ) * zt   &
-                     &  + rn_b0 * ( 1._wp - 0.5_wp*rn_lambda2*zs - rn_mu2*zh ) * zs   &
-                     &  - rn_nu * zt * zs
-                     !                                 
-                  prd(ji,jj,jk) = zn * r1_rau0 * ztm                ! density anomaly (masked)
-               END DO
-            END DO
-         END DO
+         DO_3D_11_11( 1, jpkm1 )
+            zt  = pts  (ji,jj,jk,jp_tem) - 10._wp
+            zs  = pts  (ji,jj,jk,jp_sal) - 35._wp
+            zh  = pdep (ji,jj,jk)
+            ztm = tmask(ji,jj,jk)
+            !
+            zn =  - rn_a0 * ( 1._wp + 0.5_wp*rn_lambda1*zt + rn_mu1*zh ) * zt   &
+               &  + rn_b0 * ( 1._wp - 0.5_wp*rn_lambda2*zs - rn_mu2*zh ) * zs   &
+               &  - rn_nu * zt * zs
+               !                                 
+            prd(ji,jj,jk) = zn * r1_rho0 * ztm                ! density anomaly (masked)
+         END_3D
          !
       END SELECT
       !
-      IF(ln_ctl)   CALL prt_ctl( tab3d_1=prd, clinfo1=' eos-insitu  : ', kdim=jpk )
+      IF(sn_cfctl%l_prtctl)   CALL prt_ctl( tab3d_1=prd, clinfo1=' eos-insitu  : ', kdim=jpk )
       !
       IF( ln_timing )   CALL timing_stop('eos-insitu')
       !
@@ -305,7 +298,7 @@ CONTAINS
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE eos_insitu_pot  ***
       !!
-      !! ** Purpose :   Compute the in situ density (ratio rho/rau0) and the
+      !! ** Purpose :   Compute the in situ density (ratio rho/rho0) and the
       !!      potential volumic mass (Kg/m3) from potential temperature and
       !!      salinity fields using an equation of state selected in the
       !!     namelist.
@@ -343,166 +336,62 @@ CONTAINS
               zsign(jsmp+1) = -1._wp
             END DO
             !
-            DO jk = 1, jpkm1
-               DO jj = 1, jpj
-                  DO ji = 1, jpi
+            DO_3D_11_11( 1, jpkm1 )
+               !
+               ! compute density (2*nn_sto_eos) times:
+               ! (1) for t+dt, s+ds (with the random TS fluctutation computed in sto_pts)
+               ! (2) for t-dt, s-ds (with the opposite fluctuation)
+               DO jsmp = 1, nn_sto_eos*2
+                  jdof   = (jsmp + 1) / 2
+                  zh     = pdep(ji,jj,jk) * r1_Z0                                  ! depth
+                  zt     = (pts (ji,jj,jk,jp_tem) + pts_ran(ji,jj,jk,jp_tem,jdof) * zsign(jsmp)) * r1_T0    ! temperature
+                  zstemp = pts  (ji,jj,jk,jp_sal) + pts_ran(ji,jj,jk,jp_sal,jdof) * zsign(jsmp)
+                  zs     = SQRT( ABS( zstemp + rdeltaS ) * r1_S0 )   ! square root salinity
+                  ztm    = tmask(ji,jj,jk)                                         ! tmask
+                  !
+                  zn3 = EOS013*zt   &
+                     &   + EOS103*zs+EOS003
                      !
-                     ! compute density (2*nn_sto_eos) times:
-                     ! (1) for t+dt, s+ds (with the random TS fluctutation computed in sto_pts)
-                     ! (2) for t-dt, s-ds (with the opposite fluctuation)
-                     DO jsmp = 1, nn_sto_eos*2
-                        jdof   = (jsmp + 1) / 2
-                        zh     = pdep(ji,jj,jk) * r1_Z0                                  ! depth
-                        zt     = (pts (ji,jj,jk,jp_tem) + pts_ran(ji,jj,jk,jp_tem,jdof) * zsign(jsmp)) * r1_T0    ! temperature
-                        zstemp = pts  (ji,jj,jk,jp_sal) + pts_ran(ji,jj,jk,jp_sal,jdof) * zsign(jsmp)
-                        zs     = SQRT( ABS( zstemp + rdeltaS ) * r1_S0 )   ! square root salinity
-                        ztm    = tmask(ji,jj,jk)                                         ! tmask
-                        !
-                        zn3 = EOS013*zt   &
-                           &   + EOS103*zs+EOS003
-                           !
-                        zn2 = (EOS022*zt   &
-                           &   + EOS112*zs+EOS012)*zt   &
-                           &   + (EOS202*zs+EOS102)*zs+EOS002
-                           !
-                        zn1 = (((EOS041*zt   &
-                           &   + EOS131*zs+EOS031)*zt   &
-                           &   + (EOS221*zs+EOS121)*zs+EOS021)*zt   &
-                           &   + ((EOS311*zs+EOS211)*zs+EOS111)*zs+EOS011)*zt   &
-                           &   + (((EOS401*zs+EOS301)*zs+EOS201)*zs+EOS101)*zs+EOS001
-                           !
-                        zn0_sto(jsmp) = (((((EOS060*zt   &
-                           &   + EOS150*zs+EOS050)*zt   &
-                           &   + (EOS240*zs+EOS140)*zs+EOS040)*zt   &
-                           &   + ((EOS330*zs+EOS230)*zs+EOS130)*zs+EOS030)*zt   &
-                           &   + (((EOS420*zs+EOS320)*zs+EOS220)*zs+EOS120)*zs+EOS020)*zt   &
-                           &   + ((((EOS510*zs+EOS410)*zs+EOS310)*zs+EOS210)*zs+EOS110)*zs+EOS010)*zt   &
-                           &   + (((((EOS600*zs+EOS500)*zs+EOS400)*zs+EOS300)*zs+EOS200)*zs+EOS100)*zs+EOS000
-                           !
-                        zn_sto(jsmp)  = ( ( zn3 * zh + zn2 ) * zh + zn1 ) * zh + zn0_sto(jsmp)
-                     END DO
+                  zn2 = (EOS022*zt   &
+                     &   + EOS112*zs+EOS012)*zt   &
+                     &   + (EOS202*zs+EOS102)*zs+EOS002
                      !
-                     ! compute stochastic density as the mean of the (2*nn_sto_eos) densities
-                     prhop(ji,jj,jk) = 0._wp ; prd(ji,jj,jk) = 0._wp
-                     DO jsmp = 1, nn_sto_eos*2
-                        prhop(ji,jj,jk) = prhop(ji,jj,jk) + zn0_sto(jsmp)                      ! potential density referenced at the surface
-                        !
-                        prd(ji,jj,jk) = prd(ji,jj,jk) + (  zn_sto(jsmp) * r1_rau0 - 1._wp  )   ! density anomaly (masked)
-                     END DO
-                     prhop(ji,jj,jk) = 0.5_wp * prhop(ji,jj,jk) * ztm / nn_sto_eos
-                     prd  (ji,jj,jk) = 0.5_wp * prd  (ji,jj,jk) * ztm / nn_sto_eos
-                  END DO
+                  zn1 = (((EOS041*zt   &
+                     &   + EOS131*zs+EOS031)*zt   &
+                     &   + (EOS221*zs+EOS121)*zs+EOS021)*zt   &
+                     &   + ((EOS311*zs+EOS211)*zs+EOS111)*zs+EOS011)*zt   &
+                     &   + (((EOS401*zs+EOS301)*zs+EOS201)*zs+EOS101)*zs+EOS001
+                     !
+                  zn0_sto(jsmp) = (((((EOS060*zt   &
+                     &   + EOS150*zs+EOS050)*zt   &
+                     &   + (EOS240*zs+EOS140)*zs+EOS040)*zt   &
+                     &   + ((EOS330*zs+EOS230)*zs+EOS130)*zs+EOS030)*zt   &
+                     &   + (((EOS420*zs+EOS320)*zs+EOS220)*zs+EOS120)*zs+EOS020)*zt   &
+                     &   + ((((EOS510*zs+EOS410)*zs+EOS310)*zs+EOS210)*zs+EOS110)*zs+EOS010)*zt   &
+                     &   + (((((EOS600*zs+EOS500)*zs+EOS400)*zs+EOS300)*zs+EOS200)*zs+EOS100)*zs+EOS000
+                     !
+                  zn_sto(jsmp)  = ( ( zn3 * zh + zn2 ) * zh + zn1 ) * zh + zn0_sto(jsmp)
                END DO
-            END DO
+               !
+               ! compute stochastic density as the mean of the (2*nn_sto_eos) densities
+               prhop(ji,jj,jk) = 0._wp ; prd(ji,jj,jk) = 0._wp
+               DO jsmp = 1, nn_sto_eos*2
+                  prhop(ji,jj,jk) = prhop(ji,jj,jk) + zn0_sto(jsmp)                      ! potential density referenced at the surface
+                  !
+                  prd(ji,jj,jk) = prd(ji,jj,jk) + (  zn_sto(jsmp) * r1_rho0 - 1._wp  )   ! density anomaly (masked)
+               END DO
+               prhop(ji,jj,jk) = 0.5_wp * prhop(ji,jj,jk) * ztm / nn_sto_eos
+               prd  (ji,jj,jk) = 0.5_wp * prd  (ji,jj,jk) * ztm / nn_sto_eos
+            END_3D
             DEALLOCATE(zn0_sto,zn_sto,zsign)
          ! Non-stochastic equation of state
          ELSE
-            DO jk = 1, jpkm1
-               DO jj = 1, jpj
-                  DO ji = 1, jpi
-                     !
-                     zh  = pdep(ji,jj,jk) * r1_Z0                                  ! depth
-                     zt  = pts (ji,jj,jk,jp_tem) * r1_T0                           ! temperature
-                     zs  = SQRT( ABS( pts(ji,jj,jk,jp_sal) + rdeltaS ) * r1_S0 )   ! square root salinity
-                     ztm = tmask(ji,jj,jk)                                         ! tmask
-                     !
-                     zn3 = EOS013*zt   &
-                        &   + EOS103*zs+EOS003
-                        !
-                     zn2 = (EOS022*zt   &
-                        &   + EOS112*zs+EOS012)*zt   &
-                        &   + (EOS202*zs+EOS102)*zs+EOS002
-                        !
-                     zn1 = (((EOS041*zt   &
-                        &   + EOS131*zs+EOS031)*zt   &
-                        &   + (EOS221*zs+EOS121)*zs+EOS021)*zt   &
-                        &   + ((EOS311*zs+EOS211)*zs+EOS111)*zs+EOS011)*zt   &
-                        &   + (((EOS401*zs+EOS301)*zs+EOS201)*zs+EOS101)*zs+EOS001
-                        !
-                     zn0 = (((((EOS060*zt   &
-                        &   + EOS150*zs+EOS050)*zt   &
-                        &   + (EOS240*zs+EOS140)*zs+EOS040)*zt   &
-                        &   + ((EOS330*zs+EOS230)*zs+EOS130)*zs+EOS030)*zt   &
-                        &   + (((EOS420*zs+EOS320)*zs+EOS220)*zs+EOS120)*zs+EOS020)*zt   &
-                        &   + ((((EOS510*zs+EOS410)*zs+EOS310)*zs+EOS210)*zs+EOS110)*zs+EOS010)*zt   &
-                        &   + (((((EOS600*zs+EOS500)*zs+EOS400)*zs+EOS300)*zs+EOS200)*zs+EOS100)*zs+EOS000
-                        !
-                     zn  = ( ( zn3 * zh + zn2 ) * zh + zn1 ) * zh + zn0
-                     !
-                     prhop(ji,jj,jk) = zn0 * ztm                           ! potential density referenced at the surface
-                     !
-                     prd(ji,jj,jk) = (  zn * r1_rau0 - 1._wp  ) * ztm      ! density anomaly (masked)
-                  END DO
-               END DO
-            END DO
-         ENDIF
-         
-      CASE( np_seos )                !==  simplified EOS  ==!
-         !
-         DO jk = 1, jpkm1
-            DO jj = 1, jpj
-               DO ji = 1, jpi
-                  zt  = pts  (ji,jj,jk,jp_tem) - 10._wp
-                  zs  = pts  (ji,jj,jk,jp_sal) - 35._wp
-                  zh  = pdep (ji,jj,jk)
-                  ztm = tmask(ji,jj,jk)
-                  !                                                     ! potential density referenced at the surface
-                  zn =  - rn_a0 * ( 1._wp + 0.5_wp*rn_lambda1*zt ) * zt   &
-                     &  + rn_b0 * ( 1._wp - 0.5_wp*rn_lambda2*zs ) * zs   &
-                     &  - rn_nu * zt * zs
-                  prhop(ji,jj,jk) = ( rau0 + zn ) * ztm
-                  !                                                     ! density anomaly (masked)
-                  zn = zn - ( rn_a0 * rn_mu1 * zt + rn_b0 * rn_mu2 * zs ) * zh
-                  prd(ji,jj,jk) = zn * r1_rau0 * ztm
-                  !
-               END DO
-            END DO
-         END DO
-         !
-      END SELECT
-      !
-      IF(ln_ctl)   CALL prt_ctl( tab3d_1=prd, clinfo1=' eos-pot: ', tab3d_2=prhop, clinfo2=' pot : ', kdim=jpk )
-      !
-      IF( ln_timing )   CALL timing_stop('eos-pot')
-      !
-   END SUBROUTINE eos_insitu_pot
-
-
-   SUBROUTINE eos_insitu_2d( pts, pdep, prd )
-      !!----------------------------------------------------------------------
-      !!                  ***  ROUTINE eos_insitu_2d  ***
-      !!
-      !! ** Purpose :   Compute the in situ density (ratio rho/rau0) from
-      !!      potential temperature and salinity using an equation of state
-      !!      selected in the nameos namelist. * 2D field case
-      !!
-      !! ** Action  : - prd , the in situ density (no units) (unmasked)
-      !!
-      !!----------------------------------------------------------------------
-      REAL(wp), DIMENSION(jpi,jpj,jpts), INTENT(in   ) ::   pts   ! 1 : potential temperature  [Celsius]
-      !                                                           ! 2 : salinity               [psu]
-      REAL(wp), DIMENSION(jpi,jpj)     , INTENT(in   ) ::   pdep  ! depth                      [m]
-      REAL(wp), DIMENSION(jpi,jpj)     , INTENT(  out) ::   prd   ! in situ density
-      !
-      INTEGER  ::   ji, jj, jk                ! dummy loop indices
-      REAL(wp) ::   zt , zh , zs              ! local scalars
-      REAL(wp) ::   zn , zn0, zn1, zn2, zn3   !   -      -
-      !!----------------------------------------------------------------------
-      !
-      IF( ln_timing )   CALL timing_start('eos2d')
-      !
-      prd(:,:) = 0._wp
-      !
-      SELECT CASE( neos )
-      !
-      CASE( np_teos10, np_eos80 )                !==  polynomial TEOS-10 / EOS-80 ==!
-         !
-         DO jj = 1, jpjm1
-            DO ji = 1, fs_jpim1   ! vector opt.
+            DO_3D_11_11( 1, jpkm1 )
                !
-               zh  = pdep(ji,jj) * r1_Z0                                  ! depth
-               zt  = pts (ji,jj,jp_tem) * r1_T0                           ! temperature
-               zs  = SQRT( ABS( pts(ji,jj,jp_sal) + rdeltaS ) * r1_S0 )   ! square root salinity
+               zh  = pdep(ji,jj,jk) * r1_Z0                                  ! depth
+               zt  = pts (ji,jj,jk,jp_tem) * r1_T0                           ! temperature
+               zs  = SQRT( ABS( pts(ji,jj,jk,jp_sal) + rdeltaS ) * r1_S0 )   ! square root salinity
+               ztm = tmask(ji,jj,jk)                                         ! tmask
                !
                zn3 = EOS013*zt   &
                   &   + EOS103*zs+EOS003
@@ -527,43 +416,127 @@ CONTAINS
                   !
                zn  = ( ( zn3 * zh + zn2 ) * zh + zn1 ) * zh + zn0
                !
-               prd(ji,jj) = zn * r1_rau0 - 1._wp               ! unmasked in situ density anomaly
+               prhop(ji,jj,jk) = zn0 * ztm                           ! potential density referenced at the surface
                !
-            END DO
-         END DO
-         !
-         CALL lbc_lnk( 'eosbn2', prd, 'T', 1. )                    ! Lateral boundary conditions
-         !
+               prd(ji,jj,jk) = (  zn * r1_rho0 - 1._wp  ) * ztm      ! density anomaly (masked)
+            END_3D
+         ENDIF
+         
       CASE( np_seos )                !==  simplified EOS  ==!
          !
-         DO jj = 1, jpjm1
-            DO ji = 1, fs_jpim1   ! vector opt.
-               !
-               zt    = pts  (ji,jj,jp_tem)  - 10._wp
-               zs    = pts  (ji,jj,jp_sal)  - 35._wp
-               zh    = pdep (ji,jj)                         ! depth at the partial step level
-               !
-               zn =  - rn_a0 * ( 1._wp + 0.5_wp*rn_lambda1*zt + rn_mu1*zh ) * zt   &
-                  &  + rn_b0 * ( 1._wp - 0.5_wp*rn_lambda2*zs - rn_mu2*zh ) * zs   &
-                  &  - rn_nu * zt * zs
-                  !
-               prd(ji,jj) = zn * r1_rau0               ! unmasked in situ density anomaly
-               !
-            END DO
-         END DO
-         !
-         CALL lbc_lnk( 'eosbn2', prd, 'T', 1. )                    ! Lateral boundary conditions
+         DO_3D_11_11( 1, jpkm1 )
+            zt  = pts  (ji,jj,jk,jp_tem) - 10._wp
+            zs  = pts  (ji,jj,jk,jp_sal) - 35._wp
+            zh  = pdep (ji,jj,jk)
+            ztm = tmask(ji,jj,jk)
+            !                                                     ! potential density referenced at the surface
+            zn =  - rn_a0 * ( 1._wp + 0.5_wp*rn_lambda1*zt ) * zt   &
+               &  + rn_b0 * ( 1._wp - 0.5_wp*rn_lambda2*zs ) * zs   &
+               &  - rn_nu * zt * zs
+            prhop(ji,jj,jk) = ( rho0 + zn ) * ztm
+            !                                                     ! density anomaly (masked)
+            zn = zn - ( rn_a0 * rn_mu1 * zt + rn_b0 * rn_mu2 * zs ) * zh
+            prd(ji,jj,jk) = zn * r1_rho0 * ztm
+            !
+         END_3D
          !
       END SELECT
       !
-      IF(ln_ctl)   CALL prt_ctl( tab2d_1=prd, clinfo1=' eos2d: ' )
+      IF(sn_cfctl%l_prtctl)   CALL prt_ctl( tab3d_1=prd, clinfo1=' eos-pot: ', tab3d_2=prhop, clinfo2=' pot : ', kdim=jpk )
+      !
+      IF( ln_timing )   CALL timing_stop('eos-pot')
+      !
+   END SUBROUTINE eos_insitu_pot
+
+
+   SUBROUTINE eos_insitu_2d( pts, pdep, prd )
+      !!----------------------------------------------------------------------
+      !!                  ***  ROUTINE eos_insitu_2d  ***
+      !!
+      !! ** Purpose :   Compute the in situ density (ratio rho/rho0) from
+      !!      potential temperature and salinity using an equation of state
+      !!      selected in the nameos namelist. * 2D field case
+      !!
+      !! ** Action  : - prd , the in situ density (no units) (unmasked)
+      !!
+      !!----------------------------------------------------------------------
+      REAL(wp), DIMENSION(jpi,jpj,jpts), INTENT(in   ) ::   pts   ! 1 : potential temperature  [Celsius]
+      !                                                           ! 2 : salinity               [psu]
+      REAL(wp), DIMENSION(jpi,jpj)     , INTENT(in   ) ::   pdep  ! depth                      [m]
+      REAL(wp), DIMENSION(jpi,jpj)     , INTENT(  out) ::   prd   ! in situ density
+      !
+      INTEGER  ::   ji, jj, jk                ! dummy loop indices
+      REAL(wp) ::   zt , zh , zs              ! local scalars
+      REAL(wp) ::   zn , zn0, zn1, zn2, zn3   !   -      -
+      !!----------------------------------------------------------------------
+      !
+      IF( ln_timing )   CALL timing_start('eos2d')
+      !
+      prd(:,:) = 0._wp
+      !
+      SELECT CASE( neos )
+      !
+      CASE( np_teos10, np_eos80 )                !==  polynomial TEOS-10 / EOS-80 ==!
+         !
+         DO_2D_11_11
+            !
+            zh  = pdep(ji,jj) * r1_Z0                                  ! depth
+            zt  = pts (ji,jj,jp_tem) * r1_T0                           ! temperature
+            zs  = SQRT( ABS( pts(ji,jj,jp_sal) + rdeltaS ) * r1_S0 )   ! square root salinity
+            !
+            zn3 = EOS013*zt   &
+               &   + EOS103*zs+EOS003
+               !
+            zn2 = (EOS022*zt   &
+               &   + EOS112*zs+EOS012)*zt   &
+               &   + (EOS202*zs+EOS102)*zs+EOS002
+               !
+            zn1 = (((EOS041*zt   &
+               &   + EOS131*zs+EOS031)*zt   &
+               &   + (EOS221*zs+EOS121)*zs+EOS021)*zt   &
+               &   + ((EOS311*zs+EOS211)*zs+EOS111)*zs+EOS011)*zt   &
+               &   + (((EOS401*zs+EOS301)*zs+EOS201)*zs+EOS101)*zs+EOS001
+               !
+            zn0 = (((((EOS060*zt   &
+               &   + EOS150*zs+EOS050)*zt   &
+               &   + (EOS240*zs+EOS140)*zs+EOS040)*zt   &
+               &   + ((EOS330*zs+EOS230)*zs+EOS130)*zs+EOS030)*zt   &
+               &   + (((EOS420*zs+EOS320)*zs+EOS220)*zs+EOS120)*zs+EOS020)*zt   &
+               &   + ((((EOS510*zs+EOS410)*zs+EOS310)*zs+EOS210)*zs+EOS110)*zs+EOS010)*zt   &
+               &   + (((((EOS600*zs+EOS500)*zs+EOS400)*zs+EOS300)*zs+EOS200)*zs+EOS100)*zs+EOS000
+               !
+            zn  = ( ( zn3 * zh + zn2 ) * zh + zn1 ) * zh + zn0
+            !
+            prd(ji,jj) = zn * r1_rho0 - 1._wp               ! unmasked in situ density anomaly
+            !
+         END_2D
+         !
+      CASE( np_seos )                !==  simplified EOS  ==!
+         !
+         DO_2D_11_11
+            !
+            zt    = pts  (ji,jj,jp_tem)  - 10._wp
+            zs    = pts  (ji,jj,jp_sal)  - 35._wp
+            zh    = pdep (ji,jj)                         ! depth at the partial step level
+            !
+            zn =  - rn_a0 * ( 1._wp + 0.5_wp*rn_lambda1*zt + rn_mu1*zh ) * zt   &
+               &  + rn_b0 * ( 1._wp - 0.5_wp*rn_lambda2*zs - rn_mu2*zh ) * zs   &
+               &  - rn_nu * zt * zs
+               !
+            prd(ji,jj) = zn * r1_rho0               ! unmasked in situ density anomaly
+            !
+         END_2D
+         !
+      END SELECT
+      !
+      IF(sn_cfctl%l_prtctl)   CALL prt_ctl( tab2d_1=prd, clinfo1=' eos2d: ' )
       !
       IF( ln_timing )   CALL timing_stop('eos2d')
       !
    END SUBROUTINE eos_insitu_2d
 
 
-   SUBROUTINE rab_3d( pts, pab )
+   SUBROUTINE rab_3d( pts, pab, Kmm )
       !!----------------------------------------------------------------------
       !!                 ***  ROUTINE rab_3d  ***
       !!
@@ -573,6 +546,7 @@ CONTAINS
       !!
       !! ** Action  : - pab     : thermal/haline expansion ratio at T-points
       !!----------------------------------------------------------------------
+      INTEGER                              , INTENT(in   ) ::   Kmm   ! time level index
       REAL(wp), DIMENSION(jpi,jpj,jpk,jpts), INTENT(in   ) ::   pts   ! pot. temperature & salinity
       REAL(wp), DIMENSION(jpi,jpj,jpk,jpts), INTENT(  out) ::   pab   ! thermal/haline expansion ratio
       !
@@ -587,80 +561,72 @@ CONTAINS
       !
       CASE( np_teos10, np_eos80 )                !==  polynomial TEOS-10 / EOS-80 ==!
          !
-         DO jk = 1, jpkm1
-            DO jj = 1, jpj
-               DO ji = 1, jpi
-                  !
-                  zh  = gdept_n(ji,jj,jk) * r1_Z0                                ! depth
-                  zt  = pts (ji,jj,jk,jp_tem) * r1_T0                           ! temperature
-                  zs  = SQRT( ABS( pts(ji,jj,jk,jp_sal) + rdeltaS ) * r1_S0 )   ! square root salinity
-                  ztm = tmask(ji,jj,jk)                                         ! tmask
-                  !
-                  ! alpha
-                  zn3 = ALP003
-                  !
-                  zn2 = ALP012*zt + ALP102*zs+ALP002
-                  !
-                  zn1 = ((ALP031*zt   &
-                     &   + ALP121*zs+ALP021)*zt   &
-                     &   + (ALP211*zs+ALP111)*zs+ALP011)*zt   &
-                     &   + ((ALP301*zs+ALP201)*zs+ALP101)*zs+ALP001
-                     !
-                  zn0 = ((((ALP050*zt   &
-                     &   + ALP140*zs+ALP040)*zt   &
-                     &   + (ALP230*zs+ALP130)*zs+ALP030)*zt   &
-                     &   + ((ALP320*zs+ALP220)*zs+ALP120)*zs+ALP020)*zt   &
-                     &   + (((ALP410*zs+ALP310)*zs+ALP210)*zs+ALP110)*zs+ALP010)*zt   &
-                     &   + ((((ALP500*zs+ALP400)*zs+ALP300)*zs+ALP200)*zs+ALP100)*zs+ALP000
-                     !
-                  zn  = ( ( zn3 * zh + zn2 ) * zh + zn1 ) * zh + zn0
-                  !
-                  pab(ji,jj,jk,jp_tem) = zn * r1_rau0 * ztm
-                  !
-                  ! beta
-                  zn3 = BET003
-                  !
-                  zn2 = BET012*zt + BET102*zs+BET002
-                  !
-                  zn1 = ((BET031*zt   &
-                     &   + BET121*zs+BET021)*zt   &
-                     &   + (BET211*zs+BET111)*zs+BET011)*zt   &
-                     &   + ((BET301*zs+BET201)*zs+BET101)*zs+BET001
-                     !
-                  zn0 = ((((BET050*zt   &
-                     &   + BET140*zs+BET040)*zt   &
-                     &   + (BET230*zs+BET130)*zs+BET030)*zt   &
-                     &   + ((BET320*zs+BET220)*zs+BET120)*zs+BET020)*zt   &
-                     &   + (((BET410*zs+BET310)*zs+BET210)*zs+BET110)*zs+BET010)*zt   &
-                     &   + ((((BET500*zs+BET400)*zs+BET300)*zs+BET200)*zs+BET100)*zs+BET000
-                     !
-                  zn  = ( ( zn3 * zh + zn2 ) * zh + zn1 ) * zh + zn0
-                  !
-                  pab(ji,jj,jk,jp_sal) = zn / zs * r1_rau0 * ztm
-                  !
-               END DO
-            END DO
-         END DO
+         DO_3D_11_11( 1, jpkm1 )
+            !
+            zh  = gdept(ji,jj,jk,Kmm) * r1_Z0                                ! depth
+            zt  = pts (ji,jj,jk,jp_tem) * r1_T0                           ! temperature
+            zs  = SQRT( ABS( pts(ji,jj,jk,jp_sal) + rdeltaS ) * r1_S0 )   ! square root salinity
+            ztm = tmask(ji,jj,jk)                                         ! tmask
+            !
+            ! alpha
+            zn3 = ALP003
+            !
+            zn2 = ALP012*zt + ALP102*zs+ALP002
+            !
+            zn1 = ((ALP031*zt   &
+               &   + ALP121*zs+ALP021)*zt   &
+               &   + (ALP211*zs+ALP111)*zs+ALP011)*zt   &
+               &   + ((ALP301*zs+ALP201)*zs+ALP101)*zs+ALP001
+               !
+            zn0 = ((((ALP050*zt   &
+               &   + ALP140*zs+ALP040)*zt   &
+               &   + (ALP230*zs+ALP130)*zs+ALP030)*zt   &
+               &   + ((ALP320*zs+ALP220)*zs+ALP120)*zs+ALP020)*zt   &
+               &   + (((ALP410*zs+ALP310)*zs+ALP210)*zs+ALP110)*zs+ALP010)*zt   &
+               &   + ((((ALP500*zs+ALP400)*zs+ALP300)*zs+ALP200)*zs+ALP100)*zs+ALP000
+               !
+            zn  = ( ( zn3 * zh + zn2 ) * zh + zn1 ) * zh + zn0
+            !
+            pab(ji,jj,jk,jp_tem) = zn * r1_rho0 * ztm
+            !
+            ! beta
+            zn3 = BET003
+            !
+            zn2 = BET012*zt + BET102*zs+BET002
+            !
+            zn1 = ((BET031*zt   &
+               &   + BET121*zs+BET021)*zt   &
+               &   + (BET211*zs+BET111)*zs+BET011)*zt   &
+               &   + ((BET301*zs+BET201)*zs+BET101)*zs+BET001
+               !
+            zn0 = ((((BET050*zt   &
+               &   + BET140*zs+BET040)*zt   &
+               &   + (BET230*zs+BET130)*zs+BET030)*zt   &
+               &   + ((BET320*zs+BET220)*zs+BET120)*zs+BET020)*zt   &
+               &   + (((BET410*zs+BET310)*zs+BET210)*zs+BET110)*zs+BET010)*zt   &
+               &   + ((((BET500*zs+BET400)*zs+BET300)*zs+BET200)*zs+BET100)*zs+BET000
+               !
+            zn  = ( ( zn3 * zh + zn2 ) * zh + zn1 ) * zh + zn0
+            !
+            pab(ji,jj,jk,jp_sal) = zn / zs * r1_rho0 * ztm
+            !
+         END_3D
          !
       CASE( np_seos )                  !==  simplified EOS  ==!
          !
-         DO jk = 1, jpkm1
-            DO jj = 1, jpj
-               DO ji = 1, jpi
-                  zt  = pts (ji,jj,jk,jp_tem) - 10._wp   ! pot. temperature anomaly (t-T0)
-                  zs  = pts (ji,jj,jk,jp_sal) - 35._wp   ! abs. salinity anomaly (s-S0)
-                  zh  = gdept_n(ji,jj,jk)                ! depth in meters at t-point
-                  ztm = tmask(ji,jj,jk)                  ! land/sea bottom mask = surf. mask
-                  !
-                  zn  = rn_a0 * ( 1._wp + rn_lambda1*zt + rn_mu1*zh ) + rn_nu*zs
-                  pab(ji,jj,jk,jp_tem) = zn * r1_rau0 * ztm   ! alpha
-                  !
-                  zn  = rn_b0 * ( 1._wp - rn_lambda2*zs - rn_mu2*zh ) - rn_nu*zt
-                  pab(ji,jj,jk,jp_sal) = zn * r1_rau0 * ztm   ! beta
-                  !
-               END DO
-            END DO
-         END DO
+         DO_3D_11_11( 1, jpkm1 )
+            zt  = pts (ji,jj,jk,jp_tem) - 10._wp   ! pot. temperature anomaly (t-T0)
+            zs  = pts (ji,jj,jk,jp_sal) - 35._wp   ! abs. salinity anomaly (s-S0)
+            zh  = gdept(ji,jj,jk,Kmm)                ! depth in meters at t-point
+            ztm = tmask(ji,jj,jk)                  ! land/sea bottom mask = surf. mask
+            !
+            zn  = rn_a0 * ( 1._wp + rn_lambda1*zt + rn_mu1*zh ) + rn_nu*zs
+            pab(ji,jj,jk,jp_tem) = zn * r1_rho0 * ztm   ! alpha
+            !
+            zn  = rn_b0 * ( 1._wp - rn_lambda2*zs - rn_mu2*zh ) - rn_nu*zt
+            pab(ji,jj,jk,jp_sal) = zn * r1_rho0 * ztm   ! beta
+            !
+         END_3D
          !
       CASE DEFAULT
          WRITE(ctmp1,*) '          bad flag value for neos = ', neos
@@ -668,15 +634,15 @@ CONTAINS
          !
       END SELECT
       !
-      IF(ln_ctl)   CALL prt_ctl( tab3d_1=pab(:,:,:,jp_tem), clinfo1=' rab_3d_t: ', &
-         &                       tab3d_2=pab(:,:,:,jp_sal), clinfo2=' rab_3d_s : ', kdim=jpk )
+      IF(sn_cfctl%l_prtctl)   CALL prt_ctl( tab3d_1=pab(:,:,:,jp_tem), clinfo1=' rab_3d_t: ', &
+         &                                  tab3d_2=pab(:,:,:,jp_sal), clinfo2=' rab_3d_s : ', kdim=jpk )
       !
       IF( ln_timing )   CALL timing_stop('rab_3d')
       !
    END SUBROUTINE rab_3d
 
 
-   SUBROUTINE rab_2d( pts, pdep, pab )
+   SUBROUTINE rab_2d( pts, pdep, pab, Kmm )
       !!----------------------------------------------------------------------
       !!                 ***  ROUTINE rab_2d  ***
       !!
@@ -684,6 +650,7 @@ CONTAINS
       !!
       !! ** Action  : - pab     : thermal/haline expansion ratio at T-points
       !!----------------------------------------------------------------------
+      INTEGER                              , INTENT(in   ) ::   Kmm   ! time level index
       REAL(wp), DIMENSION(jpi,jpj,jpts)    , INTENT(in   ) ::   pts    ! pot. temperature & salinity
       REAL(wp), DIMENSION(jpi,jpj)         , INTENT(in   ) ::   pdep   ! depth                  [m]
       REAL(wp), DIMENSION(jpi,jpj,jpts)    , INTENT(  out) ::   pab    ! thermal/haline expansion ratio
@@ -701,80 +668,72 @@ CONTAINS
       !
       CASE( np_teos10, np_eos80 )                !==  polynomial TEOS-10 / EOS-80 ==!
          !
-         DO jj = 1, jpjm1
-            DO ji = 1, fs_jpim1   ! vector opt.
+         DO_2D_11_11
+            !
+            zh  = pdep(ji,jj) * r1_Z0                                  ! depth
+            zt  = pts (ji,jj,jp_tem) * r1_T0                           ! temperature
+            zs  = SQRT( ABS( pts(ji,jj,jp_sal) + rdeltaS ) * r1_S0 )   ! square root salinity
+            !
+            ! alpha
+            zn3 = ALP003
+            !
+            zn2 = ALP012*zt + ALP102*zs+ALP002
+            !
+            zn1 = ((ALP031*zt   &
+               &   + ALP121*zs+ALP021)*zt   &
+               &   + (ALP211*zs+ALP111)*zs+ALP011)*zt   &
+               &   + ((ALP301*zs+ALP201)*zs+ALP101)*zs+ALP001
                !
-               zh  = pdep(ji,jj) * r1_Z0                                  ! depth
-               zt  = pts (ji,jj,jp_tem) * r1_T0                           ! temperature
-               zs  = SQRT( ABS( pts(ji,jj,jp_sal) + rdeltaS ) * r1_S0 )   ! square root salinity
+            zn0 = ((((ALP050*zt   &
+               &   + ALP140*zs+ALP040)*zt   &
+               &   + (ALP230*zs+ALP130)*zs+ALP030)*zt   &
+               &   + ((ALP320*zs+ALP220)*zs+ALP120)*zs+ALP020)*zt   &
+               &   + (((ALP410*zs+ALP310)*zs+ALP210)*zs+ALP110)*zs+ALP010)*zt   &
+               &   + ((((ALP500*zs+ALP400)*zs+ALP300)*zs+ALP200)*zs+ALP100)*zs+ALP000
                !
-               ! alpha
-               zn3 = ALP003
+            zn  = ( ( zn3 * zh + zn2 ) * zh + zn1 ) * zh + zn0
+            !
+            pab(ji,jj,jp_tem) = zn * r1_rho0
+            !
+            ! beta
+            zn3 = BET003
+            !
+            zn2 = BET012*zt + BET102*zs+BET002
+            !
+            zn1 = ((BET031*zt   &
+               &   + BET121*zs+BET021)*zt   &
+               &   + (BET211*zs+BET111)*zs+BET011)*zt   &
+               &   + ((BET301*zs+BET201)*zs+BET101)*zs+BET001
                !
-               zn2 = ALP012*zt + ALP102*zs+ALP002
+            zn0 = ((((BET050*zt   &
+               &   + BET140*zs+BET040)*zt   &
+               &   + (BET230*zs+BET130)*zs+BET030)*zt   &
+               &   + ((BET320*zs+BET220)*zs+BET120)*zs+BET020)*zt   &
+               &   + (((BET410*zs+BET310)*zs+BET210)*zs+BET110)*zs+BET010)*zt   &
+               &   + ((((BET500*zs+BET400)*zs+BET300)*zs+BET200)*zs+BET100)*zs+BET000
                !
-               zn1 = ((ALP031*zt   &
-                  &   + ALP121*zs+ALP021)*zt   &
-                  &   + (ALP211*zs+ALP111)*zs+ALP011)*zt   &
-                  &   + ((ALP301*zs+ALP201)*zs+ALP101)*zs+ALP001
-                  !
-               zn0 = ((((ALP050*zt   &
-                  &   + ALP140*zs+ALP040)*zt   &
-                  &   + (ALP230*zs+ALP130)*zs+ALP030)*zt   &
-                  &   + ((ALP320*zs+ALP220)*zs+ALP120)*zs+ALP020)*zt   &
-                  &   + (((ALP410*zs+ALP310)*zs+ALP210)*zs+ALP110)*zs+ALP010)*zt   &
-                  &   + ((((ALP500*zs+ALP400)*zs+ALP300)*zs+ALP200)*zs+ALP100)*zs+ALP000
-                  !
-               zn  = ( ( zn3 * zh + zn2 ) * zh + zn1 ) * zh + zn0
-               !
-               pab(ji,jj,jp_tem) = zn * r1_rau0
-               !
-               ! beta
-               zn3 = BET003
-               !
-               zn2 = BET012*zt + BET102*zs+BET002
-               !
-               zn1 = ((BET031*zt   &
-                  &   + BET121*zs+BET021)*zt   &
-                  &   + (BET211*zs+BET111)*zs+BET011)*zt   &
-                  &   + ((BET301*zs+BET201)*zs+BET101)*zs+BET001
-                  !
-               zn0 = ((((BET050*zt   &
-                  &   + BET140*zs+BET040)*zt   &
-                  &   + (BET230*zs+BET130)*zs+BET030)*zt   &
-                  &   + ((BET320*zs+BET220)*zs+BET120)*zs+BET020)*zt   &
-                  &   + (((BET410*zs+BET310)*zs+BET210)*zs+BET110)*zs+BET010)*zt   &
-                  &   + ((((BET500*zs+BET400)*zs+BET300)*zs+BET200)*zs+BET100)*zs+BET000
-                  !
-               zn  = ( ( zn3 * zh + zn2 ) * zh + zn1 ) * zh + zn0
-               !
-               pab(ji,jj,jp_sal) = zn / zs * r1_rau0
-               !
-               !
-            END DO
-         END DO
-         !                            ! Lateral boundary conditions
-         CALL lbc_lnk_multi( 'eosbn2', pab(:,:,jp_tem), 'T', 1. , pab(:,:,jp_sal), 'T', 1. )                    
+            zn  = ( ( zn3 * zh + zn2 ) * zh + zn1 ) * zh + zn0
+            !
+            pab(ji,jj,jp_sal) = zn / zs * r1_rho0
+            !
+            !
+         END_2D
          !
       CASE( np_seos )                  !==  simplified EOS  ==!
          !
-         DO jj = 1, jpjm1
-            DO ji = 1, fs_jpim1   ! vector opt.
-               !
-               zt    = pts  (ji,jj,jp_tem) - 10._wp   ! pot. temperature anomaly (t-T0)
-               zs    = pts  (ji,jj,jp_sal) - 35._wp   ! abs. salinity anomaly (s-S0)
-               zh    = pdep (ji,jj)                   ! depth at the partial step level
-               !
-               zn  = rn_a0 * ( 1._wp + rn_lambda1*zt + rn_mu1*zh ) + rn_nu*zs
-               pab(ji,jj,jp_tem) = zn * r1_rau0   ! alpha
-               !
-               zn  = rn_b0 * ( 1._wp - rn_lambda2*zs - rn_mu2*zh ) - rn_nu*zt
-               pab(ji,jj,jp_sal) = zn * r1_rau0   ! beta
-               !
-            END DO
-         END DO
-         !                            ! Lateral boundary conditions
-         CALL lbc_lnk_multi( 'eosbn2', pab(:,:,jp_tem), 'T', 1. , pab(:,:,jp_sal), 'T', 1. )                    
+         DO_2D_11_11
+            !
+            zt    = pts  (ji,jj,jp_tem) - 10._wp   ! pot. temperature anomaly (t-T0)
+            zs    = pts  (ji,jj,jp_sal) - 35._wp   ! abs. salinity anomaly (s-S0)
+            zh    = pdep (ji,jj)                   ! depth at the partial step level
+            !
+            zn  = rn_a0 * ( 1._wp + rn_lambda1*zt + rn_mu1*zh ) + rn_nu*zs
+            pab(ji,jj,jp_tem) = zn * r1_rho0   ! alpha
+            !
+            zn  = rn_b0 * ( 1._wp - rn_lambda2*zs - rn_mu2*zh ) - rn_nu*zt
+            pab(ji,jj,jp_sal) = zn * r1_rho0   ! beta
+            !
+         END_2D
          !
       CASE DEFAULT
          WRITE(ctmp1,*) '          bad flag value for neos = ', neos
@@ -782,15 +741,15 @@ CONTAINS
          !
       END SELECT
       !
-      IF(ln_ctl)   CALL prt_ctl( tab2d_1=pab(:,:,jp_tem), clinfo1=' rab_2d_t: ', &
-         &                       tab2d_2=pab(:,:,jp_sal), clinfo2=' rab_2d_s : ' )
+      IF(sn_cfctl%l_prtctl)   CALL prt_ctl( tab2d_1=pab(:,:,jp_tem), clinfo1=' rab_2d_t: ', &
+         &                                  tab2d_2=pab(:,:,jp_sal), clinfo2=' rab_2d_s : ' )
       !
       IF( ln_timing )   CALL timing_stop('rab_2d')
       !
    END SUBROUTINE rab_2d
 
 
-   SUBROUTINE rab_0d( pts, pdep, pab )
+   SUBROUTINE rab_0d( pts, pdep, pab, Kmm )
       !!----------------------------------------------------------------------
       !!                 ***  ROUTINE rab_0d  ***
       !!
@@ -798,6 +757,7 @@ CONTAINS
       !!
       !! ** Action  : - pab     : thermal/haline expansion ratio at T-points
       !!----------------------------------------------------------------------
+      INTEGER                              , INTENT(in   ) ::   Kmm   ! time level index
       REAL(wp), DIMENSION(jpts)    , INTENT(in   ) ::   pts    ! pot. temperature & salinity
       REAL(wp),                      INTENT(in   ) ::   pdep   ! depth                  [m]
       REAL(wp), DIMENSION(jpts)    , INTENT(  out) ::   pab    ! thermal/haline expansion ratio
@@ -838,7 +798,7 @@ CONTAINS
             !
          zn  = ( ( zn3 * zh + zn2 ) * zh + zn1 ) * zh + zn0
          !
-         pab(jp_tem) = zn * r1_rau0
+         pab(jp_tem) = zn * r1_rho0
          !
          ! beta
          zn3 = BET003
@@ -859,7 +819,7 @@ CONTAINS
             !
          zn  = ( ( zn3 * zh + zn2 ) * zh + zn1 ) * zh + zn0
          !
-         pab(jp_sal) = zn / zs * r1_rau0
+         pab(jp_sal) = zn / zs * r1_rho0
          !
          !
          !
@@ -870,10 +830,10 @@ CONTAINS
          zh    = pdep                   ! depth at the partial step level
          !
          zn  = rn_a0 * ( 1._wp + rn_lambda1*zt + rn_mu1*zh ) + rn_nu*zs
-         pab(jp_tem) = zn * r1_rau0   ! alpha
+         pab(jp_tem) = zn * r1_rho0   ! alpha
          !
          zn  = rn_b0 * ( 1._wp - rn_lambda2*zs - rn_mu2*zh ) - rn_nu*zt
-         pab(jp_sal) = zn * r1_rau0   ! beta
+         pab(jp_sal) = zn * r1_rho0   ! beta
          !
       CASE DEFAULT
          WRITE(ctmp1,*) '          bad flag value for neos = ', neos
@@ -886,7 +846,7 @@ CONTAINS
    END SUBROUTINE rab_0d
 
 
-   SUBROUTINE bn2( pts, pab, pn2 )
+   SUBROUTINE bn2( pts, pab, pn2, Kmm )
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE bn2  ***
       !!
@@ -900,6 +860,7 @@ CONTAINS
       !! ** Action  :   pn2 : square of the brunt-vaisala frequency at w-point 
       !!
       !!----------------------------------------------------------------------
+      INTEGER                              , INTENT(in   ) ::   Kmm   ! time level index
       REAL(wp), DIMENSION(jpi,jpj,jpk,jpts), INTENT(in   ) ::  pts   ! pot. temperature and salinity   [Celsius,psu]
       REAL(wp), DIMENSION(jpi,jpj,jpk,jpts), INTENT(in   ) ::  pab   ! thermal/haline expansion coef.  [Celsius-1,psu-1]
       REAL(wp), DIMENSION(jpi,jpj,jpk     ), INTENT(  out) ::  pn2   ! Brunt-Vaisala frequency squared [1/s^2]
@@ -910,23 +871,19 @@ CONTAINS
       !
       IF( ln_timing )   CALL timing_start('bn2')
       !
-      DO jk = 2, jpkm1           ! interior points only (2=< jk =< jpkm1 )
-         DO jj = 1, jpj          ! surface and bottom value set to zero one for all in istate.F90
-            DO ji = 1, jpi
-               zrw =   ( gdepw_n(ji,jj,jk  ) - gdept_n(ji,jj,jk) )   &
-                  &  / ( gdept_n(ji,jj,jk-1) - gdept_n(ji,jj,jk) ) 
-                  !
-               zaw = pab(ji,jj,jk,jp_tem) * (1. - zrw) + pab(ji,jj,jk-1,jp_tem) * zrw 
-               zbw = pab(ji,jj,jk,jp_sal) * (1. - zrw) + pab(ji,jj,jk-1,jp_sal) * zrw
-               !
-               pn2(ji,jj,jk) = grav * (  zaw * ( pts(ji,jj,jk-1,jp_tem) - pts(ji,jj,jk,jp_tem) )     &
-                  &                    - zbw * ( pts(ji,jj,jk-1,jp_sal) - pts(ji,jj,jk,jp_sal) )  )  &
-                  &            / e3w_n(ji,jj,jk) * wmask(ji,jj,jk)
-            END DO
-         END DO
-      END DO
+      DO_3D_11_11( 2, jpkm1 )
+         zrw =   ( gdepw(ji,jj,jk  ,Kmm) - gdept(ji,jj,jk,Kmm) )   &
+            &  / ( gdept(ji,jj,jk-1,Kmm) - gdept(ji,jj,jk,Kmm) ) 
+            !
+         zaw = pab(ji,jj,jk,jp_tem) * (1. - zrw) + pab(ji,jj,jk-1,jp_tem) * zrw 
+         zbw = pab(ji,jj,jk,jp_sal) * (1. - zrw) + pab(ji,jj,jk-1,jp_sal) * zrw
+         !
+         pn2(ji,jj,jk) = grav * (  zaw * ( pts(ji,jj,jk-1,jp_tem) - pts(ji,jj,jk,jp_tem) )     &
+            &                    - zbw * ( pts(ji,jj,jk-1,jp_sal) - pts(ji,jj,jk,jp_sal) )  )  &
+            &            / e3w(ji,jj,jk,Kmm) * wmask(ji,jj,jk)
+      END_3D
       !
-      IF(ln_ctl)   CALL prt_ctl( tab3d_1=pn2, clinfo1=' bn2  : ', kdim=jpk )
+      IF(sn_cfctl%l_prtctl)   CALL prt_ctl( tab3d_1=pn2, clinfo1=' bn2  : ', kdim=jpk )
       !
       IF( ln_timing )   CALL timing_stop('bn2')
       !
@@ -962,30 +919,28 @@ CONTAINS
       z1_S0   = 0.875_wp/35.16504_wp
       z1_T0   = 1._wp/40._wp
       !
-      DO jj = 1, jpj
-         DO ji = 1, jpi
+      DO_2D_11_11
+         !
+         zt  = ctmp   (ji,jj) * z1_T0
+         zs  = SQRT( ABS( psal(ji,jj) + zdeltaS ) * r1_S0 )
+         ztm = tmask(ji,jj,1)
+         !
+         zn = ((((-2.1385727895e-01_wp*zt   &
+            &   - 2.7674419971e-01_wp*zs+1.0728094330_wp)*zt   &
+            &   + (2.6366564313_wp*zs+3.3546960647_wp)*zs-7.8012209473_wp)*zt   &
+            &   + ((1.8835586562_wp*zs+7.3949191679_wp)*zs-3.3937395875_wp)*zs-5.6414948432_wp)*zt   &
+            &   + (((3.5737370589_wp*zs-1.5512427389e+01_wp)*zs+2.4625741105e+01_wp)*zs   &
+            &      +1.9912291000e+01_wp)*zs-3.2191146312e+01_wp)*zt   &
+            &   + ((((5.7153204649e-01_wp*zs-3.0943149543_wp)*zs+9.3052495181_wp)*zs   &
+            &      -9.4528934807_wp)*zs+3.1066408996_wp)*zs-4.3504021262e-01_wp
             !
-            zt  = ctmp   (ji,jj) * z1_T0
-            zs  = SQRT( ABS( psal(ji,jj) + zdeltaS ) * r1_S0 )
-            ztm = tmask(ji,jj,1)
+         zd = (2.0035003456_wp*zt   &
+            &   -3.4570358592e-01_wp*zs+5.6471810638_wp)*zt   &
+            &   + (1.5393993508_wp*zs-6.9394762624_wp)*zs+1.2750522650e+01_wp
             !
-            zn = ((((-2.1385727895e-01_wp*zt   &
-               &   - 2.7674419971e-01_wp*zs+1.0728094330_wp)*zt   &
-               &   + (2.6366564313_wp*zs+3.3546960647_wp)*zs-7.8012209473_wp)*zt   &
-               &   + ((1.8835586562_wp*zs+7.3949191679_wp)*zs-3.3937395875_wp)*zs-5.6414948432_wp)*zt   &
-               &   + (((3.5737370589_wp*zs-1.5512427389e+01_wp)*zs+2.4625741105e+01_wp)*zs   &
-               &      +1.9912291000e+01_wp)*zs-3.2191146312e+01_wp)*zt   &
-               &   + ((((5.7153204649e-01_wp*zs-3.0943149543_wp)*zs+9.3052495181_wp)*zs   &
-               &      -9.4528934807_wp)*zs+3.1066408996_wp)*zs-4.3504021262e-01_wp
-               !
-            zd = (2.0035003456_wp*zt   &
-               &   -3.4570358592e-01_wp*zs+5.6471810638_wp)*zt   &
-               &   + (1.5393993508_wp*zs-6.9394762624_wp)*zs+1.2750522650e+01_wp
-               !
-            ptmp(ji,jj) = ( zt / z1_T0 + zn / zd ) * ztm
-               !
-         END DO
-      END DO
+         ptmp(ji,jj) = ( zt / z1_T0 + zn / zd ) * ztm
+            !
+      END_2D
       !
       IF( ln_timing )   CALL timing_stop('eos_pt_from_ct')
       !
@@ -1017,13 +972,11 @@ CONTAINS
       CASE ( np_teos10, np_seos )      !==  CT,SA (TEOS-10 and S-EOS formulations) ==!
          !
          z1_S0 = 1._wp / 35.16504_wp
-         DO jj = 1, jpj
-            DO ji = 1, jpi
-               zs= SQRT( ABS( psal(ji,jj) ) * z1_S0 )           ! square root salinity
-               ptf(ji,jj) = ((((1.46873e-03_wp*zs-9.64972e-03_wp)*zs+2.28348e-02_wp)*zs &
-                  &          - 3.12775e-02_wp)*zs+2.07679e-02_wp)*zs-5.87701e-02_wp
-            END DO
-         END DO
+         DO_2D_11_11
+            zs= SQRT( ABS( psal(ji,jj) ) * z1_S0 )           ! square root salinity
+            ptf(ji,jj) = ((((1.46873e-03_wp*zs-9.64972e-03_wp)*zs+2.28348e-02_wp)*zs &
+               &          - 3.12775e-02_wp)*zs+2.07679e-02_wp)*zs-5.87701e-02_wp
+         END_2D
          ptf(:,:) = ptf(:,:) * psal(:,:)
          !
          IF( PRESENT( pdep ) )   ptf(:,:) = ptf(:,:) - 7.53e-4 * pdep(:,:)
@@ -1090,7 +1043,7 @@ CONTAINS
    END SUBROUTINE eos_fzp_0d
 
 
-   SUBROUTINE eos_pen( pts, pab_pe, ppen )
+   SUBROUTINE eos_pen( pts, pab_pe, ppen, Kmm )
       !!----------------------------------------------------------------------
       !!                 ***  ROUTINE eos_pen  ***
       !!
@@ -1098,18 +1051,19 @@ CONTAINS
       !!
       !! ** Method  :   PE is defined analytically as the vertical 
       !!                   primitive of EOS times -g integrated between 0 and z>0.
-      !!                pen is the nonlinear bsq-PE anomaly: pen = ( PE - rau0 gz ) / rau0 gz - rd
+      !!                pen is the nonlinear bsq-PE anomaly: pen = ( PE - rho0 gz ) / rho0 gz - rd
       !!                                                      = 1/z * /int_0^z rd dz - rd 
       !!                                where rd is the density anomaly (see eos_rhd function)
       !!                ab_pe are partial derivatives of PE anomaly with respect to T and S:
-      !!                    ab_pe(1) = - 1/(rau0 gz) * dPE/dT + drd/dT = - d(pen)/dT
-      !!                    ab_pe(2) =   1/(rau0 gz) * dPE/dS + drd/dS =   d(pen)/dS
+      !!                    ab_pe(1) = - 1/(rho0 gz) * dPE/dT + drd/dT = - d(pen)/dT
+      !!                    ab_pe(2) =   1/(rho0 gz) * dPE/dS + drd/dS =   d(pen)/dS
       !!
       !! ** Action  : - pen         : PE anomaly given at T-points
       !!            : - pab_pe  : given at T-points
       !!                    pab_pe(:,:,:,jp_tem) is alpha_pe
       !!                    pab_pe(:,:,:,jp_sal) is beta_pe
       !!----------------------------------------------------------------------
+      INTEGER                              , INTENT(in   ) ::   Kmm   ! time level index
       REAL(wp), DIMENSION(jpi,jpj,jpk,jpts), INTENT(in   ) ::   pts     ! pot. temperature & salinity
       REAL(wp), DIMENSION(jpi,jpj,jpk,jpts), INTENT(  out) ::   pab_pe  ! alpha_pe and beta_pe
       REAL(wp), DIMENSION(jpi,jpj,jpk)     , INTENT(  out) ::   ppen     ! potential energy anomaly
@@ -1125,86 +1079,78 @@ CONTAINS
       !
       CASE( np_teos10, np_eos80 )                !==  polynomial TEOS-10 / EOS-80 ==!
          !
-         DO jk = 1, jpkm1
-            DO jj = 1, jpj
-               DO ji = 1, jpi
-                  !
-                  zh  = gdept_n(ji,jj,jk) * r1_Z0                                ! depth
-                  zt  = pts (ji,jj,jk,jp_tem) * r1_T0                           ! temperature
-                  zs  = SQRT( ABS( pts(ji,jj,jk,jp_sal) + rdeltaS ) * r1_S0 )   ! square root salinity
-                  ztm = tmask(ji,jj,jk)                                         ! tmask
-                  !
-                  ! potential energy non-linear anomaly
-                  zn2 = (PEN012)*zt   &
-                     &   + PEN102*zs+PEN002
-                     !
-                  zn1 = ((PEN021)*zt   &
-                     &   + PEN111*zs+PEN011)*zt   &
-                     &   + (PEN201*zs+PEN101)*zs+PEN001
-                     !
-                  zn0 = ((((PEN040)*zt   &
-                     &   + PEN130*zs+PEN030)*zt   &
-                     &   + (PEN220*zs+PEN120)*zs+PEN020)*zt   &
-                     &   + ((PEN310*zs+PEN210)*zs+PEN110)*zs+PEN010)*zt   &
-                     &   + (((PEN400*zs+PEN300)*zs+PEN200)*zs+PEN100)*zs+PEN000
-                     !
-                  zn  = ( zn2 * zh + zn1 ) * zh + zn0
-                  !
-                  ppen(ji,jj,jk)  = zn * zh * r1_rau0 * ztm
-                  !
-                  ! alphaPE non-linear anomaly
-                  zn2 = APE002
-                  !
-                  zn1 = (APE011)*zt   &
-                     &   + APE101*zs+APE001
-                     !
-                  zn0 = (((APE030)*zt   &
-                     &   + APE120*zs+APE020)*zt   &
-                     &   + (APE210*zs+APE110)*zs+APE010)*zt   &
-                     &   + ((APE300*zs+APE200)*zs+APE100)*zs+APE000
-                     !
-                  zn  = ( zn2 * zh + zn1 ) * zh + zn0
-                  !                              
-                  pab_pe(ji,jj,jk,jp_tem) = zn * zh * r1_rau0 * ztm
-                  !
-                  ! betaPE non-linear anomaly
-                  zn2 = BPE002
-                  !
-                  zn1 = (BPE011)*zt   &
-                     &   + BPE101*zs+BPE001
-                     !
-                  zn0 = (((BPE030)*zt   &
-                     &   + BPE120*zs+BPE020)*zt   &
-                     &   + (BPE210*zs+BPE110)*zs+BPE010)*zt   &
-                     &   + ((BPE300*zs+BPE200)*zs+BPE100)*zs+BPE000
-                     !
-                  zn  = ( zn2 * zh + zn1 ) * zh + zn0
-                  !                              
-                  pab_pe(ji,jj,jk,jp_sal) = zn / zs * zh * r1_rau0 * ztm
-                  !
-               END DO
-            END DO
-         END DO
+         DO_3D_11_11( 1, jpkm1 )
+            !
+            zh  = gdept(ji,jj,jk,Kmm) * r1_Z0                                ! depth
+            zt  = pts (ji,jj,jk,jp_tem) * r1_T0                           ! temperature
+            zs  = SQRT( ABS( pts(ji,jj,jk,jp_sal) + rdeltaS ) * r1_S0 )   ! square root salinity
+            ztm = tmask(ji,jj,jk)                                         ! tmask
+            !
+            ! potential energy non-linear anomaly
+            zn2 = (PEN012)*zt   &
+               &   + PEN102*zs+PEN002
+               !
+            zn1 = ((PEN021)*zt   &
+               &   + PEN111*zs+PEN011)*zt   &
+               &   + (PEN201*zs+PEN101)*zs+PEN001
+               !
+            zn0 = ((((PEN040)*zt   &
+               &   + PEN130*zs+PEN030)*zt   &
+               &   + (PEN220*zs+PEN120)*zs+PEN020)*zt   &
+               &   + ((PEN310*zs+PEN210)*zs+PEN110)*zs+PEN010)*zt   &
+               &   + (((PEN400*zs+PEN300)*zs+PEN200)*zs+PEN100)*zs+PEN000
+               !
+            zn  = ( zn2 * zh + zn1 ) * zh + zn0
+            !
+            ppen(ji,jj,jk)  = zn * zh * r1_rho0 * ztm
+            !
+            ! alphaPE non-linear anomaly
+            zn2 = APE002
+            !
+            zn1 = (APE011)*zt   &
+               &   + APE101*zs+APE001
+               !
+            zn0 = (((APE030)*zt   &
+               &   + APE120*zs+APE020)*zt   &
+               &   + (APE210*zs+APE110)*zs+APE010)*zt   &
+               &   + ((APE300*zs+APE200)*zs+APE100)*zs+APE000
+               !
+            zn  = ( zn2 * zh + zn1 ) * zh + zn0
+            !                              
+            pab_pe(ji,jj,jk,jp_tem) = zn * zh * r1_rho0 * ztm
+            !
+            ! betaPE non-linear anomaly
+            zn2 = BPE002
+            !
+            zn1 = (BPE011)*zt   &
+               &   + BPE101*zs+BPE001
+               !
+            zn0 = (((BPE030)*zt   &
+               &   + BPE120*zs+BPE020)*zt   &
+               &   + (BPE210*zs+BPE110)*zs+BPE010)*zt   &
+               &   + ((BPE300*zs+BPE200)*zs+BPE100)*zs+BPE000
+               !
+            zn  = ( zn2 * zh + zn1 ) * zh + zn0
+            !                              
+            pab_pe(ji,jj,jk,jp_sal) = zn / zs * zh * r1_rho0 * ztm
+            !
+         END_3D
          !
       CASE( np_seos )                !==  Vallis (2006) simplified EOS  ==!
          !
-         DO jk = 1, jpkm1
-            DO jj = 1, jpj
-               DO ji = 1, jpi
-                  zt  = pts(ji,jj,jk,jp_tem) - 10._wp  ! temperature anomaly (t-T0)
-                  zs = pts (ji,jj,jk,jp_sal) - 35._wp  ! abs. salinity anomaly (s-S0)
-                  zh  = gdept_n(ji,jj,jk)              ! depth in meters  at t-point
-                  ztm = tmask(ji,jj,jk)                ! tmask
-                  zn  = 0.5_wp * zh * r1_rau0 * ztm
-                  !                                    ! Potential Energy
-                  ppen(ji,jj,jk) = ( rn_a0 * rn_mu1 * zt + rn_b0 * rn_mu2 * zs ) * zn
-                  !                                    ! alphaPE
-                  pab_pe(ji,jj,jk,jp_tem) = - rn_a0 * rn_mu1 * zn
-                  pab_pe(ji,jj,jk,jp_sal) =   rn_b0 * rn_mu2 * zn
-                  !
-               END DO
-            END DO
-         END DO
+         DO_3D_11_11( 1, jpkm1 )
+            zt  = pts(ji,jj,jk,jp_tem) - 10._wp  ! temperature anomaly (t-T0)
+            zs = pts (ji,jj,jk,jp_sal) - 35._wp  ! abs. salinity anomaly (s-S0)
+            zh  = gdept(ji,jj,jk,Kmm)              ! depth in meters  at t-point
+            ztm = tmask(ji,jj,jk)                ! tmask
+            zn  = 0.5_wp * zh * r1_rho0 * ztm
+            !                                    ! Potential Energy
+            ppen(ji,jj,jk) = ( rn_a0 * rn_mu1 * zt + rn_b0 * rn_mu2 * zs ) * zn
+            !                                    ! alphaPE
+            pab_pe(ji,jj,jk,jp_tem) = - rn_a0 * rn_mu1 * zn
+            pab_pe(ji,jj,jk,jp_sal) =   rn_b0 * rn_mu2 * zn
+            !
+         END_3D
          !
       CASE DEFAULT
          WRITE(ctmp1,*) '          bad flag value for neos = ', neos
@@ -1232,16 +1178,14 @@ CONTAINS
          &                                             rn_lambda2, rn_mu2, rn_nu
       !!----------------------------------------------------------------------
       !
-      REWIND( numnam_ref )              ! Namelist nameos in reference namelist : equation of state
       READ  ( numnam_ref, nameos, IOSTAT = ios, ERR = 901 )
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'nameos in reference namelist', lwp )
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'nameos in reference namelist' )
       !
-      REWIND( numnam_cfg )              ! Namelist nameos in configuration namelist : equation of state
       READ  ( numnam_cfg, nameos, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'nameos in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'nameos in configuration namelist' )
       IF(lwm) WRITE( numond, nameos )
       !
-      rau0        = 1026._wp                 !: volumic mass of reference     [kg/m3]
+      rho0        = 1026._wp                 !: volumic mass of reference     [kg/m3]
       rcp         = 3991.86795711963_wp      !: heat capacity     [J/K]
       !
       IF(lwp) THEN                ! Control print
@@ -1646,11 +1590,14 @@ CONTAINS
          BPE002 = 5.3661089288e-04_wp
          !
       CASE( np_seos )                        !==  Simplified EOS     ==!
+
+         r1_S0  = 0.875_wp/35.16504_wp   ! Used to convert CT in potential temperature when using bulk formulae (eos_pt_from_ct)
+         
          IF(lwp) THEN
             WRITE(numout,*)
             WRITE(numout,*) '   ==>>>   use of simplified eos:    '
             WRITE(numout,*) '              rhd(dT=T-10,dS=S-35,Z) = [-a0*(1+lambda1/2*dT+mu1*Z)*dT '
-            WRITE(numout,*) '                                       + b0*(1+lambda2/2*dT+mu2*Z)*dS - nu*dT*dS] / rau0'
+            WRITE(numout,*) '                                       + b0*(1+lambda2/2*dT+mu2*Z)*dS - nu*dT*dS] / rho0'
             WRITE(numout,*) '              with the following coefficients :'
             WRITE(numout,*) '                 thermal exp. coef.    rn_a0      = ', rn_a0
             WRITE(numout,*) '                 saline  cont. coef.   rn_b0      = ', rn_b0
@@ -1669,10 +1616,10 @@ CONTAINS
          !
       END SELECT
       !
-      rau0_rcp    = rau0 * rcp 
-      r1_rau0     = 1._wp / rau0
+      rho0_rcp    = rho0 * rcp 
+      r1_rho0     = 1._wp / rho0
       r1_rcp      = 1._wp / rcp
-      r1_rau0_rcp = 1._wp / rau0_rcp 
+      r1_rho0_rcp = 1._wp / rho0_rcp 
       !
       IF(lwp) THEN
          IF( l_useCT )   THEN
@@ -1687,11 +1634,11 @@ CONTAINS
       !
       IF(lwp) WRITE(numout,*)
       IF(lwp) WRITE(numout,*) '   Associated physical constant'
-      IF(lwp) WRITE(numout,*) '      volumic mass of reference           rau0  = ', rau0   , ' kg/m^3'
-      IF(lwp) WRITE(numout,*) '      1. / rau0                        r1_rau0  = ', r1_rau0, ' m^3/kg'
+      IF(lwp) WRITE(numout,*) '      volumic mass of reference           rho0  = ', rho0   , ' kg/m^3'
+      IF(lwp) WRITE(numout,*) '      1. / rho0                        r1_rho0  = ', r1_rho0, ' m^3/kg'
       IF(lwp) WRITE(numout,*) '      ocean specific heat                 rcp   = ', rcp    , ' J/Kelvin'
-      IF(lwp) WRITE(numout,*) '      rau0 * rcp                       rau0_rcp = ', rau0_rcp
-      IF(lwp) WRITE(numout,*) '      1. / ( rau0 * rcp )           r1_rau0_rcp = ', r1_rau0_rcp
+      IF(lwp) WRITE(numout,*) '      rho0 * rcp                       rho0_rcp = ', rho0_rcp
+      IF(lwp) WRITE(numout,*) '      1. / ( rho0 * rcp )           r1_rho0_rcp = ', r1_rho0_rcp
       !
    END SUBROUTINE eos_init
 

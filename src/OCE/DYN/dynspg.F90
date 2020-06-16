@@ -20,8 +20,7 @@ MODULE dynspg
    USE sbcapr         ! surface boundary condition: atmospheric pressure
    USE dynspg_exp     ! surface pressure gradient     (dyn_spg_exp routine)
    USE dynspg_ts      ! surface pressure gradient     (dyn_spg_ts  routine)
-   USE sbctide        ! 
-   USE updtide        ! 
+   USE tide_mod       !
    USE trd_oce        ! trends: ocean variables
    USE trddyn         ! trend manager: dynamics
    !
@@ -42,17 +41,19 @@ MODULE dynspg
    INTEGER, PARAMETER ::   np_TS  = 1   ! split-explicit time stepping (Time-Splitting)
    INTEGER, PARAMETER ::   np_EXP = 0   !       explicit time stepping
    INTEGER, PARAMETER ::   np_NO  =-1   ! no surface pressure gradient, no scheme
+   !
+   REAL(wp) ::   zt0step !   Time of day at the beginning of the time step
 
    !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: dynspg.F90 10068 2018-08-28 14:09:04Z nicolasmartin $ 
+   !! $Id: dynspg.F90 12489 2020-02-28 15:55:11Z davestorkey $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE dyn_spg( kt )
+   SUBROUTINE dyn_spg( kt, Kbb, Kmm, Krhs, puu, pvv, pssh, puu_b, pvv_b, Kaa )
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE dyn_spg  ***
       !!
@@ -65,15 +66,18 @@ CONTAINS
       !!
       !!              ln_apr_dyn=T : the atmospheric pressure forcing is applied 
       !!             as the gradient of the inverse barometer ssh:
-      !!                apgu = - 1/rau0 di[apr] = 0.5*grav di[ssh_ib+ssh_ibb]
-      !!                apgv = - 1/rau0 dj[apr] = 0.5*grav dj[ssh_ib+ssh_ibb]
-      !!             Note that as all external forcing a time averaging over a two rdt
+      !!                apgu = - 1/rho0 di[apr] = 0.5*grav di[ssh_ib+ssh_ibb]
+      !!                apgv = - 1/rho0 dj[apr] = 0.5*grav dj[ssh_ib+ssh_ibb]
+      !!             Note that as all external forcing a time averaging over a two rn_Dt
       !!             period is used to prevent the divergence of odd and even time step.
       !!----------------------------------------------------------------------
-      INTEGER, INTENT(in) ::   kt   ! ocean time-step index
+      INTEGER                             , INTENT( in )  ::  kt                  ! ocean time-step index
+      INTEGER                             , INTENT( in )  ::  Kbb, Kmm, Krhs, Kaa ! ocean time level indices
+      REAL(wp), DIMENSION(jpi,jpj,jpk,jpt), INTENT(inout) ::  puu, pvv            ! ocean velocities and RHS of momentum equation
+      REAL(wp), DIMENSION(jpi,jpj,jpt)    , INTENT(inout) ::  pssh, puu_b, pvv_b  ! SSH and barotropic velocities at main time levels
       !
       INTEGER  ::   ji, jj, jk                   ! dummy loop indices
-      REAL(wp) ::   z2dt, zg_2, zintp, zgrau0r, zld   ! local scalars
+      REAL(wp) ::   z2dt, zg_2, zintp, zgrho0r, zld   ! local scalars
       REAL(wp), ALLOCATABLE, DIMENSION(:,:)   ::   zpice
       REAL(wp), ALLOCATABLE, DIMENSION(:,:,:) ::   ztrdu, ztrdv
       !!----------------------------------------------------------------------
@@ -82,97 +86,85 @@ CONTAINS
       !
       IF( l_trddyn )   THEN                      ! temporary save of ta and sa trends
          ALLOCATE( ztrdu(jpi,jpj,jpk) , ztrdv(jpi,jpj,jpk) ) 
-         ztrdu(:,:,:) = ua(:,:,:)
-         ztrdv(:,:,:) = va(:,:,:)
+         ztrdu(:,:,:) = puu(:,:,:,Krhs)
+         ztrdv(:,:,:) = pvv(:,:,:,Krhs)
       ENDIF
       !
       IF(      ln_apr_dyn                                                &   ! atmos. pressure
          .OR.  ( .NOT.ln_dynspg_ts .AND. (ln_tide_pot .AND. ln_tide) )   &   ! tide potential (no time slitting)
          .OR.  ln_ice_embd ) THEN                                            ! embedded sea-ice
          !
-         DO jj = 2, jpjm1
-            DO ji = fs_2, fs_jpim1   ! vector opt.
-               spgu(ji,jj) = 0._wp
-               spgv(ji,jj) = 0._wp
-            END DO
-         END DO         
+         DO_2D_00_00
+            spgu(ji,jj) = 0._wp
+            spgv(ji,jj) = 0._wp
+         END_2D
          !
          IF( ln_apr_dyn .AND. .NOT.ln_dynspg_ts ) THEN   !==  Atmospheric pressure gradient (added later in time-split case) ==!
             zg_2 = grav * 0.5
-            DO jj = 2, jpjm1                          ! gradient of Patm using inverse barometer ssh
-               DO ji = fs_2, fs_jpim1   ! vector opt.
-                  spgu(ji,jj) = spgu(ji,jj) + zg_2 * (  ssh_ib (ji+1,jj) - ssh_ib (ji,jj)    &
-                     &                                + ssh_ibb(ji+1,jj) - ssh_ibb(ji,jj)  ) * r1_e1u(ji,jj)
-                  spgv(ji,jj) = spgv(ji,jj) + zg_2 * (  ssh_ib (ji,jj+1) - ssh_ib (ji,jj)    &
-                     &                                + ssh_ibb(ji,jj+1) - ssh_ibb(ji,jj)  ) * r1_e2v(ji,jj)
-               END DO
-            END DO
+            DO_2D_00_00
+               spgu(ji,jj) = spgu(ji,jj) + zg_2 * (  ssh_ib (ji+1,jj) - ssh_ib (ji,jj)    &
+                  &                                + ssh_ibb(ji+1,jj) - ssh_ibb(ji,jj)  ) * r1_e1u(ji,jj)
+               spgv(ji,jj) = spgv(ji,jj) + zg_2 * (  ssh_ib (ji,jj+1) - ssh_ib (ji,jj)    &
+                  &                                + ssh_ibb(ji,jj+1) - ssh_ibb(ji,jj)  ) * r1_e2v(ji,jj)
+            END_2D
          ENDIF
          !
          !                                    !==  tide potential forcing term  ==!
          IF( .NOT.ln_dynspg_ts .AND. ( ln_tide_pot .AND. ln_tide )  ) THEN   ! N.B. added directly at sub-time-step in ts-case
             !
-            CALL upd_tide( kt )                      ! update tide potential
+            ! Update tide potential at the beginning of current time step
+            zt0step = REAL(nsec_day, wp)-0.5_wp*rn_Dt
+            CALL upd_tide(zt0step, Kmm)
             !
-            DO jj = 2, jpjm1                         ! add tide potential forcing
-               DO ji = fs_2, fs_jpim1   ! vector opt.
-                  spgu(ji,jj) = spgu(ji,jj) + grav * ( pot_astro(ji+1,jj) - pot_astro(ji,jj) ) * r1_e1u(ji,jj)
-                  spgv(ji,jj) = spgv(ji,jj) + grav * ( pot_astro(ji,jj+1) - pot_astro(ji,jj) ) * r1_e2v(ji,jj)
-               END DO 
-            END DO
+            DO_2D_00_00
+               spgu(ji,jj) = spgu(ji,jj) + grav * ( pot_astro(ji+1,jj) - pot_astro(ji,jj) ) * r1_e1u(ji,jj)
+               spgv(ji,jj) = spgv(ji,jj) + grav * ( pot_astro(ji,jj+1) - pot_astro(ji,jj) ) * r1_e2v(ji,jj)
+            END_2D
             !
             IF (ln_scal_load) THEN
                zld = rn_scal_load * grav
-               DO jj = 2, jpjm1                    ! add scalar approximation for load potential
-                  DO ji = fs_2, fs_jpim1   ! vector opt.
-                     spgu(ji,jj) = spgu(ji,jj) + zld * ( sshn(ji+1,jj) - sshn(ji,jj) ) * r1_e1u(ji,jj)
-                     spgv(ji,jj) = spgv(ji,jj) + zld * ( sshn(ji,jj+1) - sshn(ji,jj) ) * r1_e2v(ji,jj)
-                  END DO 
-               END DO
+               DO_2D_00_00
+                  spgu(ji,jj) = spgu(ji,jj) + zld * ( pssh(ji+1,jj,Kmm) - pssh(ji,jj,Kmm) ) * r1_e1u(ji,jj)
+                  spgv(ji,jj) = spgv(ji,jj) + zld * ( pssh(ji,jj+1,Kmm) - pssh(ji,jj,Kmm) ) * r1_e2v(ji,jj)
+               END_2D
             ENDIF
          ENDIF
          !
          IF( ln_ice_embd ) THEN              !== embedded sea ice: Pressure gradient due to snow-ice mass ==!
             ALLOCATE( zpice(jpi,jpj) )
             zintp = REAL( MOD( kt-1, nn_fsbc ) ) / REAL( nn_fsbc )
-            zgrau0r     = - grav * r1_rau0
-            zpice(:,:) = (  zintp * snwice_mass(:,:) + ( 1.- zintp ) * snwice_mass_b(:,:)  ) * zgrau0r
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1   ! vector opt.
-                  spgu(ji,jj) = spgu(ji,jj) + ( zpice(ji+1,jj) - zpice(ji,jj) ) * r1_e1u(ji,jj)
-                  spgv(ji,jj) = spgv(ji,jj) + ( zpice(ji,jj+1) - zpice(ji,jj) ) * r1_e2v(ji,jj)
-               END DO
-            END DO
+            zgrho0r     = - grav * r1_rho0
+            zpice(:,:) = (  zintp * snwice_mass(:,:) + ( 1.- zintp ) * snwice_mass_b(:,:)  ) * zgrho0r
+            DO_2D_00_00
+               spgu(ji,jj) = spgu(ji,jj) + ( zpice(ji+1,jj) - zpice(ji,jj) ) * r1_e1u(ji,jj)
+               spgv(ji,jj) = spgv(ji,jj) + ( zpice(ji,jj+1) - zpice(ji,jj) ) * r1_e2v(ji,jj)
+            END_2D
             DEALLOCATE( zpice )         
          ENDIF
          !
-         DO jk = 1, jpkm1                    !== Add all terms to the general trend
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1   ! vector opt.
-                  ua(ji,jj,jk) = ua(ji,jj,jk) + spgu(ji,jj)
-                  va(ji,jj,jk) = va(ji,jj,jk) + spgv(ji,jj)
-               END DO
-            END DO
-         END DO    
+         DO_3D_00_00( 1, jpkm1 )
+            puu(ji,jj,jk,Krhs) = puu(ji,jj,jk,Krhs) + spgu(ji,jj)
+            pvv(ji,jj,jk,Krhs) = pvv(ji,jj,jk,Krhs) + spgv(ji,jj)
+         END_3D
          !
 !!gm add here a call to dyn_trd for ice pressure gradient, the surf pressure trends ????
          !    
       ENDIF
       !
       SELECT CASE ( nspg )                   !== surface pressure gradient computed and add to the general trend ==!
-      CASE ( np_EXP )   ;   CALL dyn_spg_exp( kt )              ! explicit
-      CASE ( np_TS  )   ;   CALL dyn_spg_ts ( kt )              ! time-splitting
+      CASE ( np_EXP )   ;   CALL dyn_spg_exp( kt,      Kmm,       puu, pvv, Krhs )                    ! explicit
+      CASE ( np_TS  )   ;   CALL dyn_spg_ts ( kt, Kbb, Kmm, Krhs, puu, pvv, pssh, puu_b, pvv_b, Kaa ) ! time-splitting
       END SELECT
       !                    
       IF( l_trddyn )   THEN                  ! save the surface pressure gradient trends for further diagnostics
-         ztrdu(:,:,:) = ua(:,:,:) - ztrdu(:,:,:)
-         ztrdv(:,:,:) = va(:,:,:) - ztrdv(:,:,:)
-         CALL trd_dyn( ztrdu, ztrdv, jpdyn_spg, kt )
+         ztrdu(:,:,:) = puu(:,:,:,Krhs) - ztrdu(:,:,:)
+         ztrdv(:,:,:) = pvv(:,:,:,Krhs) - ztrdv(:,:,:)
+         CALL trd_dyn( ztrdu, ztrdv, jpdyn_spg, kt, Kmm )
          DEALLOCATE( ztrdu , ztrdv ) 
       ENDIF
       !                                      ! print mean trends (used for debugging)
-      IF(ln_ctl)   CALL prt_ctl( tab3d_1=ua, clinfo1=' spg  - Ua: ', mask1=umask, &
-         &                       tab3d_2=va, clinfo2=       ' Va: ', mask2=vmask, clinfo3='dyn' )
+      IF(sn_cfctl%l_prtctl)   CALL prt_ctl( tab3d_1=puu(:,:,:,Krhs), clinfo1=' spg  - Ua: ', mask1=umask, &
+         &                                  tab3d_2=pvv(:,:,:,Krhs), clinfo2=       ' Va: ', mask2=vmask, clinfo3='dyn' )
       !
       IF( ln_timing )   CALL timing_stop('dyn_spg')
       !
@@ -190,7 +182,7 @@ CONTAINS
       !
       NAMELIST/namdyn_spg/ ln_dynspg_exp       , ln_dynspg_ts,   &
       &                    ln_bt_fw, ln_bt_av  , ln_bt_auto  ,   &
-      &                    nn_baro , rn_bt_cmax, nn_bt_flt, rn_bt_alpha
+      &                    nn_e , rn_bt_cmax, nn_bt_flt, rn_bt_alpha
       !!----------------------------------------------------------------------
       !
       IF(lwp) THEN
@@ -199,13 +191,11 @@ CONTAINS
          WRITE(numout,*) '~~~~~~~~~~~~'
       ENDIF
       !
-      REWIND( numnam_ref )              ! Namelist namdyn_spg in reference namelist : Free surface
       READ  ( numnam_ref, namdyn_spg, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namdyn_spg in reference namelist', lwp )
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namdyn_spg in reference namelist' )
       !
-      REWIND( numnam_cfg )              ! Namelist namdyn_spg in configuration namelist : Free surface
       READ  ( numnam_cfg, namdyn_spg, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namdyn_spg in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namdyn_spg in configuration namelist' )
       IF(lwm) WRITE ( numond, namdyn_spg )
       !
       IF(lwp) THEN             ! Namelist print
@@ -231,7 +221,7 @@ CONTAINS
       ENDIF
       !
       IF( nspg == np_TS ) THEN   ! split-explicit scheme initialisation
-         CALL dyn_spg_ts_init          ! do it first: set nn_baro used to allocate some arrays later on
+         CALL dyn_spg_ts_init          ! do it first: set nn_e used to allocate some arrays later on
       ENDIF
       !
    END SUBROUTINE dyn_spg_init

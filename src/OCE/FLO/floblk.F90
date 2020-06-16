@@ -3,9 +3,7 @@ MODULE floblk
    !!                     ***  MODULE  floblk  ***
    !! Ocean floats :   trajectory computation
    !!======================================================================
-#if   defined key_floats
-   !!----------------------------------------------------------------------
-   !!   'key_floats'                                     float trajectories
+   !!
    !!----------------------------------------------------------------------
    !!    flotblk     : compute float trajectories with Blanke algorithme
    !!----------------------------------------------------------------------
@@ -23,12 +21,12 @@ MODULE floblk
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: floblk.F90 10425 2018-12-19 21:54:16Z smasson $ 
+   !! $Id: floblk.F90 13026 2020-06-03 14:30:02Z rblod $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE flo_blk( kt )
+   SUBROUTINE flo_blk( kt, Kbb, Kmm )
       !!---------------------------------------------------------------------
       !!                  ***  ROUTINE flo_blk  ***
       !!           
@@ -39,8 +37,13 @@ CONTAINS
       !!      algorithm. We need to know the velocity field, the old positions
       !!      of the floats and the grid defined on the domain.
       !!----------------------------------------------------------------------
-      INTEGER, INTENT( in  ) ::   kt ! ocean time step
+      INTEGER, INTENT( in  ) ::   kt       ! ocean time step
+      INTEGER, INTENT( in  ) ::   Kbb, Kmm ! ocean time level indices
       !!
+#ifndef key_agrif
+
+!RB super quick fix to compile with agrif
+
       INTEGER :: jfl              ! dummy loop arguments
       INTEGER :: ind, ifin, iloop
       REAL(wp)   ::       &
@@ -111,24 +114,24 @@ CONTAINS
             
             ! compute the transport across the mesh where the float is.            
 !!bug (gm) change e3t into e3. but never checked 
-            zsurfx(1) = e2u(iiloc(jfl)-1,ijloc(jfl)  ) * e3u_n(iiloc(jfl)-1,ijloc(jfl)  ,-ikl(jfl))
-            zsurfx(2) = e2u(iiloc(jfl)  ,ijloc(jfl)  ) * e3u_n(iiloc(jfl)  ,ijloc(jfl)  ,-ikl(jfl))
-            zsurfy(1) = e1v(iiloc(jfl)  ,ijloc(jfl)-1) * e3v_n(iiloc(jfl)  ,ijloc(jfl)-1,-ikl(jfl))
-            zsurfy(2) = e1v(iiloc(jfl)  ,ijloc(jfl)  ) * e3v_n(iiloc(jfl)  ,ijloc(jfl)  ,-ikl(jfl))
+            zsurfx(1) = e2u(iiloc(jfl)-1,ijloc(jfl)  ) * e3u(iiloc(jfl)-1,ijloc(jfl)  ,-ikl(jfl),Kmm)
+            zsurfx(2) = e2u(iiloc(jfl)  ,ijloc(jfl)  ) * e3u(iiloc(jfl)  ,ijloc(jfl)  ,-ikl(jfl),Kmm)
+            zsurfy(1) = e1v(iiloc(jfl)  ,ijloc(jfl)-1) * e3v(iiloc(jfl)  ,ijloc(jfl)-1,-ikl(jfl),Kmm)
+            zsurfy(2) = e1v(iiloc(jfl)  ,ijloc(jfl)  ) * e3v(iiloc(jfl)  ,ijloc(jfl)  ,-ikl(jfl),Kmm)
 
             ! for a isobar float zsurfz is put to zero. The vertical velocity will be zero too.
             zsurfz =          e1e2t(iiloc(jfl),ijloc(jfl))
-            zvol   = zsurfz * e3t_n(iiloc(jfl),ijloc(jfl),-ikl(jfl))
+            zvol   = zsurfz * e3t(iiloc(jfl),ijloc(jfl),-ikl(jfl),Kmm)
 
             !
-            zuinfl =( ub(iiloc(jfl)-1,ijloc(jfl),-ikl(jfl)) + un(iiloc(jfl)-1,ijloc(jfl),-ikl(jfl)) )/2.*zsurfx(1)
-            zuoutfl=( ub(iiloc(jfl)  ,ijloc(jfl),-ikl(jfl)) + un(iiloc(jfl)  ,ijloc(jfl),-ikl(jfl)) )/2.*zsurfx(2)
-            zvinfl =( vb(iiloc(jfl),ijloc(jfl)-1,-ikl(jfl)) + vn(iiloc(jfl),ijloc(jfl)-1,-ikl(jfl)) )/2.*zsurfy(1)
-            zvoutfl=( vb(iiloc(jfl),ijloc(jfl)  ,-ikl(jfl)) + vn(iiloc(jfl),ijloc(jfl)  ,-ikl(jfl)) )/2.*zsurfy(2)
+            zuinfl =( uu(iiloc(jfl)-1,ijloc(jfl),-ikl(jfl),Kbb) + uu(iiloc(jfl)-1,ijloc(jfl),-ikl(jfl),Kmm) )/2.*zsurfx(1)
+            zuoutfl=( uu(iiloc(jfl)  ,ijloc(jfl),-ikl(jfl),Kbb) + uu(iiloc(jfl)  ,ijloc(jfl),-ikl(jfl),Kmm) )/2.*zsurfx(2)
+            zvinfl =( vv(iiloc(jfl),ijloc(jfl)-1,-ikl(jfl),Kbb) + vv(iiloc(jfl),ijloc(jfl)-1,-ikl(jfl),Kmm) )/2.*zsurfy(1)
+            zvoutfl=( vv(iiloc(jfl),ijloc(jfl)  ,-ikl(jfl),Kbb) + vv(iiloc(jfl),ijloc(jfl)  ,-ikl(jfl),Kmm) )/2.*zsurfy(2)
             zwinfl =-(wb(iiloc(jfl),ijloc(jfl),-(ikl(jfl)-1))    &
-               &   +  wn(iiloc(jfl),ijloc(jfl),-(ikl(jfl)-1)) )/2. *  zsurfz*nisobfl(jfl)
+               &   +  ww(iiloc(jfl),ijloc(jfl),-(ikl(jfl)-1)) )/2. *  zsurfz*nisobfl(jfl)
             zwoutfl=-(wb(iiloc(jfl),ijloc(jfl),- ikl(jfl)   )   &
-               &   +  wn(iiloc(jfl),ijloc(jfl),- ikl(jfl)   ) )/2. *  zsurfz*nisobfl(jfl)
+               &   +  ww(iiloc(jfl),ijloc(jfl),- ikl(jfl)   ) )/2. *  zsurfz*nisobfl(jfl)
             
             ! interpolation of velocity field on the float initial position            
             zufl(jfl)=  zuinfl  + ( zgifl(jfl) - float(iil(jfl)-1) ) * ( zuoutfl - zuinfl)
@@ -175,7 +178,7 @@ CONTAINS
             zudfl (jfl) = zuoutfl - zuinfl
             zgidfl(jfl) = float(iioutfl(jfl) - iiinfl(jfl))
             IF( zufl(jfl)*zuoutfl <= 0. ) THEN
-               ztxfl(jfl) = 1.E99
+               ztxfl(jfl) = HUGE(1._wp)
             ELSE
                IF( ABS(zudfl(jfl)) >= 1.E-5 ) THEN
                   ztxfl(jfl)= zgidfl(jfl)/zudfl(jfl) * LOG(zuoutfl/zufl (jfl))
@@ -191,7 +194,7 @@ CONTAINS
             zvdfl (jfl) = zvoutfl - zvinfl
             zgjdfl(jfl) = float(ijoutfl(jfl)-ijinfl(jfl))
             IF( zvfl(jfl)*zvoutfl <= 0. ) THEN
-               ztyfl(jfl) = 1.E99
+               ztyfl(jfl) = HUGE(1._wp)
             ELSE
                IF( ABS(zvdfl(jfl)) >= 1.E-5 ) THEN
                   ztyfl(jfl) = zgjdfl(jfl)/zvdfl(jfl) * LOG(zvoutfl/zvfl (jfl))
@@ -208,7 +211,7 @@ CONTAINS
                zwdfl (jfl) = zwoutfl - zwinfl
                zgkdfl(jfl) = float(ikoutfl(jfl) - ikinfl(jfl))
                IF( zwfl(jfl)*zwoutfl <= 0. ) THEN
-                  ztzfl(jfl) = 1.E99
+                  ztzfl(jfl) = HUGE(1._wp)
                ELSE
                   IF( ABS(zwdfl(jfl)) >= 1.E-5 ) THEN
                      ztzfl(jfl) = zgkdfl(jfl)/zwdfl(jfl) * LOG(zwoutfl/zwfl (jfl))
@@ -233,9 +236,9 @@ CONTAINS
             zagenewfl(jfl) = zagefl(jfl) + zttfl(jfl)*zvol
             ! test to know if the "age" of the float is not bigger than the 
             ! time step
-            IF( zagenewfl(jfl) > rdt ) THEN
-               zttfl(jfl) = (rdt-zagefl(jfl)) / zvol
-               zagenewfl(jfl) = rdt
+            IF( zagenewfl(jfl) > rn_Dt ) THEN
+               zttfl(jfl) = (rn_Dt-zagefl(jfl)) / zvol
+               zagenewfl(jfl) = rn_Dt
             ENDIF
             
             ! In the "minimal" direction we compute the index of new mesh
@@ -340,14 +343,14 @@ CONTAINS
       IF( ln_argo ) THEN
          ifin = 1
          DO jfl = 1, jpnfl
-            IF( zagefl(jfl) < rdt )   ifin = 0
+            IF( zagefl(jfl) < rn_Dt )   ifin = 0
             tpifl(jfl) = zgifl(jfl) + 0.5
             tpjfl(jfl) = zgjfl(jfl) + 0.5
          END DO
       ELSE
          ifin = 1
          DO jfl = 1, jpnfl
-            IF( zagefl(jfl) < rdt )   ifin = 0
+            IF( zagefl(jfl) < rn_Dt )   ifin = 0
             tpifl(jfl) = zgifl(jfl) + 0.5
             tpjfl(jfl) = zgjfl(jfl) + 0.5
             IF( nisobfl(jfl) == 1 ) tpkfl(jfl) = -(zgkfl(jfl))
@@ -364,18 +367,10 @@ CONTAINS
          iloop = iloop + 1 
          GO TO 222
       ENDIF
+#endif
       !
       !
    END SUBROUTINE flo_blk
 
-#  else
-   !!----------------------------------------------------------------------
-   !!   Default option                                         Empty module
-   !!----------------------------------------------------------------------
-CONTAINS
-   SUBROUTINE flo_blk                  ! Empty routine
-   END SUBROUTINE flo_blk 
-#endif
-   
    !!======================================================================
 END MODULE floblk 

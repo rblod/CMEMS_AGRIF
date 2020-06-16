@@ -30,11 +30,12 @@ MODULE par_kind
    INTEGER, PUBLIC, PARAMETER ::   i8 = SELECTED_INT_KIND(14)        !: double precision (integer 8)
    
    !                                                                !!** Integer **
-   INTEGER, PUBLIC, PARAMETER ::   lc = 256                          !: Lenght of Character strings
+   INTEGER, PUBLIC, PARAMETER ::   lc  = 256                          !: Lenght of Character strings
+   INTEGER, PUBLIC, PARAMETER ::   lca = 400                          !: Lenght of Character arrays
 
    !!----------------------------------------------------------------------
    !! NEMO 3.3 , NEMO Consortium (2018)
-   !! $Id: par_kind.F90 10068 2018-08-28 14:09:04Z nicolasmartin $ 
+   !! $Id: par_kind.F90 13026 2020-06-03 14:30:02Z rblod $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 END MODULE par_kind

@@ -2,8 +2,6 @@
 ! NEMO system team, System and Interface for oceanic RElocable Nesting
 !----------------------------------------------------------------------
 !
-! MODULE: iom_mpp
-!
 ! DESCRIPTION:
 !> @brief This module manage massively parallel processing Input/Output manager.
 !> Library to read/write mpp files.
@@ -85,12 +83,13 @@
 !>
 !> @author
 !> J.Paul
-! REVISION HISTORY:
+!>
 !> @date November, 2013 - Initial Version
 !>
-!> @note Software governed by the CeCILL licence     (./LICENSE)
+!> @note Software governed by the CeCILL licence     (NEMOGCM/NEMO_CeCILL.txt)
 !----------------------------------------------------------------------
 MODULE iom_mpp
+
    USE netcdf                          ! nf90 library
    USE global                          ! global parameter
    USE kind                            ! F90 kind parameter
@@ -102,6 +101,7 @@ MODULE iom_mpp
    USE file                            ! file manager
    USE iom                             ! I/O manager
    USE mpp                             ! mpp manager
+
    IMPLICIT NONE
    ! NOTE_avoid_public_variables_if_possible
 
@@ -122,6 +122,8 @@ MODULE iom_mpp
    END INTERFACE iom_mpp_read_var
 
 CONTAINS
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_mpp_open(td_mpp, id_perio, id_ew)
    !-------------------------------------------------------------------
    !> @brief This subroutine open files composing mpp structure to be used.
    !> @details
@@ -137,11 +139,14 @@ CONTAINS
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !> @date August, 2017 
+   !> - handle use of domain decomposition for monoproc file
+   !>
    !> @param[inout] td_mpp mpp structure
    !-------------------------------------------------------------------
-   SUBROUTINE iom_mpp_open(td_mpp, id_perio, id_ew)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TMPP) , INTENT(INOUT)  :: td_mpp
       INTEGER(i4), INTENT(IN), OPTIONAL :: id_perio
@@ -149,6 +154,20 @@ CONTAINS
 
       ! local variable
       CHARACTER(LEN=lc) :: cl_name
+      INTEGER(i4) :: il_pid  
+      INTEGER(i4) :: il_impp 
+      INTEGER(i4) :: il_jmpp 
+      INTEGER(i4) :: il_lci  
+      INTEGER(i4) :: il_lcj  
+      INTEGER(i4) :: il_ldi  
+      INTEGER(i4) :: il_ldj  
+      INTEGER(i4) :: il_lei  
+      INTEGER(i4) :: il_lej  
+      LOGICAL     :: ll_ctr  
+      LOGICAL     :: ll_use  
+      LOGICAL     :: ll_create  
+      INTEGER(i4) :: il_iind 
+      INTEGER(i4) :: il_jind 
 
       ! loop indices
       INTEGER(i4) :: ji
@@ -174,7 +193,7 @@ CONTAINS
                                       & TRIM(td_mpp%c_type) )
 
          td_mpp%t_proc(:)%c_type=TRIM(td_mpp%c_type) 
-         IF( td_mpp%i_nproc > 1 )THEN
+         IF( td_mpp%i_nproc > 1 .AND. td_mpp%l_usempp )THEN
             DO ji=1,td_mpp%i_nproc
                IF( td_mpp%t_proc(ji)%l_use )THEN
 
@@ -199,6 +218,59 @@ CONTAINS
                td_mpp%t_proc(1)%c_name=TRIM(cl_name)
 
                CALL iom_open(td_mpp%t_proc(1))
+
+               IF( .NOT. td_mpp%l_usempp )THEN
+                  ! copy file structure of first proc, except layout decomposition
+                  ! do not do it when creating output file.
+                  ll_create=( ALL(td_mpp%t_proc(:)%l_wrt) .AND. &
+                  &           ALL(td_mpp%t_proc(:)%l_use) )
+                  IF( .NOT. ll_create )THEN
+                     DO ji=2,td_mpp%i_nproc
+                        IF( td_mpp%t_proc(ji)%l_use )THEN
+                           il_pid  = td_mpp%t_proc(ji)%i_pid  
+                           il_impp = td_mpp%t_proc(ji)%i_impp 
+                           il_jmpp = td_mpp%t_proc(ji)%i_jmpp 
+                           il_lci  = td_mpp%t_proc(ji)%i_lci  
+                           il_lcj  = td_mpp%t_proc(ji)%i_lcj  
+                           il_ldi  = td_mpp%t_proc(ji)%i_ldi  
+                           il_ldj  = td_mpp%t_proc(ji)%i_ldj  
+                           il_lei  = td_mpp%t_proc(ji)%i_lei  
+                           il_lej  = td_mpp%t_proc(ji)%i_lej  
+                           ll_ctr  = td_mpp%t_proc(ji)%l_ctr  
+                           ll_use  = td_mpp%t_proc(ji)%l_use  
+                           il_iind = td_mpp%t_proc(ji)%i_iind 
+                           il_jind = td_mpp%t_proc(ji)%i_jind 
+
+                           td_mpp%t_proc(ji)=file_copy(td_mpp%t_proc(1))
+                           td_mpp%t_proc(ji)%i_id=td_mpp%t_proc(1)%i_id
+                           td_mpp%t_proc(ji)%l_def=.FALSE.
+
+                           td_mpp%t_proc(ji)%i_pid  = il_pid  
+                           td_mpp%t_proc(ji)%i_impp = il_impp 
+                           td_mpp%t_proc(ji)%i_jmpp = il_jmpp 
+                           td_mpp%t_proc(ji)%i_lci  = il_lci  
+                           td_mpp%t_proc(ji)%i_lcj  = il_lcj  
+                           td_mpp%t_proc(ji)%i_ldi  = il_ldi  
+                           td_mpp%t_proc(ji)%i_ldj  = il_ldj  
+                           td_mpp%t_proc(ji)%i_lei  = il_lei  
+                           td_mpp%t_proc(ji)%i_lej  = il_lej  
+                           td_mpp%t_proc(ji)%l_ctr  = ll_ctr  
+                           td_mpp%t_proc(ji)%l_use  = ll_use  
+                           td_mpp%t_proc(ji)%i_iind = il_iind 
+                           td_mpp%t_proc(ji)%i_jind = il_jind 
+                        ENDIF
+                     ENDDO
+                  ELSE
+                     ! keep file id
+                     DO ji=2,td_mpp%i_nproc
+                        IF( td_mpp%t_proc(ji)%l_use )THEN 
+                           td_mpp%t_proc(ji)%i_id=td_mpp%t_proc(1)%i_id
+                           td_mpp%t_proc(ji)%l_def=.FALSE.
+                        ENDIF
+                     ENDDO
+                  ENDIF
+               ENDIF
+
          ENDIF
 
          IF( PRESENT(id_ew) )THEN
@@ -218,17 +290,20 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE iom_mpp_open
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_mpp_create(td_mpp)
    !-------------------------------------------------------------------
    !> @brief This subroutine create files, composing mpp structure to be used,
    !> in write mode.
    !> 
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[inout] td_mpp mpp structure
    !-------------------------------------------------------------------
-   SUBROUTINE iom_mpp_create(td_mpp)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TMPP), INTENT(INOUT)  :: td_mpp
       !----------------------------------------------------------------
@@ -246,16 +321,19 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE iom_mpp_create
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_mpp_close(td_mpp)
    !-------------------------------------------------------------------
    !> @brief This subroutine close files composing mpp structure.
    !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !>
    !> @param[in] td_mpp mpp structure
    !-------------------------------------------------------------------
-   SUBROUTINE iom_mpp_close(td_mpp)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TMPP), INTENT(INOUT) :: td_mpp
 
@@ -272,15 +350,26 @@ CONTAINS
          ! 
          td_mpp%i_id=0         
 
-         DO ji=1,td_mpp%i_nproc
-            IF( td_mpp%t_proc(ji)%i_id /= 0 )THEN
-               CALL iom_close(td_mpp%t_proc(ji))
+         IF( td_mpp%l_usempp )THEN
+            DO ji=1,td_mpp%i_nproc
+               IF( td_mpp%t_proc(ji)%i_id /= 0 )THEN
+                  CALL iom_close(td_mpp%t_proc(ji))
+               ENDIF
+            ENDDO
+         ELSE
+            IF( td_mpp%t_proc(1)%i_id /= 0 )THEN
+               CALL iom_close(td_mpp%t_proc(1))
+               td_mpp%t_proc(:)%i_id=0
             ENDIF
-         ENDDO
+         ENDIF
          td_mpp%t_proc(:)%l_use=.FALSE.
+
       ENDIF
 
    END SUBROUTINE iom_mpp_close
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION iom_mpp__read_var_id(td_mpp, id_varid, id_start, id_count) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function read variable value in opened mpp files,
    !> given variable id.
@@ -301,14 +390,17 @@ CONTAINS
    !> @param[in] id_count  number of indices selected along each dimension
    !> @return  variable structure 
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION iom_mpp__read_var_id(td_mpp, id_varid,&
-   &                                        id_start, id_count)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TMPP),                INTENT(IN) :: td_mpp
       INTEGER(i4),               INTENT(IN) :: id_varid
       INTEGER(i4), DIMENSION(:), INTENT(IN), OPTIONAL :: id_start
       INTEGER(i4), DIMENSION(:), INTENT(IN), OPTIONAL :: id_count      
+
+      ! function
+      TYPE(TVAR)                            :: tf_var
 
       ! local variable
       INTEGER(i4), DIMENSION(1) :: il_ind
@@ -333,11 +425,10 @@ CONTAINS
             &           mask=(td_mpp%t_proc(1)%t_var(:)%i_id==id_varid))
             IF( il_ind(1) /= 0 )THEN
 
-               iom_mpp__read_var_id=var_copy(td_mpp%t_proc(1)%t_var(il_ind(1)))
+               tf_var=var_copy(td_mpp%t_proc(1)%t_var(il_ind(1)))
 
                !!! read variable value
-               CALL iom_mpp__read_var_value(td_mpp, iom_mpp__read_var_id, &
-               &                            id_start, id_count)
+               CALL iom_mpp__read_var_value(td_mpp, tf_var, id_start, id_count)
 
             ELSE
                CALL logger_error( &
@@ -353,6 +444,9 @@ CONTAINS
       ENDIF
 
    END FUNCTION iom_mpp__read_var_id
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION iom_mpp__read_var_name(td_mpp, cd_name, id_start, id_count) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief This function read variable value in opened mpp files, 
    !> given variable name or standard name.
@@ -364,12 +458,12 @@ CONTAINS
    !> look first for variable name. If it doesn't
    !> exist in file, look for variable standard name.<br/>
    !> If variable name is not present, check variable standard name.<br/>
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date October, 2014
    !> - use start and count array instead of domain structure.
-   !
+   !>
    !> @param[in] td_mpp    mpp structure
    !> @param[in] cd_name   variable name
    !> @param[in] id_start  index in the variable from which the data values 
@@ -377,14 +471,17 @@ CONTAINS
    !> @param[in] id_count  number of indices selected along each dimension
    !> @return  variable structure 
    !-------------------------------------------------------------------
-   TYPE(TVAR) FUNCTION iom_mpp__read_var_name(td_mpp, cd_name,    &
-   &                                          id_start, id_count )
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TMPP),                INTENT(IN) :: td_mpp
       CHARACTER(LEN=*),          INTENT(IN) :: cd_name
       INTEGER(i4), DIMENSION(:), INTENT(IN), OPTIONAL :: id_start
-      INTEGER(i4), DIMENSION(:), INTENT(IN), OPTIONAL :: id_count      
+      INTEGER(i4), DIMENSION(:), INTENT(IN), OPTIONAL :: id_count
+
+      ! function
+      TYPE(TVAR)                            :: tf_var
 
       ! local variable
       INTEGER(i4)       :: il_ind
@@ -399,18 +496,16 @@ CONTAINS
 
          CALL logger_error( " IOM MPP READ VAR: mpp structure not opened. "//&
          &               " can not read variable in "//TRIM(td_mpp%c_name))   
-      
+ 
       ELSE
 
             il_ind=var_get_index( td_mpp%t_proc(1)%t_var(:), cd_name)
             IF( il_ind /= 0 )THEN
 
-               iom_mpp__read_var_name=var_copy(td_mpp%t_proc(1)%t_var(il_ind))
+               tf_var=var_copy(td_mpp%t_proc(1)%t_var(il_ind))
 
                !!! read variable value
-               CALL iom_mpp__read_var_value( td_mpp, &
-               &                             iom_mpp__read_var_name, &
-               &                             id_start, id_count)
+               CALL iom_mpp__read_var_value( td_mpp, tf_var, id_start, id_count)
 
             ELSE
 
@@ -423,6 +518,8 @@ CONTAINS
       ENDIF
       
    END FUNCTION iom_mpp__read_var_name
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_mpp__read_var_value(td_mpp, td_var, id_start, id_count)
    !-------------------------------------------------------------------
    !> @brief This subroutine read variable value
    !> in an mpp structure.
@@ -430,7 +527,7 @@ CONTAINS
    !> @details
    !> Optionally start indices and number of point to be read could be specify.
    !> as well as East West ovelap of the global domain.
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date October, 2014
@@ -442,14 +539,14 @@ CONTAINS
    !> will be read
    !> @param[in] id_count  number of indices selected along each dimension
    !-------------------------------------------------------------------
-   SUBROUTINE iom_mpp__read_var_value(td_mpp, td_var, &
-   &                                  id_start, id_count )
+
       IMPLICIT NONE
+
       ! Argument      
-      TYPE(TMPP),   INTENT(IN)    :: td_mpp
-      TYPE(TVAR),   INTENT(INOUT) :: td_var
-      INTEGER(i4), DIMENSION(:), INTENT(IN),   OPTIONAL :: id_start
-      INTEGER(i4), DIMENSION(:), INTENT(IN),   OPTIONAL :: id_count      
+      TYPE(TMPP)               , INTENT(IN   ) :: td_mpp
+      TYPE(TVAR)               , INTENT(INOUT) :: td_var
+      INTEGER(i4), DIMENSION(:), INTENT(IN   ), OPTIONAL :: id_start
+      INTEGER(i4), DIMENSION(:), INTENT(IN   ), OPTIONAL :: id_count      
 
       ! local variable
       INTEGER(i4)                       :: il_status
@@ -493,6 +590,11 @@ CONTAINS
                &  TRIM(fct_str(il_count(jp_J)))//","//&
                &  TRIM(fct_str(il_count(jp_K)))//","//&
                &  TRIM(fct_str(il_count(jp_L))) )
+
+      !IF( td_mpp%l_usempp .AND. (PRESENT(id_start) .OR. PRESENT(id_count)))THEN
+      !   CALL logger_fatal("IOM MPP READ VAR VALUE: should not use"//&
+      !      &  " start or count arguments when usempp is False.")
+      !ENDIF
 
       DO jk=1,ip_maxdim
          IF( .NOT. td_var%t_dim(jk)%l_use )THEN
@@ -573,9 +675,15 @@ CONTAINS
             il_j2=MIN(il_j2p, il_end(2))
 
             IF( (il_i1<=il_i2).AND.(il_j1<=il_j2) )THEN
-               il_strt(:)=(/ il_i1-il_i1p+1, &
-               &             il_j1-il_j1p+1, &
-               &             1,1 /)
+               IF( td_mpp%l_usempp )THEN
+                  il_strt(:)=(/ il_i1-il_i1p+1, &
+                  &             il_j1-il_j1p+1, &
+                  &             1,1 /)
+               ELSE
+                  il_strt(:)=(/ il_i1, &
+                  &             il_j1, &
+                  &             1,1 /)
+               ENDIF
 
                il_cnt(:)=(/ il_i2-il_i1+1,         &
                &            il_j2-il_j1+1,         &
@@ -615,21 +723,27 @@ CONTAINS
       ENDIF      
 
    END SUBROUTINE iom_mpp__read_var_value
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_mpp_write_file(td_mpp, cd_dimorder)
    !-------------------------------------------------------------------
    !> @brief This subroutine write files composing mpp structure.
-   !
+   !>
    !> @details
    !> optionally, you could specify the dimension order (default 'xyzt')
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !> @date July, 2015 - add dimension order option 
-   !
+   !> @date July, 2015 
+   !> - add dimension order option 
+   !> @date August, 2017 
+   !> - handle use of domain decomposition for monoproc file
+   !>
    !> @param[inout] td_mpp mpp structure
-   !> @param[In] cd_dimorder dimension order
+   !> @param[in] cd_dimorder dimension order
    !-------------------------------------------------------------------
-   SUBROUTINE iom_mpp_write_file(td_mpp, cd_dimorder)
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TMPP)      , INTENT(INOUT) :: td_mpp
       CHARACTER(LEN=*), INTENT(IN   ), OPTIONAL :: cd_dimorder
@@ -638,6 +752,7 @@ CONTAINS
       ! loop indices
       INTEGER(i4) :: ji
       !----------------------------------------------------------------
+
       ! check if mpp exist
       IF( .NOT. ASSOCIATED(td_mpp%t_proc) )THEN
 
@@ -645,14 +760,137 @@ CONTAINS
          &               " in mpp strcuture "//TRIM(td_mpp%c_name))
 
       ELSE
-         DO ji=1, td_mpp%i_nproc
-            IF( td_mpp%t_proc(ji)%i_id /= 0 )THEN
-               CALL iom_write_file(td_mpp%t_proc(ji), cd_dimorder)
-            ELSE
-               CALL logger_debug( " MPP WRITE: no id associated to file "//&
-               &              TRIM(td_mpp%t_proc(ji)%c_name) )
-            ENDIF
-         ENDDO
+         IF( td_mpp%l_usempp )THEN
+            DO ji=1, td_mpp%i_nproc
+               IF( td_mpp%t_proc(ji)%i_id /= 0 )THEN
+                  CALL logger_debug("MPP WRITE: proc "//TRIM(fct_str(ji)))
+                  CALL iom_write_file(td_mpp%t_proc(ji), cd_dimorder)
+               ELSE
+                  CALL logger_debug( " MPP WRITE: no id associated to file "//&
+                  &              TRIM(td_mpp%t_proc(ji)%c_name) )
+               ENDIF
+            ENDDO
+         ELSE
+            CALL iom_write_header(td_mpp%t_proc(1), cd_dimorder, td_mpp%t_dim(:))
+
+            CALL iom_mpp__write_var(td_mpp, cd_dimorder)
+         ENDIF
       ENDIF
+
    END SUBROUTINE iom_mpp_write_file
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE iom_mpp__write_var(td_mpp, cd_dimorder)
+   !-------------------------------------------------------------------
+   !> @brief This subroutine write variables from mpp structure in one output
+   !> file.
+   !>
+   !> @details
+   !> optionally, you could specify the dimension order (default 'xyzt')
+   !>
+   !> @author J.Paul
+   !> @date August, 2017 - Initial Version
+   !>
+   !> @param[inout] td_mpp mpp structure
+   !> @param[in] cd_dimorder dimension order
+   !-------------------------------------------------------------------
+
+      IMPLICIT NONE
+
+      ! Argument      
+      TYPE(TMPP)      , INTENT(INOUT) :: td_mpp
+      CHARACTER(LEN=*), INTENT(IN   ), OPTIONAL :: cd_dimorder
+
+      ! local variable
+      INTEGER(i4), DIMENSION(4)         :: il_ind
+      INTEGER(i4)                       :: il_i1p
+      INTEGER(i4)                       :: il_i2p
+      INTEGER(i4)                       :: il_j1p
+      INTEGER(i4)                       :: il_j2p
+      INTEGER(i4)                       :: il_i1
+      INTEGER(i4)                       :: il_i2
+      INTEGER(i4)                       :: il_j1
+      INTEGER(i4)                       :: il_j2
+
+      INTEGER(i4), DIMENSION(ip_maxdim) :: il_start
+      INTEGER(i4), DIMENSION(ip_maxdim) :: il_count     
+
+      INTEGER(i4), DIMENSION(ip_maxdim) :: il_strt
+      INTEGER(i4), DIMENSION(ip_maxdim) :: il_cnt      
+
+      REAL(dp)                          :: dl_fill
+
+      TYPE(TFILE)                       :: tl_file
+
+      ! loop indices
+      INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
+      !----------------------------------------------------------------
+
+      ! write variable in file
+      DO jj = 1, td_mpp%i_nproc
+         
+         ! link
+         tl_file=td_mpp%t_proc(jj)
+         CALL logger_debug("IOM MPP WRITE: proc "//fct_str(jj))
+
+         ! get processor indices
+         il_ind(:)=mpp_get_proc_index( td_mpp, jj )
+         il_i1p = il_ind(1)
+         il_i2p = il_ind(2)
+         il_j1p = il_ind(3)
+         il_j2p = il_ind(4)
+      
+         IF( jj > 1 )THEN
+            ! force to use id from variable write on first proc
+            tl_file%t_var(:)%i_id=td_mpp%t_proc(1)%t_var(:)%i_id
+         ENDIF
+
+         DO ji = 1, tl_file%i_nvar
+
+            IF( jj > 1 )THEN
+               ! check _FillValue
+               dl_fill=td_mpp%t_proc(1)%t_var(ji)%d_fill
+               IF( tl_file%t_var(ji)%d_fill /= dl_fill )THEN
+                  CALL var_chg_FillValue( tl_file%t_var(ji), dl_fill )
+               ENDIF
+            ENDIF
+
+            il_start(:)=1
+            il_count(:)=td_mpp%t_dim(:)%i_len
+
+            IF( .NOT. tl_file%t_var(ji)%t_dim(1)%l_use )THEN
+               il_i1p=1 ; il_i2p=1
+               il_count(1) = 1
+            ENDIF
+            IF( .NOT. tl_file%t_var(ji)%t_dim(2)%l_use )THEN
+               il_j1p=1 ; il_j2p=1
+               il_count(2) = 1
+            ENDIF            
+            
+            il_i1=MAX(il_i1p, il_start(1))
+            il_i2=MIN(il_i2p, il_count(1))
+
+            il_j1=MAX(il_j1p, il_start(2))
+            il_j2=MIN(il_j2p, il_count(2))
+         
+            IF( (il_i1<=il_i2).AND.(il_j1<=il_j2) )THEN
+               il_strt(:)=(/ il_i1, &
+               &             il_j1, &
+               &             1,1 /)
+
+               il_cnt(:)=(/ il_i2-il_i1+1,         &
+               &            il_j2-il_j1+1,         &
+               &            tl_file%t_var(ji)%t_dim(3)%i_len, &
+               &            tl_file%t_var(ji)%t_dim(4)%i_len /)
+
+               CALL iom_write_var(tl_file, cd_dimorder, &
+               &                  id_start=il_strt(:), &
+               &                  id_count=il_cnt(:))
+            ENDIF
+
+         ENDDO
+      ENDDO
+
+   END SUBROUTINE iom_mpp__write_var   
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 END MODULE iom_mpp

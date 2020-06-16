@@ -9,6 +9,7 @@
     parent_bathy_meter     = '1_bathy_meter.nc'
     parent_meter_name      = 'Bathymetry'
     parent_domcfg_out      = '1_domain_cfg.nc'
+    parent_jperio          = 0
 /    
     
 &bathymetry    

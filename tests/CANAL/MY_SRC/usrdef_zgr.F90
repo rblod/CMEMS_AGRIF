@@ -30,11 +30,9 @@ MODULE usrdef_zgr
 
    PUBLIC   usr_def_zgr        ! called by domzgr.F90
 
-  !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: usrdef_zgr.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: usrdef_zgr.F90 12740 2020-04-12 09:03:06Z smasson $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS             
@@ -205,7 +203,7 @@ CONTAINS
       !
       CALL lbc_lnk( 'usrdef_zgr', z2d, 'T', 1. )           ! set surrounding land to zero (here jperio=0 ==>> closed)
       !
-      k_bot(:,:) = INT( z2d(:,:) )           ! =jpkm1 over the ocean point, =0 elsewhere
+      k_bot(:,:) = NINT( z2d(:,:) )          ! =jpkm1 over the ocean point, =0 elsewhere
       !
       k_top(:,:) = MIN( 1 , k_bot(:,:) )     ! = 1    over the ocean point, =0 elsewhere
       !

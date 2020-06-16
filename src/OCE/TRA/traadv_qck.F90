@@ -20,6 +20,7 @@ MODULE traadv_qck
    USE trd_oce         ! trends: ocean variables
    USE trdtra          ! trends manager: tracers 
    USE diaptr          ! poleward transport diagnostics
+   USE iom
    !
    USE in_out_manager  ! I/O manager
    USE lib_mpp         ! distribued memory computing
@@ -38,16 +39,15 @@ MODULE traadv_qck
 
 
    !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: traadv_qck.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: traadv_qck.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE tra_adv_qck ( kt, kit000, cdtype, p2dt, pun, pvn, pwn,      &
-      &                                       ptb, ptn, pta, kjpt )
+   SUBROUTINE tra_adv_qck ( kt, kit000, cdtype, p2dt, pU, pV, pW, Kbb, Kmm, pt, kjpt, Krhs )
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE tra_adv_qck  ***
       !!
@@ -71,26 +71,26 @@ CONTAINS
       !!
       !!         dt = 2*rdtra and the scalar values are tb and sb
       !!
-      !!       On the vertical, the simple centered scheme used ptn
+      !!       On the vertical, the simple centered scheme used pt(:,:,:,:,Kmm)
       !!
       !!               The fluxes are bounded by the ULTIMATE limiter to
       !!             guarantee the monotonicity of the solution and to
       !!            prevent the appearance of spurious numerical oscillations
       !!
-      !! ** Action : - update pta  with the now advective tracer trends
+      !! ** Action : - update pt(:,:,:,:,Krhs)  with the now advective tracer trends
       !!             - send trends to trdtra module for further diagnostcs (l_trdtra=T)
-      !!             - htr_adv, str_adv : poleward advective heat and salt transport (ln_diaptr=T)
+      !!             - poleward advective heat and salt transport (ln_diaptr=T)
       !!
       !! ** Reference : Leonard (1979, 1991)
       !!----------------------------------------------------------------------
-      INTEGER                              , INTENT(in   ) ::   kt              ! ocean time-step index
-      INTEGER                              , INTENT(in   ) ::   kit000          ! first time step index
-      CHARACTER(len=3)                     , INTENT(in   ) ::   cdtype          ! =TRA or TRC (tracer indicator)
-      INTEGER                              , INTENT(in   ) ::   kjpt            ! number of tracers
-      REAL(wp)                             , INTENT(in   ) ::   p2dt            ! tracer time-step
-      REAL(wp), DIMENSION(jpi,jpj,jpk     ), INTENT(in   ) ::   pun, pvn, pwn   ! 3 ocean velocity components
-      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt), INTENT(in   ) ::   ptb, ptn        ! before and now tracer fields
-      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt), INTENT(inout) ::   pta             ! tracer trend 
+      INTEGER                                  , INTENT(in   ) ::   kt              ! ocean time-step index
+      INTEGER                                  , INTENT(in   ) ::   Kbb, Kmm, Krhs  ! ocean time level indices
+      INTEGER                                  , INTENT(in   ) ::   kit000          ! first time step index
+      CHARACTER(len=3)                         , INTENT(in   ) ::   cdtype          ! =TRA or TRC (tracer indicator)
+      INTEGER                                  , INTENT(in   ) ::   kjpt            ! number of tracers
+      REAL(wp)                                 , INTENT(in   ) ::   p2dt            ! tracer time-step
+      REAL(wp), DIMENSION(jpi,jpj,jpk         ), INTENT(in   ) ::   pU, pV, pW      ! 3 ocean volume transport components
+      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt,jpt), INTENT(inout) ::   pt              ! tracers and RHS of tracer equation
       !!----------------------------------------------------------------------
       !
       IF( kt == kit000 )  THEN
@@ -102,32 +102,31 @@ CONTAINS
       !
       l_trd = .FALSE.
       l_ptr = .FALSE.
-      IF( ( cdtype == 'TRA' .AND. l_trdtra ) .OR. ( cdtype == 'TRC' .AND. l_trdtrc ) )      l_trd = .TRUE.
-      IF(   cdtype == 'TRA' .AND. ln_diaptr )                                               l_ptr = .TRUE. 
+      IF( ( cdtype == 'TRA' .AND. l_trdtra ) .OR. ( cdtype == 'TRC' .AND. l_trdtrc ) )   l_trd = .TRUE.
+      IF(   cdtype == 'TRA' .AND. ( iom_use( 'sophtadv' ) .OR. iom_use( 'sophtadv' ) ) ) l_ptr = .TRUE. 
       !
       !
       !        ! horizontal fluxes are computed with the QUICKEST + ULTIMATE scheme
-      CALL tra_adv_qck_i( kt, cdtype, p2dt, pun, ptb, ptn, pta, kjpt ) 
-      CALL tra_adv_qck_j( kt, cdtype, p2dt, pvn, ptb, ptn, pta, kjpt ) 
+      CALL tra_adv_qck_i( kt, cdtype, p2dt, pU, Kbb, Kmm, pt, kjpt, Krhs ) 
+      CALL tra_adv_qck_j( kt, cdtype, p2dt, pV, Kbb, Kmm, pt, kjpt, Krhs ) 
 
       !        ! vertical fluxes are computed with the 2nd order centered scheme
-      CALL tra_adv_cen2_k( kt, cdtype, pwn,         ptn, pta, kjpt )
+      CALL tra_adv_cen2_k( kt, cdtype, pW, Kmm, pt, kjpt, Krhs )
       !
    END SUBROUTINE tra_adv_qck
 
 
-   SUBROUTINE tra_adv_qck_i( kt, cdtype, p2dt, pun,                  &
-      &                                        ptb, ptn, pta, kjpt   )
+   SUBROUTINE tra_adv_qck_i( kt, cdtype, p2dt, pU, Kbb, Kmm, pt, kjpt, Krhs )
       !!----------------------------------------------------------------------
       !!
       !!----------------------------------------------------------------------
-      INTEGER                              , INTENT(in   ) ::   kt         ! ocean time-step index
-      CHARACTER(len=3)                     , INTENT(in   ) ::   cdtype     ! =TRA or TRC (tracer indicator)
-      INTEGER                              , INTENT(in   ) ::   kjpt       ! number of tracers
-      REAL(wp)                             , INTENT(in   ) ::   p2dt       ! tracer time-step
-      REAL(wp), DIMENSION(jpi,jpj,jpk     ), INTENT(in   ) ::   pun        ! i-velocity components
-      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt), INTENT(in   ) ::   ptb, ptn   ! before and now tracer fields
-      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt), INTENT(inout) ::   pta        ! tracer trend 
+      INTEGER                                  , INTENT(in   ) ::   kt         ! ocean time-step index
+      INTEGER                                  , INTENT(in   ) ::   Kbb, Kmm, Krhs  ! ocean time level indices
+      CHARACTER(len=3)                         , INTENT(in   ) ::   cdtype     ! =TRA or TRC (tracer indicator)
+      INTEGER                                  , INTENT(in   ) ::   kjpt       ! number of tracers
+      REAL(wp)                                 , INTENT(in   ) ::   p2dt       ! tracer time-step
+      REAL(wp), DIMENSION(jpi,jpj,jpk         ), INTENT(in   ) ::   pU        ! i-velocity components
+      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt,jpt), INTENT(inout) ::   pt              ! active tracers and RHS of tracer equation
       !!
       INTEGER  ::   ji, jj, jk, jn   ! dummy loop indices
       REAL(wp) ::   ztra, zbtr, zdir, zdx, zmsk   ! local scalars
@@ -141,39 +140,27 @@ CONTAINS
          zfd(:,:,:) = 0._wp     ;   zwx(:,:,:) = 0._wp   
          !
 !!gm why not using a SHIFT instruction...
-         DO jk = 1, jpkm1     !--- Computation of the ustream and downstream value of the tracer and the mask
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1   ! vector opt.
-                  zfc(ji,jj,jk) = ptb(ji-1,jj,jk,jn)        ! Upstream   in the x-direction for the tracer
-                  zfd(ji,jj,jk) = ptb(ji+1,jj,jk,jn)        ! Downstream in the x-direction for the tracer
-               END DO
-            END DO
-         END DO
+         DO_3D_00_00( 1, jpkm1 )
+            zfc(ji,jj,jk) = pt(ji-1,jj,jk,jn,Kbb)        ! Upstream   in the x-direction for the tracer
+            zfd(ji,jj,jk) = pt(ji+1,jj,jk,jn,Kbb)        ! Downstream in the x-direction for the tracer
+         END_3D
          CALL lbc_lnk_multi( 'traadv_qck', zfc(:,:,:), 'T', 1. , zfd(:,:,:), 'T', 1. )   ! Lateral boundary conditions 
          
          !
          ! Horizontal advective fluxes
          ! ---------------------------
-         DO jk = 1, jpkm1                             
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1   ! vector opt.         
-                  zdir = 0.5 + SIGN( 0.5, pun(ji,jj,jk) )   ! if pun > 0 : zdir = 1 otherwise zdir = 0 
-                  zfu(ji,jj,jk) = zdir * zfc(ji,jj,jk ) + ( 1. - zdir ) * zfd(ji+1,jj,jk)  ! FU in the x-direction for T 
-               END DO
-            END DO
-         END DO
+         DO_3D_00_00( 1, jpkm1 )
+            zdir = 0.5 + SIGN( 0.5, pU(ji,jj,jk) )   ! if pU > 0 : zdir = 1 otherwise zdir = 0 
+            zfu(ji,jj,jk) = zdir * zfc(ji,jj,jk ) + ( 1. - zdir ) * zfd(ji+1,jj,jk)  ! FU in the x-direction for T 
+         END_3D
          !
-         DO jk = 1, jpkm1  
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1   ! vector opt.   
-                  zdir = 0.5 + SIGN( 0.5, pun(ji,jj,jk) )   ! if pun > 0 : zdir = 1 otherwise zdir = 0 
-                  zdx = ( zdir * e1t(ji,jj) + ( 1. - zdir ) * e1t(ji+1,jj) ) * e2u(ji,jj) * e3u_n(ji,jj,jk)
-                  zwx(ji,jj,jk)  = ABS( pun(ji,jj,jk) ) * p2dt / zdx    ! (0<zc_cfl<1 : Courant number on x-direction)
-                  zfc(ji,jj,jk)  = zdir * ptb(ji  ,jj,jk,jn) + ( 1. - zdir ) * ptb(ji+1,jj,jk,jn)  ! FC in the x-direction for T
-                  zfd(ji,jj,jk)  = zdir * ptb(ji+1,jj,jk,jn) + ( 1. - zdir ) * ptb(ji  ,jj,jk,jn)  ! FD in the x-direction for T
-               END DO
-            END DO
-         END DO 
+         DO_3D_00_00( 1, jpkm1 )
+            zdir = 0.5 + SIGN( 0.5, pU(ji,jj,jk) )   ! if pU > 0 : zdir = 1 otherwise zdir = 0 
+            zdx = ( zdir * e1t(ji,jj) + ( 1. - zdir ) * e1t(ji+1,jj) ) * e2u(ji,jj) * e3u(ji,jj,jk,Kmm)
+            zwx(ji,jj,jk)  = ABS( pU(ji,jj,jk) ) * p2dt / zdx    ! (0<zc_cfl<1 : Courant number on x-direction)
+            zfc(ji,jj,jk)  = zdir * pt(ji  ,jj,jk,jn,Kbb) + ( 1. - zdir ) * pt(ji+1,jj,jk,jn,Kbb)  ! FC in the x-direction for T
+            zfd(ji,jj,jk)  = zdir * pt(ji+1,jj,jk,jn,Kbb) + ( 1. - zdir ) * pt(ji  ,jj,jk,jn,Kbb)  ! FD in the x-direction for T
+         END_3D
          !--- Lateral boundary conditions 
          CALL lbc_lnk_multi( 'traadv_qck', zfu(:,:,:), 'T', 1. , zfd(:,:,:), 'T', 1., zfc(:,:,:), 'T', 1.,  zwx(:,:,:), 'T', 1. )
 
@@ -181,65 +168,54 @@ CONTAINS
          CALL quickest( zfu, zfd, zfc, zwx )
          !
          ! Mask at the T-points in the x-direction (mask=0 or mask=1)
-         DO jk = 1, jpkm1  
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1   ! vector opt.               
-                  zfu(ji,jj,jk) = tmask(ji-1,jj,jk) + tmask(ji,jj,jk) + tmask(ji+1,jj,jk) - 2.
-               END DO
-            END DO
-         END DO
+         DO_3D_00_00( 1, jpkm1 )
+            zfu(ji,jj,jk) = tmask(ji-1,jj,jk) + tmask(ji,jj,jk) + tmask(ji+1,jj,jk) - 2.
+         END_3D
          CALL lbc_lnk( 'traadv_qck', zfu(:,:,:), 'T', 1. )      ! Lateral boundary conditions 
 
          !
          ! Tracer flux on the x-direction
          DO jk = 1, jpkm1  
             !
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1   ! vector opt.               
-                  zdir = 0.5 + SIGN( 0.5, pun(ji,jj,jk) )   ! if pun > 0 : zdir = 1 otherwise zdir = 0 
-                  !--- If the second ustream point is a land point
-                  !--- the flux is computed by the 1st order UPWIND scheme
-                  zmsk = zdir * zfu(ji,jj,jk) + ( 1. - zdir ) * zfu(ji+1,jj,jk)
-                  zwx(ji,jj,jk) = zmsk * zwx(ji,jj,jk) + ( 1. - zmsk ) * zfc(ji,jj,jk)
-                  zwx(ji,jj,jk) = zwx(ji,jj,jk) * pun(ji,jj,jk)
-               END DO
-            END DO
+            DO_2D_00_00
+               zdir = 0.5 + SIGN( 0.5, pU(ji,jj,jk) )   ! if pU > 0 : zdir = 1 otherwise zdir = 0 
+               !--- If the second ustream point is a land point
+               !--- the flux is computed by the 1st order UPWIND scheme
+               zmsk = zdir * zfu(ji,jj,jk) + ( 1. - zdir ) * zfu(ji+1,jj,jk)
+               zwx(ji,jj,jk) = zmsk * zwx(ji,jj,jk) + ( 1. - zmsk ) * zfc(ji,jj,jk)
+               zwx(ji,jj,jk) = zwx(ji,jj,jk) * pU(ji,jj,jk)
+            END_2D
          END DO
          !
          CALL lbc_lnk( 'traadv_qck', zwx(:,:,:), 'T', 1. ) ! Lateral boundary conditions
          !
          ! Computation of the trend
-         DO jk = 1, jpkm1  
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1   ! vector opt.  
-                  zbtr = r1_e1e2t(ji,jj) / e3t_n(ji,jj,jk)
-                  ! horizontal advective trends
-                  ztra = - zbtr * ( zwx(ji,jj,jk) - zwx(ji-1,jj,jk) )
-                  !--- add it to the general tracer trends
-                  pta(ji,jj,jk,jn) = pta(ji,jj,jk,jn) + ztra
-               END DO
-            END DO
-         END DO
+         DO_3D_00_00( 1, jpkm1 )
+            zbtr = r1_e1e2t(ji,jj) / e3t(ji,jj,jk,Kmm)
+            ! horizontal advective trends
+            ztra = - zbtr * ( zwx(ji,jj,jk) - zwx(ji-1,jj,jk) )
+            !--- add it to the general tracer trends
+            pt(ji,jj,jk,jn,Krhs) = pt(ji,jj,jk,jn,Krhs) + ztra
+         END_3D
          !                                 ! trend diagnostics
-         IF( l_trd )   CALL trd_tra( kt, cdtype, jn, jptra_xad, zwx, pun, ptn(:,:,:,jn) )
+         IF( l_trd )   CALL trd_tra( kt, Kmm, Krhs, cdtype, jn, jptra_xad, zwx, pU, pt(:,:,:,jn,Kmm) )
          !
       END DO
       !
    END SUBROUTINE tra_adv_qck_i
 
 
-   SUBROUTINE tra_adv_qck_j( kt, cdtype, p2dt, pvn,                &
-      &                                        ptb, ptn, pta, kjpt )
+   SUBROUTINE tra_adv_qck_j( kt, cdtype, p2dt, pV, Kbb, Kmm, pt, kjpt, Krhs )
       !!----------------------------------------------------------------------
       !!
       !!----------------------------------------------------------------------
-      INTEGER                              , INTENT(in   ) ::   kt         ! ocean time-step index
-      CHARACTER(len=3)                     , INTENT(in   ) ::   cdtype     ! =TRA or TRC (tracer indicator)
-      INTEGER                              , INTENT(in   ) ::   kjpt       ! number of tracers
-      REAL(wp)                             , INTENT(in   ) ::   p2dt       ! tracer time-step
-      REAL(wp), DIMENSION(jpi,jpj,jpk     ), INTENT(in   ) ::   pvn        ! j-velocity components
-      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt), INTENT(in   ) ::   ptb, ptn   ! before and now tracer fields
-      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt), INTENT(inout) ::   pta        ! tracer trend 
+      INTEGER                                  , INTENT(in   ) ::   kt         ! ocean time-step index
+      INTEGER                                  , INTENT(in   ) ::   Kbb, Kmm, Krhs  ! ocean time level indices
+      CHARACTER(len=3)                         , INTENT(in   ) ::   cdtype     ! =TRA or TRC (tracer indicator)
+      INTEGER                                  , INTENT(in   ) ::   kjpt       ! number of tracers
+      REAL(wp)                                 , INTENT(in   ) ::   p2dt       ! tracer time-step
+      REAL(wp), DIMENSION(jpi,jpj,jpk         ), INTENT(in   ) ::   pV        ! j-velocity components
+      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt,jpt), INTENT(inout) ::   pt              ! active tracers and RHS of tracer equation
       !!
       INTEGER  :: ji, jj, jk, jn                ! dummy loop indices
       REAL(wp) :: ztra, zbtr, zdir, zdx, zmsk   ! local scalars
@@ -255,14 +231,12 @@ CONTAINS
          DO jk = 1, jpkm1                                
             !                                             
             !--- Computation of the ustream and downstream value of the tracer and the mask
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1   ! vector opt.
-                  ! Upstream in the x-direction for the tracer
-                  zfc(ji,jj,jk) = ptb(ji,jj-1,jk,jn)
-                  ! Downstream in the x-direction for the tracer
-                  zfd(ji,jj,jk) = ptb(ji,jj+1,jk,jn)
-               END DO
-            END DO
+            DO_2D_00_00
+               ! Upstream in the x-direction for the tracer
+               zfc(ji,jj,jk) = pt(ji,jj-1,jk,jn,Kbb)
+               ! Downstream in the x-direction for the tracer
+               zfd(ji,jj,jk) = pt(ji,jj+1,jk,jn,Kbb)
+            END_2D
          END DO
          CALL lbc_lnk_multi( 'traadv_qck', zfc(:,:,:), 'T', 1. , zfd(:,:,:), 'T', 1. )   ! Lateral boundary conditions 
 
@@ -271,26 +245,18 @@ CONTAINS
          ! Horizontal advective fluxes
          ! ---------------------------
          !
-         DO jk = 1, jpkm1                             
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1   ! vector opt.         
-                  zdir = 0.5 + SIGN( 0.5, pvn(ji,jj,jk) )   ! if pun > 0 : zdir = 1 otherwise zdir = 0 
-                  zfu(ji,jj,jk) = zdir * zfc(ji,jj,jk ) + ( 1. - zdir ) * zfd(ji,jj+1,jk)  ! FU in the x-direction for T 
-               END DO
-            END DO
-         END DO
+         DO_3D_00_00( 1, jpkm1 )
+            zdir = 0.5 + SIGN( 0.5, pV(ji,jj,jk) )   ! if pU > 0 : zdir = 1 otherwise zdir = 0 
+            zfu(ji,jj,jk) = zdir * zfc(ji,jj,jk ) + ( 1. - zdir ) * zfd(ji,jj+1,jk)  ! FU in the x-direction for T 
+         END_3D
          !
-         DO jk = 1, jpkm1  
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1   ! vector opt.   
-                  zdir = 0.5 + SIGN( 0.5, pvn(ji,jj,jk) )   ! if pun > 0 : zdir = 1 otherwise zdir = 0 
-                  zdx = ( zdir * e2t(ji,jj) + ( 1. - zdir ) * e2t(ji,jj+1) ) * e1v(ji,jj) * e3v_n(ji,jj,jk)
-                  zwy(ji,jj,jk)  = ABS( pvn(ji,jj,jk) ) * p2dt / zdx    ! (0<zc_cfl<1 : Courant number on x-direction)
-                  zfc(ji,jj,jk)  = zdir * ptb(ji,jj  ,jk,jn) + ( 1. - zdir ) * ptb(ji,jj+1,jk,jn)  ! FC in the x-direction for T
-                  zfd(ji,jj,jk)  = zdir * ptb(ji,jj+1,jk,jn) + ( 1. - zdir ) * ptb(ji,jj  ,jk,jn)  ! FD in the x-direction for T
-               END DO
-            END DO
-         END DO
+         DO_3D_00_00( 1, jpkm1 )
+            zdir = 0.5 + SIGN( 0.5, pV(ji,jj,jk) )   ! if pU > 0 : zdir = 1 otherwise zdir = 0 
+            zdx = ( zdir * e2t(ji,jj) + ( 1. - zdir ) * e2t(ji,jj+1) ) * e1v(ji,jj) * e3v(ji,jj,jk,Kmm)
+            zwy(ji,jj,jk)  = ABS( pV(ji,jj,jk) ) * p2dt / zdx    ! (0<zc_cfl<1 : Courant number on x-direction)
+            zfc(ji,jj,jk)  = zdir * pt(ji,jj  ,jk,jn,Kbb) + ( 1. - zdir ) * pt(ji,jj+1,jk,jn,Kbb)  ! FC in the x-direction for T
+            zfd(ji,jj,jk)  = zdir * pt(ji,jj+1,jk,jn,Kbb) + ( 1. - zdir ) * pt(ji,jj  ,jk,jn,Kbb)  ! FD in the x-direction for T
+         END_3D
 
          !--- Lateral boundary conditions 
          CALL lbc_lnk_multi( 'traadv_qck', zfu(:,:,:), 'T', 1. , zfd(:,:,:), 'T', 1., zfc(:,:,:), 'T', 1., zwy(:,:,:), 'T', 1. )
@@ -299,46 +265,36 @@ CONTAINS
          CALL quickest( zfu, zfd, zfc, zwy )
          !
          ! Mask at the T-points in the x-direction (mask=0 or mask=1)
-         DO jk = 1, jpkm1  
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1   ! vector opt.               
-                  zfu(ji,jj,jk) = tmask(ji,jj-1,jk) + tmask(ji,jj,jk) + tmask(ji,jj+1,jk) - 2.
-               END DO
-            END DO
-         END DO
+         DO_3D_00_00( 1, jpkm1 )
+            zfu(ji,jj,jk) = tmask(ji,jj-1,jk) + tmask(ji,jj,jk) + tmask(ji,jj+1,jk) - 2.
+         END_3D
          CALL lbc_lnk( 'traadv_qck', zfu(:,:,:), 'T', 1. )    !--- Lateral boundary conditions 
          !
          ! Tracer flux on the x-direction
          DO jk = 1, jpkm1  
             !
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1   ! vector opt.               
-                  zdir = 0.5 + SIGN( 0.5, pvn(ji,jj,jk) )   ! if pun > 0 : zdir = 1 otherwise zdir = 0 
-                  !--- If the second ustream point is a land point
-                  !--- the flux is computed by the 1st order UPWIND scheme
-                  zmsk = zdir * zfu(ji,jj,jk) + ( 1. - zdir ) * zfu(ji,jj+1,jk)
-                  zwy(ji,jj,jk) = zmsk * zwy(ji,jj,jk) + ( 1. - zmsk ) * zfc(ji,jj,jk)
-                  zwy(ji,jj,jk) = zwy(ji,jj,jk) * pvn(ji,jj,jk)
-               END DO
-            END DO
+            DO_2D_00_00
+               zdir = 0.5 + SIGN( 0.5, pV(ji,jj,jk) )   ! if pU > 0 : zdir = 1 otherwise zdir = 0 
+               !--- If the second ustream point is a land point
+               !--- the flux is computed by the 1st order UPWIND scheme
+               zmsk = zdir * zfu(ji,jj,jk) + ( 1. - zdir ) * zfu(ji,jj+1,jk)
+               zwy(ji,jj,jk) = zmsk * zwy(ji,jj,jk) + ( 1. - zmsk ) * zfc(ji,jj,jk)
+               zwy(ji,jj,jk) = zwy(ji,jj,jk) * pV(ji,jj,jk)
+            END_2D
          END DO
          !
          CALL lbc_lnk( 'traadv_qck', zwy(:,:,:), 'T', 1. ) ! Lateral boundary conditions
          !
          ! Computation of the trend
-         DO jk = 1, jpkm1  
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1   ! vector opt.  
-                  zbtr = r1_e1e2t(ji,jj) / e3t_n(ji,jj,jk)
-                  ! horizontal advective trends
-                  ztra = - zbtr * ( zwy(ji,jj,jk) - zwy(ji,jj-1,jk) )
-                  !--- add it to the general tracer trends
-                  pta(ji,jj,jk,jn) = pta(ji,jj,jk,jn) + ztra
-               END DO
-            END DO
-         END DO
+         DO_3D_00_00( 1, jpkm1 )
+            zbtr = r1_e1e2t(ji,jj) / e3t(ji,jj,jk,Kmm)
+            ! horizontal advective trends
+            ztra = - zbtr * ( zwy(ji,jj,jk) - zwy(ji,jj-1,jk) )
+            !--- add it to the general tracer trends
+            pt(ji,jj,jk,jn,Krhs) = pt(ji,jj,jk,jn,Krhs) + ztra
+         END_3D
          !                                 ! trend diagnostics
-         IF( l_trd )   CALL trd_tra( kt, cdtype, jn, jptra_yad, zwy, pvn, ptn(:,:,:,jn) )
+         IF( l_trd )   CALL trd_tra( kt, Kmm, Krhs, cdtype, jn, jptra_yad, zwy, pV, pt(:,:,:,jn,Kmm) )
          !                                 ! "Poleward" heat and salt transports (contribution of upstream fluxes)
          IF( l_ptr )   CALL dia_ptr_hst( jn, 'adv', zwy(:,:,:) )
          !
@@ -347,17 +303,16 @@ CONTAINS
    END SUBROUTINE tra_adv_qck_j
 
 
-   SUBROUTINE tra_adv_cen2_k( kt, cdtype, pwn,           &
-     &                                    ptn, pta, kjpt )
+   SUBROUTINE tra_adv_cen2_k( kt, cdtype, pW, Kmm, pt, kjpt, Krhs )
       !!----------------------------------------------------------------------
       !!
       !!----------------------------------------------------------------------
-      INTEGER                              , INTENT(in   ) ::   kt       ! ocean time-step index
-      CHARACTER(len=3)                     , INTENT(in   ) ::   cdtype   ! =TRA or TRC (tracer indicator)
-      INTEGER                              , INTENT(in   ) ::   kjpt     ! number of tracers
-      REAL(wp), DIMENSION(jpi,jpj,jpk     ), INTENT(in   ) ::   pwn      ! vertical velocity 
-      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt), INTENT(in   ) ::   ptn      ! before and now tracer fields
-      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt), INTENT(inout) ::   pta      ! tracer trend 
+      INTEGER                                  , INTENT(in   ) ::   kt       ! ocean time-step index
+      INTEGER                                  , INTENT(in   ) ::   Kmm, Krhs  ! ocean time level indices
+      CHARACTER(len=3)                         , INTENT(in   ) ::   cdtype   ! =TRA or TRC (tracer indicator)
+      INTEGER                                  , INTENT(in   ) ::   kjpt     ! number of tracers
+      REAL(wp), DIMENSION(jpi,jpj,jpk         ), INTENT(in   ) ::   pW      ! vertical velocity 
+      REAL(wp), DIMENSION(jpi,jpj,jpk,kjpt,jpt), INTENT(inout) ::   pt              ! active tracers and RHS of tracer equation
       !
       INTEGER  ::   ji, jj, jk, jn   ! dummy loop indices
       REAL(wp), DIMENSION(jpi,jpj,jpk) ::   zwz   ! 3D workspace
@@ -370,35 +325,25 @@ CONTAINS
       DO jn = 1, kjpt                                            ! tracer loop
          !                                                       ! ===========
          !
-         DO jk = 2, jpkm1                    !* Interior point   (w-masked 2nd order centered flux)
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1   ! vector opt.
-                  zwz(ji,jj,jk) = 0.5 * pwn(ji,jj,jk) * ( ptn(ji,jj,jk-1,jn) + ptn(ji,jj,jk,jn) ) * wmask(ji,jj,jk)
-               END DO
-            END DO
-         END DO
+         DO_3D_00_00( 2, jpkm1 )
+            zwz(ji,jj,jk) = 0.5 * pW(ji,jj,jk) * ( pt(ji,jj,jk-1,jn,Kmm) + pt(ji,jj,jk,jn,Kmm) ) * wmask(ji,jj,jk)
+         END_3D
          IF( ln_linssh ) THEN                !* top value   (only in linear free surf. as zwz is multiplied by wmask)
             IF( ln_isfcav ) THEN                  ! ice-shelf cavities (top of the ocean)
-               DO jj = 1, jpj
-                  DO ji = 1, jpi
-                     zwz(ji,jj, mikt(ji,jj) ) = pwn(ji,jj,mikt(ji,jj)) * ptn(ji,jj,mikt(ji,jj),jn)   ! linear free surface 
-                  END DO
-               END DO   
+               DO_2D_11_11
+                  zwz(ji,jj, mikt(ji,jj) ) = pW(ji,jj,mikt(ji,jj)) * pt(ji,jj,mikt(ji,jj),jn,Kmm)   ! linear free surface 
+               END_2D
             ELSE                                   ! no ocean cavities (only ocean surface)
-               zwz(:,:,1) = pwn(:,:,1) * ptn(:,:,1,jn)
+               zwz(:,:,1) = pW(:,:,1) * pt(:,:,1,jn,Kmm)
             ENDIF
          ENDIF
          !
-         DO jk = 1, jpkm1          !==  Tracer flux divergence added to the general trend  ==!
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1   ! vector opt.
-                  pta(ji,jj,jk,jn) = pta(ji,jj,jk,jn) - ( zwz(ji,jj,jk) - zwz(ji,jj,jk+1) )   &
-                     &                                * r1_e1e2t(ji,jj) / e3t_n(ji,jj,jk)
-               END DO
-            END DO
-         END DO
+         DO_3D_00_00( 1, jpkm1 )
+            pt(ji,jj,jk,jn,Krhs) = pt(ji,jj,jk,jn,Krhs) - ( zwz(ji,jj,jk) - zwz(ji,jj,jk+1) )   &
+               &                                * r1_e1e2t(ji,jj) / e3t(ji,jj,jk,Kmm)
+         END_3D
          !                                 ! Send trends for diagnostic
-         IF( l_trd )  CALL trd_tra( kt, cdtype, jn, jptra_zad, zwz, pwn, ptn(:,:,:,jn) )
+         IF( l_trd )  CALL trd_tra( kt, Kmm, Krhs, cdtype, jn, jptra_zad, zwz, pW, pt(:,:,:,jn,Kmm) )
          !
       END DO
       !
@@ -422,35 +367,31 @@ CONTAINS
       REAL(wp) ::  zc, zcurv, zfho          !   -      -
       !----------------------------------------------------------------------
       !
-      DO jk = 1, jpkm1
-         DO jj = 1, jpj
-            DO ji = 1, jpi
-               zc     = puc(ji,jj,jk)                         ! Courant number
-               zcurv  = pfd(ji,jj,jk) + pfu(ji,jj,jk) - 2. * pfc(ji,jj,jk)
-               zcoef1 = 0.5 *      ( pfc(ji,jj,jk) + pfd(ji,jj,jk) )
-               zcoef2 = 0.5 * zc * ( pfd(ji,jj,jk) - pfc(ji,jj,jk) )
-               zcoef3 = ( 1. - ( zc * zc ) ) * r1_6 * zcurv
-               zfho   = zcoef1 - zcoef2 - zcoef3              !  phi_f QUICKEST 
-               !
-               zcoef1 = pfd(ji,jj,jk) - pfu(ji,jj,jk)
-               zcoef2 = ABS( zcoef1 )
-               zcoef3 = ABS( zcurv )
-               IF( zcoef3 >= zcoef2 ) THEN
-                  zfho = pfc(ji,jj,jk) 
-               ELSE
-                  zcoef3 = pfu(ji,jj,jk) + ( ( pfc(ji,jj,jk) - pfu(ji,jj,jk) ) / MAX( zc, 1.e-9 ) )    ! phi_REF
-                  IF( zcoef1 >= 0. ) THEN
-                     zfho = MAX( pfc(ji,jj,jk), zfho ) 
-                     zfho = MIN( zfho, MIN( zcoef3, pfd(ji,jj,jk) ) ) 
-                  ELSE
-                     zfho = MIN( pfc(ji,jj,jk), zfho ) 
-                     zfho = MAX( zfho, MAX( zcoef3, pfd(ji,jj,jk) ) ) 
-                  ENDIF
-               ENDIF
-               puc(ji,jj,jk) = zfho
-            END DO
-         END DO
-      END DO
+      DO_3D_11_11( 1, jpkm1 )
+         zc     = puc(ji,jj,jk)                         ! Courant number
+         zcurv  = pfd(ji,jj,jk) + pfu(ji,jj,jk) - 2. * pfc(ji,jj,jk)
+         zcoef1 = 0.5 *      ( pfc(ji,jj,jk) + pfd(ji,jj,jk) )
+         zcoef2 = 0.5 * zc * ( pfd(ji,jj,jk) - pfc(ji,jj,jk) )
+         zcoef3 = ( 1. - ( zc * zc ) ) * r1_6 * zcurv
+         zfho   = zcoef1 - zcoef2 - zcoef3              !  phi_f QUICKEST 
+         !
+         zcoef1 = pfd(ji,jj,jk) - pfu(ji,jj,jk)
+         zcoef2 = ABS( zcoef1 )
+         zcoef3 = ABS( zcurv )
+         IF( zcoef3 >= zcoef2 ) THEN
+            zfho = pfc(ji,jj,jk) 
+         ELSE
+            zcoef3 = pfu(ji,jj,jk) + ( ( pfc(ji,jj,jk) - pfu(ji,jj,jk) ) / MAX( zc, 1.e-9 ) )    ! phi_REF
+            IF( zcoef1 >= 0. ) THEN
+               zfho = MAX( pfc(ji,jj,jk), zfho ) 
+               zfho = MIN( zfho, MIN( zcoef3, pfd(ji,jj,jk) ) ) 
+            ELSE
+               zfho = MIN( pfc(ji,jj,jk), zfho ) 
+               zfho = MAX( zfho, MAX( zcoef3, pfd(ji,jj,jk) ) ) 
+            ENDIF
+         ENDIF
+         puc(ji,jj,jk) = zfho
+      END_3D
       !
    END SUBROUTINE quickest
 

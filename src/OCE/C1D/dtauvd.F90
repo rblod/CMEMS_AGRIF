@@ -30,9 +30,11 @@ MODULE dtauvd
 
    TYPE(FLD), ALLOCATABLE, DIMENSION(:) ::   sf_uvd   ! structure for input U & V current (file information and data)
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: dtauvd.F90 10068 2018-08-28 14:09:04Z nicolasmartin $ 
+   !! $Id: dtauvd.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -59,13 +61,11 @@ CONTAINS
       !
       ierr0 = 0   ;   ierr1 = 0   ;   ierr2 = 0  ;   ierr3 = 0
 
-      REWIND( numnam_ref )              ! Namelist namc1d_uvd in reference namelist : 
       READ  ( numnam_ref, namc1d_uvd, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namc1d_uvd in reference namelist', lwp )
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namc1d_uvd in reference namelist' )
       !
-      REWIND( numnam_cfg )              ! Namelist namc1d_uvd in configuration namelist : Parameters of the run
       READ  ( numnam_cfg, namc1d_uvd, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namc1d_uvd in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namc1d_uvd in configuration namelist' )
       IF(lwm) WRITE ( numond, namc1d_uvd )
 
       !                             ! force the initialization when dyndmp is used
@@ -116,7 +116,7 @@ CONTAINS
    END SUBROUTINE dta_uvd_init
 
 
-   SUBROUTINE dta_uvd( kt, puvd )
+   SUBROUTINE dta_uvd( kt, Kmm, puvd )
       !!----------------------------------------------------------------------
       !!                   ***  ROUTINE dta_uvd  ***
       !!                    
@@ -132,6 +132,7 @@ CONTAINS
       !! ** Action  :   puvd,  U & V current data interpolated onto model mesh at time-step kt
       !!----------------------------------------------------------------------
       INTEGER                           , INTENT(in   ) ::   kt     ! ocean time-step
+      INTEGER                           , INTENT(in   ) ::   Kmm    ! time level index
       REAL(wp), DIMENSION(jpi,jpj,jpk,2), INTENT(  out) ::   puvd   ! U & V current data
       !
       INTEGER ::   ji, jj, jk, jl, jkk               ! dummy loop indicies
@@ -156,34 +157,32 @@ CONTAINS
             WRITE(numout,*) 'dta_uvd: interpolate U & V current data onto the s- or mixed s-z-coordinate mesh'
          ENDIF
          !
-         DO jj = 1, jpj                   ! vertical interpolation of U & V current:
-            DO ji = 1, jpi                ! determines the interpolated U & V current profiles at each (i,j) point
-               DO jk = 1, jpk
-                  zl = gdept_n(ji,jj,jk)
-                  IF    ( zl < gdept_1d(1  ) ) THEN          ! extrapolate above the first level of data
-                     zup(jk) =  puvd(ji,jj,1    ,1)
-                     zvp(jk) =  puvd(ji,jj,1    ,2)
-                  ELSEIF( zl > gdept_1d(jpk) ) THEN          ! extrapolate below the last level of data
-                     zup(jk) =  puvd(ji,jj,jpkm1,1)
-                     zvp(jk) =  puvd(ji,jj,jpkm1,2)
-                  ELSE                                      ! inbetween : vertical interpolation between jkk & jkk+1
-                     DO jkk = 1, jpkm1                      ! when  gdept(jkk) < zl < gdept(jkk+1)
-                        IF( (zl-gdept_1d(jkk)) * (zl-gdept_1d(jkk+1)) <= 0._wp ) THEN
-                           zi = ( zl - gdept_1d(jkk) ) / (gdept_1d(jkk+1)-gdept_1d(jkk))
-                           zup(jk) = puvd(ji,jj,jkk,1) + ( puvd(ji,jj,jkk+1,1 ) - puvd(ji,jj,jkk,1) ) * zi 
-                           zvp(jk) = puvd(ji,jj,jkk,2) + ( puvd(ji,jj,jkk+1,2 ) - puvd(ji,jj,jkk,2) ) * zi
-                        ENDIF
-                     END DO
-                  ENDIF
-               END DO
-               DO jk = 1, jpkm1           ! apply mask
-                  puvd(ji,jj,jk,1) = zup(jk) * umask(ji,jj,jk)
-                  puvd(ji,jj,jk,2) = zvp(jk) * vmask(ji,jj,jk)
-               END DO
-               puvd(ji,jj,jpk,1) = 0._wp
-               puvd(ji,jj,jpk,2) = 0._wp
+         DO_2D_11_11
+            DO jk = 1, jpk
+               zl = gdept(ji,jj,jk,Kmm)
+               IF    ( zl < gdept_1d(1  ) ) THEN          ! extrapolate above the first level of data
+                  zup(jk) =  puvd(ji,jj,1    ,1)
+                  zvp(jk) =  puvd(ji,jj,1    ,2)
+               ELSEIF( zl > gdept_1d(jpk) ) THEN          ! extrapolate below the last level of data
+                  zup(jk) =  puvd(ji,jj,jpkm1,1)
+                  zvp(jk) =  puvd(ji,jj,jpkm1,2)
+               ELSE                                      ! inbetween : vertical interpolation between jkk & jkk+1
+                  DO jkk = 1, jpkm1                      ! when  gdept(jkk) < zl < gdept(jkk+1)
+                     IF( (zl-gdept_1d(jkk)) * (zl-gdept_1d(jkk+1)) <= 0._wp ) THEN
+                        zi = ( zl - gdept_1d(jkk) ) / (gdept_1d(jkk+1)-gdept_1d(jkk))
+                        zup(jk) = puvd(ji,jj,jkk,1) + ( puvd(ji,jj,jkk+1,1 ) - puvd(ji,jj,jkk,1) ) * zi 
+                        zvp(jk) = puvd(ji,jj,jkk,2) + ( puvd(ji,jj,jkk+1,2 ) - puvd(ji,jj,jkk,2) ) * zi
+                     ENDIF
+                  END DO
+               ENDIF
             END DO
-         END DO
+            DO jk = 1, jpkm1           ! apply mask
+               puvd(ji,jj,jk,1) = zup(jk) * umask(ji,jj,jk)
+               puvd(ji,jj,jk,2) = zvp(jk) * vmask(ji,jj,jk)
+            END DO
+            puvd(ji,jj,jpk,1) = 0._wp
+            puvd(ji,jj,jpk,2) = 0._wp
+         END_2D
          ! 
          DEALLOCATE( zup, zvp )
          ! 
@@ -193,16 +192,14 @@ CONTAINS
          puvd(:,:,:,2) = puvd(:,:,:,2) * vmask(:,:,:)
          !
          IF( ln_zps ) THEN                ! zps-coordinate (partial steps) interpolation at the last ocean level
-            DO jj = 1, jpj
-               DO ji = 1, jpi
-                  ik = mbkt(ji,jj) 
-                  IF( ik > 1 ) THEN
-                     zl = ( gdept_1d(ik) - gdept_0(ji,jj,ik) ) / ( gdept_1d(ik) - gdept_1d(ik-1) )
-                     puvd(ji,jj,ik,1) = (1.-zl) * puvd(ji,jj,ik,1) + zl * puvd(ji,jj,ik-1,1)
-                     puvd(ji,jj,ik,2) = (1.-zl) * puvd(ji,jj,ik,2) + zl * puvd(ji,jj,ik-1,2)
-                  ENDIF
-               END DO
-            END DO
+            DO_2D_11_11
+               ik = mbkt(ji,jj) 
+               IF( ik > 1 ) THEN
+                  zl = ( gdept_1d(ik) - gdept_0(ji,jj,ik) ) / ( gdept_1d(ik) - gdept_1d(ik-1) )
+                  puvd(ji,jj,ik,1) = (1.-zl) * puvd(ji,jj,ik,1) + zl * puvd(ji,jj,ik-1,1)
+                  puvd(ji,jj,ik,2) = (1.-zl) * puvd(ji,jj,ik,2) + zl * puvd(ji,jj,ik-1,2)
+               ENDIF
+            END_2D
          ENDIF
          !
       ENDIF

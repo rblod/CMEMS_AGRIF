@@ -21,7 +21,7 @@ MODULE trcice_pisces
 
    !!----------------------------------------------------------------------
    !! NEMO/TOP 4.0 , NEMO Consortium (2018)
-   !! $Id: trcice_pisces.F90 10213 2018-10-23 14:40:09Z aumont $ 
+   !! $Id: trcice_pisces.F90 10794 2019-03-22 09:25:28Z cetlod $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -118,6 +118,7 @@ CONTAINS
       zpisc(jpdch,1) =  1.02e-7_wp
       zpisc(jpno3,1) =  5.79e-6_wp / rno3 
       zpisc(jpnh4,1) =  3.22e-7_wp / rno3
+      zpisc(jplgw,1) =  1.0e-9_wp
 
       ! ln_p5z
       zpisc(jppic,1) =  9.57e-8_wp
@@ -161,6 +162,7 @@ CONTAINS
       zpisc(jpdch,2) =  2.36e-07_wp 
       zpisc(jpno3,2) =  3.51e-06_wp / rno3 
       zpisc(jpnh4,2) =  6.15e-08_wp / rno3 
+      zpisc(jplgw,2) =  1.0e-9_wp
 
       ! ln_p5z
       zpisc(jppic,2) =  5.25e-7_wp
@@ -204,6 +206,7 @@ CONTAINS
       zpisc(jpdch,3) =  1.60e-7_wp  
       zpisc(jpno3,3) =  2.64e-5_wp / rno3  
       zpisc(jpnh4,3) =  3.39e-7_wp / rno3  
+      zpisc(jplgw,3) =  1.0e-9_wp
 
       ! ln_p5z
       zpisc(jppic,3) =  8.10e-7_wp
@@ -248,6 +251,7 @@ CONTAINS
       zpisc(jpdch,4) = 9.69e-8_wp
       zpisc(jpno3,4) = 5.36e-5_wp / rno3
       zpisc(jpnh4,4) = 7.18e-7_wp / rno3
+      zpisc(jplgw,4) = 1.0e-9_wp
 
       ! ln_p5z
       zpisc(jppic,4) =  6.64e-7_wp
@@ -265,7 +269,19 @@ CONTAINS
       zpisc(jpdop,4) =  1.06e-5_wp
       zpisc(jpgon,4) =  1.05e-8_wp
       zpisc(jpgop,4) =  1.05e-8_wp
- 
+!
+!     ln_ironice and tracers in seaice are redundant. Thus, if tracers in ice
+!     is activated, ln_ironice should be set to false
+!     ------------------------------------------------------------------------
+      IF( nn_ice_tr /= 0 .AND. ln_ironice ) THEN
+         IF(lwp) THEN
+            WRITE(numout,*) '   ==>>>   ln_ironice incompatible with nn_ice_tr = ', nn_ice_tr
+            WRITE(numout,*) '           Specify your sea ice iron concentration in nampisice instead '
+            WRITE(numout,*) '           ln_ironice is forced to .FALSE. '
+         ENDIF
+         ln_ironice = .FALSE.
+      ENDIF
+! 
       DO jn = jp_pcs0, jp_pcs1
          IF( cn_trc_o(jn) == 'GL ' ) trc_o(:,:,jn) = zpisc(jn,1)  ! Global case
          IF( cn_trc_o(jn) == 'AA ' ) THEN 
@@ -309,7 +325,6 @@ CONTAINS
          ELSE                                    ! prescribed concentration
             trc_i(:,:,jn) = trc_ice_prescr(jn)
          ENDIF
-       
          !-- Baltic
          IF( cn_cfg == "orca" .OR. cn_cfg == "ORCA" ) THEN     
             IF ( trc_ice_ratio(jn) >= - 1._wp ) THEN ! no prescribed conc. ; typically everything but iron) 
@@ -317,12 +332,7 @@ CONTAINS
                       54._wp <= gphit(:,:) .AND. gphit(:,:) <= 66._wp )
                      trc_i(:,:,jn) = zratio(jn,2) * trc_o(:,:,jn) 
                END WHERE
-            ELSE                                 ! prescribed tracer concentration in ice
-               WHERE( 14._wp <= glamt(:,:) .AND. glamt(:,:) <= 32._wp .AND.    &
-                   54._wp <= gphit(:,:) .AND. gphit(:,:) <= 66._wp )
-                     trc_i(:,:,jn) = trc_ice_prescr(jn)
-               END WHERE
-            ENDIF ! trc_ice_ratio
+            ENDIF
          ENDIF
       !
       END DO ! jn

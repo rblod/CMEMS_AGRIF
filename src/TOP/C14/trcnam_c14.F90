@@ -19,7 +19,7 @@ MODULE trcnam_c14
    !!
    !!----------------------------------------------------------------------
    !! NEMO/TOP 4.0 , NEMO Consortium (2018)
-   !! $Id: trcnam_c14.F90 10069 2018-08-28 14:12:24Z nicolasmartin $ 
+   !! $Id: trcnam_c14.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 
@@ -60,12 +60,10 @@ CONTAINS
       ln_trc_cbc(jp_c14) = .false.
       ln_trc_obc(jp_c14) = .false.
       !
-      REWIND( numtrc_ref )              ! Namelist namc14_typ in reference namelist :
       READ  ( numtrc_ref, namc14_typ, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namc14_typ in reference namelist', lwp )
-      REWIND( numtrc_cfg )              ! Namelist namcfcdate in configuration namelist 
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namc14_typ in reference namelist' )
       READ  ( numtrc_cfg, namc14_typ, IOSTAT = ios, ERR = 902)
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namc14_typ in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namc14_typ in configuration namelist' )
       IF(lwm) WRITE ( numonr, namc14_typ )
       !
       IF(lwp) THEN                  ! control print
@@ -77,12 +75,10 @@ CONTAINS
          WRITE(numout,*)
       ENDIF
 
-      REWIND( numtrc_ref )              ! Namelist namc14_typ in reference namelist :
       READ  ( numtrc_ref, namc14_sbc, IOSTAT = ios, ERR = 903)
-903   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namc14_sbc in reference namelist', lwp )
-      REWIND( numtrc_cfg )              ! Namelist namcfcdate in configuration namelist 
+903   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namc14_sbc in reference namelist' )
       READ  ( numtrc_cfg, namc14_sbc, IOSTAT = ios, ERR = 904)
-904   IF( ios >  0 )   CALL ctl_nam ( ios , 'namc14_sbc in configuration namelist', lwp )
+904   IF( ios >  0 )   CALL ctl_nam ( ios , 'namc14_sbc in configuration namelist' )
       IF(lwm) WRITE( numonr, namc14_sbc )
       !
       IF(lwp) THEN                  ! control print
@@ -93,12 +89,10 @@ CONTAINS
          WRITE(numout,*)
       ENDIF
 
-      REWIND( numtrc_ref )              ! Namelist namc14_typ in reference namelist :
       READ  ( numtrc_ref, namc14_fcg, IOSTAT = ios, ERR = 905)
-905   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namc14_fcg in reference namelist', lwp )
-      REWIND( numtrc_cfg )              ! Namelist namcfcdate in configuration namelist 
+905   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namc14_fcg in reference namelist' )
       READ  ( numtrc_cfg, namc14_fcg, IOSTAT = ios, ERR = 906)
-906   IF( ios >  0 )   CALL ctl_nam ( ios , 'namc14_fcg in configuration namelist', lwp )
+906   IF( ios >  0 )   CALL ctl_nam ( ios , 'namc14_fcg in configuration namelist' )
       IF(lwm) WRITE ( numonr, namc14_fcg )
       !
       IF(lwp) THEN                  ! control print

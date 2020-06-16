@@ -88,7 +88,7 @@ MODULE cpl_oasis3
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: cpl_oasis3.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: cpl_oasis3.F90 12527 2020-03-09 17:06:41Z smasson $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -113,7 +113,7 @@ CONTAINS
       ! 1st Initialize the OASIS system for the application
       !------------------------------------------------------------------
       CALL oasis_init_comp ( ncomp_id, TRIM(cd_modname), nerror )
-      IF ( nerror /= OASIS_Ok ) &
+      IF( nerror /= OASIS_Ok ) &
          CALL oasis_abort (ncomp_id, 'cpl_init', 'Failure in oasis_init_comp')
 
       !------------------------------------------------------------------
@@ -121,7 +121,7 @@ CONTAINS
       !------------------------------------------------------------------
 
       CALL oasis_get_localcomm ( kl_comm, nerror )
-      IF ( nerror /= OASIS_Ok ) &
+      IF( nerror /= OASIS_Ok ) &
          CALL oasis_abort (ncomp_id, 'cpl_init','Failure in oasis_get_localcomm' )
       !
    END SUBROUTINE cpl_init
@@ -148,7 +148,7 @@ CONTAINS
       !!--------------------------------------------------------------------
 
       ! patch to restore wraparound rows in cpl_send, cpl_rcv, cpl_define
-      IF ( ltmp_wapatch ) THEN
+      IF( ltmp_wapatch ) THEN
          nldi_save = nldi   ;   nlei_save = nlei
          nldj_save = nldj   ;   nlej_save = nlej
          IF( nimpp           ==      1 ) nldi = 1
@@ -202,7 +202,7 @@ CONTAINS
       paral(4) = nlej-nldj+1                                    ! local extent in j
       paral(5) = jpiglo                                         ! global extent in x
       
-      IF( ln_ctl ) THEN
+      IF( sn_cfctl%l_oasout ) THEN
          WRITE(numout,*) ' multiexchg: paral (1:5)', paral
          WRITE(numout,*) ' multiexchg: jpi, jpj =', jpi, jpj
          WRITE(numout,*) ' multiexchg: nldi, nlei, nimpp =', nldi, nlei, nimpp
@@ -216,7 +216,7 @@ CONTAINS
       ssnd(:)%ncplmodel = kcplmodel
       !
       DO ji = 1, ksnd
-         IF ( ssnd(ji)%laction ) THEN
+         IF( ssnd(ji)%laction ) THEN
 
             IF( ssnd(ji)%nct > nmaxcat ) THEN
                CALL oasis_abort ( ncomp_id, 'cpl_define', 'Number of categories of '//   &
@@ -227,30 +227,30 @@ CONTAINS
             DO jc = 1, ssnd(ji)%nct
                DO jm = 1, kcplmodel
 
-                  IF ( ssnd(ji)%nct .GT. 1 ) THEN
+                  IF( ssnd(ji)%nct .GT. 1 ) THEN
                      WRITE(cli2,'(i2.2)') jc
                      zclname = TRIM(ssnd(ji)%clname)//'_cat'//cli2
                   ELSE
                      zclname = ssnd(ji)%clname
                   ENDIF
-                  IF ( kcplmodel  > 1 ) THEN
+                  IF( kcplmodel  > 1 ) THEN
                      WRITE(cli2,'(i2.2)') jm
                      zclname = 'model'//cli2//'_'//TRIM(zclname)
                   ENDIF
 #if defined key_agrif
                   IF( agrif_fixed() /= 0 ) THEN 
                      zclname=TRIM(Agrif_CFixed())//'_'//TRIM(zclname)
-                  END IF
+                  ENDIF
 #endif
-                  IF( ln_ctl ) WRITE(numout,*) "Define", ji, jc, jm, " "//TRIM(zclname), " for ", OASIS_Out
+                  IF( sn_cfctl%l_oasout ) WRITE(numout,*) "Define", ji, jc, jm, " "//TRIM(zclname), " for ", OASIS_Out
                   CALL oasis_def_var (ssnd(ji)%nid(jc,jm), zclname, id_part   , (/ 2, 1 /),   &
                      &                OASIS_Out          , ishape , OASIS_REAL, nerror )
-                  IF ( nerror /= OASIS_Ok ) THEN
+                  IF( nerror /= OASIS_Ok ) THEN
                      WRITE(numout,*) 'Failed to define transient ', ji, jc, jm, " "//TRIM(zclname)
                      CALL oasis_abort ( ssnd(ji)%nid(jc,jm), 'cpl_define', 'Failure in oasis_def_var' )
                   ENDIF
-                  IF( ln_ctl .AND. ssnd(ji)%nid(jc,jm) /= -1 ) WRITE(numout,*) "variable defined in the namcouple"
-                  IF( ln_ctl .AND. ssnd(ji)%nid(jc,jm) == -1 ) WRITE(numout,*) "variable NOT defined in the namcouple"
+                  IF( sn_cfctl%l_oasout .AND. ssnd(ji)%nid(jc,jm) /= -1 ) WRITE(numout,*) "variable defined in the namcouple"
+                  IF( sn_cfctl%l_oasout .AND. ssnd(ji)%nid(jc,jm) == -1 ) WRITE(numout,*) "variable NOT defined in the namcouple"
                END DO
             END DO
          ENDIF
@@ -261,7 +261,7 @@ CONTAINS
       srcv(:)%ncplmodel = kcplmodel
       !
       DO ji = 1, krcv
-         IF ( srcv(ji)%laction ) THEN 
+         IF( srcv(ji)%laction ) THEN 
             
             IF( srcv(ji)%nct > nmaxcat ) THEN
                CALL oasis_abort ( ncomp_id, 'cpl_define', 'Number of categories of '//   &
@@ -272,30 +272,30 @@ CONTAINS
             DO jc = 1, srcv(ji)%nct
                DO jm = 1, kcplmodel
                   
-                  IF ( srcv(ji)%nct .GT. 1 ) THEN
+                  IF( srcv(ji)%nct .GT. 1 ) THEN
                      WRITE(cli2,'(i2.2)') jc
                      zclname = TRIM(srcv(ji)%clname)//'_cat'//cli2
                   ELSE
                      zclname = srcv(ji)%clname
                   ENDIF
-                  IF ( kcplmodel  > 1 ) THEN
+                  IF( kcplmodel  > 1 ) THEN
                      WRITE(cli2,'(i2.2)') jm
                      zclname = 'model'//cli2//'_'//TRIM(zclname)
                   ENDIF
 #if defined key_agrif
                   IF( agrif_fixed() /= 0 ) THEN 
                      zclname=TRIM(Agrif_CFixed())//'_'//TRIM(zclname)
-                  END IF
+                  ENDIF
 #endif
-                  IF( ln_ctl ) WRITE(numout,*) "Define", ji, jc, jm, " "//TRIM(zclname), " for ", OASIS_In
+                  IF( sn_cfctl%l_oasout ) WRITE(numout,*) "Define", ji, jc, jm, " "//TRIM(zclname), " for ", OASIS_In
                   CALL oasis_def_var (srcv(ji)%nid(jc,jm), zclname, id_part   , (/ 2, 1 /),   &
                      &                OASIS_In           , ishape , OASIS_REAL, nerror )
-                  IF ( nerror /= OASIS_Ok ) THEN
+                  IF( nerror /= OASIS_Ok ) THEN
                      WRITE(numout,*) 'Failed to define transient ', ji, jc, jm, " "//TRIM(zclname)
                      CALL oasis_abort ( srcv(ji)%nid(jc,jm), 'cpl_define', 'Failure in oasis_def_var' )
                   ENDIF
-                  IF( ln_ctl .AND. srcv(ji)%nid(jc,jm) /= -1 ) WRITE(numout,*) "variable defined in the namcouple"
-                  IF( ln_ctl .AND. srcv(ji)%nid(jc,jm) == -1 ) WRITE(numout,*) "variable NOT defined in the namcouple"
+                  IF( sn_cfctl%l_oasout .AND. srcv(ji)%nid(jc,jm) /= -1 ) WRITE(numout,*) "variable defined in the namcouple"
+                  IF( sn_cfctl%l_oasout .AND. srcv(ji)%nid(jc,jm) == -1 ) WRITE(numout,*) "variable NOT defined in the namcouple"
 
                END DO
             END DO
@@ -305,11 +305,17 @@ CONTAINS
       !------------------------------------------------------------------
       ! End of definition phase
       !------------------------------------------------------------------
-      
+      !     
+#if defined key_agrif
+      IF( agrif_fixed() == Agrif_Nb_Fine_Grids() ) THEN
+#endif
       CALL oasis_enddef(nerror)
       IF( nerror /= OASIS_Ok )   CALL oasis_abort ( ncomp_id, 'cpl_define', 'Failure in oasis_enddef')
+#if defined key_agrif
+      ENDIF
+#endif
       !
-      IF ( ltmp_wapatch ) THEN
+      IF( ltmp_wapatch ) THEN
          nldi = nldi_save   ;   nlei = nlei_save
          nldj = nldj_save   ;   nlej = nlej_save
       ENDIF
@@ -331,7 +337,7 @@ CONTAINS
       INTEGER                                   ::   jc,jm     ! local loop index
       !!--------------------------------------------------------------------
       ! patch to restore wraparound rows in cpl_send, cpl_rcv, cpl_define
-      IF ( ltmp_wapatch ) THEN
+      IF( ltmp_wapatch ) THEN
          nldi_save = nldi   ;   nlei_save = nlei
          nldj_save = nldj   ;   nlej_save = nlej
          IF( nimpp           ==      1 ) nldi = 1
@@ -348,7 +354,7 @@ CONTAINS
             IF( ssnd(kid)%nid(jc,jm) /= -1 ) THEN
                CALL oasis_put ( ssnd(kid)%nid(jc,jm), kstep, pdata(nldi:nlei, nldj:nlej,jc), kinfo )
                
-               IF ( ln_ctl ) THEN        
+               IF ( sn_cfctl%l_oasout ) THEN        
                   IF ( kinfo == OASIS_Sent     .OR. kinfo == OASIS_ToRest .OR.   &
                      & kinfo == OASIS_SentOut  .OR. kinfo == OASIS_ToRestOut ) THEN
                      WRITE(numout,*) '****************'
@@ -356,9 +362,9 @@ CONTAINS
                      WRITE(numout,*) 'oasis_put: ivarid ', ssnd(kid)%nid(jc,jm)
                      WRITE(numout,*) 'oasis_put:  kstep ', kstep
                      WRITE(numout,*) 'oasis_put:   info ', kinfo
-                     WRITE(numout,*) '     - Minimum value is ', MINVAL(pdata(:,:,jc))
-                     WRITE(numout,*) '     - Maximum value is ', MAXVAL(pdata(:,:,jc))
-                     WRITE(numout,*) '     -     Sum value is ', SUM(pdata(:,:,jc))
+                     WRITE(numout,*) '     - Minimum value is ', MINVAL(pdata(nldi:nlei,nldj:nlej,jc))
+                     WRITE(numout,*) '     - Maximum value is ', MAXVAL(pdata(nldi:nlei,nldj:nlej,jc))
+                     WRITE(numout,*) '     -     Sum value is ',    SUM(pdata(nldi:nlei,nldj:nlej,jc))
                      WRITE(numout,*) '****************'
                   ENDIF
                ENDIF
@@ -367,7 +373,7 @@ CONTAINS
             
          ENDDO
       ENDDO
-      IF ( ltmp_wapatch ) THEN
+      IF( ltmp_wapatch ) THEN
          nldi = nldi_save   ;   nlei = nlei_save
          nldj = nldj_save   ;   nlej = nlej_save
       ENDIF
@@ -392,7 +398,7 @@ CONTAINS
       LOGICAL                                   ::   llaction, llfisrt
       !!--------------------------------------------------------------------
       ! patch to restore wraparound rows in cpl_send, cpl_rcv, cpl_define
-      IF ( ltmp_wapatch ) THEN
+      IF( ltmp_wapatch ) THEN
          nldi_save = nldi   ;   nlei_save = nlei
          nldj_save = nldj   ;   nlej_save = nlej
       ENDIF
@@ -402,7 +408,7 @@ CONTAINS
       kinfo = OASIS_idle
       !
       DO jc = 1, srcv(kid)%nct
-         IF ( ltmp_wapatch ) THEN
+         IF( ltmp_wapatch ) THEN
             IF( nimpp           ==      1 ) nldi = 1
             IF( nimpp + jpi - 1 == jpiglo ) nlei = jpi
             IF( njmpp           ==      1 ) nldj = 1
@@ -419,9 +425,9 @@ CONTAINS
                llaction =  kinfo == OASIS_Recvd   .OR. kinfo == OASIS_FromRest .OR.   &
                   &        kinfo == OASIS_RecvOut .OR. kinfo == OASIS_FromRestOut
                
-               IF ( ln_ctl )   WRITE(numout,*) "llaction, kinfo, kstep, ivarid: " , llaction, kinfo, kstep, srcv(kid)%nid(jc,jm)
+               IF ( sn_cfctl%l_oasout )   WRITE(numout,*) "llaction, kinfo, kstep, ivarid: " , llaction, kinfo, kstep, srcv(kid)%nid(jc,jm)
                
-               IF ( llaction ) THEN
+               IF( llaction ) THEN
                   
                   kinfo = OASIS_Rcv
                   IF( llfisrt ) THEN 
@@ -431,15 +437,15 @@ CONTAINS
                      pdata(nldi:nlei,nldj:nlej,jc) = pdata(nldi:nlei,nldj:nlej,jc) + exfld(:,:) * pmask(nldi:nlei,nldj:nlej,jm)
                   ENDIF
                   
-                  IF ( ln_ctl ) THEN        
+                  IF ( sn_cfctl%l_oasout ) THEN        
                      WRITE(numout,*) '****************'
                      WRITE(numout,*) 'oasis_get: Incoming ', srcv(kid)%clname
                      WRITE(numout,*) 'oasis_get: ivarid '  , srcv(kid)%nid(jc,jm)
                      WRITE(numout,*) 'oasis_get:   kstep', kstep
                      WRITE(numout,*) 'oasis_get:   info ', kinfo
-                     WRITE(numout,*) '     - Minimum value is ', MINVAL(pdata(:,:,jc))
-                     WRITE(numout,*) '     - Maximum value is ', MAXVAL(pdata(:,:,jc))
-                     WRITE(numout,*) '     -     Sum value is ', SUM(pdata(:,:,jc))
+                     WRITE(numout,*) '     - Minimum value is ', MINVAL(pdata(nldi:nlei,nldj:nlej,jc))
+                     WRITE(numout,*) '     - Maximum value is ', MAXVAL(pdata(nldi:nlei,nldj:nlej,jc))
+                     WRITE(numout,*) '     -     Sum value is ',    SUM(pdata(nldi:nlei,nldj:nlej,jc))
                      WRITE(numout,*) '****************'
                   ENDIF
                   
@@ -449,7 +455,7 @@ CONTAINS
             
          ENDDO
 
-         IF ( ltmp_wapatch ) THEN
+         IF( ltmp_wapatch ) THEN
             nldi = nldi_save   ;   nlei = nlei_save
             nldj = nldj_save   ;   nlej = nlej_save
          ENDIF
@@ -482,7 +488,7 @@ CONTAINS
       id = -1        ! defaut definition
       !
       DO ji = 1, nsnd
-         IF (ssnd(ji)%laction ) THEN
+         IF(ssnd(ji)%laction ) THEN
             DO jm = 1, ncplmodel
                IF( ssnd(ji)%nid(1,jm) /= -1 ) THEN
                   IF( TRIM(cdfieldname) == TRIM(ssnd(ji)%clname) ) THEN
@@ -494,7 +500,7 @@ CONTAINS
          ENDIF
       ENDDO
       DO ji = 1, nrcv
-         IF (srcv(ji)%laction ) THEN
+         IF(srcv(ji)%laction ) THEN
             DO jm = 1, ncplmodel
                IF( srcv(ji)%nid(1,jm) /= -1 ) THEN
                   IF( TRIM(cdfieldname) == TRIM(srcv(ji)%clname) ) THEN
@@ -507,7 +513,7 @@ CONTAINS
       ENDDO
       !
       IF( id /= -1 ) THEN
-#if defined key_oa3mct_v3
+#if ! defined key_oa3mct_v1v2
          CALL oasis_get_freqs(id, mop, 1, itmp, info)
 #else
          CALL oasis_get_freqs(id,      1, itmp, info)
@@ -528,7 +534,7 @@ CONTAINS
       !!----------------------------------------------------------------------
       !
       DEALLOCATE( exfld )
-      IF (nstop == 0) THEN
+      IF(nstop == 0) THEN
          CALL oasis_terminate( nerror )         
       ELSE
          CALL oasis_abort( ncomp_id, "cpl_finalize", "NEMO ABORT STOP" )
@@ -599,11 +605,11 @@ CONTAINS
       WRITE(numout,*) 'oasis_get: Error you sould not be there...'
    END SUBROUTINE oasis_get
 
-   SUBROUTINE oasis_get_freqs(k1,k2,k3,k4)
+   SUBROUTINE oasis_get_freqs(k1,k5,k2,k3,k4)
       INTEGER              , INTENT(in   ) ::  k1,k2
       INTEGER, DIMENSION(1), INTENT(  out) ::  k3
-      INTEGER              , INTENT(  out) ::  k4
-      k3(1) = k1 ; k4 = k2
+      INTEGER              , INTENT(  out) ::  k4,k5
+      k3(1) = k1 ; k4 = k2 ; k5 = k2
       WRITE(numout,*) 'oasis_get_freqs: Error you sould not be there...'
    END SUBROUTINE oasis_get_freqs
 

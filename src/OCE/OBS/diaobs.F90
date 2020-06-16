@@ -93,16 +93,16 @@ MODULE diaobs
    TYPE(obs_prof), PUBLIC, POINTER, DIMENSION(:) ::   profdata     !: Initial profile data
    TYPE(obs_prof), PUBLIC, POINTER, DIMENSION(:) ::   profdataqc   !: Profile data after quality control
 
-   CHARACTER(len=6), PUBLIC, DIMENSION(:), ALLOCATABLE ::   cobstypesprof, cobstypessurf   !: Profile & surface obs types
+   CHARACTER(len=lca), PUBLIC, DIMENSION(:), ALLOCATABLE ::   cobstypesprof, cobstypessurf   !: Profile & surface obs types
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: diaobs.F90 10068 2018-08-28 14:09:04Z nicolasmartin $
+   !! $Id: diaobs.F90 13026 2020-06-03 14:30:02Z rblod $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE dia_obs_init
+   SUBROUTINE dia_obs_init( Kmm )
       !!----------------------------------------------------------------------
       !!                    ***  ROUTINE dia_obs_init  ***
       !!          
@@ -113,7 +113,8 @@ CONTAINS
       !! ** Action  : Read the namelist and call reading routines
       !!
       !!----------------------------------------------------------------------
-      INTEGER, PARAMETER ::   jpmaxnfiles = 1000    ! Maximum number of files for each obs type
+      INTEGER, INTENT(in)                ::   Kmm                      ! ocean time level indices
+      INTEGER, PARAMETER                 ::   jpmaxnfiles = 1000       ! Maximum number of files for each obs type
       INTEGER, DIMENSION(:), ALLOCATABLE ::   ifilesprof, ifilessurf   ! Number of profile & surface files
       INTEGER :: ios             ! Local integer output status for namelist read
       INTEGER :: jtype           ! Counter for obs types
@@ -200,12 +201,10 @@ CONTAINS
       CALL fin_date( rn_dobsend )
 
       ! Read namelist namobs : control observation diagnostics
-      REWIND( numnam_ref )   ! Namelist namobs in reference namelist
       READ  ( numnam_ref, namobs, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namobs in reference namelist', lwp )
-      REWIND( numnam_cfg )   ! Namelist namobs in configuration namelist
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namobs in reference namelist' )
       READ  ( numnam_cfg, namobs, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namobs in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namobs in configuration namelist' )
       IF(lwm) WRITE ( numond, namobs )
 
       IF( .NOT.ln_diaobs ) THEN
@@ -428,7 +427,7 @@ CONTAINS
                &               llvar1, llvar2, &
                &               jpi, jpj, jpk, &
                &               zmask1, zglam1, zgphi1, zmask2, zglam2, zgphi2,  &
-               &               ln_nea, ln_bound_reject, &
+               &               ln_nea, ln_bound_reject, Kmm, &
                &               kdailyavtypes = nn_profdavtypes )
          END DO
          !
@@ -458,7 +457,7 @@ CONTAINS
             CALL obs_pre_surf( surfdata(jtype), surfdataqc(jtype), ln_nea, ln_bound_reject )
             !
             IF( TRIM(cobstypessurf(jtype)) == 'sla' ) THEN
-               CALL obs_rea_mdt( surfdataqc(jtype), n2dintsurf(jtype) )
+               CALL obs_rea_mdt( surfdataqc(jtype), n2dintsurf(jtype), Kmm )
                IF( ln_altbias )   &
                   & CALL obs_rea_altbias ( surfdataqc(jtype), n2dintsurf(jtype), cn_altbiasfile )
             ENDIF
@@ -482,7 +481,7 @@ CONTAINS
    END SUBROUTINE dia_obs_init
 
 
-   SUBROUTINE dia_obs( kstp )
+   SUBROUTINE dia_obs( kstp, Kmm )
       !!----------------------------------------------------------------------
       !!                    ***  ROUTINE dia_obs  ***
       !!          
@@ -495,9 +494,9 @@ CONTAINS
       !!
       !! ** Action  :
       !!----------------------------------------------------------------------
-      USE dom_oce, ONLY : gdept_n, gdept_1d   ! Ocean space and time domain variables
+      USE dom_oce, ONLY : gdept, gdept_1d     ! Ocean space domain variables (Kmm time-level only)
       USE phycst , ONLY : rday                ! Physical constants
-      USE oce    , ONLY : tsn, un, vn, sshn   ! Ocean dynamics and tracers variables
+      USE oce    , ONLY : ts, uu, vv, ssh     ! Ocean dynamics and tracers variables (Kmm time-level only)
       USE phycst , ONLY : rday                ! Physical constants
 #if defined  key_si3
       USE ice    , ONLY : at_i                ! SI3 Ice model variables
@@ -510,6 +509,7 @@ CONTAINS
 
       !! * Arguments
       INTEGER, INTENT(IN) :: kstp  ! Current timestep
+      INTEGER, INTENT(in) :: Kmm   ! ocean time level indices
       !! * Local declarations
       INTEGER :: idaystp           ! Number of timesteps per day
       INTEGER :: jtype             ! Data loop variable
@@ -538,7 +538,7 @@ CONTAINS
          WRITE(numout,*) '~~~~~~~'
       ENDIF
 
-      idaystp = NINT( rday / rdt )
+      idaystp = NINT( rday / rn_Dt )
 
       !-----------------------------------------------------------------------
       ! Call the profile and surface observation operators
@@ -550,8 +550,8 @@ CONTAINS
 
             SELECT CASE ( TRIM(cobstypesprof(jtype)) )
             CASE('prof')
-               zprofvar1(:,:,:) = tsn(:,:,:,jp_tem)
-               zprofvar2(:,:,:) = tsn(:,:,:,jp_sal)
+               zprofvar1(:,:,:) = ts(:,:,:,jp_tem,Kmm)
+               zprofvar2(:,:,:) = ts(:,:,:,jp_sal,Kmm)
                zprofmask1(:,:,:) = tmask(:,:,:)
                zprofmask2(:,:,:) = tmask(:,:,:)
                zglam1(:,:) = glamt(:,:)
@@ -559,8 +559,8 @@ CONTAINS
                zgphi1(:,:) = gphit(:,:)
                zgphi2(:,:) = gphit(:,:)
             CASE('vel')
-               zprofvar1(:,:,:) = un(:,:,:)
-               zprofvar2(:,:,:) = vn(:,:,:)
+               zprofvar1(:,:,:) = uu(:,:,:,Kmm)
+               zprofvar2(:,:,:) = vv(:,:,:,Kmm)
                zprofmask1(:,:,:) = umask(:,:,:)
                zprofmask2(:,:,:) = vmask(:,:,:)
                zglam1(:,:) = glamu(:,:)
@@ -574,7 +574,7 @@ CONTAINS
             CALL obs_prof_opt( profdataqc(jtype), kstp, jpi, jpj, jpk,  &
                &               nit000, idaystp,                         &
                &               zprofvar1, zprofvar2,                    &
-               &               gdept_n(:,:,:), gdepw_n(:,:,:),            & 
+               &               gdept(:,:,:,Kmm), gdepw(:,:,:,Kmm),      & 
                &               zprofmask1, zprofmask2,                  &
                &               zglam1, zglam2, zgphi1, zgphi2,          &
                &               nn_1dint, nn_2dint,                      &
@@ -593,11 +593,11 @@ CONTAINS
 
             SELECT CASE ( TRIM(cobstypessurf(jtype)) )
             CASE('sst')
-               zsurfvar(:,:) = tsn(:,:,1,jp_tem)
+               zsurfvar(:,:) = ts(:,:,1,jp_tem,Kmm)
             CASE('sla')
-               zsurfvar(:,:) = sshn(:,:)
+               zsurfvar(:,:) = ssh(:,:,Kmm)
             CASE('sss')
-               zsurfvar(:,:) = tsn(:,:,1,jp_sal)
+               zsurfvar(:,:) = ts(:,:,1,jp_sal,Kmm)
             CASE('sic')
                IF ( kstp == 0 ) THEN
                   IF ( lwp .AND. surfdataqc(jtype)%nsstpmpp(1) > 0 ) THEN
@@ -773,7 +773,7 @@ CONTAINS
       USE phycst, ONLY : &            ! Physical constants
          & rday
       USE dom_oce, ONLY : &           ! Ocean space and time domain variables
-         & rdt
+         & rn_Dt
 
       IMPLICIT NONE
 
@@ -804,7 +804,7 @@ CONTAINS
       !!----------------------------------------------------------------------
       !! Compute number of days + number of hours + min since initial time
       !!----------------------------------------------------------------------
-      zdayfrc = kstp * rdt / rday
+      zdayfrc = kstp * rn_Dt / rday
       zdayfrc = zdayfrc - aint(zdayfrc)
       imin = imin + int( zdayfrc * 24 * 60 ) 
       DO WHILE (imin >= 60) 
@@ -815,7 +815,7 @@ CONTAINS
         ihou=ihou-24
         iday=iday+1
       END DO 
-      iday = iday + kstp * rdt / rday 
+      iday = iday + kstp * rn_Dt / rday 
 
       !-----------------------------------------------------------------------
       ! Convert number of days (iday) into a real date

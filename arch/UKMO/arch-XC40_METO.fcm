@@ -47,11 +47,12 @@
 %OASIS_LIBDIR        -L%OASIS_HOME/lib
 %OASIS_LIB           -lpsmile.MPI1 -lmct -lmpeu -lscrip
 
-%CPP                 cpp
+%CPP                 cpp -Dkey_nosignedzero
 %FC                  ftn
 
-%FCFLAGS             -s real64 -s integer32 -e m -O3 -Ovector1 -hfp0 -hflex_mp=strict -h noomp  
-%FFLAGS              %FCFLAGS
+%FCFLAGS             -em -s real64 -s integer32 -O2 -hflex_mp=intolerant -e0 -ez
+%FFLAGS              -em -s real64 -s integer32 -O2 -hflex_mp=intolerant -e0 -ez -Rb
+
 %LD                  ftn
 %FPPFLAGS            -P -E -traditional-cpp
 %LDFLAGS             -hbyteswapio

@@ -28,14 +28,16 @@ MODULE p4zmort
    REAL(wp), PUBLIC ::   mprat    !:
    REAL(wp), PUBLIC ::   mprat2   !:
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/TOP 4.0 , NEMO Consortium (2018)
-   !! $Id: p4zmort.F90 10227 2018-10-25 14:42:24Z aumont $ 
+   !! $Id: p4zmort.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE p4z_mort( kt )
+   SUBROUTINE p4z_mort( kt, Kbb, Krhs )
       !!---------------------------------------------------------------------
       !!                     ***  ROUTINE p4z_mort  ***
       !!
@@ -45,16 +47,17 @@ CONTAINS
       !! ** Method  : - ???
       !!---------------------------------------------------------------------
       INTEGER, INTENT(in) ::   kt ! ocean time step
+      INTEGER, INTENT(in) ::   Kbb, Krhs  ! time level indices
       !!---------------------------------------------------------------------
       !
-      CALL p4z_nano            ! nanophytoplankton
+      CALL p4z_nano( Kbb, Krhs )            ! nanophytoplankton
       !
-      CALL p4z_diat            ! diatoms
+      CALL p4z_diat( Kbb, Krhs )            ! diatoms
       !
    END SUBROUTINE p4z_mort
 
 
-   SUBROUTINE p4z_nano
+   SUBROUTINE p4z_nano( Kbb, Krhs )
       !!---------------------------------------------------------------------
       !!                     ***  ROUTINE p4z_nano  ***
       !!
@@ -62,6 +65,7 @@ CONTAINS
       !!
       !! ** Method  : - ???
       !!---------------------------------------------------------------------
+      INTEGER, INTENT(in) ::   Kbb, Krhs  ! time level indices
       INTEGER  ::   ji, jj, jk
       REAL(wp) ::   zsizerat, zcompaph
       REAL(wp) ::   zfactfe, zfactch, zprcaca, zfracal
@@ -72,55 +76,51 @@ CONTAINS
       IF( ln_timing )   CALL timing_start('p4z_nano')
       !
       prodcal(:,:,:) = 0._wp   ! calcite production variable set to zero
-      DO jk = 1, jpkm1
-         DO jj = 1, jpj
-            DO ji = 1, jpi
-               zcompaph = MAX( ( trb(ji,jj,jk,jpphy) - 1e-8 ), 0.e0 )
-               !     When highly limited by macronutrients, very small cells 
-               !     dominate the community. As a consequence, aggregation
-               !     due to turbulence is negligible. Mortality is also set
-               !     to 0
-               zsizerat = MIN(1., MAX( 0., (quotan(ji,jj,jk) - 0.2) / 0.3) ) * trb(ji,jj,jk,jpphy)
-               !     Squared mortality of Phyto similar to a sedimentation term during
-               !     blooms (Doney et al. 1996)
-               zrespp = wchl * 1.e6 * xstep * xdiss(ji,jj,jk) * zcompaph * zsizerat 
+      DO_3D_11_11( 1, jpkm1 )
+         zcompaph = MAX( ( tr(ji,jj,jk,jpphy,Kbb) - 1e-8 ), 0.e0 )
+         !     When highly limited by macronutrients, very small cells 
+         !     dominate the community. As a consequence, aggregation
+         !     due to turbulence is negligible. Mortality is also set
+         !     to 0
+         zsizerat = MIN(1., MAX( 0., (quotan(ji,jj,jk) - 0.2) / 0.3) ) * tr(ji,jj,jk,jpphy,Kbb)
+         !     Squared mortality of Phyto similar to a sedimentation term during
+         !     blooms (Doney et al. 1996)
+         zrespp = wchl * 1.e6 * xstep * xdiss(ji,jj,jk) * zcompaph * zsizerat 
 
-               !     Phytoplankton mortality. This mortality loss is slightly
-               !     increased when nutrients are limiting phytoplankton growth
-               !     as observed for instance in case of iron limitation.
-               ztortp = mprat * xstep * zcompaph / ( xkmort + trb(ji,jj,jk,jpphy) ) * zsizerat
+         !     Phytoplankton mortality. This mortality loss is slightly
+         !     increased when nutrients are limiting phytoplankton growth
+         !     as observed for instance in case of iron limitation.
+         ztortp = mprat * xstep * zcompaph / ( xkmort + tr(ji,jj,jk,jpphy,Kbb) ) * zsizerat
 
-               zmortp = zrespp + ztortp
+         zmortp = zrespp + ztortp
 
-               !   Update the arrays TRA which contains the biological sources and sinks
+         !   Update the arrays TRA which contains the biological sources and sinks
 
-               zfactfe = trb(ji,jj,jk,jpnfe)/(trb(ji,jj,jk,jpphy)+rtrn)
-               zfactch = trb(ji,jj,jk,jpnch)/(trb(ji,jj,jk,jpphy)+rtrn)
-               tra(ji,jj,jk,jpphy) = tra(ji,jj,jk,jpphy) - zmortp
-               tra(ji,jj,jk,jpnch) = tra(ji,jj,jk,jpnch) - zmortp * zfactch
-               tra(ji,jj,jk,jpnfe) = tra(ji,jj,jk,jpnfe) - zmortp * zfactfe
-               zprcaca = xfracal(ji,jj,jk) * zmortp
-               !
-               prodcal(ji,jj,jk) = prodcal(ji,jj,jk) + zprcaca  ! prodcal=prodcal(nanophy)+prodcal(microzoo)+prodcal(mesozoo)
-               !
-               zfracal = 0.5 * xfracal(ji,jj,jk)
-               tra(ji,jj,jk,jpdic) = tra(ji,jj,jk,jpdic) - zprcaca
-               tra(ji,jj,jk,jptal) = tra(ji,jj,jk,jptal) - 2. * zprcaca
-               tra(ji,jj,jk,jpcal) = tra(ji,jj,jk,jpcal) + zprcaca
-               tra(ji,jj,jk,jpgoc) = tra(ji,jj,jk,jpgoc) + zfracal * zmortp
-               tra(ji,jj,jk,jppoc) = tra(ji,jj,jk,jppoc) + ( 1. - zfracal ) * zmortp
-               prodpoc(ji,jj,jk) = prodpoc(ji,jj,jk) + ( 1. - zfracal ) * zmortp
-               prodgoc(ji,jj,jk) = prodgoc(ji,jj,jk) + zfracal * zmortp
-               tra(ji,jj,jk,jpsfe) = tra(ji,jj,jk,jpsfe) + ( 1. - zfracal ) * zmortp * zfactfe
-               tra(ji,jj,jk,jpbfe) = tra(ji,jj,jk,jpbfe) + zfracal * zmortp * zfactfe
-            END DO
-         END DO
-      END DO
+         zfactfe = tr(ji,jj,jk,jpnfe,Kbb)/(tr(ji,jj,jk,jpphy,Kbb)+rtrn)
+         zfactch = tr(ji,jj,jk,jpnch,Kbb)/(tr(ji,jj,jk,jpphy,Kbb)+rtrn)
+         tr(ji,jj,jk,jpphy,Krhs) = tr(ji,jj,jk,jpphy,Krhs) - zmortp
+         tr(ji,jj,jk,jpnch,Krhs) = tr(ji,jj,jk,jpnch,Krhs) - zmortp * zfactch
+         tr(ji,jj,jk,jpnfe,Krhs) = tr(ji,jj,jk,jpnfe,Krhs) - zmortp * zfactfe
+         zprcaca = xfracal(ji,jj,jk) * zmortp
+         !
+         prodcal(ji,jj,jk) = prodcal(ji,jj,jk) + zprcaca  ! prodcal=prodcal(nanophy)+prodcal(microzoo)+prodcal(mesozoo)
+         !
+         zfracal = 0.5 * xfracal(ji,jj,jk)
+         tr(ji,jj,jk,jpdic,Krhs) = tr(ji,jj,jk,jpdic,Krhs) - zprcaca
+         tr(ji,jj,jk,jptal,Krhs) = tr(ji,jj,jk,jptal,Krhs) - 2. * zprcaca
+         tr(ji,jj,jk,jpcal,Krhs) = tr(ji,jj,jk,jpcal,Krhs) + zprcaca
+         tr(ji,jj,jk,jpgoc,Krhs) = tr(ji,jj,jk,jpgoc,Krhs) + zfracal * zmortp
+         tr(ji,jj,jk,jppoc,Krhs) = tr(ji,jj,jk,jppoc,Krhs) + ( 1. - zfracal ) * zmortp
+         prodpoc(ji,jj,jk) = prodpoc(ji,jj,jk) + ( 1. - zfracal ) * zmortp
+         prodgoc(ji,jj,jk) = prodgoc(ji,jj,jk) + zfracal * zmortp
+         tr(ji,jj,jk,jpsfe,Krhs) = tr(ji,jj,jk,jpsfe,Krhs) + ( 1. - zfracal ) * zmortp * zfactfe
+         tr(ji,jj,jk,jpbfe,Krhs) = tr(ji,jj,jk,jpbfe,Krhs) + zfracal * zmortp * zfactfe
+      END_3D
       !
-       IF(ln_ctl)   THEN  ! print mean trends (used for debugging)
+       IF(sn_cfctl%l_prttrc)   THEN  ! print mean trends (used for debugging)
          WRITE(charout, FMT="('nano')")
          CALL prt_ctl_trc_info(charout)
-         CALL prt_ctl_trc(tab4d=tra, mask=tmask, clinfo=ctrcnm)
+         CALL prt_ctl_trc(tab4d=tr(:,:,:,:,Krhs), mask=tmask, clinfo=ctrcnm)
        ENDIF
       !
       IF( ln_timing )   CALL timing_stop('p4z_nano')
@@ -128,7 +128,7 @@ CONTAINS
    END SUBROUTINE p4z_nano
 
 
-   SUBROUTINE p4z_diat
+   SUBROUTINE p4z_diat( Kbb, Krhs )
       !!---------------------------------------------------------------------
       !!                     ***  ROUTINE p4z_diat  ***
       !!
@@ -136,6 +136,7 @@ CONTAINS
       !!
       !! ** Method  : - ???
       !!---------------------------------------------------------------------
+      INTEGER, INTENT(in) ::   Kbb, Krhs  ! time level indices
       INTEGER  ::   ji, jj, jk
       REAL(wp) ::   zfactfe,zfactsi,zfactch, zcompadi
       REAL(wp) ::   zrespp2, ztortp2, zmortp2
@@ -150,52 +151,48 @@ CONTAINS
       !    sticky and coagulate to sink quickly out of the euphotic zone
       !     ------------------------------------------------------------
 
-      DO jk = 1, jpkm1
-         DO jj = 1, jpj
-            DO ji = 1, jpi
+      DO_3D_11_11( 1, jpkm1 )
 
-               zcompadi = MAX( ( trb(ji,jj,jk,jpdia) - 1e-9), 0. )
+         zcompadi = MAX( ( tr(ji,jj,jk,jpdia,Kbb) - 1e-9), 0. )
 
-               !    Aggregation term for diatoms is increased in case of nutrient
-               !    stress as observed in reality. The stressed cells become more
-               !    sticky and coagulate to sink quickly out of the euphotic zone
-               !     ------------------------------------------------------------
-               !  Phytoplankton respiration 
-               !     ------------------------
-               zlim2   = xlimdia(ji,jj,jk) * xlimdia(ji,jj,jk)
-               zlim1   = 0.25 * ( 1. - zlim2 ) / ( 0.25 + zlim2 ) 
-               zrespp2 = 1.e6 * xstep * (  wchld + wchldm * zlim1 ) * xdiss(ji,jj,jk) * zcompadi * trb(ji,jj,jk,jpdia)
+         !    Aggregation term for diatoms is increased in case of nutrient
+         !    stress as observed in reality. The stressed cells become more
+         !    sticky and coagulate to sink quickly out of the euphotic zone
+         !     ------------------------------------------------------------
+         !  Phytoplankton respiration 
+         !     ------------------------
+         zlim2   = xlimdia(ji,jj,jk) * xlimdia(ji,jj,jk)
+         zlim1   = 0.25 * ( 1. - zlim2 ) / ( 0.25 + zlim2 ) 
+         zrespp2 = 1.e6 * xstep * (  wchld + wchldm * zlim1 ) * xdiss(ji,jj,jk) * zcompadi * tr(ji,jj,jk,jpdia,Kbb)
 
-               !     Phytoplankton mortality. 
-               !     ------------------------
-               ztortp2 = mprat2 * xstep * trb(ji,jj,jk,jpdia)  / ( xkmort + trb(ji,jj,jk,jpdia) ) * zcompadi 
+         !     Phytoplankton mortality. 
+         !     ------------------------
+         ztortp2 = mprat2 * xstep * tr(ji,jj,jk,jpdia,Kbb)  / ( xkmort + tr(ji,jj,jk,jpdia,Kbb) ) * zcompadi 
 
-               zmortp2 = zrespp2 + ztortp2
+         zmortp2 = zrespp2 + ztortp2
 
-               !   Update the arrays tra which contains the biological sources and sinks
-               !   ---------------------------------------------------------------------
-               zfactch = trb(ji,jj,jk,jpdch) / ( trb(ji,jj,jk,jpdia) + rtrn )
-               zfactfe = trb(ji,jj,jk,jpdfe) / ( trb(ji,jj,jk,jpdia) + rtrn )
-               zfactsi = trb(ji,jj,jk,jpdsi) / ( trb(ji,jj,jk,jpdia) + rtrn )
-               tra(ji,jj,jk,jpdia) = tra(ji,jj,jk,jpdia) - zmortp2 
-               tra(ji,jj,jk,jpdch) = tra(ji,jj,jk,jpdch) - zmortp2 * zfactch
-               tra(ji,jj,jk,jpdfe) = tra(ji,jj,jk,jpdfe) - zmortp2 * zfactfe
-               tra(ji,jj,jk,jpdsi) = tra(ji,jj,jk,jpdsi) - zmortp2 * zfactsi
-               tra(ji,jj,jk,jpgsi) = tra(ji,jj,jk,jpgsi) + zmortp2 * zfactsi
-               tra(ji,jj,jk,jpgoc) = tra(ji,jj,jk,jpgoc) + zrespp2 + 0.5 * ztortp2
-               tra(ji,jj,jk,jppoc) = tra(ji,jj,jk,jppoc) + 0.5 * ztortp2
-               prodpoc(ji,jj,jk) = prodpoc(ji,jj,jk) + 0.5 * ztortp2
-               prodgoc(ji,jj,jk) = prodgoc(ji,jj,jk) + zrespp2 + 0.5 * ztortp2
-               tra(ji,jj,jk,jpsfe) = tra(ji,jj,jk,jpsfe) + 0.5 * ztortp2 * zfactfe
-               tra(ji,jj,jk,jpbfe) = tra(ji,jj,jk,jpbfe) + ( zrespp2 + 0.5 * ztortp2 ) * zfactfe
-            END DO
-         END DO
-      END DO
+         !   Update the arrays tr(:,:,:,:,Krhs) which contains the biological sources and sinks
+         !   ---------------------------------------------------------------------
+         zfactch = tr(ji,jj,jk,jpdch,Kbb) / ( tr(ji,jj,jk,jpdia,Kbb) + rtrn )
+         zfactfe = tr(ji,jj,jk,jpdfe,Kbb) / ( tr(ji,jj,jk,jpdia,Kbb) + rtrn )
+         zfactsi = tr(ji,jj,jk,jpdsi,Kbb) / ( tr(ji,jj,jk,jpdia,Kbb) + rtrn )
+         tr(ji,jj,jk,jpdia,Krhs) = tr(ji,jj,jk,jpdia,Krhs) - zmortp2 
+         tr(ji,jj,jk,jpdch,Krhs) = tr(ji,jj,jk,jpdch,Krhs) - zmortp2 * zfactch
+         tr(ji,jj,jk,jpdfe,Krhs) = tr(ji,jj,jk,jpdfe,Krhs) - zmortp2 * zfactfe
+         tr(ji,jj,jk,jpdsi,Krhs) = tr(ji,jj,jk,jpdsi,Krhs) - zmortp2 * zfactsi
+         tr(ji,jj,jk,jpgsi,Krhs) = tr(ji,jj,jk,jpgsi,Krhs) + zmortp2 * zfactsi
+         tr(ji,jj,jk,jpgoc,Krhs) = tr(ji,jj,jk,jpgoc,Krhs) + zrespp2 + 0.5 * ztortp2
+         tr(ji,jj,jk,jppoc,Krhs) = tr(ji,jj,jk,jppoc,Krhs) + 0.5 * ztortp2
+         prodpoc(ji,jj,jk) = prodpoc(ji,jj,jk) + 0.5 * ztortp2
+         prodgoc(ji,jj,jk) = prodgoc(ji,jj,jk) + zrespp2 + 0.5 * ztortp2
+         tr(ji,jj,jk,jpsfe,Krhs) = tr(ji,jj,jk,jpsfe,Krhs) + 0.5 * ztortp2 * zfactfe
+         tr(ji,jj,jk,jpbfe,Krhs) = tr(ji,jj,jk,jpbfe,Krhs) + ( zrespp2 + 0.5 * ztortp2 ) * zfactfe
+      END_3D
       !
-      IF(ln_ctl) THEN      ! print mean trends (used for debugging)
+      IF(sn_cfctl%l_prttrc) THEN      ! print mean trends (used for debugging)
          WRITE(charout, FMT="('diat')")
          CALL prt_ctl_trc_info(charout)
-         CALL prt_ctl_trc(tab4d=tra, mask=tmask, clinfo=ctrcnm)
+         CALL prt_ctl_trc(tab4d=tr(:,:,:,:,Krhs), mask=tmask, clinfo=ctrcnm)
       ENDIF
       !
       IF( ln_timing )   CALL timing_stop('p4z_diat')
@@ -226,12 +223,10 @@ CONTAINS
          WRITE(numout,*) '~~~~~~~~~~~~~'
       ENDIF
       !
-      REWIND( numnatp_ref )              ! Namelist nampismort in reference namelist : Pisces phytoplankton
       READ  ( numnatp_ref, namp4zmort, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namp4zmort in reference namelist', lwp )
-      REWIND( numnatp_cfg )              ! Namelist nampismort in configuration namelist : Pisces phytoplankton
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namp4zmort in reference namelist' )
       READ  ( numnatp_cfg, namp4zmort, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namp4zmort in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namp4zmort in configuration namelist' )
       IF(lwm) WRITE( numonp, namp4zmort )
       !
       IF(lwp) THEN                         ! control print

@@ -77,11 +77,6 @@
        <!-- mass fluxes -->
        <field field_ref="vfxice"           name="vfxice" />
        <field field_ref="vfxsnw"           name="vfxsnw" />
-       
-       <!-- diag error for negative ice volume after advection -->
-       <field field_ref="iceneg_pres"      name="sineg_pres" />
-       <field field_ref="iceneg_volu"      name="sineg_volu" />
-       <field field_ref="iceneg_hfx"       name="sineg_hfx"  />
 
        <!-- categories -->
        <field field_ref="icemask_cat"      name="simskcat"/>
@@ -97,27 +92,27 @@
      
      <file id="file22" name_suffix="_SBC_scalar" description="scalar variables" enabled=".true." >
        <!-- global contents -->
-       <field field_ref="ibgvol_tot"     grid_ref="grid_1point"   name="ibgvol_tot"   />
-       <field field_ref="sbgvol_tot"     grid_ref="grid_1point"   name="sbgvol_tot"   />
-       <field field_ref="ibgarea_tot"    grid_ref="grid_1point"   name="ibgarea_tot"  />
-       <field field_ref="ibgsalt_tot"    grid_ref="grid_1point"   name="ibgsalt_tot"  />
-       <field field_ref="ibgheat_tot"    grid_ref="grid_1point"   name="ibgheat_tot"  />
-       <field field_ref="sbgheat_tot"    grid_ref="grid_1point"   name="sbgheat_tot"  />
+       <field field_ref="ibgvol_tot"     name="ibgvol_tot"   />
+       <field field_ref="sbgvol_tot"     name="sbgvol_tot"   />
+       <field field_ref="ibgarea_tot"    name="ibgarea_tot"  />
+       <field field_ref="ibgsalt_tot"    name="ibgsalt_tot"  />
+       <field field_ref="ibgheat_tot"    name="ibgheat_tot"  />
+       <field field_ref="sbgheat_tot"    name="sbgheat_tot"  />
        
        <!-- global drifts (conservation checks) -->
-       <field field_ref="ibgvolume"      grid_ref="grid_1point"   name="ibgvolume"    />
-       <field field_ref="ibgsaltco"      grid_ref="grid_1point"   name="ibgsaltco"    />
-       <field field_ref="ibgheatco"      grid_ref="grid_1point"   name="ibgheatco"    />
-       <field field_ref="ibgheatfx"      grid_ref="grid_1point"   name="ibgheatfx"    />
+       <field field_ref="ibgvolume"      name="ibgvolume"    />
+       <field field_ref="ibgsaltco"      name="ibgsaltco"    />
+       <field field_ref="ibgheatco"      name="ibgheatco"    />
+       <field field_ref="ibgheatfx"      name="ibgheatfx"    />
        
        <!-- global forcings  -->
-       <field field_ref="ibgfrcvoltop"   grid_ref="grid_1point"   name="ibgfrcvoltop" />
-       <field field_ref="ibgfrcvolbot"   grid_ref="grid_1point"   name="ibgfrcvolbot" />
-       <field field_ref="ibgfrctemtop"   grid_ref="grid_1point"   name="ibgfrctemtop" />
-       <field field_ref="ibgfrctembot"   grid_ref="grid_1point"   name="ibgfrctembot" />
-       <field field_ref="ibgfrcsal"      grid_ref="grid_1point"   name="ibgfrcsal"    />
-       <field field_ref="ibgfrchfxtop"   grid_ref="grid_1point"   name="ibgfrchfxtop" />
-       <field field_ref="ibgfrchfxbot"   grid_ref="grid_1point"   name="ibgfrchfxbot" />
+       <field field_ref="ibgfrcvoltop"   name="ibgfrcvoltop" />
+       <field field_ref="ibgfrcvolbot"   name="ibgfrcvolbot" />
+       <field field_ref="ibgfrctemtop"   name="ibgfrctemtop" />
+       <field field_ref="ibgfrctembot"   name="ibgfrctembot" />
+       <field field_ref="ibgfrcsal"      name="ibgfrcsal"    />
+       <field field_ref="ibgfrchfxtop"   name="ibgfrchfxtop" />
+       <field field_ref="ibgfrchfxbot"   name="ibgfrchfxbot" />
      </file>
      
    </file_group>
@@ -127,8 +122,20 @@
    <file_group id="2h"  output_freq="2h"  output_level="10" enabled=".TRUE."/> <!-- 2h files -->
    <file_group id="3h"  output_freq="3h"  output_level="10" enabled=".TRUE."/> <!-- 3h files -->     
    <file_group id="4h"  output_freq="4h"  output_level="10" enabled=".TRUE."/> <!-- 4h files -->
-   <file_group id="6h"  output_freq="6h"  output_level="10" enabled=".TRUE."/> <!-- 6h files -->        
-   <file_group id="1m"  output_freq="1mo" output_level="10" enabled=".TRUE."/> <!-- real monthly files -->
+   <file_group id="6h"  output_freq="6h"  output_level="10" enabled=".TRUE."/> <!-- 6h files -->      
+
+   <file_group id="1m"  output_freq="1mo" output_level="10" enabled=".TRUE."> <!-- real monthly files -->
+
+     <!-- To compute transport through straits : need to read ice mask at ice iteration at freq_offset = 1mo - nn_fsbc
+      <file id="file23" name_suffix="_strait_ice" description="transport variables through straits" >
+          <field field_ref="strait_mifl"      name="simassacrossline"  freq_offset="1mo-4ts" />
+          <field field_ref="strait_msfl"      name="snmassacrossline"  freq_offset="1mo-4ts" />
+          <field field_ref="strait_arfl"      name="siareaacrossline"  freq_offset="1mo-4ts" />
+        </file>
+     -->
+
+    </file_group>
+
    <file_group id="2m"  output_freq="2mo" output_level="10" enabled=".TRUE."/> <!-- real 2m files -->
    <file_group id="3m"  output_freq="3mo" output_level="10" enabled=".TRUE."/> <!-- real 3m files -->
    <file_group id="4m"  output_freq="4mo" output_level="10" enabled=".TRUE."/> <!-- real 4m files -->
@@ -137,6 +144,13 @@
    <file_group id="2y"  output_freq="2y"  output_level="10" enabled=".TRUE."/> <!-- real 2y files -->
    <file_group id="5y"  output_freq="5y"  output_level="10" enabled=".TRUE."/> <!-- real 5y files -->
    <file_group id="10y" output_freq="10y" output_level="10" enabled=".TRUE."/> <!-- real 10y files -->
-   
+ 
+   <!-- To compute transport through straits : need to read ice mask at ice iteration at freq_offset = - nn_fsbc + 1
+   <file id="maskMFO" name="maskMFO" enabled="true" mode="read" output_freq="1mo" cyclic="true"  >
+      <field id="maskMFO_u_ice" operation="instant"  freq_offset="-3ts"  grid_ref="grid_U_4strait_ice" />
+      <field id="maskMFO_v_ice" operation="instant"  freq_offset="-3ts"  grid_ref="grid_V_4strait_ice" />
+   </file>
+
+     -->
  </file_definition>
  

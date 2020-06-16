@@ -2,8 +2,6 @@
 ! NEMO system team, System and Interface for oceanic RElocable Nesting
 !----------------------------------------------------------------------
 !
-! MODULE: interp
-!
 ! DESCRIPTION:
 !> @brief 
 !> This module manage cubic interpolation on regular grid.
@@ -23,12 +21,12 @@
 !>
 !> @author
 !> J.Paul
-! REVISION HISTORY:
+!>
 !> @date September, 2014 -Initial version
 !> @date June, 2015
 !> - use math module
 !>
-!> @note Software governed by the CeCILL licence     (./LICENSE)
+!> @note Software governed by the CeCILL licence     (NEMOGCM/NEMO_CeCILL.txt)
 !----------------------------------------------------------------------
 MODULE interp_cubic
 
@@ -56,7 +54,12 @@ MODULE interp_cubic
    PRIVATE :: interp_cubic__get_weight2D !< compute interpoaltion weight for 2D array 
    PRIVATE :: interp_cubic__get_weight1D !< compute interpoaltion weight for 1D array
 
-CONTAINS   
+CONTAINS
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE interp_cubic_fill(dd_value, dd_fill, &
+         &                      id_detect,         &
+         &                      id_rho,            &
+         &                      ld_even, ld_discont)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute horizontal cubic interpolation on 4D array of value. 
@@ -73,9 +76,9 @@ CONTAINS
    !> @param[in] ld_even      even refinment or not 
    !> @param[in] ld_discont   longitudinal discontinuity (-180°/180°, 0°/360°) or not
    !-------------------------------------------------------------------
-   SUBROUTINE interp_cubic_fill(dd_value, dd_fill, id_detect, &
-   &                            id_rho, ld_even, ld_discont )
+
       IMPLICIT NONE
+
       ! Argument
       REAL(dp)        , DIMENSION(:,:,:,:), INTENT(INOUT) :: dd_value 
       REAL(dp)                            , INTENT(IN   ) :: dd_fill 
@@ -163,6 +166,12 @@ CONTAINS
       DEALLOCATE(dl_weight_J)
 
    END SUBROUTINE interp_cubic_fill
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE interp_cubic__2D(dd_value,  dd_fill,   &
+         &                     id_detect,            &
+         &                     dd_weight,            &
+         &                     id_rhoi, id_rhoj,     &
+         &                     ld_discont)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute cubic interpolation on 2D array of value. 
@@ -181,13 +190,9 @@ CONTAINS
    !> @param[in] ld_even      even refinment or not 
    !> @param[in] ld_discont   longitudinal discontinuity (-180°/180°, 0°/360°) or not
    !-------------------------------------------------------------------
-   SUBROUTINE interp_cubic__2D( dd_value,  dd_fill,   &
-      &                         id_detect,            &
-      &                         dd_weight,            &
-      &                         id_rhoi, id_rhoj,     &
-      &                         ld_discont )
 
       IMPLICIT NONE
+
       ! Argument
       REAL(dp)        , DIMENSION(:,:), INTENT(INOUT) :: dd_value 
       REAL(dp)                        , INTENT(IN   ) :: dd_fill 
@@ -217,7 +222,6 @@ CONTAINS
       INTEGER(i4) :: jj
       INTEGER(i4) :: ii
       INTEGER(i4) :: ij
-
       !----------------------------------------------------------------
 
       IF( ANY(id_detect(:,:)==1) )THEN
@@ -323,6 +327,12 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE interp_cubic__2D
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE interp_cubic__1D(dd_value,  dd_fill,   &
+         &                     id_detect,            &
+         &                     dd_weight,            &
+         &                     id_rhoi,              &
+         &                     ld_discont)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute cubic interpolation on 1D array of value. 
@@ -339,13 +349,9 @@ CONTAINS
    !> @param[in] ld_even      even refinment or not 
    !> @param[in] ld_discont   longitudinal discontinuity (-180°/180°, 0°/360°) or not
    !-------------------------------------------------------------------
-   SUBROUTINE interp_cubic__1D( dd_value,  dd_fill,   &
-      &                         id_detect,            &
-      &                         dd_weight,            &
-      &                         id_rhoi,              &
-      &                         ld_discont )
 
       IMPLICIT NONE
+
       ! Argument
       REAL(dp)        , DIMENSION(:)  , INTENT(INOUT) :: dd_value 
       REAL(dp)                        , INTENT(IN   ) :: dd_fill 
@@ -369,7 +375,6 @@ CONTAINS
       ! loop indices
       INTEGER(i4) :: ji
       INTEGER(i4) :: ii
-
       !----------------------------------------------------------------
 
       IF( ANY(id_detect(:)==1) )THEN
@@ -446,6 +451,11 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE interp_cubic__1D
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION interp_cubic__2D_coef(dd_value,                    &
+         &                        dd_dfdx,  dd_dfdy, dd_d2fdxy,&
+         &                        dd_fill) &
+         & RESULT (df_coef)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute 2D array of coefficient for cubic interpolation.
@@ -459,12 +469,9 @@ CONTAINS
    !> @param[in] dd_d2fdxy 2D array of cross derivative in i-j-direction
    !> @param[in] dd_fill   FillValue of variable
    !-------------------------------------------------------------------
-   FUNCTION interp_cubic__2D_coef( dd_value, &
-      &                            dd_dfdx,  &
-      &                            dd_dfdy,  &
-      &                            dd_d2fdxy,&
-      &                            dd_fill )
+
       IMPLICIT NONE
+
       ! Argument
       REAL(dp), DIMENSION(:,:), INTENT(IN) :: dd_value 
       REAL(dp), DIMENSION(:,:), INTENT(IN) :: dd_dfdx  
@@ -473,7 +480,7 @@ CONTAINS
       REAL(dp)                , INTENT(IN) :: dd_fill
 
       ! function
-      REAL(dp), DIMENSION(16) :: interp_cubic__2D_coef
+      REAL(dp), DIMENSION(16)              :: df_coef
 
       ! local variable
       REAL(dp), DIMENSION(16,16), PARAMETER :: dl_matrix = RESHAPE( &
@@ -499,16 +506,20 @@ CONTAINS
 
       !----------------------------------------------------------------
       ! init
-      interp_cubic__2D_coef(:)=dd_fill
+      df_coef(:)=dd_fill
 
       dl_vect( 1: 4)=PACK(dd_value(:,:),.TRUE. )
       dl_vect( 5: 8)=PACK(dd_dfdx(:,:),.TRUE. )
       dl_vect( 9:12)=PACK(dd_dfdy(:,:),.TRUE. )
       dl_vect(13:16)=PACK(dd_d2fdxy(:,:),.TRUE. )
 
-      interp_cubic__2D_coef(:)=MATMUL(dl_matrix(:,:),dl_vect(:))
+      df_coef(:)=MATMUL(dl_matrix(:,:),dl_vect(:))
 
    END FUNCTION interp_cubic__2D_coef
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE interp_cubic__2D_fill(dd_value, id_detect, &
+         &                          dd_weight, dd_coef,  &
+         &                          dd_fill, id_rhoi, id_rhoj)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute cubic interpolation of a 2D array of value. 
@@ -524,10 +535,9 @@ CONTAINS
    !> @param[in] id_rhoi      refinement factor in i-direction 
    !> @param[in] id_rhoj      refinement factor in j-direction
    !-------------------------------------------------------------------
-   SUBROUTINE interp_cubic__2D_fill( dd_value, id_detect, &
-   &                                 dd_weight, dd_coef,  &
-   &                                 dd_fill, id_rhoi, id_rhoj )
+
       IMPLICIT NONE
+
       ! Argument
       REAL(dp)        , DIMENSION(:,:), INTENT(INOUT) :: dd_value 
       INTEGER(i4)     , DIMENSION(:,:), INTENT(INOUT) :: id_detect
@@ -569,6 +579,11 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE interp_cubic__2D_fill
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION interp_cubic__1D_coef(dd_value, &
+         &                        dd_dfdx,  &
+         &                        dd_fill)  &
+         &  RESULT (df_coef)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute 1D array of coefficient for cubic interpolation. 
@@ -582,17 +597,16 @@ CONTAINS
    !> @param[in] dd_dfdx   1D array of first derivative 
    !> @param[in] dd_fill   FillValue of variable
    !-------------------------------------------------------------------
-   FUNCTION interp_cubic__1D_coef( dd_value, &
-      &                            dd_dfdx,  &
-      &                            dd_fill )
+
       IMPLICIT NONE
+
       ! Argument
       REAL(dp), DIMENSION(:)  , INTENT(IN) :: dd_value 
       REAL(dp), DIMENSION(:)  , INTENT(IN) :: dd_dfdx  
       REAL(dp)                , INTENT(IN) :: dd_fill  
 
       ! function
-      REAL(dp), DIMENSION(4) :: interp_cubic__1D_coef
+      REAL(dp), DIMENSION(4)               :: df_coef
 
       ! local variable
       REAL(dp), DIMENSION(4,4), PARAMETER :: dl_matrix = RESHAPE( &
@@ -606,14 +620,18 @@ CONTAINS
 
       !----------------------------------------------------------------
       ! init
-      interp_cubic__1D_coef(:)=dd_fill
+      df_coef(:)=dd_fill
 
       dl_vect( 1: 2)=PACK(dd_value(:),.TRUE. )
       dl_vect( 3: 4)=PACK(dd_dfdx(:),.TRUE. )
 
-      interp_cubic__1D_coef(:)=MATMUL(dl_matrix(:,:),dl_vect(:))
+      df_coef(:)=MATMUL(dl_matrix(:,:),dl_vect(:))
 
    END FUNCTION interp_cubic__1D_coef
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE interp_cubic__1D_fill(dd_value, id_detect, &
+         &                          dd_weight, dd_coef,  &
+         &                          dd_fill, id_rhoi)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute cubic interpolation of a 1D array of value. 
@@ -628,10 +646,9 @@ CONTAINS
    !> @param[in] ld_even      even refinment or not
    !> @param[in] id_rho       refinement factor 
    !-------------------------------------------------------------------
-   SUBROUTINE interp_cubic__1D_fill( dd_value, id_detect, &
-   &                                 dd_weight, dd_coef,  &
-   &                                 dd_fill, id_rhoi )
+
       IMPLICIT NONE
+
       ! Argument
       REAL(dp)        , DIMENSION(:)  , INTENT(INOUT) :: dd_value 
       INTEGER(i4)     , DIMENSION(:)  , INTENT(INOUT) :: id_detect
@@ -641,7 +658,6 @@ CONTAINS
       INTEGER(I4)                     , INTENT(IN   ) :: id_rhoi
 
       ! local variable
-
       ! loop indices
       INTEGER(i4) :: ji
       !----------------------------------------------------------------
@@ -665,6 +681,9 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE interp_cubic__1D_fill
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE interp_cubic__get_weight2D(dd_weight, &
+         &                               id_rho, ld_even)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute interpoaltion weight for 2D array. 
@@ -676,9 +695,9 @@ CONTAINS
    !> @param[in] ld_even   even refinment or not
    !> @param[in] id_rho    refinement factor 
    !-------------------------------------------------------------------
-   SUBROUTINE interp_cubic__get_weight2D(dd_weight, &
-   &                                     id_rho, ld_even)
+
       IMPLICIT NONE
+
       ! Argument
       REAL(dp)   , DIMENSION(:,:), INTENT(INOUT) :: dd_weight
       INTEGER(I4), DIMENSION(:)  , INTENT(IN   ) :: id_rho
@@ -696,7 +715,6 @@ CONTAINS
       
       ! loop indices
       INTEGER(i4) :: ii 
-
       INTEGER(i4) :: ji 
       INTEGER(i4) :: jj
       !----------------------------------------------------------------
@@ -746,6 +764,9 @@ CONTAINS
       ENDDO
 
    END SUBROUTINE interp_cubic__get_weight2D
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE interp_cubic__get_weight1D(dd_weight, &
+         &                               id_rho, ld_even)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute interpoaltion weight for 1D array. 
@@ -757,18 +778,20 @@ CONTAINS
    !> @param[in] ld_even   even refinment or not
    !> @param[in] id_rho    refinement factor 
    !-------------------------------------------------------------------
-   SUBROUTINE interp_cubic__get_weight1D(dd_weight, &
-   &                                     id_rho, ld_even)
+
       IMPLICIT NONE
+
       ! Argument
       REAL(dp)   , DIMENSION(:,:), INTENT(INOUT) :: dd_weight
       INTEGER(I4)                , INTENT(IN   ) :: id_rho
       LOGICAL                    , INTENT(IN   ) :: ld_even
+
       ! local variable
       REAL(dp)                  :: dl_dx
       REAL(dp)                  :: dl_x      
       REAL(dp)                  :: dl_x2
       REAL(dp)                  :: dl_x3
+
       ! loop indices
       INTEGER(i4) :: ji   
       !----------------------------------------------------------------
@@ -792,4 +815,5 @@ CONTAINS
       ENDDO
 
    END SUBROUTINE interp_cubic__get_weight1D
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 END MODULE interp_cubic

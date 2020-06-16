@@ -2,8 +2,6 @@
 ! NEMO system team, System and Interface for oceanic RElocable Nesting
 !----------------------------------------------------------------------
 !
-! MODULE: grid_hgr
-!
 ! DESCRIPTION:
 !> @brief This module manage Horizontal grid.
 !>
@@ -59,7 +57,7 @@
 !>
 !> @author
 !> G, Madec
-! REVISION HISTORY:
+!>
 !> @date March, 1988 - Original code
 !> @date January, 1996 
 !> - terrain following coordinates
@@ -87,9 +85,10 @@
 !> - J, Paul : compute coriolis factor at f-point and at t-point 
 !> - J, Paul : do not use anymore special case for ORCA grid
 !>
-!> @note Software governed by the CeCILL licence     (./LICENSE)
+!> @note Software governed by the CeCILL licence     (NEMOGCM/NEMO_CeCILL.txt)
 !----------------------------------------------------------------------
 MODULE grid_hgr
+
    USE netcdf                          ! nf90 library
    USE kind                            ! F90 kind parameter
    USE fct                             ! basic usefull function
@@ -105,6 +104,7 @@ MODULE grid_hgr
    USE mpp                             ! MPP manager
    USE iom_mpp                         ! I/O MPP manager
    USE lbc                             ! lateral boundary conditions
+
    IMPLICIT NONE
    ! NOTE_avoid_public_variables_if_possible
 
@@ -241,8 +241,10 @@ MODULE grid_hgr
    TYPE(TVAR), SAVE :: tg_gsinf
 
 CONTAINS
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_hgr_init(jpi, jpj, jpk, ld_domcfg) 
    !-------------------------------------------------------------------
-   !> @brief This function initialise hgr structure
+   !> @brief This subroutine initialise hgr structure
    !>
    !> @author J.Paul
    !> @date September, 2015 - Initial version
@@ -250,8 +252,9 @@ CONTAINS
    !> @param[in] jpi
    !> @param[in] jpj
    !-------------------------------------------------------------------
-   SUBROUTINE grid_hgr_init(jpi,jpj,jpk,ld_domcfg) 
+
       IMPLICIT NONE
+
       ! Argument      
       INTEGER(i4), INTENT(IN) :: jpi
       INTEGER(i4), INTENT(IN) :: jpj
@@ -322,15 +325,18 @@ CONTAINS
 !      tg_wvmask  = var_init('wvmask' ,dl_tmp3D(:,:,:), dd_fill=dp_fill_i1, id_type=NF90_BYTE)
 
    END SUBROUTINE grid_hgr_init
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_hgr_clean(ld_domcfg) 
    !-------------------------------------------------------------------
-   !> @brief This function clean hgr structure
+   !> @brief This subroutine clean hgr structure
    !>
    !> @author J.Paul
    !> @date September, 2015 - Initial version
    !>
    !-------------------------------------------------------------------
-   SUBROUTINE grid_hgr_clean(ld_domcfg) 
+
       IMPLICIT NONE
+
       ! Argument      
       LOGICAL    , INTENT(IN) :: ld_domcfg
 
@@ -381,6 +387,9 @@ CONTAINS
          CALL var_clean(tg_fmask   )
       ENDIF
    END SUBROUTINE grid_hgr_clean
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION grid_hgr_nam(cd_coord, id_perio, cd_namelist) &
+         & RESULT (tf_namh)
    !-------------------------------------------------------------------
    !> @brief This function initialise hgr namelist structure
    !>
@@ -392,15 +401,16 @@ CONTAINS
    !> @param[in] cd_namelist
    !> @return hgr namelist structure
    !-------------------------------------------------------------------
-   FUNCTION grid_hgr_nam( cd_coord,id_perio,cd_namelist )
+
       IMPLICIT NONE
+
       ! Argument      
       CHARACTER(LEN=*), INTENT(IN) :: cd_coord
       INTEGER(i4)     , INTENT(IN) :: id_perio   
       CHARACTER(LEN=*), INTENT(IN) :: cd_namelist
       
       ! function
-      TYPE(TNAMH) :: grid_hgr_nam
+      TYPE(TNAMH)                  :: tf_namh
 
       ! local variable
       INTEGER(i4)        :: il_status
@@ -460,11 +470,11 @@ CONTAINS
          il_fileid=fct_getunit()
 
          OPEN( il_fileid, FILE=TRIM(cd_namelist), &
-         &                FORM='FORMATTED',       &
-         &                ACCESS='SEQUENTIAL',    &
-         &                STATUS='OLD',           &
-         &                ACTION='READ',          &
-         &                IOSTAT=il_status)
+            &             FORM='FORMATTED',       &
+            &             ACCESS='SEQUENTIAL',    &
+            &             STATUS='OLD',           &
+            &             ACTION='READ',          &
+            &             IOSTAT=il_status)
          CALL fct_err(il_status)
          IF( il_status /= 0 )THEN
             CALL logger_fatal("GRID HGR NAM: error opening "//&
@@ -481,23 +491,23 @@ CONTAINS
             CALL logger_error("GRID HGR NAM: closing "//TRIM(cd_namelist))
          ENDIF
         
-         grid_hgr_nam%c_coord   = TRIM(cd_coord)
-         grid_hgr_nam%i_perio   = id_perio
+         tf_namh%c_coord   = TRIM(cd_coord)
+         tf_namh%i_perio   = id_perio
 
-         grid_hgr_nam%i_mshhgr  = in_mshhgr
-         grid_hgr_nam%d_ppglam0 = dn_ppglam0
-         grid_hgr_nam%d_ppgphi0 = dn_ppgphi0
+         tf_namh%i_mshhgr  = in_mshhgr
+         tf_namh%d_ppglam0 = dn_ppglam0
+         tf_namh%d_ppgphi0 = dn_ppgphi0
 
-         grid_hgr_nam%d_ppe1_deg= dn_ppe1_deg
-         grid_hgr_nam%d_ppe2_deg= dn_ppe2_deg
-!         grid_hgr_nam%d_ppe1_m  = dn_ppe1_m
-!         grid_hgr_nam%d_ppe2_m  = dn_ppe2_m
+         tf_namh%d_ppe1_deg= dn_ppe1_deg
+         tf_namh%d_ppe2_deg= dn_ppe2_deg
+!         tf_namh%d_ppe1_m  = dn_ppe1_m
+!         tf_namh%d_ppe2_m  = dn_ppe2_m
 
-!         grid_hgr_nam%i_cla     = in_cla
+!         tf_namh%i_cla     = in_cla
 
-!         grid_hgr_nam%c_cfg     = TRIM(cn_cfg)
-         grid_hgr_nam%i_cfg     = in_cfg
-         grid_hgr_nam%l_bench   = ln_bench
+!         tf_namh%c_cfg     = TRIM(cn_cfg)
+         tf_namh%i_cfg     = in_cfg
+         tf_namh%l_bench   = ln_bench
 
       ELSE
 
@@ -506,6 +516,8 @@ CONTAINS
       ENDIF
 
    END FUNCTION grid_hgr_nam
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_hgr_fill(td_nam, jpi, jpj, ld_domcfg) 
    !-------------------------------------------------------------------
    !> @brief This subroutine fill horizontal mesh (hgr structure)
    !>
@@ -516,8 +528,9 @@ CONTAINS
    !> @param[in] jpi
    !> @param[in] jpj
    !-------------------------------------------------------------------
-   SUBROUTINE grid_hgr_fill(td_nam,jpi,jpj,ld_domcfg) 
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TNAMH), INTENT(IN) :: td_nam
       INTEGER(i4), INTENT(IN) :: jpi
@@ -599,6 +612,8 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE grid_hgr_fill
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_hgr__fill_curv(td_nam)!,jpi,jpj) 
    !-------------------------------------------------------------------
    !> @brief This subroutine fill horizontal mesh (hgr structure)
    !> for case of curvilinear coordinate on the sphere read in coordinate.nc file
@@ -612,8 +627,9 @@ CONTAINS
    ! @param[in] jpi
    ! @param[in] jpj   
    !-------------------------------------------------------------------
-   SUBROUTINE grid_hgr__fill_curv( td_nam )!,jpi,jpj ) 
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TNAMH), INTENT(IN) :: td_nam
 !      INTEGER(i4), INTENT(IN) :: jpi
@@ -832,6 +848,8 @@ CONTAINS
 !      ENDIF
 
    END SUBROUTINE grid_hgr__fill_curv
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_hgr__fill_reg(td_nam, jpi, jpj) 
    !-------------------------------------------------------------------
    !> @brief This subroutine fill horizontal mesh (hgr structure)
    !> for case of geographical mesh on the sphere with regular grid-spacing
@@ -843,8 +861,9 @@ CONTAINS
    !> @param[in] jpi
    !> @param[in] jpj   
    !-------------------------------------------------------------------
-   SUBROUTINE grid_hgr__fill_reg(td_nam,jpi,jpj) 
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TNAMH), INTENT(IN) :: td_nam
       INTEGER(i4), INTENT(IN) :: jpi
@@ -892,6 +911,8 @@ CONTAINS
       END DO
 
    END SUBROUTINE grid_hgr__fill_reg
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_hgr__fill_plan(td_nam, jpi, jpj) 
    !-------------------------------------------------------------------
    !> @brief This subroutine fill horizontal mesh (hgr structure)
    !> for case of f- or beta-plane with regular grid-spacing
@@ -903,8 +924,9 @@ CONTAINS
    !> @param[in] jpi
    !> @param[in] jpj   
    !-------------------------------------------------------------------
-   SUBROUTINE grid_hgr__fill_plan(td_nam,jpi,jpj) 
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TNAMH), INTENT(IN) :: td_nam
       INTEGER(i4), INTENT(IN) :: jpi
@@ -969,6 +991,8 @@ CONTAINS
       tg_e2f%d_value(:,:,1,1) = td_nam%d_ppe2_deg
 
    END SUBROUTINE grid_hgr__fill_plan
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_hgr__fill_merc(td_nam, jpi, jpj) 
    !-------------------------------------------------------------------
    !> @brief This subroutine fill horizontal mesh (hgr structure)
    !> for case of geographical mesh on the sphere, isotropic MERCATOR type
@@ -980,8 +1004,9 @@ CONTAINS
    !> @param[in] jpi
    !> @param[in] jpj   
    !-------------------------------------------------------------------
-   SUBROUTINE grid_hgr__fill_merc(td_nam,jpi,jpj) 
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TNAMH), INTENT(IN) :: td_nam
       INTEGER(i4), INTENT(IN) :: jpi
@@ -1046,6 +1071,8 @@ CONTAINS
       END DO
 
    END SUBROUTINE grid_hgr__fill_merc
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_hgr__fill_gyre(td_nam, jpi, jpj) 
    !-------------------------------------------------------------------
    !> @brief This subroutine fill horizontal mesh (hgr structure)
    !> for case of beta-plane with regular grid-spacing and rotated domain (GYRE configuration)
@@ -1057,8 +1084,9 @@ CONTAINS
    !> @param[in] jpi
    !> @param[in] jpj
    !-------------------------------------------------------------------
-   SUBROUTINE grid_hgr__fill_gyre(td_nam,jpi,jpj) 
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TNAMH), INTENT(IN) :: td_nam
       INTEGER(i4), INTENT(IN) :: jpi
@@ -1143,6 +1171,8 @@ CONTAINS
       tg_e2f%d_value(:,:,1,1) = ze1
 
    END SUBROUTINE grid_hgr__fill_gyre
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_hgr__fill_coriolis(td_nam, jpi)!,jpj) 
    !-------------------------------------------------------------------
    !> @brief This subroutine fill coriolis factor
    !>
@@ -1155,8 +1185,9 @@ CONTAINS
    !> @param[in] jpi
    ! @param[in] jpj
    !-------------------------------------------------------------------
-   SUBROUTINE grid_hgr__fill_coriolis(td_nam,jpi)!,jpj) 
+
       IMPLICIT NONE
+
       ! Argument      
       TYPE(TNAMH), INTENT(IN) :: td_nam
       INTEGER(i4), INTENT(IN) :: jpi
@@ -1217,8 +1248,10 @@ CONTAINS
       END SELECT
 
    END SUBROUTINE grid_hgr__fill_coriolis
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE grid_hgr__angle(td_nam, jpi, jpj)
    !!----------------------------------------------------------------------
-   !! @brief This subroutine compute angles between model grid lines and the North direction
+   !> @brief This subroutine compute angles between model grid lines and the North direction
    !>
    !> @details
    !> ** Method  :
@@ -1240,8 +1273,9 @@ CONTAINS
    !> @param[in] jpi
    !> @param[in] jpj
    !!----------------------------------------------------------------------
-   SUBROUTINE grid_hgr__angle(td_nam, jpi,jpj)
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TNAMH), INTENT(IN) :: td_nam
       INTEGER(i4), INTENT(IN) :: jpi
@@ -1407,4 +1441,5 @@ CONTAINS
       CALL lbc_lnk( tg_gsinf%d_value(:,:,1,1), 'F', td_nam%i_perio, -1._dp )
 
    END SUBROUTINE grid_hgr__angle
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 END MODULE grid_hgr

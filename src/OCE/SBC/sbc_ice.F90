@@ -69,7 +69,6 @@ MODULE sbc_ice
    REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:)   ::   emp_oce        !: evap - precip over ocean                 [kg/m2/s]
    REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:)   ::   wndm_ice       !: wind speed module at T-point                 [m/s]
    REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:)   ::   sstfrz         !: wind speed module at T-point                 [m/s]
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::   tsfc_ice       !: sea ice surface skin temperature (on categories)
 #endif
 
 #if defined key_cice
@@ -107,7 +106,7 @@ MODULE sbc_ice
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: sbc_ice.F90 10425 2018-12-19 21:54:16Z smasson $ 
+   !! $Id: sbc_ice.F90 12396 2020-02-18 10:24:16Z clem $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -131,7 +130,7 @@ CONTAINS
          &      evap_ice(jpi,jpj,jpl) , devap_ice(jpi,jpj,jpl) , qprec_ice  (jpi,jpj)     ,   &
          &      qemp_ice(jpi,jpj)     , qevap_ice(jpi,jpj,jpl) , qemp_oce   (jpi,jpj)     ,   &
          &      qns_oce (jpi,jpj)     , qsr_oce  (jpi,jpj)     , emp_oce    (jpi,jpj)     ,   &
-         &      emp_ice (jpi,jpj)     , tsfc_ice (jpi,jpj,jpl) , sstfrz     (jpi,jpj)     , STAT= ierr(2) )
+         &      emp_ice (jpi,jpj)     , sstfrz   (jpi,jpj)     , STAT= ierr(2) )
 #endif
 
 #if defined key_cice

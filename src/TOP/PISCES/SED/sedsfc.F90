@@ -10,10 +10,12 @@ MODULE sedsfc
 
    PUBLIC sed_sfc
 
-   !! $Id: sedsfc.F90 10222 2018-10-25 09:42:23Z aumont $
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
+   !! $Id: sedsfc.F90 12377 2020-02-12 14:39:06Z acc $
 CONTAINS
 
-   SUBROUTINE sed_sfc( kt )
+   SUBROUTINE sed_sfc( kt, Kbb )
       !!---------------------------------------------------------------------
       !!                  ***  ROUTINE sed_sfc ***
       !!
@@ -25,6 +27,7 @@ CONTAINS
       !!----------------------------------------------------------------------
       !!* Arguments
       INTEGER, INTENT(in) ::  kt              ! time step
+      INTEGER, INTENT(in) ::  Kbb             ! time index
 
       ! * local variables
       INTEGER :: ji, jj, ikt     ! dummy loop indices
@@ -44,21 +47,19 @@ CONTAINS
       CALL unpack_arr ( jpoce, trc_data(1:jpi,1:jpj,8), iarroce(1:jpoce), pwcp(1:jpoce,1,jwfe2) )
 
 
-      DO jj = 1,jpj
-         DO ji = 1, jpi
-            ikt = mbkt(ji,jj)
-            IF ( tmask(ji,jj,ikt) == 1 ) THEN
-               trb(ji,jj,ikt,jptal) = trc_data(ji,jj,1)
-               trb(ji,jj,ikt,jpdic) = trc_data(ji,jj,2)
-               trb(ji,jj,ikt,jpno3) = trc_data(ji,jj,3) * 7.625
-               trb(ji,jj,ikt,jppo4) = trc_data(ji,jj,4) * 122.
-               trb(ji,jj,ikt,jpoxy) = trc_data(ji,jj,5)
-               trb(ji,jj,ikt,jpsil) = trc_data(ji,jj,6)
-               trb(ji,jj,ikt,jpnh4) = trc_data(ji,jj,7) * 7.625
-               trb(ji,jj,ikt,jpfer) = trc_data(ji,jj,8)
-            ENDIF
-         ENDDO
-      ENDDO
+      DO_2D_11_11
+         ikt = mbkt(ji,jj)
+         IF ( tmask(ji,jj,ikt) == 1 ) THEN
+            tr(ji,jj,ikt,jptal,Kbb) = trc_data(ji,jj,1)
+            tr(ji,jj,ikt,jpdic,Kbb) = trc_data(ji,jj,2)
+            tr(ji,jj,ikt,jpno3,Kbb) = trc_data(ji,jj,3) * 7.625
+            tr(ji,jj,ikt,jppo4,Kbb) = trc_data(ji,jj,4) * 122.
+            tr(ji,jj,ikt,jpoxy,Kbb) = trc_data(ji,jj,5)
+            tr(ji,jj,ikt,jpsil,Kbb) = trc_data(ji,jj,6)
+            tr(ji,jj,ikt,jpnh4,Kbb) = trc_data(ji,jj,7) * 7.625
+            tr(ji,jj,ikt,jpfer,Kbb) = trc_data(ji,jj,8)
+         ENDIF
+      END_2D
 
       IF( ln_timing )  CALL timing_stop('sed_sfc')
 

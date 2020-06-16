@@ -60,9 +60,7 @@
       ENDIF
       !
       ALLOCATE(work(ipi))
-      IF( ln_timing ) CALL tic_tac(.TRUE., ld_global = .TRUE.)
       CALL mpi_allreduce( ARRAY_IN(:), work, ipi, MPI_TYPE, MPI_OPERATION, ilocalcomm, ierror )
-      IF( ln_timing ) CALL tic_tac(.FALSE., ld_global = .TRUE.)
       DO ii = 1, ipi
          ARRAY_IN(ii) = work(ii)
       ENDDO

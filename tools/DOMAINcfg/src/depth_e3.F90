@@ -13,13 +13,11 @@ MODULE depth_e3
    !!   e3_to_depth   : use e3t & e3w to calculate the depth of t- and w-points
    !!                   (generic interface for 1D and 3D fields)
    !!---------------------------------------------------------------------
-   USE oce               ! ocean variables
    USE dom_oce           ! ocean domain
    !
    USE in_out_manager    ! I/O manager
    USE lbclnk            ! ocean lateral boundary conditions (or mpp link)
    USE lib_mpp           ! distributed memory computing library
-   USE timing            ! Timing
 
    IMPLICIT NONE
    PRIVATE

@@ -24,7 +24,7 @@ MODULE obs_readmdt
    USE dom_oce, ONLY : &                  ! Domain variables
       &                    tmask, tmask_i, e1e2t, gphit, glamt
    USE obs_const, ONLY :   obfillflt      ! Fillvalue
-   USE oce      , ONLY :   sshn           ! Model variables
+   USE oce      , ONLY :   ssh            ! Model variables
 
    IMPLICIT NONE
    PRIVATE
@@ -36,14 +36,16 @@ MODULE obs_readmdt
    REAL(wp), PUBLIC :: rn_mdtcorr   = 1.61_wp  ! User specified MDT correction
    REAL(wp), PUBLIC :: rn_mdtcutoff = 65.0_wp  ! MDT cutoff for computed correction
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: obs_readmdt.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: obs_readmdt.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE obs_rea_mdt( sladata, k2dint )
+   SUBROUTINE obs_rea_mdt( sladata, k2dint, Kmm )
       !!---------------------------------------------------------------------
       !!
       !!                   *** ROUTINE obs_rea_mdt ***
@@ -58,6 +60,7 @@ CONTAINS
       !
       TYPE(obs_surf), INTENT(inout) ::   sladata   ! SLA data
       INTEGER       , INTENT(in)    ::   k2dint    ! ?
+      INTEGER       , INTENT(in)    ::   Kmm       ! ?
       !
       CHARACTER(LEN=12), PARAMETER ::   cpname  = 'obs_rea_mdt'
       CHARACTER(LEN=20), PARAMETER ::   mdtname = 'slaReferenceLevel.nc'
@@ -105,7 +108,7 @@ CONTAINS
 
       ! Remove the offset between the MDT used with the sla and the model MDT
       IF( nn_msshc == 1 .OR. nn_msshc == 2 ) &
-         & CALL obs_offset_mdt( jpi, jpj, z_mdt, zfill )
+         & CALL obs_offset_mdt( jpi, jpj, z_mdt, zfill, Kmm )
 
       ! Intepolate the MDT already on the model grid at the observation point
   
@@ -168,7 +171,7 @@ CONTAINS
    END SUBROUTINE obs_rea_mdt
 
 
-   SUBROUTINE obs_offset_mdt( kpi, kpj, mdt, zfill )
+   SUBROUTINE obs_offset_mdt( kpi, kpj, mdt, zfill, Kmm )
       !!---------------------------------------------------------------------
       !!
       !!                   *** ROUTINE obs_offset_mdt ***
@@ -182,6 +185,7 @@ CONTAINS
       !! ** Action  : 
       !!----------------------------------------------------------------------
       INTEGER, INTENT(IN) ::  kpi, kpj
+      INTEGER, INTENT(IN) ::  Kmm
       REAL(wp), DIMENSION(kpi,kpj), INTENT(INOUT) ::   mdt     ! MDT used on the model grid
       REAL(wp)                    , INTENT(IN   ) ::   zfill 
       ! 
@@ -210,14 +214,12 @@ CONTAINS
       zeta1 = 0.0
       zeta2 = 0.0
 
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-          zdxdy = e1e2t(ji,jj) * zpromsk(ji,jj)
-          zarea = zarea + zdxdy
-          zeta1 = zeta1 + mdt(ji,jj) * zdxdy
-          zeta2 = zeta2 + sshn (ji,jj) * zdxdy
-        END DO      
-      END DO
+      DO_2D_11_11
+       zdxdy = e1e2t(ji,jj) * zpromsk(ji,jj)
+       zarea = zarea + zdxdy
+       zeta1 = zeta1 + mdt(ji,jj) * zdxdy
+       zeta2 = zeta2 + ssh(ji,jj,Kmm) * zdxdy
+      END_2D
 
       CALL mpp_sum( 'obs_readmdt', zeta1 )
       CALL mpp_sum( 'obs_readmdt', zeta2 )

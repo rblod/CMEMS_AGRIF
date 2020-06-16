@@ -46,7 +46,7 @@ set -o posix
 # EVOLUTIONS
 # ==========
 #
-# $Id: Fprep_agrif.sh 9598 2018-05-15 22:47:16Z nicolasmartin $
+# $Id: Fprep_agrif.sh 13057 2020-06-07 17:57:15Z rblod $
 #
 #
 #
@@ -64,6 +64,7 @@ if [ ! -f ${MAIN_DIR}/ext/AGRIF/nemo_mpi.h ];then
 fi
 
  #- CONV
+export MYARCH=$3
 fcm build ${COMPIL_DIR}/conv.cfg || exit 1
 #C_COMPILER=${CC-cc}
 #gmake CC=${C_COMPILER} -C ${MAIN_DIR}/ext/AGRIF/LIB

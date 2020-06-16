@@ -35,7 +35,7 @@ MODULE prtctl
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: prtctl.F90 10068 2018-08-28 14:09:04Z nicolasmartin $ 
+   !! $Id: prtctl.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -49,7 +49,7 @@ CONTAINS
       !!                in mono and mpp case. This way can be usefull when
       !!                debugging a new parametrization in mono or mpp. 
       !!
-      !! ** Method  : 2 possibilities exist when setting the ln_ctl parameter to
+      !! ** Method  : 2 possibilities exist when setting the sn_cfctl%prtctl parameter to
       !!                .true. in the ocean namelist:
       !!              - to debug a MPI run .vs. a mono-processor one; 
       !!                the control print will be done over each sub-domain.
@@ -63,7 +63,7 @@ CONTAINS
       !!              - All arguments of the above calling sequence are optional so their
       !!                name must be explicitly typed if used. For instance if the 3D
       !!                array tn(:,:,:) must be passed through the prt_ctl subroutine, 
-      !!                it must looks like: CALL prt_ctl(tab3d_1=tn).
+      !!                it must look like: CALL prt_ctl(tab3d_1=tn).
       !!
       !!                    tab2d_1 : first 2D array
       !!                    tab3d_1 : first 3D array

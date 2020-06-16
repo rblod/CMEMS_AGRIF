@@ -37,11 +37,9 @@ MODULE icethd_pnd
    INTEGER, PARAMETER ::   np_pndCST = 1   ! Constant pond scheme
    INTEGER, PARAMETER ::   np_pndH12 = 2   ! Evolutive pond scheme (Holland et al. 2012)
 
-   !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/ICE 4.0 , NEMO Consortium (2018)
-   !! $Id: icethd_pnd.F90 10532 2019-01-16 13:39:38Z clem $
+   !! $Id: icethd_pnd.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -166,7 +164,7 @@ CONTAINS
             !
             ! melt pond mass flux (<0)
             IF( zdv_mlt > 0._wp ) THEN
-               zfac = zfr_mlt * zdv_mlt * rhow * r1_rdtice
+               zfac = zfr_mlt * zdv_mlt * rhow * r1_Dt_ice
                wfx_pnd_1d(ji) = wfx_pnd_1d(ji) - zfac
                !
                ! adjust ice/snow melting flux to balance melt pond flux (>0)
@@ -204,15 +202,13 @@ CONTAINS
       !!-------------------------------------------------------------------
       INTEGER  ::   ios, ioptio   ! Local integer
       !!
-      NAMELIST/namthd_pnd/  ln_pnd_H12, ln_pnd_CST, rn_apnd, rn_hpnd, ln_pnd_alb
+      NAMELIST/namthd_pnd/  ln_pnd, ln_pnd_H12, ln_pnd_CST, rn_apnd, rn_hpnd, ln_pnd_alb
       !!-------------------------------------------------------------------
       !
-      REWIND( numnam_ice_ref )              ! Namelist namthd_pnd  in reference namelist : Melt Ponds  
       READ  ( numnam_ice_ref, namthd_pnd, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namthd_pnd  in reference namelist', lwp )
-      REWIND( numnam_ice_cfg )              ! Namelist namthd_pnd  in configuration namelist : Melt Ponds
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namthd_pnd  in reference namelist' )
       READ  ( numnam_ice_cfg, namthd_pnd, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namthd_pnd in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namthd_pnd in configuration namelist' )
       IF(lwm) WRITE ( numoni, namthd_pnd )
       !
       IF(lwp) THEN                        ! control print
@@ -220,19 +216,21 @@ CONTAINS
          WRITE(numout,*) 'ice_thd_pnd_init: ice parameters for melt ponds'
          WRITE(numout,*) '~~~~~~~~~~~~~~~~'
          WRITE(numout,*) '   Namelist namicethd_pnd:'
-         WRITE(numout,*) '      Evolutive  melt pond fraction and depth (Holland et al 2012) ln_pnd_H12 = ', ln_pnd_H12
-         WRITE(numout,*) '      Prescribed melt pond fraction and depth                      ln_pnd_CST = ', ln_pnd_CST
-         WRITE(numout,*) '         Prescribed pond fraction                                  rn_apnd    = ', rn_apnd
-         WRITE(numout,*) '         Prescribed pond depth                                     rn_hpnd    = ', rn_hpnd
-         WRITE(numout,*) '      Melt ponds affect albedo or not                              ln_pnd_alb = ', ln_pnd_alb
+         WRITE(numout,*) '      Melt ponds activated or not                                     ln_pnd     = ', ln_pnd
+         WRITE(numout,*) '         Evolutive  melt pond fraction and depth (Holland et al 2012) ln_pnd_H12 = ', ln_pnd_H12
+         WRITE(numout,*) '         Prescribed melt pond fraction and depth                      ln_pnd_CST = ', ln_pnd_CST
+         WRITE(numout,*) '            Prescribed pond fraction                                  rn_apnd    = ', rn_apnd
+         WRITE(numout,*) '            Prescribed pond depth                                     rn_hpnd    = ', rn_hpnd
+         WRITE(numout,*) '         Melt ponds affect albedo or not                              ln_pnd_alb = ', ln_pnd_alb
       ENDIF
       !
       !                             !== set the choice of ice pond scheme ==!
       ioptio = 0
-                                                            nice_pnd = np_pndNO
-      IF( ln_pnd_CST ) THEN   ;   ioptio = ioptio + 1   ;   nice_pnd = np_pndCST    ;   ENDIF
-      IF( ln_pnd_H12 ) THEN   ;   ioptio = ioptio + 1   ;   nice_pnd = np_pndH12    ;   ENDIF
-      IF( ioptio > 1 )   CALL ctl_stop( 'ice_thd_pnd_init: choose one and only one pond scheme (ln_pnd_H12 or ln_pnd_CST)' )
+      IF( .NOT.ln_pnd ) THEN   ;   ioptio = ioptio + 1   ;   nice_pnd = np_pndNO     ;   ENDIF
+      IF( ln_pnd_CST  ) THEN   ;   ioptio = ioptio + 1   ;   nice_pnd = np_pndCST    ;   ENDIF
+      IF( ln_pnd_H12  ) THEN   ;   ioptio = ioptio + 1   ;   nice_pnd = np_pndH12    ;   ENDIF
+      IF( ioptio /= 1 )   &
+         & CALL ctl_stop( 'ice_thd_pnd_init: choose either none (ln_pnd=F) or only one pond scheme (ln_pnd_H12 or ln_pnd_CST)' )
       !
       SELECT CASE( nice_pnd )
       CASE( np_pndNO )         

@@ -11,6 +11,7 @@ MODULE zdfmxl
    !!   zdf_mxl      : Compute the turbocline and mixed layer depths.
    !!----------------------------------------------------------------------
    USE oce            ! ocean dynamics and tracers variables
+   USE isf_oce        ! ice shelf
    USE dom_oce        ! ocean space and time domain variables
    USE trc_oce  , ONLY: l_offline         ! ocean space and time domain variables
    USE zdf_oce        ! ocean vertical physics
@@ -34,9 +35,11 @@ MODULE zdfmxl
    REAL(wp), PUBLIC ::   rho_c = 0.01_wp    !: density criterion for mixed layer depth
    REAL(wp), PUBLIC ::   avt_c = 5.e-4_wp   ! Kz criterion for the turbocline depth
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: zdfmxl.F90 10425 2018-12-19 21:54:16Z smasson $ 
+   !! $Id: zdfmxl.F90 12489 2020-02-28 15:55:11Z davestorkey $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -56,7 +59,7 @@ CONTAINS
    END FUNCTION zdf_mxl_alloc
 
 
-   SUBROUTINE zdf_mxl( kt )
+   SUBROUTINE zdf_mxl( kt, Kmm )
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE zdfmxl  ***
       !!                   
@@ -74,6 +77,7 @@ CONTAINS
       !! ** Action  :   nmln, hmld, hmlp, hmlpt
       !!----------------------------------------------------------------------
       INTEGER, INTENT(in) ::   kt   ! ocean time-step index
+      INTEGER, INTENT(in) ::   Kmm  ! ocean time level index
       !
       INTEGER  ::   ji, jj, jk      ! dummy loop indices
       INTEGER  ::   iikn, iiki, ikt ! local integer
@@ -92,36 +96,26 @@ CONTAINS
       ! w-level of the mixing and mixed layers
       nmln(:,:)  = nlb10               ! Initialization to the number of w ocean point
       hmlp(:,:)  = 0._wp               ! here hmlp used as a dummy variable, integrating vertically N^2
-      zN2_c = grav * rho_c * r1_rau0   ! convert density criteria into N^2 criteria
-      DO jk = nlb10, jpkm1
-         DO jj = 1, jpj                ! Mixed layer level: w-level 
-            DO ji = 1, jpi
-               ikt = mbkt(ji,jj)
-               hmlp(ji,jj) = hmlp(ji,jj) + MAX( rn2b(ji,jj,jk) , 0._wp ) * e3w_n(ji,jj,jk)
-               IF( hmlp(ji,jj) < zN2_c )   nmln(ji,jj) = MIN( jk , ikt ) + 1   ! Mixed layer level
-            END DO
-         END DO
-      END DO
+      zN2_c = grav * rho_c * r1_rho0   ! convert density criteria into N^2 criteria
+      DO_3D_11_11( nlb10, jpkm1 )
+         ikt = mbkt(ji,jj)
+         hmlp(ji,jj) = hmlp(ji,jj) + MAX( rn2b(ji,jj,jk) , 0._wp ) * e3w(ji,jj,jk,Kmm)
+         IF( hmlp(ji,jj) < zN2_c )   nmln(ji,jj) = MIN( jk , ikt ) + 1   ! Mixed layer level
+      END_3D
       !
       ! w-level of the turbocline and mixing layer (iom_use)
       imld(:,:) = mbkt(:,:) + 1        ! Initialization to the number of w ocean point
-      DO jk = jpkm1, nlb10, -1         ! from the bottom to nlb10 
-         DO jj = 1, jpj
-            DO ji = 1, jpi
-               IF( avt (ji,jj,jk) < avt_c * wmask(ji,jj,jk) )   imld(ji,jj) = jk      ! Turbocline 
-            END DO
-         END DO
-      END DO
+      DO_3DS_11_11( jpkm1, nlb10, -1 )
+         IF( avt (ji,jj,jk) < avt_c * wmask(ji,jj,jk) )   imld(ji,jj) = jk      ! Turbocline 
+      END_3D
       ! depth of the mixing and mixed layers
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-            iiki = imld(ji,jj)
-            iikn = nmln(ji,jj)
-            hmld (ji,jj) = gdepw_n(ji,jj,iiki  ) * ssmask(ji,jj)    ! Turbocline depth 
-            hmlp (ji,jj) = gdepw_n(ji,jj,iikn  ) * ssmask(ji,jj)    ! Mixed layer depth
-            hmlpt(ji,jj) = gdept_n(ji,jj,iikn-1) * ssmask(ji,jj)    ! depth of the last T-point inside the mixed layer
-         END DO
-      END DO
+      DO_2D_11_11
+         iiki = imld(ji,jj)
+         iikn = nmln(ji,jj)
+         hmld (ji,jj) = gdepw(ji,jj,iiki  ,Kmm) * ssmask(ji,jj)    ! Turbocline depth 
+         hmlp (ji,jj) = gdepw(ji,jj,iikn  ,Kmm) * ssmask(ji,jj)    ! Mixed layer depth
+         hmlpt(ji,jj) = gdept(ji,jj,iikn-1,Kmm) * ssmask(ji,jj)    ! depth of the last T-point inside the mixed layer
+      END_2D
       !
       IF( .NOT.l_offline ) THEN
          IF( iom_use("mldr10_1") ) THEN
@@ -136,7 +130,7 @@ CONTAINS
          ENDIF
       ENDIF
       !
-      IF(ln_ctl)   CALL prt_ctl( tab2d_1=REAL(nmln,wp), clinfo1=' nmln : ', tab2d_2=hmlp, clinfo2=' hmlp : ' )
+      IF(sn_cfctl%l_prtctl)   CALL prt_ctl( tab2d_1=REAL(nmln,wp), clinfo1=' nmln : ', tab2d_2=hmlp, clinfo2=' hmlp : ' )
       !
    END SUBROUTINE zdf_mxl
 

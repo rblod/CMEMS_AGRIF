@@ -13,11 +13,13 @@ MODULE domngb
    !
    USE in_out_manager ! I/O manager
    USE lib_mpp        ! for mppsum
+   USE phycst
 
    IMPLICIT NONE
    PRIVATE
 
-   PUBLIC   dom_ngb   ! routine called in iom.F90 module
+   PUBLIC   dom_ngb   ! routine called in iom.F90 and domclo.F90 module
+   PUBLIC   dist
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
@@ -26,7 +28,7 @@ MODULE domngb
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE dom_ngb( plon, plat, kii, kjj, cdgrid, kkk )
+   SUBROUTINE dom_ngb( plon, plat, kii, kjj, rdist, cdgrid, kkk )
       !!----------------------------------------------------------------------
       !!                    ***  ROUTINE dom_ngb  ***
       !!
@@ -36,6 +38,7 @@ CONTAINS
       !!                -> not good if located at too high latitude...
       !!----------------------------------------------------------------------
       REAL(wp)        , INTENT(in   ) ::   plon, plat   ! longitude,latitude of the point
+      REAL(wp)        , INTENT(  out) ::   rdist        ! distance between the located point and the source
       INTEGER         , INTENT(  out) ::   kii, kjj     ! i-,j-index of the closes grid point
       INTEGER         , INTENT(in   ), OPTIONAL :: kkk  ! k-index of the mask level used
       CHARACTER(len=1), INTENT(in   ) ::   cdgrid       ! grid name 'T', 'U', 'V', 'W'
@@ -62,19 +65,42 @@ CONTAINS
       IF( zlon <  90. )   WHERE( zglam(:,:) > 180. ) zglam(:,:) = zglam(:,:) - 360.   ! glam between -180 and 180
       zglam(:,:) = zglam(:,:) - zlon
 
-      zgphi(:,:) = zgphi(:,:) - plat
-      zdist(:,:) = zglam(:,:) * zglam(:,:) + zgphi(:,:) * zgphi(:,:)
-      
       IF( lk_mpp ) THEN  
-         CALL mpp_minloc( 'domngb', zdist(:,:), zmask, zmini, iloc)
+         CALL mpp_minloc( 'domngb', zdist(:,:), zmask, rdist, iloc)
          kii = iloc(1) ; kjj = iloc(2)
       ELSE
          iloc(:) = MINLOC( zdist(:,:), mask = zmask(:,:) == 1.e0 )
+         rdist = MINVAL( zdist(:,:) )
          kii = iloc(1) + nimpp - 1
          kjj = iloc(2) + njmpp - 1
       ENDIF
       !
    END SUBROUTINE dom_ngb
+
+   FUNCTION dist(plonsrc, platsrc, plontrg, plattrg)
+      REAL(wp),                     INTENT(in) :: plonsrc, platsrc ! lat/lon of the source point
+      REAL(wp), DIMENSION(jpi,jpj), INTENT(in) :: plontrg, plattrg ! lat/lon of the target (2d in this case)
+
+      REAL(wp) :: zxs, zys, zzs
+      REAL(wp), DIMENSION(jpi,jpj) :: zxt, zyt, zzt
+
+      REAL(wp), DIMENSION(jpi,jpj) :: dist ! distance between src and trg
+
+      zxs = COS( rad * platsrc ) * COS( rad * plonsrc )
+      zys = COS( rad * platsrc ) * SIN( rad * plonsrc )
+      zzs = SIN( rad * platsrc )
+
+      zxt = COS( rad * plattrg ) * COS( rad * plontrg )
+      zyt = COS( rad * plattrg ) * SIN( rad * plontrg )
+      zzt = SIN( rad * plattrg )
+
+      dist(:,:) = ( zxs - zxt(:,:) )**2   &
+         &      + ( zys - zyt(:,:) )**2   &
+         &      + ( zzs - zzt(:,:) )**2
+
+      dist(:,:) = ra * SQRT( dist(:,:) )
+
+   END FUNCTION dist
 
    !!======================================================================
 END MODULE domngb

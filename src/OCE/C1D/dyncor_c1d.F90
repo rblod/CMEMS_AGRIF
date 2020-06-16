@@ -30,10 +30,10 @@ MODULE dyncor_c1d
    PUBLIC   dyn_cor_c1d  ! called by step1d.F90
 
    !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: dyncor_c1d.F90 10068 2018-08-28 14:09:04Z nicolasmartin $ 
+   !! $Id: dyncor_c1d.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -55,14 +55,16 @@ CONTAINS
    END SUBROUTINE cor_c1d
 
 
-   SUBROUTINE dyn_cor_c1d( kt )
+   SUBROUTINE dyn_cor_c1d( kt, Kmm, puu, pvv, Krhs )
       !!----------------------------------------------------------------------
       !!                   ***  ROUTINE dyn_cor_c1d  ***
       !! 
       !! ** Purpose :   Compute the now Coriolis trend and add it to 
       !!               the general trend of the momentum equation in 1D case.
       !!----------------------------------------------------------------------
-      INTEGER, INTENT( in ) ::   kt   ! ocean time-step index
+      INTEGER                             , INTENT(in   ) ::   kt        ! ocean time-step index
+      INTEGER                             , INTENT(in   ) ::   Kmm, Krhs ! ocean time level indices
+      REAL(wp), DIMENSION(jpi,jpj,jpk,jpt), INTENT(inout) ::   puu, pvv  ! ocean velocities and RHS of momentum equation
       !!
       INTEGER ::   ji, jj, jk   ! dummy loop indices
       !!----------------------------------------------------------------------
@@ -74,28 +76,20 @@ CONTAINS
       ENDIF
       !
       IF( ln_stcor ) THEN
-         DO jk = 1, jpkm1
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1   ! vector opt.
-                  ua(ji,jj,jk) = ua(ji,jj,jk) + ff_t(ji,jj) * (vn(ji,jj,jk) + vsd(ji,jj,jk))
-                  va(ji,jj,jk) = va(ji,jj,jk) - ff_t(ji,jj) * (un(ji,jj,jk) + usd(ji,jj,jk))
-               END DO
-            END DO
-         END DO
+         DO_3D_00_00( 1, jpkm1 )
+            puu(ji,jj,jk,Krhs) = puu(ji,jj,jk,Krhs) + ff_t(ji,jj) * (pvv(ji,jj,jk,Kmm) + vsd(ji,jj,jk))
+            pvv(ji,jj,jk,Krhs) = pvv(ji,jj,jk,Krhs) - ff_t(ji,jj) * (puu(ji,jj,jk,Kmm) + usd(ji,jj,jk))
+         END_3D
       ELSE
-         DO jk = 1, jpkm1
-            DO jj = 2, jpjm1
-               DO ji = fs_2, fs_jpim1   ! vector opt.
-                  ua(ji,jj,jk) = ua(ji,jj,jk) + ff_t(ji,jj) * vn(ji,jj,jk)
-                  va(ji,jj,jk) = va(ji,jj,jk) - ff_t(ji,jj) * un(ji,jj,jk)
-               END DO
-            END DO
-         END DO
+         DO_3D_00_00( 1, jpkm1 )
+            puu(ji,jj,jk,Krhs) = puu(ji,jj,jk,Krhs) + ff_t(ji,jj) * pvv(ji,jj,jk,Kmm)
+            pvv(ji,jj,jk,Krhs) = pvv(ji,jj,jk,Krhs) - ff_t(ji,jj) * puu(ji,jj,jk,Kmm)
+         END_3D
       END IF
       
       !
-      IF(ln_ctl)   CALL prt_ctl( tab3d_1=ua, clinfo1=' cor  - Ua: ', mask1=umask,  &
-         &                       tab3d_2=va, clinfo2=' Va: '       , mask2=vmask )
+      IF(sn_cfctl%l_prtctl)   CALL prt_ctl( tab3d_1=puu(:,:,:,Krhs), clinfo1=' cor  - Ua: ', mask1=umask,  &
+         &                                  tab3d_2=pvv(:,:,:,Krhs), clinfo2=' Va: '       , mask2=vmask )
       !
    END SUBROUTINE dyn_cor_c1d
 

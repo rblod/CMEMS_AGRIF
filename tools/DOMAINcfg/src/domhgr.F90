@@ -27,7 +27,6 @@ MODULE domhgr
    !
    USE in_out_manager ! I/O manager
    USE lib_mpp        ! MPP library
-   USE timing         ! Timing
 
    IMPLICIT NONE
    PRIVATE
@@ -110,8 +109,6 @@ CONTAINS
       INTEGER  ::   isrow                ! index for ORCA1 starting row
       INTEGER  ::   ie1e2u_v             ! fag for u- & v-surface read in coordinate file or not
       !!----------------------------------------------------------------------
-      !
-  !    IF( nn_timing == 1 )  CALL timing_start('dom_hgr')
       !
       IF(lwp) THEN
          WRITE(numout,*)
@@ -288,10 +285,8 @@ CONTAINS
          glam0 = zlam1 + zcos_alpha * ze1deg * REAL( jpjglo-2 , wp )
          gphi0 = zphi1 + zsin_alpha * ze1deg * REAL( jpjglo-2 , wp )
          !
-         IF( nprint==1 .AND. lwp )   THEN
-            WRITE(numout,*) '          ze1', ze1, 'cosalpha', zcos_alpha, 'sinalpha', zsin_alpha
-            WRITE(numout,*) '          ze1deg', ze1deg, 'glam0', glam0, 'gphi0', gphi0
-         ENDIF
+    !        WRITE(numout,*) '          ze1', ze1, 'cosalpha', zcos_alpha, 'sinalpha', zsin_alpha
+    !        WRITE(numout,*) '          ze1deg', ze1deg, 'glam0', glam0, 'gphi0', gphi0
          !
          DO jj = 1, jpj
             DO ji = 1, jpi
@@ -345,7 +340,7 @@ CONTAINS
       e2_e1u(:,:) = e2u(:,:) / e1u(:,:)
       e1_e2v(:,:) = e1v(:,:) / e2v(:,:)
 
-      IF( lwp .AND. nn_print >=1 .AND. .NOT.ln_rstart ) THEN      ! Control print : Grid informations (if not restart)
+      IF( lwp ) THEN      ! Control print : Grid informations (if not restart)
          WRITE(numout,*)
          WRITE(numout,*) '          longitude and e1 scale factors'
          WRITE(numout,*) '          ------------------------------'
@@ -436,13 +431,11 @@ CONTAINS
       ! Control of domain for symetrical condition
       ! ------------------------------------------
       ! The equator line must be the latitude coordinate axe
-
-!      IF( nperio == 2 ) THEN
-!         znorme = SQRT( SUM( gphiu(:,2) * gphiu(:,2) ) ) / REAL( jpi )
-!         IF( znorme > 1.e-13 ) CALL ctl_stop( ' ===>>>> : symmetrical condition: rerun with good equator line' )
-!      ENDIF
-      !
-    !  IF( nn_timing == 1 )  CALL timing_stop('dom_hgr')
+ !(PM) be carefull with nperio/jperio 
+      IF( jperio == 2 ) THEN
+         znorme = SQRT( SUM( gphiu(:,2) * gphiu(:,2) ) ) / REAL( jpi )
+         IF( znorme > 1.e-13 ) CALL ctl_stop( ' ===>>>> : symmetrical condition: rerun with good equator line' )
+      ENDIF
       !
    END SUBROUTINE dom_hgr
 

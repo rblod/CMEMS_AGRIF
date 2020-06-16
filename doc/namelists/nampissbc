@@ -3,18 +3,18 @@
 !-----------------------------------------------------------------------
 !              !  file name        ! frequency (hours) ! variable      ! time interp. !  clim  ! 'yearly'/ ! weights  ! rotation ! land/sea mask !
 !              !                   !  (if <0  months)  !   name        !   (logical)  !  (T/F) ! 'monthly' ! filename ! pairing  ! filename      !
-   sn_dust     = 'dust.orca'       ,     -1            , 'dust'        ,  .true.      , .true. , 'yearly'  , ''       , ''    , ''
-   sn_solub    = 'solubility.orca' ,    -12            , 'solubility1' ,  .false.     , .true. , 'yearly'  , ''       , ''    , ''
-   sn_riverdic = 'river.orca'      ,    120            , 'riverdic'    ,  .true.      , .true. , 'yearly'  , ''       , ''    , ''
-   sn_riverdoc = 'river.orca'      ,    120            , 'riverdoc'    ,  .true.      , .true. , 'yearly'  , ''       , ''    , ''
-   sn_riverdin = 'river.orca'      ,    120            , 'riverdin'    ,  .true.      , .true. , 'yearly'  , ''       , ''    , ''
-   sn_riverdon = 'river.orca'      ,    120            , 'riverdon'    ,  .true.      , .true. , 'yearly'  , ''       , ''    , ''
-   sn_riverdip = 'river.orca'      ,    120            , 'riverdip'    ,  .true.      , .true. , 'yearly'  , ''       , ''    , ''
-   sn_riverdop = 'river.orca'      ,    120            , 'riverdop'    ,  .true.      , .true. , 'yearly'  , ''       , ''    , ''
-   sn_riverdsi = 'river.orca'      ,    120            , 'riverdsi'    ,  .true.      , .true. , 'yearly'  , ''       , ''    , ''
-   sn_ndepo    = 'ndeposition.orca',    -12            , 'ndep'        ,  .false.     , .true. , 'yearly'  , ''       , ''    , ''
-   sn_ironsed  = 'bathy.orca'      ,    -12            , 'bathy'       ,  .false.     , .true. , 'yearly'  , ''       , ''    , ''
-   sn_hydrofe  = 'hydrofe.orca'    ,    -12            , 'epsdb'       ,  .false.     , .true. , 'yearly'  , ''       , ''    , ''
+   sn_dust     = 'dust.orca'       ,     -1.           , 'dust'        ,  .true.      , .true. , 'yearly'  , ''       , ''    , ''
+   sn_solub    = 'solubility.orca' ,    -12.           , 'solubility1' ,  .false.     , .true. , 'yearly'  , ''       , ''    , ''
+   sn_riverdic = 'river.orca'      ,    120.           , 'riverdic'    ,  .true.      , .true. , 'yearly'  , ''       , ''    , ''
+   sn_riverdoc = 'river.orca'      ,    120.           , 'riverdoc'    ,  .true.      , .true. , 'yearly'  , ''       , ''    , ''
+   sn_riverdin = 'river.orca'      ,    120.           , 'riverdin'    ,  .true.      , .true. , 'yearly'  , ''       , ''    , ''
+   sn_riverdon = 'river.orca'      ,    120.           , 'riverdon'    ,  .true.      , .true. , 'yearly'  , ''       , ''    , ''
+   sn_riverdip = 'river.orca'      ,    120.           , 'riverdip'    ,  .true.      , .true. , 'yearly'  , ''       , ''    , ''
+   sn_riverdop = 'river.orca'      ,    120.           , 'riverdop'    ,  .true.      , .true. , 'yearly'  , ''       , ''    , ''
+   sn_riverdsi = 'river.orca'      ,    120.           , 'riverdsi'    ,  .true.      , .true. , 'yearly'  , ''       , ''    , ''
+   sn_ndepo    = 'ndeposition.orca',    -12.           , 'ndep'        ,  .false.     , .true. , 'yearly'  , ''       , ''    , ''
+   sn_ironsed  = 'bathy.orca'      ,    -12.           , 'bathy'       ,  .false.     , .true. , 'yearly'  , ''       , ''    , ''
+   sn_hydrofe  = 'hydrofe.orca'    ,    -12.           , 'epsdb'       ,  .false.     , .true. , 'yearly'  , ''       , ''    , ''
 !
    cn_dir      = './'      !  root directory for the location of the dynamical files
    ln_dust     =  .true.   ! boolean for dust input from the atmosphere

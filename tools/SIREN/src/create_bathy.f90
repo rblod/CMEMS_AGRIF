@@ -2,125 +2,226 @@
 ! NEMO system team, System and Interface for oceanic RElocable Nesting
 !----------------------------------------------------------------------
 !
-! PROGRAM: create_bathy
-!
 ! DESCRIPTION:
 !> @file
-!> @brief 
 !> This program creates fine grid bathymetry file.
 !>
-!> @details
 !> @section sec1 method
-!> Bathymetry could be extracted from fine grid Bathymetry file, interpolated
-!> from coarse grid Bathymetry file, or manually written.
+!> This bathymetry could be :
+!> - extracted from a wider fine grid bathymetry file
+!> - interpolated from a wider coarse grid bathymetry file
+!> - handwritten
 !>
-!> @section sec2 how to
-!>    to create fine grid bathymetry file:<br/>
-!> @code{.sh}
-!>    ./SIREN/bin/create_bathy create_bathy.nam
-!> @endcode
-!> <br/>    
-!> \image html  bathy_40.png 
-!> <center>\image latex bathy_30.png
+!> @image html  bathy_40.png 
+!> <center>@image latex bathy_30.png
 !> </center>
 !>
-!> @note 
-!>    you could find a template of the namelist in templates directory.
+!> @section sec2 how to
+!> USAGE: create_bathy create_bathy.nam [-v] [-h]<br/>
+!>    - positional arguments:<br/>
+!>       - create_bathy.nam<br/>
+!>          namelist of create_bathy
+!>          @note
+!>             a template of the namelist could be created running (in templates directory):
+!>             @code{.sh}
+!>                python create_templates.py create_bathy
+!>             @endcode
 !>
-!>    create_bathy.nam contains 7 namelists:<br/>
-!>       - logger namelist (namlog)
-!>       - config namelist (namcfg)
-!>       - coarse grid namelist (namcrs)
-!>       - fine grid namelist (namfin)
-!>       - variable namelist (namvar)
-!>       - nesting namelist (namnst)
-!>       - output namelist (namout)
-!>    
-!>    * _logger namelist (namlog)_:<br/>
-!>       - cn_logfile   : log filename
-!>       - cn_verbosity : verbosity ('trace','debug','info',
-!> 'warning','error','fatal','none')
-!>       - in_maxerror  : maximum number of error allowed
+!>    - optional arguments:<br/>
+!>       - -h, --help<br/>
+!>          show this help message (and exit)<br/>
+!>       - -v, --version<br/>
+!>          show Siren's version   (and exit)
 !>
-!>    * _config namelist (namcfg)_:<br/>
-!>       - cn_varcfg : variable configuration file 
-!> (see ./SIREN/cfg/variable.cfg)
-!>       - cn_dimcfg : dimension configuration file. defines dimension allowed
-!> (see ./SIREN/cfg/dimension.cfg).
-!>       - cn_dumcfg : useless (dummy) configuration file, for useless 
-!> dimension or variable (see ./SIREN/cfg/dummy.cfg).
+!> @section sec_bathy create_bathy.nam
+!>    create_bathy.nam contains 7 sub-namelists:<br/>
+!>       - **namlog** to set logger parameters
+!>       - **namcfg** to set configuration file parameters
+!>       - **namsrc** to set source/coarse grid parameters
+!>       - **namtgt** to set target/fine grid parameters
+!>       - **namvar** to set variable parameters
+!>       - **namnst** to set sub domain and nesting paramters
+!>       - **namout** to set output parameters
 !>
-!>    * _coarse grid namelist (namcrs)_:<br/>
-!>       - cn_coord0 : coordinate file
-!>       - in_perio0 : NEMO periodicity index (see Model Boundary Condition in
-!> [NEMO documentation](http://www.nemo-ocean.eu/About-NEMO/Reference-manuals))
+!>    here after, each sub-namelist parameters is detailed.
+!>    @note 
+!>       default values are specified between brackets
 !>
-!>    * _fine grid namelist (namfin)_:<br/>
-!>       - cn_coord1 : coordinate file
-!>       - in_perio1 : periodicity index
-!>       - ln_fillclosed : fill closed sea or not (default is .TRUE.)
+!> @subsection sublog namlog
+!>    the logger sub-namelist parameters are :
 !>
-!>    * _variable namelist (namvar)_:<br/>
-!>       - cn_varfile : list of variable, and corresponding file.<br/> 
-!>          *cn_varfile* is the path and filename of the file where find
-!>          variable.
-!>          @note 
-!>             *cn_varfile* could be a matrix of value, if you want to filled
-!>             manually variable value.<br/>
-!>             the variable array of value is split into equal subdomain.<br/>
-!>             Each subdomain is filled with the corresponding value 
-!>             of the matrix.<br/>          
-!>             separators used to defined matrix are:
-!>                - ',' for line
-!>                - '/' for row
-!>                Example:<br/>
-!>                   3,2,3/1,4,5  =>  @f$ \left( \begin{array}{ccc}
-!>                                         3 & 2 & 3 \\
-!>                                         1 & 4 & 5 \end{array} \right) @f$
+!>    - **cn_logfile** [@a create_bathy.log]<br/>
+!>       logger filename
 !>
-!>          Examples: 
-!>             - 'Bathymetry:gridT.nc'
-!>             - 'Bathymetry:5000,5000,5000/5000,3000,5000/5000,5000,5000'
+!>    - **cn_verbosity** [@a warning]<br/>
+!>       verbosity level, choose between :
+!>          - trace
+!>          - debug
+!>          - info
+!>          - warning
+!>          - error
+!>          - fatal
+!>          - none
 !>
-!>       - cn_varinfo : list of variable and extra information about request(s) 
-!>       to be used.<br/>
-!>          each elements of *cn_varinfo* is a string character
-!>          (separated by ',').<br/>
-!>          it is composed of the variable name follow by ':', 
-!>          then request(s) to be used on this variable.<br/> 
-!>          request could be:
-!>             - int = interpolation method
-!>             - ext = extrapolation method
-!>             - flt = filter method
-!>             - min = minimum value
-!>             - max = maximum value
-!>             - unt = new units
-!>             - unf = unit scale factor (linked to new units)
+!>    - **in_maxerror** [@a 5]<br/> 
+!>       maximum number of error allowed
 !>
-!>                requests must be separated by ';'.<br/>
-!>                order of requests does not matter.<br/>
+!> @subsection subcfg namcfg
+!>    the configuration sub-namelist parameters are :
 !>
-!>          informations about available method could be find in @ref interp,
-!>          @ref extrap and @ref filter modules.<br/>
-!>          Example: 'Bathymetry: flt=2*hamming(2,3); min=0'
-!>          @note 
-!>             If you do not specify a method which is required, 
-!>             default one is apply.
-!>          @warning 
-!>             variable name must be __Bathymetry__ here.
+!>    - **cn_varcfg** [@a ./cfg/variable.cfg]<br/>
+!>       path to the variable configuration file.<br/>
+!>       the variable configuration file defines standard name, 
+!>       default interpolation method, axis,... 
+!>       to be used for some known variables.<br/> 
 !>
-!>    * _nesting namelist (namnst)_:<br/>
-!>       - in_rhoi  : refinement factor in i-direction
-!>       - in_rhoj  : refinement factor in j-direction
+!>    - **cn_dimcfg** [@a ./cfg/dimension.cfg]<br/> 
+!>       path to the dimension configuration file.<br/> 
+!>       the dimension configuration file defines dimensions allowed.<br/> 
+!>
+!>    - **cn_dumcfg** [@a ./cfg/dummy.cfg]<br/> 
+!>       path to the useless (dummy) configuration file.<br/>
+!>       the dummy configuration file defines useless 
+!>       dimension or variable. these dimension(s) or variable(s) will not be
+!>       processed.<br/>
+!>
+!> @subsection subsrc namsrc 
+!>    the source/coarse grid sub-namelist parameters are :
+!>
+!>    - **cn_coord0** [@a ]<br/> 
+!>       path to the coordinate file
+!>
+!>    - **in_perio0** [@a ]<br/> 
+!>       NEMO periodicity index<br/> 
+!>       the NEMO periodicity could be choose between 0 to 6:
+!>       <dl>
+!>          <dt>in_perio=0</dt>
+!>          <dd>standard regional model</dd>
+!>          <dt>in_perio=1</dt>
+!>          <dd>east-west cyclic model</dd>
+!>          <dt>in_perio=2</dt>
+!>          <dd>model with symmetric boundary condition across the equator</dd>
+!>          <dt>in_perio=3</dt>
+!>          <dd>regional model with North fold boundary and T-point pivot</dd>
+!>          <dt>in_perio=4</dt>
+!>          <dd>global model with a T-point pivot.<br/>
+!>          example: ORCA2, ORCA025, ORCA12</dd>
+!>          <dt>in_perio=5</dt>
+!>          <dd>regional model with North fold boundary and F-point pivot</dd>
+!>          <dt>in_perio=6</dt>
+!>          <dd>global model with a F-point pivot<br/>
+!>          example: ORCA05</dd>
+!>          </dd>
+!>       </dl>
+!>       @sa For more information see @ref md_src_docsrc_6_perio
+!>       and Model Boundary Condition paragraph in the 
+!>       [NEMO documentation](https://forge.ipsl.jussieu.fr/nemo/chrome/site/doc/NEMO/manual/pdf/NEMO_manual.pdf)
+!>
+!> @subsection subtgt namtgt 
+!>    the target/fine grid sub-namelist parameters are :
+!>
+!>    - **cn_coord1** [@a ]<br/> 
+!>       path to coordinate file
+!>
+!>    - **in_perio1** [@a ]<br/>
+!>       NEMO periodicity index (see above)
+!>    @note if the fine/target coordinates file (cn_coord1) was created by SIREN, you do
+!>    not need to fill this parameter. SIREN will read it on the global attributes of
+!>    the coordinates file.
+!>
+!>    - **ln_fillclosed** [@a .TRUE.]<br/>
+!>       logical to fill closed sea or not
+!>
+!> @subsection subvar namvar 
+!>    the variable sub-namelist parameters are :
+!>
+!>    - **cn_varfile** [@a ]<br/> 
+!>       list of variable, and associated file 
+!>       @warning 
+!>          variable name must be __Bathymetry__ here.
+!>
+!>       *cn_varfile* is the path and filename of the file where find
+!>       variable.
 !>       @note 
-!>          coarse grid indices will be deduced from fine grid
-!>          coordinate file.
+!>          *cn_varfile* could be a matrix of value, if you want to handwrite
+!>          variable value.<br/>
+!>          the variable array of value is split into equal subdomain.<br/>
+!>          each subdomain is filled with the corresponding value 
+!>          of the matrix.<br/>          
+!>          separators used to defined matrix are:
+!>             - ',' for line
+!>             - '/' for row
+!>             Example:<br/>
+!>                3,2,3/1,4,5  =>  @f$ \left( \begin{array}{ccc}
+!>                                      3 & 2 & 3 \\
+!>                                      1 & 4 & 5 \end{array} \right) @f$
 !>
-!>    * _output namelist (namout)_:<br/>
-!>       - cn_fileout : output bathymetry file
+!>       Examples: 
+!>          - 'Bathymetry:gridT.nc'
+!>          - 'Bathymetry:5000,5000,5000/5000,3000,5000/5000,5000,5000'<br/>
 !>
+!>       @note 
+!>          Optionnaly, NEMO periodicity could be added following the filename.
+!>          the periodicity must be separated by ';'
+!>
+!>       Example:
+!>          - 'Bathymetry:gridT.nc ; perio=4'<br/>
+!>
+!>    - **cn_varinfo** [@a ]<br/> 
+!>       list of variable and extra information about request(s) to be used<br/>
+!>
+!>       each elements of *cn_varinfo* is a string character (separated by ',').<br/>
+!>       it is composed of the variable name follow by ':', 
+!>       then request(s) to be used on this variable.<br/> 
+!>       request could be:
+!>          - int = interpolation method
+!>          - ext = extrapolation method
+!>          - flt = filter method
+!>          - min = minimum value
+!>          - max = maximum value
+!>          - unt = new units
+!>          - unf = unit scale factor (linked to new units)
+!>
+!>             requests must be separated by ';'.<br/>
+!>             order of requests does not matter.<br/>
+!>
+!>       informations about available method could be find in @ref interp,
+!>       @ref extrap and @ref filter modules.<br/>
+!>       Example: 
+!>          - 'Bathymetry: flt=2*hamming(2,3); min=0'
+!>
+!>       @note 
+!>          If you do not specify a method which is required, 
+!>          default one is apply.
+!>
+!>    - **ln_rand** [@a .False.]<br/> 
+!>          logical to add random value to Bathymetry<br/>
+!>          Only for handmade Bathymetry. 
+!>          A random value (+/- 0.1% of the maximum depth) will
+!>          will be added to avoid flat Bathymetry (which may cause issue).
+!>
+!> @subsection subnst namnst 
+!>    the nesting sub-namelist parameters are :
+!>
+!>    - **in_rhoi**  [@a 1]<br/> 
+!>       refinement factor in i-direction
+!>
+!>    - **in_rhoj**  [@a 1]<br/> 
+!>       refinement factor in j-direction
+!>
+!>    @note 
+!>       coarse grid indices will be deduced from fine grid
+!>       coordinate file.
+!>
+!> @subsection subout namout 
+!>    the output sub-namelist parameter is :
+!>
+!>    - **cn_fileout** [@a bathy_fine.nc]<br/>
+!>       output bathymetry filename
+!>
+!> <hr>
 !> @author J.Paul
-! REVISION HISTORY:
+!>
 !> @date November, 2013 - Initial Version
 !> @date Sepember, 2014 
 !> - add header for user
@@ -137,11 +238,25 @@
 !> - do not closed sea for east-west cyclic domain
 !> @date October, 2016
 !> - dimension to be used select from configuration file
-!
+!> @date July, 2017
+!> - add random value to avoid flat bathymetry
+!> @date January, 2019
+!> - add option to add random value to a flat Bathymetry
+!> - create and clean file structure to avoid memory leaks
+!> - check dimension of matrix for 'handmade' bathymetry
+!> - add url path to global attributes of output file(s)
+!> @date February, 2019
+!> - rename sub namelist namcrs to namsrc
+!> - rename sub namelist namfin to namtgt
+!> @date August, 2019
+!> - use periodicity read from namelist, and store in multi structure
+!> @date Ocober, 2019
+!> - add help and version optional arguments
+!>
 !> @todo
 !> - check tl_multi is not empty
 !>
-!> @note Software governed by the CeCILL licence     (./LICENSE)
+!> @note Software governed by the CeCILL licence     (NEMOGCM/NEMO_CeCILL.txt)
 !----------------------------------------------------------------------
 PROGRAM create_bathy
 
@@ -167,14 +282,21 @@ PROGRAM create_bathy
 
    IMPLICIT NONE
 
+   ! parameters
+   CHARACTER(LEN=lc), PARAMETER  :: cp_myname = "create_bathy"
+
    ! local variable
+   CHARACTER(LEN=lc)                                  :: cl_arg
    CHARACTER(LEN=lc)                                  :: cl_namelist
    CHARACTER(LEN=lc)                                  :: cl_date
    CHARACTER(LEN=lc)                                  :: cl_data
+   CHARACTER(LEN=lc)                                  :: cl_url
+   CHARACTER(LEN=lc)                                  :: cl_errormsg
 
    INTEGER(i4)                                        :: il_narg
    INTEGER(i4)                                        :: il_status
    INTEGER(i4)                                        :: il_fileid
+   INTEGER(i4)                                        :: il_varid
    INTEGER(i4)                                        :: il_attid
    INTEGER(i4)                                        :: il_imin0
    INTEGER(i4)                                        :: il_imax0
@@ -205,6 +327,8 @@ PROGRAM create_bathy
    
    TYPE(TDIM)       , DIMENSION(ip_maxdim)            :: tl_dim
 
+   TYPE(TFILE)                                        :: tl_file
+
    TYPE(TMULTI)                                       :: tl_multi
 
    REAL(dp)                                           :: dl_minbat
@@ -216,143 +340,174 @@ PROGRAM create_bathy
 
    ! namelist variable
    ! namlog
-   CHARACTER(LEN=lc)                       :: cn_logfile = 'create_bathy.log' 
-   CHARACTER(LEN=lc)                       :: cn_verbosity = 'warning' 
-   INTEGER(i4)                             :: in_maxerror = 5
+   CHARACTER(LEN=lc)                       :: cn_logfile    = 'create_bathy.log' 
+   CHARACTER(LEN=lc)                       :: cn_verbosity  = 'warning' 
+   INTEGER(i4)                             :: in_maxerror   = 5
 
    ! namcfg
-   CHARACTER(LEN=lc)                       :: cn_varcfg = './cfg/variable.cfg' 
-   CHARACTER(LEN=lc)                       :: cn_dimcfg = './cfg/dimension.cfg' 
-   CHARACTER(LEN=lc)                       :: cn_dumcfg = './cfg/dummy.cfg' 
+   CHARACTER(LEN=lc)                       :: cn_varcfg  = './cfg/variable.cfg' 
+   CHARACTER(LEN=lc)                       :: cn_dimcfg  = './cfg/dimension.cfg'
+   CHARACTER(LEN=lc)                       :: cn_dumcfg  = './cfg/dummy.cfg'
 
-   ! namcrs
-   CHARACTER(LEN=lc)                       :: cn_coord0 = '' 
-   INTEGER(i4)                             :: in_perio0 = -1
+   ! namsrc
+   CHARACTER(LEN=lc)                       :: cn_coord0  = '' 
+   INTEGER(i4)                             :: in_perio0  = -1
 
-   ! namfin
-   CHARACTER(LEN=lc)                       :: cn_coord1 = ''
-   INTEGER(i4)                             :: in_perio1 = -1
+   ! namtgt
+   CHARACTER(LEN=lc)                       :: cn_coord1  = ''
+   INTEGER(i4)                             :: in_perio1  = -1
    LOGICAL                                 :: ln_fillclosed = .TRUE.
 
    ! namvar
    CHARACTER(LEN=lc), DIMENSION(ip_maxvar) :: cn_varfile = ''
    CHARACTER(LEN=lc), DIMENSION(ip_maxvar) :: cn_varinfo = ''
+   LOGICAL                                 :: ln_rand    = .FALSE.
 
    ! namnst
-   INTEGER(i4)                             :: in_rhoi  = 1
-   INTEGER(i4)                             :: in_rhoj  = 1
+   INTEGER(i4)                             :: in_rhoi    = 1
+   INTEGER(i4)                             :: in_rhoj    = 1
 
    ! namout
    CHARACTER(LEN=lc)                       :: cn_fileout = 'bathy_fine.nc' 
    !-------------------------------------------------------------------
 
-   NAMELIST /namlog/ &   !< logger namelist
-   &  cn_logfile,    &   !< log file
-   &  cn_verbosity,  &   !< log verbosity
-   &  in_maxerror        !< logger maximum error
+   NAMELIST /namlog/ &  !< logger namelist
+   &  cn_logfile,    &  !< log file
+   &  cn_verbosity,  &  !< log verbosity
+   &  in_maxerror       !< logger maximum error
 
-   NAMELIST /namcfg/ &   !< configuration namelist
-   &  cn_varcfg, &       !< variable configuration file
-   &  cn_dimcfg, &       !< dimension configuration file
-   &  cn_dumcfg          !< dummy configuration file
+   NAMELIST /namcfg/ &  !< configuration namelist
+   &  cn_varcfg,     &  !< variable configuration file
+   &  cn_dimcfg,     &  !< dimension configuration file
+   &  cn_dumcfg         !< dummy configuration file
 
-   NAMELIST /namcrs/ &   !< coarse grid namelist
-   &  cn_coord0,  &      !< coordinate file
-   &  in_perio0          !< periodicity index
-   
-   NAMELIST /namfin/ &   !< fine grid namelist
-   &  cn_coord1,   &     !< coordinate file
-   &  in_perio1,   &     !< periodicity index
-   &  ln_fillclosed      !< fill closed sea
+   NAMELIST /namsrc/ &  !< source/coarse grid namelist
+   &  cn_coord0,     &  !< coordinate file
+   &  in_perio0         !< periodicity index
+
+   NAMELIST /namtgt/ &  !< target/fine grid namelist
+   &  cn_coord1,     &  !< coordinate file
+   &  in_perio1,     &  !< periodicity index
+   &  ln_fillclosed     !< fill closed sea
  
-   NAMELIST /namvar/ &   !< variable namelist
-   &  cn_varfile, &      !< list of variable file
-   &  cn_varinfo         !< list of variable and interpolation method to be used. (ex: 'votemper:linear','vosaline:cubic' )
-   
-   NAMELIST /namnst/ &   !< nesting namelist
-   &  in_rhoi,    &      !< refinement factor in i-direction
-   &  in_rhoj            !< refinement factor in j-direction
+   NAMELIST /namvar/ &  !< variable namelist
+   &  cn_varfile,    &  !< list of variable file
+   &  cn_varinfo,    &  !< list of variable and interpolation method to be used. (ex: 'votemper:linear','vosaline:cubic' )
+   &  ln_rand           !< add random value to avoid flat bathymetry
+ 
+   NAMELIST /namnst/ &  !< nesting namelist
+   &  in_rhoi,       &  !< refinement factor in i-direction
+   &  in_rhoj           !< refinement factor in j-direction
 
-   NAMELIST /namout/ &   !< output namlist
-   &  cn_fileout         !< fine grid bathymetry file
+   NAMELIST /namout/ &  !< output namelist
+   &  cn_fileout        !< fine grid bathymetry file
    !-------------------------------------------------------------------
 
-   ! namelist
-   ! get namelist
+   !
+   ! Initialisation
+   ! --------------
+   !
    il_narg=COMMAND_ARGUMENT_COUNT() !f03 intrinsec
-   IF( il_narg/=1 )THEN
-      PRINT *,"ERROR in create_bathy: need a namelist"
-      STOP
-   ELSE
-      CALL GET_COMMAND_ARGUMENT(1,cl_namelist) !f03 intrinsec
-   ENDIF
- 
-   ! read namelist
-   INQUIRE(FILE=TRIM(cl_namelist), EXIST=ll_exist)
-   IF( ll_exist )THEN
- 
-      il_fileid=fct_getunit()
 
-      OPEN( il_fileid, FILE=TRIM(cl_namelist), &
-      &                FORM='FORMATTED',       &
-      &                ACCESS='SEQUENTIAL',    &
-      &                STATUS='OLD',           &
-      &                ACTION='READ',          &
-      &                IOSTAT=il_status)
-      CALL fct_err(il_status)
-      IF( il_status /= 0 )THEN
-         PRINT *,"ERROR in create_bathy: error opening "//TRIM(cl_namelist)
-         STOP
-      ENDIF
-
-      READ( il_fileid, NML = namlog )
-      ! define log file
-      CALL logger_open(TRIM(cn_logfile),TRIM(cn_verbosity),in_maxerror)
-      CALL logger_header()
-
-      READ( il_fileid, NML = namcfg )
-      ! get variable extra information
-      CALL var_def_extra(TRIM(cn_varcfg))
-
-      ! get dimension allowed
-      CALL dim_def_extra(TRIM(cn_dimcfg))
-
-      ! get dummy variable
-      CALL var_get_dummy(TRIM(cn_dumcfg))
-      ! get dummy dimension
-      CALL dim_get_dummy(TRIM(cn_dumcfg))
-      ! get dummy attribute
-      CALL att_get_dummy(TRIM(cn_dumcfg))
-
-      READ( il_fileid, NML = namcrs )
-      READ( il_fileid, NML = namfin )
-      READ( il_fileid, NML = namvar )
-      ! add user change in extra information
-      CALL var_chg_extra( cn_varinfo )
-      ! match variable with file
-      tl_multi=multi_init(cn_varfile)
- 
-      READ( il_fileid, NML = namnst )
-      READ( il_fileid, NML = namout )
-
-      CLOSE( il_fileid, IOSTAT=il_status )
-      CALL fct_err(il_status)
-      IF( il_status /= 0 )THEN
-         CALL logger_error("CREATE BATHY: closing "//TRIM(cl_namelist))
-      ENDIF
-
+   ! Traitement des arguments fournis
+   ! --------------------------------
+   IF( il_narg /= 1 )THEN
+      WRITE(cl_errormsg,*) ' ERROR : one argument is needed '
+      CALL fct_help(cp_myname,cl_errormsg) 
+      CALL EXIT(1)
    ELSE
 
-      PRINT *,"ERROR in create_bathy: can't find "//TRIM(cl_namelist)
-      STOP
+      CALL GET_COMMAND_ARGUMENT(1,cl_arg) !f03 intrinsec
+      SELECT CASE (cl_arg)
+         CASE ('-v', '--version')
 
+            CALL fct_version(cp_myname)
+            CALL EXIT(0)
+
+         CASE ('-h', '--help')
+
+            CALL fct_help(cp_myname)
+            CALL EXIT(0)
+
+         CASE DEFAULT
+
+            cl_namelist=cl_arg
+
+            ! read namelist
+            INQUIRE(FILE=TRIM(cl_namelist), EXIST=ll_exist)
+            IF( ll_exist )THEN
+
+               il_fileid=fct_getunit()
+
+               OPEN( il_fileid, FILE=TRIM(cl_namelist),  &
+               &                FORM='FORMATTED',        &
+               &                ACCESS='SEQUENTIAL',     &
+               &                STATUS='OLD',            &
+               &                ACTION='READ',           &
+               &                IOSTAT=il_status)
+               CALL fct_err(il_status)
+               IF( il_status /= 0 )THEN
+                  WRITE(cl_errormsg,*) " ERROR : error opening "//TRIM(cl_namelist)
+                  CALL fct_help(cp_myname,cl_errormsg) 
+                  CALL EXIT(1)
+               ENDIF
+
+               READ( il_fileid, NML = namlog )
+ 
+               ! define logger file
+               CALL logger_open(TRIM(cn_logfile),TRIM(cn_verbosity),in_maxerror)
+               CALL logger_header()
+
+               READ( il_fileid, NML = namcfg )
+               ! get variable extra information on configuration file
+               CALL var_def_extra(TRIM(cn_varcfg))
+
+               ! get dimension allowed
+               CALL dim_def_extra(TRIM(cn_dimcfg))
+
+               ! get dummy variable
+               CALL var_get_dummy(TRIM(cn_dumcfg))
+               ! get dummy dimension
+               CALL dim_get_dummy(TRIM(cn_dumcfg))
+               ! get dummy attribute
+               CALL att_get_dummy(TRIM(cn_dumcfg))
+
+               READ( il_fileid, NML = namsrc )
+               READ( il_fileid, NML = namtgt )
+               READ( il_fileid, NML = namvar )
+               ! add user change in extra information
+               CALL var_chg_extra( cn_varinfo )
+               ! match variable with file
+               tl_multi=multi_init(cn_varfile)
+
+               READ( il_fileid, NML = namnst )
+               READ( il_fileid, NML = namout )
+
+               CLOSE( il_fileid, IOSTAT=il_status )
+               CALL fct_err(il_status)
+               IF( il_status /= 0 )THEN
+                  CALL logger_error("CREATE BATHY: closing "//TRIM(cl_namelist))
+               ENDIF
+
+            ELSE
+
+               WRITE(cl_errormsg,*) " ERROR : can't find "//TRIM(cl_namelist)
+               CALL fct_help(cp_myname,cl_errormsg) 
+               CALL EXIT(1)
+
+            ENDIF
+
+      END SELECT
    ENDIF
 
    CALL multi_print(tl_multi)
 
    ! open files
-   IF( cn_coord0 /= '' )THEN
-      tl_coord0=mpp_init( file_init(TRIM(cn_coord0)), id_perio=in_perio0)
+   IF( TRIM(cn_coord0) /= '' )THEN
+      tl_file=file_init(TRIM(cn_coord0))
+      tl_coord0=mpp_init( tl_file, id_perio=in_perio0)
+      ! clean
+      CALL file_clean(tl_file)
       CALL grid_get_info(tl_coord0)
    ELSE
       CALL logger_fatal("CREATE BATHY: no coarse grid coordinate found. "//&
@@ -360,7 +515,10 @@ PROGRAM create_bathy
    ENDIF
 
    IF( TRIM(cn_coord1) /= '' )THEN
-      tl_coord1=mpp_init( file_init(TRIM(cn_coord1)),id_perio=in_perio1)
+      tl_file=file_init(TRIM(cn_coord1))
+      tl_coord1=mpp_init( tl_file, id_perio=in_perio1)
+      ! clean
+      CALL file_clean(tl_file)
       CALL grid_get_info(tl_coord1)
    ELSE
       CALL logger_fatal("CREATE BATHY: no fine grid coordinate found. "//&
@@ -429,15 +587,24 @@ PROGRAM create_bathy
             DO jj=1,tl_multi%t_mpp(ji)%t_proc(1)%i_nvar
                jk=jk+1
                tl_tmp=var_copy(tl_multi%t_mpp(ji)%t_proc(1)%t_var(jj))
-            
-               tl_var(jk)=create_bathy_matrix(tl_tmp, tl_coord1)
+
+               IF( COUNT(tl_tmp%t_dim(:)%l_use) > 2 )THEN
+                  CALL logger_fatal("CREATE BATHY: input matrix use more "//&
+                     &              "than 2D. Check namelist.")
+               ENDIF
+               tl_var(jk)=create_bathy_matrix(tl_tmp, tl_coord1, ln_rand)
             ENDDO
             ! clean
             CALL var_clean(tl_tmp)
 
          ELSE
 
-            tl_mpp=mpp_init( file_init(TRIM(tl_multi%t_mpp(ji)%c_name)) )
+            tl_file=file_init(TRIM(tl_multi%t_mpp(ji)%c_name), &
+               &              id_perio=tl_multi%t_mpp(ji)%i_perio)
+            tl_mpp=mpp_init( tl_file )
+
+            ! clean
+            CALL file_clean(tl_file)
             CALL grid_get_info(tl_mpp)
 
             ! open mpp file
@@ -458,7 +625,7 @@ PROGRAM create_bathy
                DO jj=1,tl_multi%t_mpp(ji)%t_proc(1)%i_nvar
                   jk=jk+1
                   tl_tmp=var_copy(tl_multi%t_mpp(ji)%t_proc(1)%t_var(jj))
-               
+ 
                   tl_var(jk)=create_bathy_extract( tl_tmp, tl_mpp, &
                   &                                tl_coord1 )
                ENDDO
@@ -547,12 +714,20 @@ PROGRAM create_bathy
       CALL iom_mpp_open(tl_coord1)
 
       ! add longitude
-      tl_lon=iom_mpp_read_var(tl_coord1,'longitude')
+      il_varid=var_get_id(tl_coord1%t_proc(1)%t_var(:),'longitude')
+      IF( il_varid == 0 )THEN
+         il_varid=var_get_id(tl_coord1%t_proc(1)%t_var(:),'longitude_T')
+      ENDIF
+      tl_lon=iom_mpp_read_var(tl_coord1, il_varid)
       CALL file_add_var(tl_fileout, tl_lon)
       CALL var_clean(tl_lon)
 
       ! add latitude
-      tl_lat=iom_mpp_read_var(tl_coord1,'latitude')
+      il_varid=var_get_id(tl_coord1%t_proc(1)%t_var(:),'latitude')
+      IF( il_varid == 0 )THEN
+         il_varid=var_get_id(tl_coord1%t_proc(1)%t_var(:),'latitude_T')
+      ENDIF
+      tl_lat=iom_mpp_read_var(tl_coord1, il_varid)
       CALL file_add_var(tl_fileout, tl_lat)
       CALL var_clean(tl_lat)
 
@@ -580,10 +755,19 @@ PROGRAM create_bathy
    ENDDO
    DEALLOCATE(tl_var)
 
+   ! clean
+   CALL multi_clean(tl_multi)
+
    ! add some attribute
    tl_att=att_init("Created_by","SIREN create_bathy")
    CALL file_add_att(tl_fileout, tl_att)
 
+   !add source url
+   cl_url=fct_split(fct_split(cp_url,2,'$'),2,'URL:')
+   tl_att=att_init("SIREN_url",cl_url)
+   CALL file_add_att(tl_fileout, tl_att)
+
+   ! add date of creation
    cl_date=date_print(date_now())
    tl_att=att_init("Creation_date",cl_date)
    CALL file_add_att(tl_fileout, tl_att)
@@ -630,6 +814,9 @@ PROGRAM create_bathy
    CALL logger_close()
 
 CONTAINS
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION create_bathy_matrix(td_var, td_coord, ld_rand) &
+         & RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief
    !> This function create variable, filled with matrix value
@@ -640,32 +827,38 @@ CONTAINS
    !> Then the variable array of value is split into equal subdomain.
    !> Each subdomain is filled with the corresponding value of the matrix.
    !>
+   !> Optionaly, you could add a random value of 0.1% of maximum depth to each
+   !> points of the bathymetry
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !>
    !> @param[in] td_var    variable structure 
    !> @param[in] td_coord  coordinate file structure
+   !> @param[in] ld_rand   add random value to bathymetry
    !> @return variable structure
    !-------------------------------------------------------------------
-   FUNCTION create_bathy_matrix(td_var, td_coord)
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR), INTENT(IN) :: td_var
       TYPE(TMPP), INTENT(IN) :: td_coord
+      LOGICAL   , INTENT(IN) :: ld_rand
 
       ! function
-      TYPE(TVAR) :: create_bathy_matrix
+      TYPE(TVAR)             :: tf_var
 
       ! local variable
       INTEGER(i4)      , DIMENSION(2,2)                  :: il_xghost
-      INTEGER(i4)      , DIMENSION(3)                    :: il_dim
-      INTEGER(i4)      , DIMENSION(3)                    :: il_size
-      INTEGER(i4)      , DIMENSION(3)                    :: il_rest
+      INTEGER(i4)      , DIMENSION(2)                    :: il_dim
+      INTEGER(i4)      , DIMENSION(2)                    :: il_size
+      INTEGER(i4)      , DIMENSION(2)                    :: il_rest
 
       INTEGER(i4)      , DIMENSION(:)      , ALLOCATABLE :: il_ishape
       INTEGER(i4)      , DIMENSION(:)      , ALLOCATABLE :: il_jshape
-      INTEGER(i4)      , DIMENSION(:)      , ALLOCATABLE :: il_kshape
 
+      REAL(dp)         , DIMENSION(:,:)    , ALLOCATABLE :: dl_ran
       REAL(dp)         , DIMENSION(:,:,:,:), ALLOCATABLE :: dl_value
 
       TYPE(TVAR)                                         :: tl_lon
@@ -676,7 +869,6 @@ CONTAINS
       ! loop indices
       INTEGER(i4) :: ji
       INTEGER(i4) :: jj
-      INTEGER(i4) :: jk
       !----------------------------------------------------------------
 
       ! copy structure
@@ -704,15 +896,15 @@ CONTAINS
 
       ! write value on grid
       ! get matrix dimension
-      il_dim(:)=td_var%t_dim(1:3)%i_len
+      il_dim(:)=td_var%t_dim(1:2)%i_len
       ! output dimension
       tl_dim(:)=dim_copy(tl_lon%t_dim(:))
       ! clean
       CALL var_clean(tl_lon)
 
       ! split output domain in N subdomain depending of matrix dimension 
-      il_size(:) = tl_dim(1:3)%i_len / il_dim(:)
-      il_rest(:) = MOD(tl_dim(1:3)%i_len, il_dim(:))
+      il_size(:) = tl_dim(1:2)%i_len / il_dim(:)
+      il_rest(:) = MOD(tl_dim(1:2)%i_len, il_dim(:))
 
       ALLOCATE( il_ishape(il_dim(1)+1) )
       il_ishape(:)=0
@@ -730,14 +922,6 @@ CONTAINS
       ! add rest to last cell
       il_jshape(il_dim(2)+1)=il_jshape(il_dim(2)+1)+il_rest(2)
 
-      ALLOCATE( il_kshape(il_dim(3)+1) )
-      il_kshape(:)=0
-      DO jk=2,il_dim(3)+1
-         il_kshape(jk)=il_kshape(jk-1)+il_size(3)
-      ENDDO
-      ! add rest to last cell
-      il_kshape(il_dim(3)+1)=il_kshape(il_dim(3)+1)+il_rest(3)
-
       ! write ouput array of value 
       ALLOCATE(dl_value( tl_dim(1)%i_len, &
       &                  tl_dim(2)%i_len, &
@@ -745,32 +929,48 @@ CONTAINS
       &                  tl_dim(4)%i_len) )
 
       dl_value(:,:,:,:)=0
+      DO jj=2,il_dim(2)+1
+         DO ji=2,il_dim(1)+1
+            
+            dl_value( 1+il_ishape(ji-1):il_ishape(ji), &
+            &         1+il_jshape(jj-1):il_jshape(jj), &
+            &         1,1 ) = td_var%d_value(ji-1,jj-1,1,1)
 
-      DO jk=2,il_dim(3)+1
-         DO jj=2,il_dim(2)+1
-            DO ji=2,il_dim(1)+1
-               
-               dl_value( 1+il_ishape(ji-1):il_ishape(ji), &
-               &         1+il_jshape(jj-1):il_jshape(jj), &
-               &         1+il_kshape(jk-1):il_kshape(jk), &
-               &         1 ) = td_var%d_value(ji-1,jj-1,jk-1,1)
-
-            ENDDO
          ENDDO
       ENDDO
 
+
+      IF( ld_rand )THEN
+         ALLOCATE(dl_ran(tl_dim(1)%i_len, &
+         &               tl_dim(2)%i_len) )
+      
+         ! set random value between 0 and 1
+         CALL RANDOM_NUMBER(dl_ran(:,:))
+         ! set random value between -0.5 and 0.5
+         dl_ran(:,:)=dl_ran(:,:)-0.5
+         ! set random value of 0.1% of maximum depth
+         dl_ran(:,:)=dl_ran(:,:)*1.e-4*MAXVAL(td_var%d_value(:,:,1,1))
+
+         dl_value(:,:,1,1)=dl_value(:,:,1,1)+dl_ran(:,:)
+      
+         DEALLOCATE(dl_ran)
+      ENDIF
+
       ! initialise variable with value
-      create_bathy_matrix=var_init(TRIM(td_var%c_name),dl_value(:,:,:,:))
+      tf_var=var_init(TRIM(td_var%c_name),dl_value(:,:,:,:))
 
       DEALLOCATE(dl_value)
 
       ! add ghost cell
-      CALL grid_add_ghost(create_bathy_matrix, il_xghost(:,:))
+      CALL grid_add_ghost(tf_var, il_xghost(:,:))
 
       ! clean
       CALL dim_clean(tl_dim(:))
 
    END FUNCTION create_bathy_matrix
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION create_bathy_extract(td_var, td_mpp, td_coord) &
+         &  RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief
    !> This function extract variable from file over coordinate domain and
@@ -784,16 +984,16 @@ CONTAINS
    !> @param[in] td_coord  coordinate file structure
    !> @return variable structure
    !-------------------------------------------------------------------
-   FUNCTION create_bathy_extract(td_var, td_mpp, &
-   &                             td_coord)
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR), INTENT(IN) :: td_var  
       TYPE(TMPP), INTENT(IN) :: td_mpp
       TYPE(TMPP), INTENT(IN) :: td_coord
 
       ! function
-      TYPE(TVAR) :: create_bathy_extract
+      TYPE(TVAR)             :: tf_var
 
       ! local variable
       INTEGER(i4), DIMENSION(2,2) :: il_ind
@@ -807,8 +1007,6 @@ CONTAINS
 
       TYPE(TATT)  :: tl_att
 
-      TYPE(TVAR)  :: tl_var
-      
       TYPE(TDOM)  :: tl_dom
       ! loop indices
       !----------------------------------------------------------------
@@ -842,23 +1040,23 @@ CONTAINS
          CALL iom_dom_open(tl_mpp, tl_dom)
 
          ! read variable on domain
-         tl_var=iom_dom_read_var(tl_mpp,TRIM(td_var%c_name),tl_dom)
+         tf_var=iom_dom_read_var(tl_mpp,TRIM(td_var%c_name),tl_dom)
 
          ! close mpp file
          CALL iom_dom_close(tl_mpp)
 
          ! add ghost cell
-         CALL grid_add_ghost(tl_var,tl_dom%i_ghost(:,:))
+         CALL grid_add_ghost(tf_var,tl_dom%i_ghost(:,:))
 
          ! check result
-         IF( ANY( tl_var%t_dim(:)%l_use .AND. &
-         &        tl_var%t_dim(:)%i_len /= td_coord%t_dim(:)%i_len) )THEN
+         IF( ANY( tf_var%t_dim(:)%l_use .AND. &
+         &        tf_var%t_dim(:)%i_len /= td_coord%t_dim(:)%i_len) )THEN
             CALL logger_debug("CREATE BATHY EXTRACT: "//&
             &        "dimensoin of variable "//TRIM(td_var%c_name)//" "//&
-            &        TRIM(fct_str(tl_var%t_dim(1)%i_len))//","//&
-            &        TRIM(fct_str(tl_var%t_dim(2)%i_len))//","//&
-            &        TRIM(fct_str(tl_var%t_dim(3)%i_len))//","//&
-            &        TRIM(fct_str(tl_var%t_dim(4)%i_len)) )
+            &        TRIM(fct_str(tf_var%t_dim(1)%i_len))//","//&
+            &        TRIM(fct_str(tf_var%t_dim(2)%i_len))//","//&
+            &        TRIM(fct_str(tf_var%t_dim(3)%i_len))//","//&
+            &        TRIM(fct_str(tf_var%t_dim(4)%i_len)) )
             CALL logger_debug("CREATE BATHY EXTRACT: "//&
             &        "dimensoin of coordinate file "//&
             &        TRIM(fct_str(td_coord%t_dim(1)%i_len))//","//&
@@ -872,24 +1070,27 @@ CONTAINS
 
          ! add attribute to variable
          tl_att=att_init('src_file',TRIM(fct_basename(tl_mpp%c_name)))
-         CALL var_move_att(tl_var, tl_att)         
+         CALL var_move_att(tf_var, tl_att)         
 
          tl_att=att_init('src_i_indices',(/tl_dom%i_imin, tl_dom%i_imax/))
-         CALL var_move_att(tl_var, tl_att)
+         CALL var_move_att(tf_var, tl_att)
 
          tl_att=att_init('src_j_indices',(/tl_dom%i_jmin, tl_dom%i_jmax/))
-         CALL var_move_att(tl_var, tl_att)
-
-         ! save result
-         create_bathy_extract=var_copy(tl_var)
+         CALL var_move_att(tf_var, tl_att)
 
          ! clean structure
          CALL att_clean(tl_att)
-         CALL var_clean(tl_var)
          CALL mpp_clean(tl_mpp)
       ENDIF
 
    END FUNCTION create_bathy_extract
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION create_bathy_get_var(td_var, td_mpp,   &
+         &                       id_imin, id_jmin, &
+         &                       id_imax, id_jmax, &
+         &                       id_offset,        &
+         &                       id_rho) &
+         &  RESULT (tf_var)
    !-------------------------------------------------------------------
    !> @brief
    !> This function get coarse grid variable, interpolate variable, and return
@@ -908,12 +1109,9 @@ CONTAINS
    !> @param[in] id_rho    array of refinement factor
    !> @return variable structure
    !-------------------------------------------------------------------
-   FUNCTION create_bathy_get_var(td_var, td_mpp,   &
-            &                    id_imin, id_jmin, &
-            &                    id_imax, id_jmax, &
-            &                    id_offset,        &
-            &                    id_rho )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR)                 , INTENT(IN) :: td_var  
       TYPE(TMPP)                 , INTENT(IN) :: td_mpp 
@@ -925,12 +1123,11 @@ CONTAINS
       INTEGER(i4), DIMENSION(:)  , INTENT(IN) :: id_rho
 
       ! function
-      TYPE(TVAR) :: create_bathy_get_var
+      TYPE(TVAR)                              :: tf_var
 
       ! local variable
       TYPE(TMPP)  :: tl_mpp
       TYPE(TATT)  :: tl_att
-      TYPE(TVAR)  :: tl_var
       TYPE(TDOM)  :: tl_dom
 
       INTEGER(i4) :: il_size
@@ -958,7 +1155,7 @@ CONTAINS
       CALL iom_dom_open(tl_mpp, tl_dom)
 
       !- read variable value on domain
-      tl_var=iom_dom_read_var(tl_mpp,TRIM(td_var%c_name),tl_dom)
+      tf_var=iom_dom_read_var(tl_mpp,TRIM(td_var%c_name),tl_dom)
 
       !- close mpp files
       CALL iom_dom_close(tl_mpp)
@@ -968,42 +1165,41 @@ CONTAINS
       il_rho(:)=id_rho(:)
       
       !- interpolate variable
-      CALL create_bathy_interp(tl_var, il_rho(:), id_offset(:,:))
+      CALL create_bathy_interp(tf_var, il_rho(:), id_offset(:,:))
 
       !- remove extraband added to domain
-      CALL dom_del_extra( tl_var, tl_dom, il_rho(:) )
+      CALL dom_del_extra( tf_var, tl_dom, il_rho(:) )
 
       CALL dom_clean_extra( tl_dom )
 
       !- add ghost cell
-      CALL grid_add_ghost(tl_var,tl_dom%i_ghost(:,:))
+      CALL grid_add_ghost(tf_var,tl_dom%i_ghost(:,:))
  
       !- add attribute to variable
       tl_att=att_init('src_file',TRIM(fct_basename(tl_mpp%c_name)))
-      CALL var_move_att(tl_var, tl_att)
+      CALL var_move_att(tf_var, tl_att)
 
       tl_att=att_init('src_i_indices',(/tl_dom%i_imin, tl_dom%i_imax/))
-      CALL var_move_att(tl_var, tl_att)
+      CALL var_move_att(tf_var, tl_att)
 
       tl_att=att_init('src_j_indices',(/tl_dom%i_jmin, tl_dom%i_jmax/))
-      CALL var_move_att(tl_var, tl_att)
+      CALL var_move_att(tf_var, tl_att)
 
       IF( .NOT. ALL(id_rho(:)==1) )THEN
          tl_att=att_init("refinment_factor",(/id_rho(jp_I),id_rho(jp_J)/))
-         CALL var_move_att(tl_var, tl_att)
+         CALL var_move_att(tf_var, tl_att)
       ENDIF
 
       DEALLOCATE( il_rho )
 
-      !- save result
-      create_bathy_get_var=var_copy(tl_var)
-
       !- clean structure
       CALL att_clean(tl_att)
-      CALL var_clean(tl_var)
       CALL mpp_clean(tl_mpp)
  
    END FUNCTION create_bathy_get_var
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE create_bathy_interp(td_var, id_rho, id_offset, &
+         &                        id_iext, id_jext)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine interpolate variable
@@ -1017,10 +1213,6 @@ CONTAINS
    !> @param[in] id_iext   i-direction size of extra bands (default=im_minext)
    !> @param[in] id_jext   j-direction size of extra bands (default=im_minext)
    !-------------------------------------------------------------------
-   SUBROUTINE create_bathy_interp( td_var,         &
-   &                               id_rho,          &
-   &                               id_offset,       &
-   &                               id_iext, id_jext)
 
       IMPLICIT NONE
 
@@ -1111,6 +1303,8 @@ CONTAINS
       CALL var_clean(tl_mask)
 
    END SUBROUTINE create_bathy_interp
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE create_bathy_check_depth(td_mpp, td_depth)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine get depth variable value in an open mpp structure
@@ -1124,7 +1318,6 @@ CONTAINS
    !> @param[in] td_mpp       mpp structure
    !> @param[inout] td_depth  depth variable structure 
    !-------------------------------------------------------------------
-   SUBROUTINE create_bathy_check_depth( td_mpp, td_depth )
 
       IMPLICIT NONE
 
@@ -1163,6 +1356,8 @@ CONTAINS
       ENDIF
       
    END SUBROUTINE create_bathy_check_depth
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE create_bathy_check_time(td_mpp, td_time)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine get date and time in an open mpp structure
@@ -1176,7 +1371,6 @@ CONTAINS
    !> @param[in] td_mpp      mpp structure
    !> @param[inout] td_time  time variable structure 
    !-------------------------------------------------------------------
-   SUBROUTINE create_bathy_check_time( td_mpp, td_time )
 
       IMPLICIT NONE
 
@@ -1219,4 +1413,5 @@ CONTAINS
       ENDIF
       
    END SUBROUTINE create_bathy_check_time
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 END PROGRAM create_bathy

@@ -22,10 +22,10 @@ MODULE dommsk
    !!----------------------------------------------------------------------
    !!   dom_msk       : compute land/ocean mask
    !!----------------------------------------------------------------------
-   USE oce            ! ocean dynamics and tracers
    USE dom_oce        ! ocean space and time domain
+   USE domisf         ! domain: ice shelf
+   USE domwri         ! domain: write the meshmask file
    USE usrdef_fmask   ! user defined fmask
-   USE bdy_oce        ! open boundary
    !
    USE in_out_manager ! I/O manager
    USE iom            ! IOM library
@@ -84,6 +84,7 @@ CONTAINS
       !!               tmask_h : halo mask
       !!               ssmask , ssumask, ssvmask, ssfmask : 2D ocean mask
       !!----------------------------------------------------------------------
+
       INTEGER, DIMENSION(:,:), INTENT(in) ::   k_top, k_bot   ! first and last ocean level
       !
       INTEGER  ::   ji, jj, jk     ! dummy loop indices
@@ -94,13 +95,6 @@ CONTAINS
       REAL(wp), ALLOCATABLE, DIMENSION(:,:) ::   zwf   ! 2D workspace
       !!
       NAMELIST/namlbc/ rn_shlat, ln_vorlat
-      NAMELIST/nambdy/ ln_bdy ,nb_bdy, ln_coords_file, cn_coords_file,         &
-         &             ln_mask_file, cn_mask_file, cn_dyn2d, nn_dyn2d_dta,     &
-         &             cn_dyn3d, nn_dyn3d_dta, cn_tra, nn_tra_dta,             &
-         &             ln_tra_dmp, ln_dyn3d_dmp, rn_time_dmp, rn_time_dmp_out, &
-         &             cn_ice, nn_ice_dta,                                     &
-         &             rn_ice_tem, rn_ice_sal, rn_ice_age,                     &
-         &             ln_vol, nn_volctl, nn_rimwidth, nb_jpk_bdy
       !!---------------------------------------------------------------------
       !
       REWIND( numnam_ref )              ! Namelist namlbc in reference namelist : Lateral momentum boundary condition
@@ -129,44 +123,57 @@ CONTAINS
          CALL ctl_stop( 'dom_msk: wrong value for rn_shlat (i.e. a negalive value). We stop.' )
       ENDIF
 
+     ! 1. Ocean/land mask at t-point (computed from mbathy)
+     ! -----------------------------
+     ! N.B. tmask has already the right boundary conditions since mbathy is ok
+     !
+!      tmask(:,:,:) = 0._wp
+!      DO jk = 1, jpk
+!         DO jj = 1, jpj
+!            DO ji = 1, jpi
+!               IF(      ( REAL( mbathy (ji,jj) - jk, wp ) + 0.1_wp >= 0._wp )         &
+!               &  .AND. ( REAL( misfdep(ji,jj) - jk, wp ) - 0.1_wp <= 0._wp ) ) THEN
+!                  tmask(ji,jj,jk) = 1._wp
+!               END IF  
+!            END DO
+!         END DO
+!      END DO    
+ 
+!      IF ( ln_isfsubgl ) CALL zgr_isf_subgl
+
       !  Ocean/land mask at t-point  (computed from ko_top and ko_bot)
       ! ----------------------------
       !
       tmask(:,:,:) = 0._wp
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-            iktop = k_top(ji,jj)
-            ikbot = k_bot(ji,jj)
-            IF( iktop /= 0 ) THEN       ! water in the column
-               tmask(ji,jj,iktop:ikbot  ) = 1._wp
-            ENDIF
+      IF( ln_read_cfg) THEN
+         DO jj = 1, jpj
+            DO ji = 1, jpi
+               iktop = k_top(ji,jj)
+               ikbot = k_bot(ji,jj)
+               IF( iktop /= 0 ) THEN       ! water in the column
+                  tmask(ji,jj,iktop:ikbot  ) = 1._wp
+               ENDIF
+            END DO  
          END DO  
-      END DO  
+         ELSE
+         DO jk = 1, jpk
+            DO jj = 1, jpj
+               DO ji = 1, jpi
+                  IF(      ( REAL( mbathy (ji,jj) - jk, wp ) + 0.1_wp >= 0._wp )         &
+                  &  .AND. ( REAL( misfdep(ji,jj) - jk, wp ) - 0.1_wp <= 0._wp ) ) THEN
+                     tmask(ji,jj,jk) = 1._wp
+                  END IF
+               END DO
+            END DO
+         END DO
+         IF ( ln_isfsubgl ) CALL zgr_isf_subgl
+      ENDIF
+
+
 !SF  add here lbc_lnk: bug not still understood : cause now domain configuration is read !
 !!gm I don't understand why...  
       CALL lbc_lnk( 'dommsk', tmask  , 'T', 1._wp )      ! Lateral boundary conditions
 
-     ! Mask corrections for bdy (read in mppini2)
-      REWIND( numnam_ref )              ! Namelist nambdy in reference namelist :Unstructured open boundaries
-      READ  ( numnam_ref, nambdy, IOSTAT = ios, ERR = 903)
-903   IF( ios /= 0 )   CALL ctl_nam ( ios , 'nambdy in reference namelist', lwp )
-      REWIND( numnam_cfg )              ! Namelist nambdy in configuration namelist :Unstructured open boundaries
-      READ  ( numnam_cfg, nambdy, IOSTAT = ios, ERR = 904 )
-904   IF( ios >  0 )   CALL ctl_nam ( ios , 'nambdy in configuration namelist', lwp )
-      ! ------------------------
-      IF ( ln_bdy .AND. ln_mask_file ) THEN
-         CALL iom_open( cn_mask_file, inum )
-         CALL iom_get ( inum, jpdom_data, 'bdy_msk', bdytmask(:,:) )
-         CALL iom_close( inum )
-         DO jk = 1, jpkm1
-            DO jj = 1, jpj
-               DO ji = 1, jpi
-                  tmask(ji,jj,jk) = tmask(ji,jj,jk) * bdytmask(ji,jj)
-               END DO
-            END DO
-         END DO
-      ENDIF
-         
       !  Ocean/land mask at u-, v-, and f-points   (computed from tmask)
       ! ----------------------------------------
       ! NB: at this point, fmask is designed for free slip lateral boundary condition
@@ -187,12 +194,8 @@ CONTAINS
       ! Ocean/land mask at wu-, wv- and w points    (computed from tmask)
       !-----------------------------------------
       wmask (:,:,1) = tmask(:,:,1)     ! surface
-      wumask(:,:,1) = umask(:,:,1)
-      wvmask(:,:,1) = vmask(:,:,1)
       DO jk = 2, jpk                   ! interior values
          wmask (:,:,jk) = tmask(:,:,jk) * tmask(:,:,jk-1)
-         wumask(:,:,jk) = umask(:,:,jk) * umask(:,:,jk-1)   
-         wvmask(:,:,jk) = vmask(:,:,jk) * vmask(:,:,jk-1)
       END DO
 
 
@@ -201,7 +204,6 @@ CONTAINS
       ssmask (:,:) = MAXVAL( tmask(:,:,:), DIM=3 )
       ssumask(:,:) = MAXVAL( umask(:,:,:), DIM=3 )
       ssvmask(:,:) = MAXVAL( vmask(:,:,:), DIM=3 )
-
 
       ! Interior domain mask  (used for global sum)
       ! --------------------
@@ -291,6 +293,7 @@ CONTAINS
       ! User defined alteration of fmask (use to reduce ocean transport in specified straits)
       ! -------------------------------- 
       !
+
       CALL usr_def_fmask( cn_cfg, nn_cfg, fmask )
       !
    END SUBROUTINE dom_msk

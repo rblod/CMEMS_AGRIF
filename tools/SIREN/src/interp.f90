@@ -2,8 +2,6 @@
 ! NEMO system team, System and Interface for oceanic RElocable Nesting
 !----------------------------------------------------------------------
 !
-! MODULE: interp
-!
 ! DESCRIPTION:
 !> @brief 
 !> This module manage interpolation on regular grid.
@@ -69,13 +67,13 @@
 !>
 !> @author
 !> J.Paul
-! REVISION HISTORY:
+!> 
 !> @date November, 2013 - Initial Version
 !> @date September, 2014
 !> - add header
 !> - use interpolation method modules
 !>
-!> @note Software governed by the CeCILL licence     (./LICENSE)
+!> @note Software governed by the CeCILL licence     (NEMOGCM/NEMO_CeCILL.txt)
 !----------------------------------------------------------------------
 MODULE interp
 
@@ -127,6 +125,9 @@ MODULE interp
    END INTERFACE interp_fill_value
 
 CONTAINS
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION interp__check_method(cd_method) &
+         & RESULT (lf_avail)
    !-------------------------------------------------------------------
    !> @brief
    !> This function check if interpolation method is available.
@@ -139,15 +140,16 @@ CONTAINS
    !> @date November, 2013 - Initial Version
    !
    !> @param[in] cd_method interpolation method
-   !> @return 
+   !> @return true if interpolation method is available
    !-------------------------------------------------------------------
-   FUNCTION interp__check_method( cd_method )
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=lc) :: cd_method
 
       ! function
-      LOGICAL :: interp__check_method
+      LOGICAL           :: lf_avail
 
       ! local variable
       CHARACTER(LEN=lc) :: cl_interp
@@ -159,16 +161,19 @@ CONTAINS
 
       cl_method=fct_lower(cd_method)
 
-      interp__check_method=.FALSE.
+      lf_avail=.FALSE.
       DO ji=1,ip_ninterp
          cl_interp=fct_lower(cp_interp_list(ji))
          IF( TRIM(cl_interp) == TRIM(cl_method) )THEN
-            interp__check_method=.TRUE.
+            lf_avail=.TRUE.
             EXIT
          ENDIF
       ENDDO
 
    END FUNCTION interp__check_method
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION interp__detect_wrapper(td_mix, id_rho) &
+         & RESULT (if_detect)
    !-------------------------------------------------------------------
    !> @brief
    !> This function detected point to be interpolated.
@@ -184,16 +189,17 @@ CONTAINS
    !> @param[in] id_rho array of refinement factor
    !> @return 3D array of detected point to be interpolated 
    !-------------------------------------------------------------------
-   FUNCTION interp__detect_wrapper( td_mix, id_rho )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR) , INTENT(IN) :: td_mix
       INTEGER(I4), DIMENSION(:), INTENT(IN), OPTIONAL :: id_rho
 
       ! function
       INTEGER(i4), DIMENSION(td_mix%t_dim(1)%i_len,&
-      &                      td_mix%t_dim(2)%i_len,&
-      &                      td_mix%t_dim(3)%i_len ) :: interp__detect_wrapper
+         &                   td_mix%t_dim(2)%i_len,&
+         &                   td_mix%t_dim(3)%i_len )  :: if_detect
 
       ! local variable
       ! loop indices
@@ -202,39 +208,42 @@ CONTAINS
       IF( .NOT. ANY(td_mix%t_dim(1:3)%l_use) )THEN
          ! no dimension I-J-K used
          CALL logger_debug(" INTERP DETECT: nothing done for variable"//&
-         &              TRIM(td_mix%c_name) )
+            &              TRIM(td_mix%c_name) )
          
-         interp__detect_wrapper(:,:,:)=0
+         if_detect(:,:,:)=0
 
       ELSE IF( ALL(td_mix%t_dim(1:3)%l_use) )THEN
          
          ! detect point to be interpolated on I-J-K
          CALL logger_debug(" INTERP DETECT: detect point "//&
-         &              TRIM(td_mix%c_point)//" for variable "//&
-         &              TRIM(td_mix%c_name) )
+            &              TRIM(td_mix%c_point)//" for variable "//&
+            &              TRIM(td_mix%c_name) )
          
-         interp__detect_wrapper(:,:,:)=interp__detect( td_mix, id_rho(:) )
+         if_detect(:,:,:)=interp__detect( td_mix, id_rho(:) )
 
       ELSE IF( ALL(td_mix%t_dim(1:2)%l_use) )THEN
 
          ! detect point to be interpolated on I-J
          CALL logger_debug(" INTERP DETECT: detect point "//&
-         &              TRIM(td_mix%c_point)//" for variable "//&
-         &              TRIM(td_mix%c_name) )
+            &              TRIM(td_mix%c_point)//" for variable "//&
+            &              TRIM(td_mix%c_name) )
          
-         interp__detect_wrapper(:,:,1:1)=interp__detect( td_mix, id_rho(:))
+         if_detect(:,:,1:1)=interp__detect( td_mix, id_rho(:))
 
       ELSE IF( td_mix%t_dim(3)%l_use )THEN
          
          ! detect point to be interpolated on K
          CALL logger_debug(" INTERP DETECT: detect vertical point "//&
-         &              " for variable "//TRIM(td_mix%c_name) )
+            &              " for variable "//TRIM(td_mix%c_name) )
          
-         interp__detect_wrapper(1:1,1:1,:)=interp__detect( td_mix, id_rho(:) )
+         if_detect(1:1,1:1,:)=interp__detect( td_mix, id_rho(:) )
 
       ENDIF              
 
    END FUNCTION interp__detect_wrapper
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION interp__detect(td_mix, id_rho) &
+         & RESULT (if_detect)
    !-------------------------------------------------------------------
    !> @brief
    !> This function detected point to be interpolated.
@@ -249,16 +258,17 @@ CONTAINS
    !> @param[in] id_rho array of refinement factor
    !> @return 3D array of detected point to be interpolated 
    !-------------------------------------------------------------------
-   FUNCTION interp__detect( td_mix, id_rho )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR) , INTENT(IN) :: td_mix
       INTEGER(I4), DIMENSION(:), INTENT(IN), OPTIONAL :: id_rho
 
       ! function
       INTEGER(i4), DIMENSION(td_mix%t_dim(1)%i_len,&
-      &                      td_mix%t_dim(2)%i_len,&
-      &                      td_mix%t_dim(3)%i_len ) :: interp__detect
+         &                   td_mix%t_dim(2)%i_len,&
+         &                   td_mix%t_dim(3)%i_len )  :: if_detect
 
       ! local variable
       INTEGER(I4), DIMENSION(:), ALLOCATABLE :: il_rho
@@ -315,12 +325,12 @@ CONTAINS
       il_dim(:)=td_mix%t_dim(1:3)%i_len
 
       ! init
-      interp__detect(:,:,:)=1
+      if_detect(:,:,:)=1
 
       ! do not compute coarse grid point
-      interp__detect(1:td_mix%t_dim(1)%i_len:il_rho(jp_I), &
-      &              1:td_mix%t_dim(2)%i_len:il_rho(jp_J), &
-      &              1:td_mix%t_dim(3)%i_len:il_rho(jp_K)  ) = 0
+      if_detect(1:td_mix%t_dim(1)%i_len:il_rho(jp_I), &
+         &      1:td_mix%t_dim(2)%i_len:il_rho(jp_J), &
+         &      1:td_mix%t_dim(3)%i_len:il_rho(jp_K)  ) = 0
 
       ! do not compute point near fill value
       DO jk=1,il_dim(3),il_rho(jp_K)
@@ -330,17 +340,17 @@ CONTAINS
                IF( td_mix%d_value(ji,jj,jk,1) == td_mix%d_fill )THEN
 
                   ! i-direction
-                  interp__detect(MAX(1,ji-il_xextra):MIN(ji+il_xextra,il_dim(1)),&
-                  &              MAX(1,jj-(il_rho(jp_J)-1)):MIN(jj+(il_rho(jp_J)-1),il_dim(2)),&
-                  &              MAX(1,jk-(il_rho(jp_K)-1)):MIN(jk+(il_rho(jp_K)-1),il_dim(3)) )=0 
+                  if_detect(MAX(1,ji-il_xextra):MIN(ji+il_xextra,il_dim(1)),&
+                     &      MAX(1,jj-(il_rho(jp_J)-1)):MIN(jj+(il_rho(jp_J)-1),il_dim(2)),&
+                     &      MAX(1,jk-(il_rho(jp_K)-1)):MIN(jk+(il_rho(jp_K)-1),il_dim(3)) )=0 
                   ! j-direction
-                  interp__detect(MAX(1,ji-(il_rho(jp_I)-1)):MIN(ji+(il_rho(jp_I)-1),il_dim(1)),&
-                  &              MAX(1,jj-il_yextra):MIN(jj+il_yextra,il_dim(2)),&
-                  &              MAX(1,jk-(il_rho(jp_K)-1)):MIN(jk+(il_rho(jp_K)-1),il_dim(3)) )=0
+                  if_detect(MAX(1,ji-(il_rho(jp_I)-1)):MIN(ji+(il_rho(jp_I)-1),il_dim(1)),&
+                     &      MAX(1,jj-il_yextra):MIN(jj+il_yextra,il_dim(2)),&
+                     &      MAX(1,jk-(il_rho(jp_K)-1)):MIN(jk+(il_rho(jp_K)-1),il_dim(3)) )=0
                   ! k-direction
-                  interp__detect(MAX(1,ji-(il_rho(jp_I)-1)):MIN(ji+(il_rho(jp_I)-1),il_dim(1)),&
-                  &              MAX(1,jj-(il_rho(jp_J)-1)):MIN(jj+(il_rho(jp_J)-1),il_dim(2)),&
-                  &              MAX(1,jk-il_zextra):MIN(jk+il_zextra,il_dim(3)) )=0         
+                  if_detect(MAX(1,ji-(il_rho(jp_I)-1)):MIN(ji+(il_rho(jp_I)-1),il_dim(1)),&
+                     &      MAX(1,jj-(il_rho(jp_J)-1)):MIN(jj+(il_rho(jp_J)-1),il_dim(2)),&
+                     &      MAX(1,jk-il_zextra):MIN(jk+il_zextra,il_dim(3)) )=0         
 
                ENDIF
 
@@ -351,6 +361,8 @@ CONTAINS
       DEALLOCATE( il_rho )
 
    END FUNCTION interp__detect
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE interp_create_mixed_grid(td_var, td_mix, id_rho)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine create mixed grid.
@@ -368,8 +380,9 @@ CONTAINS
    !> @param[out] td_mix   mixed grid variable
    !> @param[in] id_rho    array of refinment factor (default 1) 
    !-------------------------------------------------------------------
-   SUBROUTINE interp_create_mixed_grid( td_var, td_mix, id_rho )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR) ,               INTENT(IN   ) :: td_var 
       TYPE(TVAR) ,               INTENT(  OUT) :: td_mix 
@@ -440,6 +453,8 @@ CONTAINS
       DEALLOCATE(il_rho)
 
    END SUBROUTINE interp_create_mixed_grid
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE interp__clean_even_grid(td_mix, id_rho)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine remove points added to mixed grid to compute
@@ -453,8 +468,9 @@ CONTAINS
    !> @param[inout] td_mix mixed grid variable
    !> @param[in] id_rho    array of refinment factor 
    !-------------------------------------------------------------------
-   SUBROUTINE interp__clean_even_grid( td_mix, id_rho )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR) ,               INTENT(INOUT) :: td_mix 
       INTEGER(I4), DIMENSION(:), INTENT(IN   ), OPTIONAL :: id_rho
@@ -601,6 +617,9 @@ CONTAINS
       DEALLOCATE(il_rho)
 
    END SUBROUTINE interp__clean_even_grid
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE interp_clean_mixed_grid(td_mix, td_var, &
+         &                            id_rho, id_offset)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine remove points added on mixed grid 
@@ -618,9 +637,9 @@ CONTAINS
    !> @param[in] id_rho    array of refinement factor (default 1)
    !> @param[in] id_offset 2D array of offset between fine and coarse grid
    !-------------------------------------------------------------------
-   SUBROUTINE interp_clean_mixed_grid( td_mix, td_var, &
-   &                                   id_rho, id_offset )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR)                 , INTENT(IN   ) :: td_mix
       TYPE(TVAR)                 , INTENT(  OUT) :: td_var
@@ -647,7 +666,7 @@ CONTAINS
       ! copy mixed variable in temporary structure
       tl_mix=var_copy(td_mix)
 
-      ! remove unusefull points over mixed grid for even refinement
+      ! remove useless points over mixed grid for even refinement
       CALL interp__clean_even_grid(tl_mix, id_rho(:))
 
       ! copy cleaned mixed variable
@@ -706,6 +725,10 @@ CONTAINS
       CALL var_clean(tl_mix)
 
    END SUBROUTINE interp_clean_mixed_grid
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE interp__fill_value_wrapper(td_var, & 
+         &                               id_rho, &
+         &                               id_offset)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine interpolate variable value.
@@ -721,10 +744,9 @@ CONTAINS
    !> @param[in] id_rho    array of refinement factor
    !> @param[in] id_offset 2D array of offset between fine and coarse grid
    !-------------------------------------------------------------------
-   SUBROUTINE interp__fill_value_wrapper( td_var, & 
-   &                                      id_rho, &
-   &                                      id_offset )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR) ,                 INTENT(INOUT) :: td_var
       INTEGER(I4), DIMENSION(:)  , INTENT(IN   ), OPTIONAL :: id_rho
@@ -822,6 +844,9 @@ CONTAINS
       DEALLOCATE(il_rho)
 
    END SUBROUTINE interp__fill_value_wrapper
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE interp__fill_value(td_var, cd_method, &
+         &                       id_rho, id_offset)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine interpolate value over mixed grid.
@@ -836,9 +861,9 @@ CONTAINS
    !> @param[in] id_rho    array of refinment factor 
    !> @param[in] id_offset 2D array of offset between fine and coarse grid
    !-------------------------------------------------------------------
-   SUBROUTINE interp__fill_value( td_var, cd_method, &
-   &                              id_rho, id_offset )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TVAR)                      , INTENT(INOUT) :: td_var 
       CHARACTER(LEN=*)                , INTENT(IN   ) :: cd_method
@@ -956,4 +981,5 @@ CONTAINS
       CALL var_clean(tl_mix)
 
    END SUBROUTINE interp__fill_value
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 END MODULE interp

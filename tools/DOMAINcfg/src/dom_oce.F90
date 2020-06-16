@@ -29,18 +29,21 @@ MODULE dom_oce
    !! ----------------------------
    INTEGER , PUBLIC ::   nmsh            !: = 1 create a mesh-mask file
    !                                    !!* Namelist namdom : time & space domain *
-   LOGICAL,  PUBLIC ::   ln_read_cfg     !: .true. read from an existing domain_cfg file
    INTEGER , PUBLIC ::   nn_bathy        !: = 0/1/2 ,compute/read the bathymetry file
    REAL(wp), PUBLIC ::   rn_bathy        !: depth of flat bottom (active if nn_bathy=0; if =0 depth=jpkm1)
    REAL(wp), PUBLIC ::   rn_hmin         !: minimum ocean depth (>0) or minimum number of ocean levels (<0)
    REAL(wp), PUBLIC ::   rn_e3zps_min    !: miminum thickness for partial steps (meters)
    REAL(wp), PUBLIC ::   rn_e3zps_rat    !: minimum thickness ration for partial steps
    INTEGER , PUBLIC ::   nn_msh          !: = 1 create a mesh-mask file
+
+   INTEGER , PUBLIC ::   ntopo           !: = 0/1 ,compute/read the bathymetry file
+   INTEGER, PUBLIC  ::   nperio          !: type of lateral boundary condition
+   REAL(wp), PUBLIC ::   e3zps_min       !: miminum thickness for partial steps (meters)
+   REAL(wp), PUBLIC ::   e3zps_rat       !: minimum thickness ration for partial steps
    INTEGER , PUBLIC ::   nn_closea       !: =0 suppress closed sea/lake from the ORCA domain or not (=1)
 
    INTEGER, PUBLIC :: nn_interp
-   CHARACTER(LEN=132), PUBLIC :: cn_domcfg
-   CHARACTER(LEN=132), PUBLIC :: cn_topo
+   CHARACTER(LEN=200), PUBLIC :: cn_topo
    CHARACTER(LEN=132), PUBLIC :: cn_bath
    CHARACTER(LEN=132), PUBLIC :: cn_lon
    CHARACTER(LEN=132), PUBLIC :: cn_lat
@@ -52,6 +55,7 @@ MODULE dom_oce
    LOGICAL, PUBLIC ::   lzoom_s    =  .FALSE.   !: South zoom type flag
    LOGICAL, PUBLIC ::   lzoom_n    =  .FALSE.   !: North zoom type flag
 
+   LOGICAL, PUBLIC ::   ln_domclo  =  .FALSE.
 
    INTEGER       ::   jphgr_msh          !: type of horizontal mesh
    !                                       !  = 0 curvilinear coordinate on the sphere read in coordinate.nc
@@ -90,7 +94,6 @@ MODULE dom_oce
    !! time & space domain namelist
    !! ----------------------------
    !                                   !!* Namelist namdom : time & space domain *
-   LOGICAL , PUBLIC ::   ln_linssh      !: =T  linear free surface ==>> model level are fixed in time
    LOGICAL , PUBLIC ::   ln_meshmask    !: =T  create a mesh-mask file (mesh_mask.nc)
    REAL(wp), PUBLIC ::   rn_isfhmin     !: threshold to discriminate grounded ice to floating ice
    REAL(wp), PUBLIC ::   rn_rdt         !: time step for the dynamics and tracer
@@ -141,10 +144,6 @@ MODULE dom_oce
    INTEGER             , PUBLIC ::   nproc            !: number for local processor
    INTEGER             , PUBLIC ::   narea            !: number for local area
    INTEGER             , PUBLIC ::   nbondi, nbondj   !: mark of i- and j-direction local boundaries
-   INTEGER, ALLOCATABLE, PUBLIC ::   nbondi_bdy(:)    !: mark i-direction local boundaries for BDY open boundaries
-   INTEGER, ALLOCATABLE, PUBLIC ::   nbondj_bdy(:)    !: mark j-direction local boundaries for BDY open boundaries
-   INTEGER, ALLOCATABLE, PUBLIC ::   nbondi_bdy_b(:)  !: mark i-direction of neighbours local boundaries for BDY open boundaries  
-   INTEGER, ALLOCATABLE, PUBLIC ::   nbondj_bdy_b(:)  !: mark j-direction of neighbours local boundaries for BDY open boundaries  
 
    INTEGER, PUBLIC ::   npolj             !: north fold mark (0, 3 or 4)
    INTEGER, PUBLIC ::   nlci, nldi, nlei  !: i-dimensions of the local subdomain and its first and last indoor indices
@@ -204,30 +203,16 @@ MODULE dom_oce
    LOGICAL, PUBLIC ::   ln_zps       !: z-coordinate - partial step
    LOGICAL, PUBLIC ::   ln_sco       !: s-coordinate or hybrid z-s coordinate
    LOGICAL, PUBLIC ::   ln_isfcav    !: presence of ISF 
-   !                                                        !  ref.   ! before  !   now   ! after  !
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::     e3t_0 ,   e3t_b ,   e3t_n ,  e3t_a   !: t- vert. scale factor [m]
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::     e3u_0 ,   e3u_b ,   e3u_n ,  e3u_a   !: u- vert. scale factor [m]
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::     e3v_0 ,   e3v_b ,   e3v_n ,  e3v_a   !: v- vert. scale factor [m]
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::     e3f_0           ,   e3f_n            !: f- vert. scale factor [m]
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::     e3w_0 ,   e3w_b ,   e3w_n            !: w- vert. scale factor [m]
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::    e3uw_0 ,  e3uw_b ,  e3uw_n            !: uw-vert. scale factor [m]
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::    e3vw_0 ,  e3vw_b ,  e3vw_n            !: vw-vert. scale factor [m]
-
-   !                                                        !  ref.   ! before  !   now   !
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::   gdept_0 , gdept_b , gdept_n   !: t- depth              [m]
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::   gdepw_0 , gdepw_b , gdepw_n   !: w- depth              [m]
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::   gde3w_0           , gde3w_n   !: w- depth (sum of e3w) [m]
-   
-   !                                                      !  ref. ! before  !   now   !  after  !
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) ::   ht_0            ,    ht_n             !: t-depth              [m]
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) ::   hu_0  ,    hu_b ,    hu_n ,    hu_a   !: u-depth              [m]
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) ::   hv_0  ,    hv_b ,    hv_n ,    hv_a   !: v-depth              [m]
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) ::           r1_hu_b , r1_hu_n , r1_hu_a   !: inverse of u-depth [1/m]
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) ::           r1_hv_b , r1_hv_n , r1_hv_a   !: inverse of v-depth [1/m]
-
+   !
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::  e3t_0, e3u_0 , e3v_0 , e3f_0 !: t-,u-,v-,f-vert. scale factor [m]
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::  e3w_0, e3uw_0, e3vw_0        !: w-,uw-,vw-vert. scale factor [m]
+   !
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::   gdept_0 !: t- depth              [m]
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:) ::   gdepw_0 !: w- depth              [m]
+   !
    INTEGER, PUBLIC ::   nla10              !: deepest    W level Above  ~10m (nlb10 - 1)
    INTEGER, PUBLIC ::   nlb10              !: shallowest W level Bellow ~10m (nla10 + 1) 
-
+   !
    !! 1D reference  vertical coordinate
    !! =-----------------====------
    REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:)   ::   gdept_1d, gdepw_1d !: reference depth of t- and w-points (m)
@@ -253,7 +238,11 @@ MODULE dom_oce
 
    REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) ::   ssmask, ssumask, ssvmask             !: surface mask at T-,U-, V- and F-pts
    REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:), TARGET :: tmask, umask, vmask, fmask   !: land/ocean mask at T-, U-, V- and F-pts
-   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:), TARGET :: wmask, wumask, wvmask        !: land/ocean mask at WT-, WU- and WV-pts
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:,:), TARGET :: wmask                        !: land/ocean mask at W- pts               
+
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) :: msk_opnsea  , msk_csundef                !: open ocean mask, closed sea mask (all of them)
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) :: msk_csglo   , msk_csrnf   , msk_csemp    !: closed sea masks
+   REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:,:) :: msk_csgrpglo, msk_csgrprnf, msk_csgrpemp !: closed sea masks
 
    REAL(wp), PUBLIC, ALLOCATABLE, SAVE, DIMENSION(:) ::   tpol, fpol          !: north fold mask (jperio= 3 or 4)
 
@@ -313,7 +302,7 @@ CONTAINS
 
    INTEGER FUNCTION dom_oce_alloc()
       !!----------------------------------------------------------------------
-      INTEGER, DIMENSION(12) :: ierr
+      INTEGER, DIMENSION(11) :: ierr
       !!----------------------------------------------------------------------
       ierr(:) = 0
       !
@@ -338,7 +327,7 @@ CONTAINS
       !    &      gdept_b(jpi,jpj,jpk) , gdepw_b(jpi,jpj,jpk) ,                             &
       !    &      gdept_n(jpi,jpj,jpk) , gdepw_n(jpi,jpj,jpk) , gde3w_n(jpi,jpj,jpk) , STAT=ierr(4) )
 
-         ALLOCATE( gdept_0(jpi,jpj,jpk) , gdepw_0(jpi,jpj,jpk) , gde3w_0(jpi,jpj,jpk) , STAT=ierr(4) )
+         ALLOCATE( gdept_0(jpi,jpj,jpk) , gdepw_0(jpi,jpj,jpk), STAT=ierr(4) )
 
          !
       ! ALLOCATE( e3t_0(jpi,jpj,jpk) , e3u_0(jpi,jpj,jpk) , e3v_0(jpi,jpj,jpk) , e3f_0(jpi,jpj,jpk) , e3w_0(jpi,jpj,jpk) ,   &
@@ -350,36 +339,36 @@ CONTAINS
       !    &      e3uw_b(jpi,jpj,jpk) , e3vw_b(jpi,jpj,jpk) ,         &
       !    &      e3uw_n(jpi,jpj,jpk) , e3vw_n(jpi,jpj,jpk) ,     STAT=ierr(5) )
 
-         ALLOCATE( e3t_0(jpi,jpj,jpk) , e3u_0(jpi,jpj,jpk) , e3v_0(jpi,jpj,jpk) , e3f_0(jpi,jpj,jpk) , e3w_0(jpi,jpj,jpk) ,   &
-            !                                                          !
-            &      e3uw_0(jpi,jpj,jpk) , e3vw_0(jpi,jpj,jpk) ,     STAT=ierr(5) )
          !
-      ALLOCATE( ht_0(jpi,jpj) , hu_0(jpi,jpj) , hv_0(jpi,jpj) ,                                           &
-         &                      hu_b(jpi,jpj) , hv_b(jpi,jpj) , r1_hu_b(jpi,jpj) , r1_hv_b(jpi,jpj) ,     &
-         &      ht_n(jpi,jpj) , hu_n(jpi,jpj) , hv_n(jpi,jpj) , r1_hu_n(jpi,jpj) , r1_hv_n(jpi,jpj) ,     &
-         &                      hu_a(jpi,jpj) , hv_a(jpi,jpj) , r1_hu_a(jpi,jpj) , r1_hv_a(jpi,jpj) , STAT=ierr(6)  )
+    !  ALLOCATE( ht_0(jpi,jpj) , hu_0(jpi,jpj) , hv_0(jpi,jpj) ,                                           &
+    !     &                      hu_b(jpi,jpj) , hv_b(jpi,jpj) , r1_hu_b(jpi,jpj) , r1_hv_b(jpi,jpj) ,     &
+    !     &      ht_n(jpi,jpj) , hu_n(jpi,jpj) , hv_n(jpi,jpj) , r1_hu_n(jpi,jpj) , r1_hv_n(jpi,jpj) ,     &
+    !     &                      hu_a(jpi,jpj) , hv_a(jpi,jpj) , r1_hu_a(jpi,jpj) , r1_hv_a(jpi,jpj) , STAT=ierr(6)  )
          !
+      ALLOCATE( e3t_0 (jpi,jpj,jpk) , e3u_0 (jpi,jpj,jpk) , e3v_0(jpi,jpj,jpk) , e3f_0(jpi,jpj,jpk) , e3w_0(jpi,jpj,jpk) ,   &
+         &      e3uw_0(jpi,jpj,jpk) , e3vw_0(jpi,jpj,jpk) , STAT=ierr(5) )
          !
-      ALLOCATE( gdept_1d(jpk) , e3tp (jpi,jpj), e3wp(jpi,jpj) ,gdepw_1d(jpk) , e3t_1d(jpk) , e3w_1d(jpk) , STAT=ierr(7) )
+      ALLOCATE( gdept_1d(jpk) , e3tp (jpi,jpj), e3wp(jpi,jpj) ,gdepw_1d(jpk) , e3t_1d(jpk) , e3w_1d(jpk) , STAT=ierr(6) )
          !
-      ALLOCATE( bathy(jpi,jpj),mbathy(jpi,jpj), tmask_i(jpi,jpj) , tmask_h(jpi,jpj) ,                        & 
+      ALLOCATE( bathy(jpi,jpj),mbathy(jpi,jpj), tmask_i(jpi,jpj) , tmask_h(jpi,jpj) ,                        &
          &      ssmask (jpi,jpj) , ssumask(jpi,jpj) , ssvmask(jpi,jpj) ,     &
-         &      mbkt   (jpi,jpj) , mbku   (jpi,jpj) , mbkv   (jpi,jpj) , STAT=ierr(9) )
+         &      mbkt   (jpi,jpj) , mbku   (jpi,jpj) , mbkv   (jpi,jpj) , STAT=ierr(7) )
          !
       ALLOCATE( misfdep(jpi,jpj) , mikt(jpi,jpj) , miku(jpi,jpj) ,     &
-         &      risfdep(jpi,jpj) , mikv(jpi,jpj) , mikf(jpi,jpj) , STAT=ierr(10) )
+         &      risfdep(jpi,jpj) , mikv(jpi,jpj) , mikf(jpi,jpj) , STAT=ierr(8) )
          !
-      ALLOCATE( tmask(jpi,jpj,jpk) , umask(jpi,jpj,jpk) ,     & 
-         &      vmask(jpi,jpj,jpk) , fmask(jpi,jpj,jpk) , STAT=ierr(11) )
+      ALLOCATE( tmask(jpi,jpj,jpk) , umask(jpi,jpj,jpk) ,     &
+         &      vmask(jpi,jpj,jpk) , fmask(jpi,jpj,jpk) , wmask(jpi,jpj,jpk) , STAT=ierr(9) )
          !
-      ALLOCATE( wmask(jpi,jpj,jpk) , wumask(jpi,jpj,jpk), wvmask(jpi,jpj,jpk) , STAT=ierr(12) )
-
       ALLOCATE( hbatv (jpi,jpj) , hbatf (jpi,jpj) ,     &
          &      hbatt (jpi,jpj) , hbatu (jpi,jpj) ,     &
          &      scosrf(jpi,jpj) , scobot(jpi,jpj) ,     &
          &      hifv  (jpi,jpj) , hiff  (jpi,jpj) ,     &
-         &      hift  (jpi,jpj) , hifu  (jpi,jpj) , STAT=ierr(8) )
-      !
+         &      hift  (jpi,jpj) , hifu  (jpi,jpj) , STAT=ierr(10) )
+
+      ALLOCATE( msk_opnsea  (jpi,jpj), msk_csundef (jpi,jpj),                        &
+         &      msk_csglo   (jpi,jpj), msk_csrnf   (jpi,jpj), msk_csemp   (jpi,jpj), &
+         &      msk_csgrpglo(jpi,jpj), msk_csgrprnf(jpi,jpj), msk_csgrpemp(jpi,jpj), STAT=ierr(11) )      !
       dom_oce_alloc = MAXVAL(ierr)
       !
    END FUNCTION dom_oce_alloc

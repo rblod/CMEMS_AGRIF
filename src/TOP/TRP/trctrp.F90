@@ -19,9 +19,10 @@ MODULE trctrp
    USE trcldf          ! lateral mixing                      (trc_ldf routine)
    USE trcadv          ! advection                           (trc_adv routine)
    USE trczdf          ! vertical diffusion                  (trc_zdf routine)
-   USE trcnxt          ! time-stepping                       (trc_nxt routine)
+   USE trcatf          ! time filtering                      (trc_atf routine)
    USE trcrad          ! positivity                          (trc_rad routine)
    USE trcsbc          ! surface boundary condition          (trc_sbc routine)
+   USE trcbc           ! Tracers boundary condtions          ( trc_bc routine)
    USE zpshde          ! partial step: hor. derivative       (zps_hde routine)
    USE bdy_oce   , ONLY: ln_bdy
    USE trcbdy          ! BDY open boundaries
@@ -37,13 +38,13 @@ MODULE trctrp
 
    !!----------------------------------------------------------------------
    !! NEMO/TOP 4.0 , NEMO Consortium (2018)
-   !! $Id: trctrp.F90 10068 2018-08-28 14:09:04Z nicolasmartin $ 
+   !! $Id: trctrp.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 
 CONTAINS
 
-   SUBROUTINE trc_trp( kt )
+   SUBROUTINE trc_trp( kt, Kbb, Kmm, Krhs, Kaa )
       !!----------------------------------------------------------------------
       !!                     ***  ROUTINE trc_trp  ***
       !!                      
@@ -52,41 +53,52 @@ CONTAINS
       !! ** Method  : - Compute the passive tracers trends 
       !!              - Update the passive tracers
       !!----------------------------------------------------------------------
-      INTEGER, INTENT( in ) ::  kt  ! ocean time-step index
+      INTEGER, INTENT( in ) :: kt                  ! ocean time-step index
+      INTEGER, INTENT( in ) :: Kbb, Kmm, Krhs, Kaa ! time level indices (not swapped in this routine)
       !! ---------------------------------------------------------------------
       !
       IF( ln_timing )   CALL timing_start('trc_trp')
       !
       IF( .NOT. lk_c1d ) THEN
          !
-                                CALL trc_sbc    ( kt )      ! surface boundary condition
-         IF( ln_trabbl )        CALL trc_bbl    ( kt )      ! advective (and/or diffusive) bottom boundary layer scheme
-         IF( ln_trcdmp )        CALL trc_dmp    ( kt )      ! internal damping trends
-         IF( ln_bdy )           CALL trc_bdy_dmp( kt )      ! BDY damping trends
-                                CALL trc_adv    ( kt )      ! horizontal & vertical advection 
+                                CALL trc_sbc    ( kt,      Kmm, tr, Krhs )      ! surface boundary condition
+         IF( ln_trcbc .AND. lltrcbc .AND. kt /= nit000 )  &
+                                CALL trc_bc     ( kt,      Kmm, tr, Krhs )      ! tracers: surface and lateral Boundary Conditions 
+         IF( ln_trabbl )        CALL trc_bbl    ( kt, Kbb, Kmm, tr, Krhs )      ! advective (and/or diffusive) bottom boundary layer scheme
+         IF( ln_trcdmp )        CALL trc_dmp    ( kt, Kbb, Kmm, tr, Krhs )      ! internal damping trends
+         IF( ln_bdy )           CALL trc_bdy_dmp( kt, Kbb,      Krhs )      ! BDY damping trends
+                                CALL trc_adv    ( kt, Kbb, Kmm, tr, Krhs )      ! horizontal & vertical advection 
          !                                                         ! Partial top/bottom cell: GRADh( trb )  
          IF( ln_zps ) THEN
-           IF( ln_isfcav ) THEN ; CALL zps_hde_isf( kt, jptra, trb, pgtu=gtru, pgtv=gtrv, pgtui=gtrui, pgtvi=gtrvi )  ! both top & bottom
-           ELSE                 ; CALL zps_hde    ( kt, jptra, trb, gtru, gtrv )                                      !  only bottom
+           IF( ln_isfcav ) THEN ; CALL zps_hde_isf( kt, Kmm, jptra, tr(:,:,:,:,Kbb), pgtu=gtru, pgtv=gtrv, pgtui=gtrui, pgtvi=gtrvi )  ! both top & bottom
+           ELSE                 ; CALL zps_hde    ( kt, Kmm, jptra, tr(:,:,:,:,Kbb), gtru, gtrv )                                      !  only bottom
            ENDIF
          ENDIF
          !                                                      
-                                CALL trc_ldf    ( kt )      ! lateral mixing
+                                CALL trc_ldf    ( kt, Kbb, Kmm,       tr, Krhs )  ! lateral mixing
 #if defined key_agrif
          IF(.NOT. Agrif_Root()) CALL Agrif_Sponge_trc       ! tracers sponge
 #endif
-                                CALL trc_zdf    ( kt )      ! vertical mixing and after tracer fields
-                                CALL trc_nxt    ( kt )      ! tracer fields at next time step     
-         IF( ln_trcrad )        CALL trc_rad    ( kt )      ! Correct artificial negative concentrations
-         IF( ln_trcdmp_clo )    CALL trc_dmp_clo( kt )      ! internal damping trends on closed seas only
+                                CALL trc_zdf    ( kt, Kbb, Kmm, Krhs, tr, Kaa  )  ! vert. mixing & after tracer	==> after
+                                CALL trc_atf    ( kt, Kbb, Kmm, Kaa , tr )        ! time filtering of "now" tracer fields    
+         !
+         ! Subsequent calls use the filtered values: Kmm and Kaa 
+         ! These are used explicitly here since time levels will not be swapped until after tra_atf/dyn_atf/ssh_atf in stp
+         !
+         IF( ln_trcrad )        CALL trc_rad    ( kt, Kmm, Kaa, tr       )    ! Correct artificial negative concentrations
+         IF( ln_trcdmp_clo )    CALL trc_dmp_clo( kt, Kmm, Kaa )              ! internal damping trends on closed seas only
 
          !
       ELSE                                               ! 1D vertical configuration
-                                CALL trc_sbc( kt )            ! surface boundary condition
-         IF( ln_trcdmp )        CALL trc_dmp( kt )            ! internal damping trends
-                                CALL trc_zdf( kt )            ! vertical mixing and after tracer fields
-                                CALL trc_nxt( kt )            ! tracer fields at next time step     
-          IF( ln_trcrad )       CALL trc_rad( kt )            ! Correct artificial negative concentrations
+                                CALL trc_sbc( kt,      Kmm,       tr, Krhs )  ! surface boundary condition
+         IF( ln_trcdmp )        CALL trc_dmp( kt, Kbb, Kmm,       tr, Krhs )  ! internal damping trends
+                                CALL trc_zdf( kt, Kbb, Kmm, Krhs, tr, Kaa  )  ! vert. mixing & after tracer	==> after
+                                CALL trc_atf( kt, Kbb, Kmm, Kaa , tr )        ! time filtering of "now" tracer fields
+         !
+         ! Subsequent calls use the filtered values: Kmm and Kaa 
+         ! These are used explicitly here since time levels will not be swapped until after tra_atf/dyn_atf/ssh_atf in stp
+         !
+         IF( ln_trcrad )       CALL trc_rad( kt, Kmm, Kaa, tr       )  ! Correct artificial negative concentrations
          !
       END IF
       !

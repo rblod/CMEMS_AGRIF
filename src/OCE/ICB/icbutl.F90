@@ -48,7 +48,7 @@ MODULE icbutl
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: icbutl.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: icbutl.F90 10702 2019-02-20 09:44:07Z mathiot $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -69,13 +69,13 @@ CONTAINS
       ! only necessary for variables not on T points
       ! and ssh which is used to calculate gradients
 
-      uo_e(:,:) = 0._wp   ;   uo_e(1:jpi,1:jpj) = ssu_m(:,:) * umask(:,:,1)
-      vo_e(:,:) = 0._wp   ;   vo_e(1:jpi,1:jpj) = ssv_m(:,:) * vmask(:,:,1)
-      ff_e(:,:) = 0._wp   ;   ff_e(1:jpi,1:jpj) = ff_f (:,:) 
-      tt_e(:,:) = 0._wp   ;   tt_e(1:jpi,1:jpj) = sst_m(:,:)
-      fr_e(:,:) = 0._wp   ;   fr_e(1:jpi,1:jpj) = fr_i (:,:)
-      ua_e(:,:) = 0._wp   ;   ua_e(1:jpi,1:jpj) = utau (:,:) * umask(:,:,1) ! maybe mask useless because mask applied in sbcblk
-      va_e(:,:) = 0._wp   ;   va_e(1:jpi,1:jpj) = vtau (:,:) * vmask(:,:,1) ! maybe mask useless because mask applied in sbcblk
+      uo_e(1:jpi,1:jpj) = ssu_m(:,:) * umask(:,:,1)
+      vo_e(1:jpi,1:jpj) = ssv_m(:,:) * vmask(:,:,1)
+      ff_e(1:jpi,1:jpj) = ff_f (:,:) 
+      tt_e(1:jpi,1:jpj) = sst_m(:,:)
+      fr_e(1:jpi,1:jpj) = fr_i (:,:)
+      ua_e(1:jpi,1:jpj) = utau (:,:) * umask(:,:,1) ! maybe mask useless because mask applied in sbcblk
+      va_e(1:jpi,1:jpj) = vtau (:,:) * vmask(:,:,1) ! maybe mask useless because mask applied in sbcblk
       !
       CALL lbc_lnk_icb( 'icbutl', uo_e, 'U', -1._wp, 1, 1 )
       CALL lbc_lnk_icb( 'icbutl', vo_e, 'V', -1._wp, 1, 1 )
@@ -85,31 +85,20 @@ CONTAINS
       CALL lbc_lnk_icb( 'icbutl', fr_e, 'T', +1._wp, 1, 1 )
       CALL lbc_lnk_icb( 'icbutl', tt_e, 'T', +1._wp, 1, 1 )
 #if defined key_si3
-      hicth(:,:) = 0._wp ;  hicth(1:jpi,1:jpj) = hm_i (:,:)  
-      ui_e(:,:) = 0._wp ;   ui_e(1:jpi, 1:jpj) = u_ice(:,:)
-      vi_e(:,:) = 0._wp ;   vi_e(1:jpi, 1:jpj) = v_ice(:,:)
+      hi_e(1:jpi, 1:jpj) = hm_i (:,:)  
+      ui_e(1:jpi, 1:jpj) = u_ice(:,:)
+      vi_e(1:jpi, 1:jpj) = v_ice(:,:)
       !      
       ! compute ssh slope using ssh_lead if embedded
       zssh_lead_m(:,:) = ice_var_sshdyn(ssh_m, snwice_mass, snwice_mass_b)
-      ssh_e(:,:) = 0._wp ;  ssh_e(1:jpi, 1:jpj) = zssh_lead_m(:,:) * tmask(:,:,1)
+      ssh_e(1:jpi, 1:jpj) = zssh_lead_m(:,:) * tmask(:,:,1)
       !
-      CALL lbc_lnk_icb( 'icbutl', hicth, 'T', +1._wp, 1, 1 )
+      CALL lbc_lnk_icb( 'icbutl', hi_e , 'T', +1._wp, 1, 1 )
       CALL lbc_lnk_icb( 'icbutl', ui_e , 'U', -1._wp, 1, 1 )
       CALL lbc_lnk_icb( 'icbutl', vi_e , 'V', -1._wp, 1, 1 )
 #else
-      ssh_e(:,:) = 0._wp ;  ssh_e(1:jpi, 1:jpj) = ssh_m(:,:) * tmask(:,:,1)
+      ssh_e(1:jpi, 1:jpj) = ssh_m(:,:) * tmask(:,:,1)
 #endif
-
-      !! special for ssh which is used to calculate slope
-      !! so fudge some numbers all the way around the boundary
-      ssh_e(0    ,    :) = ssh_e(1  ,  :)
-      ssh_e(jpi+1,    :) = ssh_e(jpi,  :)
-      ssh_e(:    ,    0) = ssh_e(:  ,  1)
-      ssh_e(:    ,jpj+1) = ssh_e(:  ,jpj)
-      ssh_e(0,0)         = ssh_e(1,1)
-      ssh_e(jpi+1,0)     = ssh_e(jpi,1)
-      ssh_e(0,jpj+1)     = ssh_e(1,jpj)
-      ssh_e(jpi+1,jpj+1) = ssh_e(jpi,jpj)
       CALL lbc_lnk_icb( 'icbutl', ssh_e, 'T', +1._wp, 1, 1 )
       !
    END SUBROUTINE icb_utl_copy
@@ -130,6 +119,8 @@ CONTAINS
       !!             right now, U is 0 in land so that the coastal value of velocity parallel to the coast
       !!             is half the off shore value, wile the normal-to-the-coast value is zero.
       !!             This is OK as a starting point.
+      !!       !!pm  HARD CODED: - rho_air now computed in sbcblk (what are the effect ?)
+      !!                         - drag coefficient (should it be namelist parameter ?)
       !!
       !!----------------------------------------------------------------------
       REAL(wp), INTENT(in   ) ::   pi , pj                        ! position in (i,j) referential
@@ -141,26 +132,26 @@ CONTAINS
       REAL(wp) ::   zcd, zmod       ! local scalars
       !!----------------------------------------------------------------------
 
-      pe1 = icb_utl_bilin_e( e1t, e1u, e1v, e1f, pi, pj )     ! scale factors
+      pe1 = icb_utl_bilin_e( e1t, e1u, e1v, e1f, pi, pj )      ! scale factors
       pe2 = icb_utl_bilin_e( e2t, e2u, e2v, e2f, pi, pj )
       !
-      puo  = icb_utl_bilin_h( uo_e, pi, pj, 'U' )             ! ocean velocities
-      pvo  = icb_utl_bilin_h( vo_e, pi, pj, 'V' )
-      psst = icb_utl_bilin_h( tt_e, pi, pj, 'T' )             ! SST
-      pcn  = icb_utl_bilin_h( fr_e , pi, pj, 'T' )            ! ice concentration
-      pff  = icb_utl_bilin_h( ff_e , pi, pj, 'F' )            ! Coriolis parameter
+      puo  = icb_utl_bilin_h( uo_e, pi, pj, 'U', .false.  )    ! ocean velocities
+      pvo  = icb_utl_bilin_h( vo_e, pi, pj, 'V', .false.  )
+      psst = icb_utl_bilin_h( tt_e, pi, pj, 'T', .true.   )    ! SST
+      pcn  = icb_utl_bilin_h( fr_e, pi, pj, 'T', .true.   )    ! ice concentration
+      pff  = icb_utl_bilin_h( ff_e, pi, pj, 'F', .false.  )    ! Coriolis parameter
       !
-      pua  = icb_utl_bilin_h( ua_e , pi, pj, 'U' )            ! 10m wind
-      pva  = icb_utl_bilin_h( va_e , pi, pj, 'V' )            ! here (ua,va) are stress => rough conversion from stress to speed
-      zcd  = 1.22_wp * 1.5e-3_wp                              ! air density * drag coefficient
+      pua  = icb_utl_bilin_h( ua_e, pi, pj, 'U', .true.   )    ! 10m wind
+      pva  = icb_utl_bilin_h( va_e, pi, pj, 'V', .true.   )    ! here (ua,va) are stress => rough conversion from stress to speed
+      zcd  = 1.22_wp * 1.5e-3_wp                               ! air density * drag coefficient 
       zmod = 1._wp / MAX(  1.e-20, SQRT(  zcd * SQRT( pua*pua + pva*pva)  )  )
       pua  = pua * zmod                                       ! note: stress module=0 necessarly implies ua=va=0
       pva  = pva * zmod
 
 #if defined key_si3
-      pui = icb_utl_bilin_h( ui_e , pi, pj, 'U' )              ! sea-ice velocities
-      pvi = icb_utl_bilin_h( vi_e , pi, pj, 'V' )
-      phi = icb_utl_bilin_h( hicth, pi, pj, 'T' )              ! ice thickness
+      pui = icb_utl_bilin_h( ui_e , pi, pj, 'U', .false. )    ! sea-ice velocities
+      pvi = icb_utl_bilin_h( vi_e , pi, pj, 'V', .false. )
+      phi = icb_utl_bilin_h( hi_e , pi, pj, 'T', .true.  )    ! ice thickness
 #else
       pui = 0._wp
       pvi = 0._wp
@@ -168,15 +159,15 @@ CONTAINS
 #endif
 
       ! Estimate SSH gradient in i- and j-direction (centred evaluation)
-      pssh_i = ( icb_utl_bilin_h( ssh_e, pi+0.1_wp, pj, 'T' ) -   &
-         &       icb_utl_bilin_h( ssh_e, pi-0.1_wp, pj, 'T' )  ) / ( 0.2_wp * pe1 )
-      pssh_j = ( icb_utl_bilin_h( ssh_e, pi, pj+0.1_wp, 'T' ) -   &
-         &       icb_utl_bilin_h( ssh_e, pi, pj-0.1_wp, 'T' )  ) / ( 0.2_wp * pe2 )
+      pssh_i = ( icb_utl_bilin_h( ssh_e, pi+0.1_wp, pj, 'T', .true. ) -   &
+         &       icb_utl_bilin_h( ssh_e, pi-0.1_wp, pj, 'T', .true. )  ) / ( 0.2_wp * pe1 )
+      pssh_j = ( icb_utl_bilin_h( ssh_e, pi, pj+0.1_wp, 'T', .true. ) -   &
+         &       icb_utl_bilin_h( ssh_e, pi, pj-0.1_wp, 'T', .true. )  ) / ( 0.2_wp * pe2 )
       !
    END SUBROUTINE icb_utl_interp
 
 
-   REAL(wp) FUNCTION icb_utl_bilin_h( pfld, pi, pj, cd_type )
+   REAL(wp) FUNCTION icb_utl_bilin_h( pfld, pi, pj, cd_type, plmask )
       !!----------------------------------------------------------------------
       !!                  ***  FUNCTION icb_utl_bilin  ***
       !!
@@ -190,9 +181,12 @@ CONTAINS
       REAL(wp), DIMENSION(0:jpi+1,0:jpj+1), INTENT(in) ::   pfld      ! field to be interpolated
       REAL(wp)                            , INTENT(in) ::   pi, pj    ! targeted coordinates in (i,j) referential
       CHARACTER(len=1)                    , INTENT(in) ::   cd_type   ! type of pfld array grid-points: = T , U , V or F points
+      LOGICAL                             , INTENT(in) ::   plmask    ! special treatment of mask point
       !
       INTEGER  ::   ii, ij   ! local integer
       REAL(wp) ::   zi, zj   ! local real
+      REAL(wp) :: zw1, zw2, zw3, zw4
+      REAL(wp), DIMENSION(4) :: zmask
       !!----------------------------------------------------------------------
       !
       SELECT CASE ( cd_type )
@@ -200,43 +194,66 @@ CONTAINS
          ! note that here there is no +0.5 added
          ! since we're looking for four T points containing quadrant we're in of 
          ! current T cell
-         ii = MAX(1, INT( pi     ))
-         ij = MAX(1, INT( pj     ))    ! T-point
+         ii = MAX(0, INT( pi     ))
+         ij = MAX(0, INT( pj     ))    ! T-point
          zi = pi - REAL(ii,wp)
          zj = pj - REAL(ij,wp)
       CASE ( 'U' )
-         ii = MAX(1, INT( pi-0.5 ))
-         ij = MAX(1, INT( pj     ))    ! U-point
-         zi = pi - 0.5 - REAL(ii,wp)
+         ii = MAX(0, INT( pi-0.5_wp ))
+         ij = MAX(0, INT( pj     ))    ! U-point
+         zi = pi - 0.5_wp - REAL(ii,wp)
          zj = pj - REAL(ij,wp)
       CASE ( 'V' )
-         ii = MAX(1, INT( pi     ))
-         ij = MAX(1, INT( pj-0.5 ))    ! V-point
+         ii = MAX(0, INT( pi     ))
+         ij = MAX(0, INT( pj-0.5_wp ))    ! V-point
          zi = pi - REAL(ii,wp)
-         zj = pj - 0.5 - REAL(ij,wp)
+         zj = pj - 0.5_wp - REAL(ij,wp)
       CASE ( 'F' )
-         ii = MAX(1, INT( pi-0.5 ))
-         ij = MAX(1, INT( pj-0.5 ))    ! F-point
-         zi = pi - 0.5 - REAL(ii,wp)
-         zj = pj - 0.5 - REAL(ij,wp)
+         ii = MAX(0, INT( pi-0.5_wp ))
+         ij = MAX(0, INT( pj-0.5_wp ))    ! F-point
+         zi = pi - 0.5_wp - REAL(ii,wp)
+         zj = pj - 0.5_wp - REAL(ij,wp)
       END SELECT
       !
       ! find position in this processor. Prevent near edge problems (see #1389)
+      ! (PM) will be useless if extra halo is used in NEMO
       !
-      IF    ( ii < mig( 1 ) ) THEN   ;   ii = 1
-      ELSEIF( ii > mig(jpi) ) THEN   ;   ii = jpi
-      ELSE                           ;   ii = mi1(ii)
+      IF    ( ii <= mig(1)-1 ) THEN   ;   ii = 0
+      ELSEIF( ii  > mig(jpi) ) THEN   ;   ii = jpi
+      ELSE                            ;   ii = mi1(ii)
       ENDIF
-      IF    ( ij < mjg( 1 ) ) THEN   ;   ij = 1
-      ELSEIF( ij > mjg(jpj) ) THEN   ;   ij = jpj
-      ELSE                           ;   ij  = mj1(ij)
+      IF    ( ij <= mjg(1)-1 ) THEN   ;   ij = 0
+      ELSEIF( ij  > mjg(jpj) ) THEN   ;   ij = jpj
+      ELSE                            ;   ij = mj1(ij)
       ENDIF
       !
-      IF( ii == jpi )   ii = ii-1      
-      IF( ij == jpj )   ij = ij-1
+      ! define mask array 
+      IF (plmask) THEN
+         ! land value is not used in the interpolation
+         SELECT CASE ( cd_type )
+         CASE ( 'T' )
+            zmask = (/tmask_e(ii,ij), tmask_e(ii+1,ij), tmask_e(ii,ij+1), tmask_e(ii+1,ij+1)/)
+         CASE ( 'U' )
+            zmask = (/umask_e(ii,ij), umask_e(ii+1,ij), umask_e(ii,ij+1), umask_e(ii+1,ij+1)/)
+         CASE ( 'V' )
+            zmask = (/vmask_e(ii,ij), vmask_e(ii+1,ij), vmask_e(ii,ij+1), vmask_e(ii+1,ij+1)/)
+         CASE ( 'F' )
+            ! F case only used for coriolis, ff_f is not mask so zmask = 1
+            zmask = 1.
+         END SELECT
+      ELSE
+         ! land value is used during interpolation
+         zmask = 1.
+      END iF
       !
-      icb_utl_bilin_h = ( pfld(ii,ij  ) * (1.-zi) + pfld(ii+1,ij  ) * zi ) * (1.-zj)   &
-         &            + ( pfld(ii,ij+1) * (1.-zi) + pfld(ii+1,ij+1) * zi ) *     zj
+      ! compute weight
+      zw1 = zmask(1) * (1._wp-zi) * (1._wp-zj)
+      zw2 = zmask(2) *        zi  * (1._wp-zj)
+      zw3 = zmask(3) * (1._wp-zi) *        zj
+      zw4 = zmask(4) *        zi  *        zj
+      !
+      ! compute interpolated value
+      icb_utl_bilin_h = ( pfld(ii,ij)*zw1 + pfld(ii+1,ij)*zw2 + pfld(ii,ij+1)*zw3 + pfld(ii+1,ij+1)*zw4 ) / MAX(1.e-20, zw1+zw2+zw3+zw4) 
       !
    END FUNCTION icb_utl_bilin_h
 
@@ -371,7 +388,7 @@ CONTAINS
       REAL(wp), DIMENSION(:,:), INTENT(in) ::   pet, peu, pev, pef   ! horizontal scale factor to be interpolated at t-,u-,v- & f-pts
       REAL(wp)                , INTENT(in) ::   pi, pj               ! targeted coordinates in (i,j) referential
       !
-      INTEGER  ::   ii, ij, icase   ! local integer
+      INTEGER  ::   ii, ij, icase, ierr   ! local integer
       !
       ! weights corresponding to corner points of a T cell quadrant
       REAL(wp) ::   zi, zj          ! local real
@@ -393,17 +410,21 @@ CONTAINS
       zj = pj - REAL(ij,wp)
 
       ! find position in this processor. Prevent near edge problems (see #1389)
-      IF    ( ii < mig( 1 ) ) THEN   ;   ii = 1
-      ELSEIF( ii > mig(jpi) ) THEN   ;   ii = jpi
+      !
+      ierr = 0
+      IF    ( ii < mig( 1 ) ) THEN   ;   ii = 1       ; ierr = ierr + 1
+      ELSEIF( ii > mig(jpi) ) THEN   ;   ii = jpi     ; ierr = ierr + 1
       ELSE                           ;   ii = mi1(ii)
       ENDIF
-      IF    ( ij < mjg( 1 ) ) THEN   ;   ij = 1
-      ELSEIF( ij > mjg(jpj) ) THEN   ;   ij = jpj
+      IF    ( ij < mjg( 1 ) ) THEN   ;   ij = 1       ; ierr = ierr + 1
+      ELSEIF( ij > mjg(jpj) ) THEN   ;   ij = jpj     ; ierr = ierr + 1
       ELSE                           ;   ij  = mj1(ij)
       ENDIF
       !
-      IF( ii == jpi )   ii = ii-1      
-      IF( ij == jpj )   ij = ij-1
+      IF( ii == jpi ) THEN ; ii = ii-1 ; ierr = ierr + 1 ; END IF     
+      IF( ij == jpj ) THEN ; ij = ij-1 ; ierr = ierr + 1 ; END IF
+      !
+      IF ( ierr > 0 ) CALL ctl_stop('STOP','icb_utl_bilin_e: an icebergs coordinates is out of valid range (out of bound error)')
       !
       IF(    0.0_wp <= zi .AND. zi < 0.5_wp   ) THEN
          IF( 0.0_wp <= zj .AND. zj < 0.5_wp        )   THEN        !  NE quadrant
@@ -435,8 +456,8 @@ CONTAINS
          ENDIF
       ENDIF
       !
-      icb_utl_bilin_e = ( ze01 * (1.-zi) + ze11 * zi ) *     zj    &
-         &            + ( ze00 * (1.-zi) + ze10 * zi ) * (1.-zj)
+      icb_utl_bilin_e = ( ze01 * (1._wp-zi) + ze11 * zi ) *        zj    &
+         &            + ( ze00 * (1._wp-zi) + ze10 * zi ) * (1._wp-zj)
       !
    END FUNCTION icb_utl_bilin_e
 
@@ -624,6 +645,7 @@ CONTAINS
       INTEGER                :: kt      ! timestep number
       !!----------------------------------------------------------------------
       !
+      IF (nn_verbose_level == 0) RETURN
       pt => berg%current_point
       WRITE(numicb, 9200) kt, berg%number(1), &
                    pt%xi, pt%yj, pt%lon, pt%lat, pt%uvel, pt%vvel,  &
@@ -648,6 +670,7 @@ CONTAINS
       TYPE(iceberg), POINTER :: this
       !!----------------------------------------------------------------------
       !
+      IF (nn_verbose_level == 0) RETURN
       this => first_berg
       IF( ASSOCIATED(this) ) THEN
          WRITE(numicb,'(a," pe=(",i3,")")' ) cd_label, narea

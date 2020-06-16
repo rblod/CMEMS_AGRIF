@@ -26,6 +26,7 @@ MODULE icesbc
    USE lib_fortran    ! fortran utilities (glob_sum + no signed zero)
    USE lbclnk         ! lateral boundary conditions (or mpp links)
    USE timing         ! Timing
+   USE fldread        !!GS: needed by agrif
 
    IMPLICIT NONE
    PRIVATE
@@ -35,10 +36,10 @@ MODULE icesbc
    PUBLIC ice_sbc_init  ! called by icestp.F90
 
    !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/ICE 4.0 , NEMO Consortium (2018)
-   !! $Id: icesbc.F90 10535 2019-01-16 17:36:47Z clem $
+   !! $Id: icesbc.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -70,18 +71,20 @@ CONTAINS
       !
       SELECT CASE( ksbc )
          CASE( jp_usr     )   ;    CALL usrdef_sbc_ice_tau( kt )                 ! user defined formulation
-         CASE( jp_blk     )   ;    CALL blk_ice_tau                              ! Bulk         formulation
+         CASE( jp_blk     )   ;    CALL blk_ice_1( sf(jp_wndi)%fnow(:,:,1), sf(jp_wndj)%fnow(:,:,1),   &
+            &                                      sf(jp_tair)%fnow(:,:,1), sf(jp_humi)%fnow(:,:,1),   &
+            &                                      sf(jp_slp )%fnow(:,:,1), u_ice, v_ice, tm_su    ,   &   ! inputs
+            &                                      putaui = utau_ice, pvtaui = vtau_ice            )       ! outputs                             
+ !        CASE( jp_abl     )    utau_ice & vtau_ice are computed in ablmod
          CASE( jp_purecpl )   ;    CALL sbc_cpl_ice_tau( utau_ice , vtau_ice )   ! Coupled      formulation
       END SELECT
       !
       IF( ln_mixcpl) THEN                                                        ! Case of a mixed Bulk/Coupled formulation
                                    CALL sbc_cpl_ice_tau( zutau_ice , zvtau_ice )
-         DO jj = 2, jpjm1
-            DO ji = 2, jpim1
-               utau_ice(ji,jj) = utau_ice(ji,jj) * xcplmask(ji,jj,0) + zutau_ice(ji,jj) * ( 1. - xcplmask(ji,jj,0) )
-               vtau_ice(ji,jj) = vtau_ice(ji,jj) * xcplmask(ji,jj,0) + zvtau_ice(ji,jj) * ( 1. - xcplmask(ji,jj,0) )
-            END DO
-         END DO
+         DO_2D_00_00
+            utau_ice(ji,jj) = utau_ice(ji,jj) * xcplmask(ji,jj,0) + zutau_ice(ji,jj) * ( 1. - xcplmask(ji,jj,0) )
+            vtau_ice(ji,jj) = vtau_ice(ji,jj) * xcplmask(ji,jj,0) + zvtau_ice(ji,jj) * ( 1. - xcplmask(ji,jj,0) )
+         END_2D
          CALL lbc_lnk_multi( 'icesbc', utau_ice, 'U', -1., vtau_ice, 'V', -1. )
       ENDIF
       !
@@ -113,9 +116,10 @@ CONTAINS
       INTEGER, INTENT(in) ::   kt     ! ocean time step
       INTEGER, INTENT(in) ::   ksbc   ! flux formulation (user defined, bulk or Pure Coupled)
       !
-      INTEGER  ::   ji, jj, jl                                ! dummy loop index
-      REAL(wp), DIMENSION(jpi,jpj,jpl) ::   zalb_os, zalb_cs  ! ice albedo under overcast/clear sky
-      REAL(wp), DIMENSION(jpi,jpj)     ::   zalb              ! 2D workspace
+      INTEGER  ::   ji, jj, jl      ! dummy loop index
+      REAL(wp) ::   zmiss_val       ! missing value retrieved from xios 
+      REAL(wp), DIMENSION(jpi,jpj,jpl)              ::   zalb_os, zalb_cs  ! ice albedo under overcast/clear sky
+      REAL(wp), DIMENSION(:,:)        , ALLOCATABLE ::   zalb, zmsk00      ! 2D workspace
       !!--------------------------------------------------------------------
       !
       IF( ln_timing )   CALL timing_start('ice_sbc_flx')
@@ -125,6 +129,9 @@ CONTAINS
          WRITE(numout,*)'ice_sbc_flx: Surface boundary condition for sea ice (flux)'
          WRITE(numout,*)'~~~~~~~~~~~~~~~'
       ENDIF
+
+      ! get missing value from xml
+      CALL iom_miss_val( "icetemp", zmiss_val )
 
       ! --- cloud-sky and overcast-sky ice albedos --- !
       CALL ice_alb( t_su, h_i, h_s, ln_pnd_alb, a_ip_frac, h_ip, zalb_cs, zalb_os )
@@ -138,8 +145,9 @@ CONTAINS
       !
       CASE( jp_usr )              !--- user defined formulation
                                   CALL usrdef_sbc_ice_flx( kt, h_s, h_i )
-      CASE( jp_blk )              !--- bulk formulation
-                                  CALL blk_ice_flx    ( t_su, h_s, h_i, alb_ice )    ! 
+      CASE( jp_blk, jp_abl )  !--- bulk formulation & ABL formulation
+                                  CALL blk_ice_2    ( t_su, h_s, h_i, alb_ice, sf(jp_tair)%fnow(:,:,1), sf(jp_humi)%fnow(:,:,1),    &
+            &                                           sf(jp_slp)%fnow(:,:,1), sf(jp_qlw)%fnow(:,:,1), sf(jp_prec)%fnow(:,:,1), sf(jp_snow)%fnow(:,:,1) )    ! 
          IF( ln_mixcpl        )   CALL sbc_cpl_ice_flx( picefr=at_i_b, palbi=alb_ice, psst=sst_m, pist=t_su, phs=h_s, phi=h_i )
          IF( nn_flxdist /= -1 )   CALL ice_flx_dist   ( t_su, alb_ice, qns_ice, qsr_ice, dqns_ice, evap_ice, devap_ice, nn_flxdist )
          !                        !    compute conduction flux and surface temperature (as in Jules surface module)
@@ -151,15 +159,25 @@ CONTAINS
       END SELECT
 
       !--- output ice albedo and surface albedo ---!
-      IF( iom_use('icealb') ) THEN
-         WHERE( at_i_b <= epsi06 )   ;   zalb(:,:) = rn_alb_oce
-         ELSEWHERE                   ;   zalb(:,:) = SUM( alb_ice * a_i_b, dim=3 ) / at_i_b
+      IF( iom_use('icealb') .OR. iom_use('albedo') ) THEN
+
+         ALLOCATE( zalb(jpi,jpj), zmsk00(jpi,jpj) )
+
+         WHERE( at_i_b < 1.e-03 )
+            zmsk00(:,:) = 0._wp
+            zalb  (:,:) = rn_alb_oce
+         ELSEWHERE
+            zmsk00(:,:) = 1._wp            
+            zalb  (:,:) = SUM( alb_ice * a_i_b, dim=3 ) / at_i_b
          END WHERE
-         CALL iom_put( "icealb" , zalb(:,:) )
-      ENDIF
-      IF( iom_use('albedo') ) THEN
+         ! ice albedo
+         CALL iom_put( 'icealb' , zalb * zmsk00 + zmiss_val * ( 1._wp - zmsk00 ) )
+         ! ice+ocean albedo
          zalb(:,:) = SUM( alb_ice * a_i_b, dim=3 ) + rn_alb_oce * ( 1._wp - at_i_b )
-         CALL iom_put( "albedo" , zalb(:,:) )
+         CALL iom_put( 'albedo' , zalb )
+
+         DEALLOCATE( zalb, zmsk00 )
+
       ENDIF
       !
       IF( ln_timing )   CALL timing_stop('ice_sbc_flx')
@@ -269,12 +287,10 @@ CONTAINS
       NAMELIST/namsbc/ rn_cio, rn_blow_s, nn_flxdist, ln_cndflx, ln_cndemulate
       !!-------------------------------------------------------------------
       !
-      REWIND( numnam_ice_ref )         ! Namelist namsbc in reference namelist : Ice dynamics
       READ  ( numnam_ice_ref, namsbc, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namsbc in reference namelist', lwp )
-      REWIND( numnam_ice_cfg )         ! Namelist namsbc in configuration namelist : Ice dynamics
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namsbc in reference namelist' )
       READ  ( numnam_ice_cfg, namsbc, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namsbc in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namsbc in configuration namelist' )
       IF(lwm) WRITE( numoni, namsbc )
       !
       IF(lwp) THEN                     ! control print

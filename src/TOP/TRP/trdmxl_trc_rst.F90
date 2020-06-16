@@ -10,7 +10,7 @@ MODULE trdmxl_trc_rst
    !!----------------------------------------------------------------------
    USE in_out_manager  ! I/O manager
    USE iom             ! I/O module
-   USE trc             ! for nn_dttrc ctrcnm
+   USE trc             ! for ctrcnm
    USE trdmxl_trc_oce  ! for lk_trdmxl_trc
 
    IMPLICIT NONE
@@ -23,7 +23,7 @@ MODULE trdmxl_trc_rst
    
    !!---------------------------------------------------------------------------------
    !! NEMO/TOP 4.0 , NEMO Consortium (2018)
-   !! $Id: trdmxl_trc_rst.F90 10425 2018-12-19 21:54:16Z smasson $ 
+   !! $Id: trdmxl_trc_rst.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!---------------------------------------------------------------------------------
 CONTAINS
@@ -43,7 +43,7 @@ CONTAINS
       INTEGER :: jl,  jk, jn               ! loop indice
       !!--------------------------------------------------------------------------------
 
-      IF( kt == nitrst - nn_dttrc .OR. nitend - nit000 + 1 < 2 * nn_dttrc ) THEN ! idem trcrst.F90
+      IF( kt == nitrst - 1 .OR. nitend - nit000 + 1 < 2 ) THEN ! idem trcrst.F90
          IF( nitrst > 1.0e9 ) THEN
             WRITE(clkt,*) nitrst
          ELSE

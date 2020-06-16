@@ -29,8 +29,6 @@ MODULE usrdef_zgr
 
    PUBLIC   usr_def_zgr        ! called by domzgr.F90
 
-  !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OPA 4.0 , NEMO Consortium (2016)
    !! $Id$
@@ -192,6 +190,11 @@ CONTAINS
       IF(lwp) WRITE(numout,*) '       BENCH case : closed flat box ocean without ocean cavities'
       !
       z2d(:,:) = REAL( jpkm1 , wp )          ! flat bottom
+      !
+      IF( jperio == 3 .OR. jperio ==4 ) THEN   ! add a small island in the upper corners to avoid model instabilities...
+         z2d(mi0(       1):mi1(     3),mj0(jpjglo-2):mj1(jpjglo)) = 0.
+         z2d(mi0(jpiglo-2):mi1(jpiglo),mj0(jpjglo-2):mj1(jpjglo)) = 0.
+      ENDIF
       !
       CALL lbc_lnk( 'usrdef_zgr', z2d, 'T', 1. )           ! set surrounding land to zero (here jperio=0 ==>> closed)
       !

@@ -25,9 +25,11 @@ MODULE usrdef_hgr
 
    PUBLIC   usr_def_hgr   ! called by domhgr.F90
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: usrdef_hgr.F90 10516 2019-01-15 16:31:25Z clem $ 
+   !! $Id: usrdef_hgr.F90 12740 2020-04-12 09:03:06Z smasson $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -87,22 +89,20 @@ CONTAINS
       ENDIF
 #endif         
 
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-            zti = FLOAT( ji - 1 + nimpp - 1 )          ;  ztj = FLOAT( jj - 1 + njmpp - 1 )
-            zui = FLOAT( ji - 1 + nimpp - 1 ) + 0.5_wp ;  zvj = FLOAT( jj - 1 + njmpp - 1 ) + 0.5_wp
-
-            plamt(ji,jj) = zlam0 + rn_dx * 1.e-3 * zti
-            plamu(ji,jj) = zlam0 + rn_dx * 1.e-3 * zui
-            plamv(ji,jj) = plamt(ji,jj) 
-            plamf(ji,jj) = plamu(ji,jj) 
-   
-            pphit(ji,jj) = zphi0 + rn_dy * 1.e-3 * ztj
-            pphiv(ji,jj) = zphi0 + rn_dy * 1.e-3 * zvj
-            pphiu(ji,jj) = pphit(ji,jj) 
-            pphif(ji,jj) = pphiv(ji,jj) 
-         END DO
-      END DO
+      DO_2D_11_11
+         zti = FLOAT( ji - 1 + nimpp - 1 )          ;  ztj = FLOAT( jj - 1 + njmpp - 1 )
+         zui = FLOAT( ji - 1 + nimpp - 1 ) + 0.5_wp ;  zvj = FLOAT( jj - 1 + njmpp - 1 ) + 0.5_wp
+         
+         plamt(ji,jj) = zlam0 + rn_dx * 1.e-3 * zti
+         plamu(ji,jj) = zlam0 + rn_dx * 1.e-3 * zui
+         plamv(ji,jj) = plamt(ji,jj) 
+         plamf(ji,jj) = plamu(ji,jj) 
+         
+         pphit(ji,jj) = zphi0 + rn_dy * 1.e-3 * ztj
+         pphiv(ji,jj) = zphi0 + rn_dy * 1.e-3 * zvj
+         pphiu(ji,jj) = pphit(ji,jj) 
+         pphif(ji,jj) = pphiv(ji,jj) 
+      END_2D
          
          ! Horizontal scale factors (in meters)
          !                              ======

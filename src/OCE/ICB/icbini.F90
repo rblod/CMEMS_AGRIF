@@ -38,9 +38,11 @@ MODULE icbini
    TYPE(FLD_N)                                        ::   sn_icb          !: information about the calving file to be read
    TYPE(FLD), PUBLIC, ALLOCATABLE     , DIMENSION(:)  ::   sf_icb          !: structure: file information, fields read
                                                                            !: used in icbini and icbstp
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: icbini.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: icbini.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -57,7 +59,7 @@ CONTAINS
       !!              - calculate the destinations for north fold exchanges
       !!              - setup either test icebergs or calving file
       !!----------------------------------------------------------------------
-      REAL(wp), INTENT(in) ::   pdt   ! iceberg time-step (rdt*nn_fsbc)
+      REAL(wp), INTENT(in) ::   pdt   ! iceberg time-step (rn_Dt*nn_fsbc)
       INTEGER , INTENT(in) ::   kt    ! time step number
       !
       INTEGER ::   ji, jj, jn               ! dummy loop indices
@@ -73,11 +75,24 @@ CONTAINS
 
       !                          ! allocate gridded fields
       IF( icb_alloc() /= 0 )   CALL ctl_stop( 'STOP', 'icb_alloc : unable to allocate arrays' )
-
+      !
+      !                          ! initialised variable with extra haloes to zero
+      uo_e(:,:) = 0._wp   ;   vo_e(:,:) = 0._wp   ;
+      ua_e(:,:) = 0._wp   ;   va_e(:,:) = 0._wp   ;
+      ff_e(:,:) = 0._wp   ;   tt_e(:,:) = 0._wp   ;
+      fr_e(:,:) = 0._wp   ;
+#if defined key_si3
+      hi_e(:,:) = 0._wp   ;
+      ui_e(:,:) = 0._wp   ;   vi_e(:,:) = 0._wp   ;
+#endif
+      ssh_e(:,:) = 0._wp  ; 
+      !
       !                          ! open ascii output file or files for iceberg status information
       !                          ! note that we choose to do this on all processors since we cannot
       !                          ! predict where icebergs will be ahead of time
-      CALL ctl_opn( numicb, 'icebergs.stat', 'REPLACE', 'FORMATTED', 'SEQUENTIAL', -1, numout, lwp, narea )
+      IF( nn_verbose_level > 0) THEN
+         CALL ctl_opn( numicb, 'icebergs.stat', 'REPLACE', 'FORMATTED', 'SEQUENTIAL', -1, numout, lwp, narea )
+      ENDIF
 
       ! set parameters (mostly from namelist)
       !
@@ -107,12 +122,10 @@ CONTAINS
       IF( jpiglo >= nicbpack )   CALL ctl_stop( 'icbini: processor index packing failure' )
       nicbfldproc(:) = -1
 
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-            src_calving_hflx(ji,jj) = narea
-            src_calving     (ji,jj) = nicbpack * mjg(jj) + mig(ji)
-         END DO
-      END DO
+      DO_2D_11_11
+         src_calving_hflx(ji,jj) = narea
+         src_calving     (ji,jj) = nicbpack * mjg(jj) + mig(ji)
+      END_2D
       CALL lbc_lnk( 'icbini', src_calving_hflx, 'T', 1._wp )
       CALL lbc_lnk( 'icbini', src_calving     , 'T', 1._wp )
 
@@ -221,6 +234,14 @@ CONTAINS
       src_calving     (:,:) = 0._wp
       src_calving_hflx(:,:) = 0._wp
 
+      ! definition of extended surface masked needed by icb_bilin_h
+      tmask_e(:,:) = 0._wp   ;   tmask_e(1:jpi,1:jpj) = tmask(:,:,1)
+      umask_e(:,:) = 0._wp   ;   umask_e(1:jpi,1:jpj) = umask(:,:,1)
+      vmask_e(:,:) = 0._wp   ;   vmask_e(1:jpi,1:jpj) = vmask(:,:,1)
+      CALL lbc_lnk_icb( 'icbini', tmask_e, 'T', +1._wp, 1, 1 )
+      CALL lbc_lnk_icb( 'icbini', umask_e, 'T', +1._wp, 1, 1 )
+      CALL lbc_lnk_icb( 'icbini', vmask_e, 'T', +1._wp, 1, 1 )
+      !
       ! assign each new iceberg with a unique number constructed from the processor number
       ! and incremented by the total number of processors
       num_bergs(:) = 0
@@ -240,8 +261,10 @@ CONTAINS
          ENDIF
          CALL iom_close( inum )                                     ! close file
          !
-         WRITE(numicb,*)
-         WRITE(numicb,*) '          calving read in a file'
+         IF( nn_verbose_level > 0) THEN
+            WRITE(numicb,*)
+            WRITE(numicb,*) '          calving read in a file'
+         ENDIF
          ALLOCATE( sf_icb(1), STAT=istat1 )         ! Create sf_icb structure (calving)
          ALLOCATE( sf_icb(1)%fnow(jpi,jpj,1), STAT=istat2 )
          ALLOCATE( sf_icb(1)%fdta(jpi,jpj,1,2), STAT=istat3 )
@@ -335,7 +358,9 @@ CONTAINS
       !
       ibergs = icb_utl_count()
       CALL mpp_sum('icbini', ibergs)
-      WRITE(numicb,'(a,i6,a)') 'diamonds, icb_ini_gen: ',ibergs,' were generated'
+      IF( nn_verbose_level > 0) THEN
+         WRITE(numicb,'(a,i6,a)') 'diamonds, icb_ini_gen: ',ibergs,' were generated'
+      ENDIF
       !
    END SUBROUTINE icb_ini_gen
 
@@ -357,7 +382,8 @@ CONTAINS
          &              rn_rho_bergs   , rn_LoW_ratio   , nn_verbose_level    , ln_operator_splitting,   &
          &              rn_bits_erosion_fraction        , rn_sicn_shift       , ln_passive_mode      ,   &
          &              ln_time_average_weight          , nn_test_icebergs    , rn_test_box          ,   &
-         &              ln_use_calving , rn_speed_limit , cn_dir, sn_icb
+         &              ln_use_calving , rn_speed_limit , cn_dir, sn_icb      ,                          &
+         &              cn_icbrst_indir, cn_icbrst_in   , cn_icbrst_outdir    , cn_icbrst_out
       !!----------------------------------------------------------------------
 
 #if defined key_agrif
@@ -378,12 +404,10 @@ CONTAINS
       ENDIF
 #endif   
       !                             !==  read namelist  ==!
-      REWIND( numnam_ref )              ! Namelist namberg in reference namelist : Iceberg parameters
       READ  ( numnam_ref, namberg, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 ) CALL ctl_nam ( ios , 'namberg in reference namelist', lwp )
-      REWIND( numnam_cfg )              ! Namelist namberg in configuration namelist : Iceberg parameters
+901   IF( ios /= 0 ) CALL ctl_nam ( ios , 'namberg in reference namelist' )
       READ  ( numnam_cfg, namberg, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 ) CALL ctl_nam ( ios , 'namberg in configuration namelist', lwp )
+902   IF( ios >  0 ) CALL ctl_nam ( ios , 'namberg in configuration namelist' )
       IF(lwm) WRITE ( numond, namberg )
       !
       IF(lwp) WRITE(numout,*)

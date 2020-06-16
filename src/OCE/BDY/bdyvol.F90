@@ -13,9 +13,9 @@ MODULE bdyvol
    USE oce            ! ocean dynamics and tracers 
    USE bdy_oce        ! ocean open boundary conditions
    USE sbc_oce        ! ocean surface boundary conditions
+   USE isf_oce, ONLY : fwfisf_cav, fwfisf_par  ! ice shelf
    USE dom_oce        ! ocean space and time domain 
    USE phycst         ! physical constants
-   USE sbcisf         ! ice shelf
    !
    USE in_out_manager ! I/O manager
    USE lib_mpp        ! for mppsum
@@ -28,7 +28,7 @@ MODULE bdyvol
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: bdyvol.F90 10481 2019-01-09 16:31:56Z mathiot $ 
+   !! $Id: bdyvol.F90 12489 2020-02-28 15:55:11Z davestorkey $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -76,7 +76,7 @@ CONTAINS
       !
       ! Calculate the cumulate surface Flux z_cflxemp (m3/s) over all the domain
       ! -----------------------------------------------------------------------
-      IF ( kc == 1 ) z_cflxemp = glob_sum( 'bdyvol', ( emp(:,:) - rnf(:,:) + fwfisf(:,:) ) * bdytmask(:,:) * e1e2t(:,:)  ) / rau0
+      IF ( kc == 1 ) z_cflxemp = glob_sum( 'bdyvol', ( emp(:,:) - rnf(:,:) + fwfisf_cav(:,:) + fwfisf_par(:,:) ) * bdytmask(:,:) * e1e2t(:,:)  ) / rho0
 
       ! Compute bdy surface each cycle if non linear free surface
       ! ---------------------------------------------------------
@@ -98,12 +98,14 @@ CONTAINS
          DO jb = 1, idx%nblenrim(jgrd)
             ii = idx%nbi(jb,jgrd)
             ij = idx%nbj(jb,jgrd)
+            IF( ii == 1 .OR. ii == jpi .OR. ij == 1 .OR. ij == jpj )  CYCLE   ! sum : else halo couted twice
             zubtpecor = zubtpecor + idx%flagu(jb,jgrd) * pua2d(ii,ij) * e2u(ii,ij) * phu(ii,ij) * tmask_i(ii,ij) * tmask_i(ii+1,ij)
          END DO
          jgrd = 3                               ! then add v component contribution
          DO jb = 1, idx%nblenrim(jgrd)
             ii = idx%nbi(jb,jgrd)
             ij = idx%nbj(jb,jgrd)
+            IF( ii == 1 .OR. ii == jpi .OR. ij == 1 .OR. ij == jpj )  CYCLE   ! sum : else halo couted twice
             zubtpecor = zubtpecor + idx%flagv(jb,jgrd) * pva2d(ii,ij) * e1v(ii,ij) * phv(ii,ij) * tmask_i(ii,ij) * tmask_i(ii,ij+1)
          END DO
          !
@@ -125,12 +127,14 @@ CONTAINS
          DO jb = 1, idx%nblenrim(jgrd)
                ii = idx%nbi(jb,jgrd)
                ij = idx%nbj(jb,jgrd)
+               !IF( ii == 1 .OR. ii == jpi .OR. ij == 1 .OR. ij == jpj )  CYCLE   ! to remove ?
                pua2d(ii,ij) = pua2d(ii,ij) - idx%flagu(jb,jgrd) * zubtpecor * tmask_i(ii,ij) * tmask_i(ii+1,ij)
          END DO
          jgrd = 3                              ! correct v component
          DO jb = 1, idx%nblenrim(jgrd)
                ii = idx%nbi(jb,jgrd)
                ij = idx%nbj(jb,jgrd)
+               !IF( ii == 1 .OR. ii == jpi .OR. ij == 1 .OR. ij == jpj )  CYCLE   ! to remove ?
                pva2d(ii,ij) = pva2d(ii,ij) - idx%flagv(jb,jgrd) * zubtpecor * tmask_i(ii,ij) * tmask_i(ii,ij+1)
          END DO
          !
@@ -138,7 +142,7 @@ CONTAINS
       ! 
       ! Check the cumulated transport through unstructured OBC once barotropic velocities corrected
       ! ------------------------------------------------------
-      IF( MOD( kt, nwrite ) == 0 .AND. ( kc == 1 ) ) THEN
+      IF( MOD( kt, MAX(nn_write,1) ) == 0 .AND. ( kc == 1 ) ) THEN
          !
          ! compute residual transport across boundary
          ztranst = 0._wp
@@ -149,12 +153,14 @@ CONTAINS
             DO jb = 1, idx%nblenrim(jgrd)
                   ii = idx%nbi(jb,jgrd)
                   ij = idx%nbj(jb,jgrd)
+                  IF( ii == 1 .OR. ii == jpi .OR. ij == 1 .OR. ij == jpj )  CYCLE
                   ztranst = ztranst + idx%flagu(jb,jgrd) * pua2d(ii,ij) * e2u(ii,ij) * phu(ii,ij) * tmask_i(ii,ij) * tmask_i(ii+1,ij)
             END DO
             jgrd = 3                              ! correct v component
             DO jb = 1, idx%nblenrim(jgrd)
                   ii = idx%nbi(jb,jgrd)
                   ij = idx%nbj(jb,jgrd)
+                  IF( ii == 1 .OR. ii == jpi .OR. ij == 1 .OR. ij == jpj )  CYCLE
                   ztranst = ztranst + idx%flagv(jb,jgrd) * pva2d(ii,ij) * e1v(ii,ij) * phv(ii,ij) * tmask_i(ii,ij) * tmask_i(ii,ij+1)
             END DO
             !
@@ -194,6 +200,7 @@ CONTAINS
          DO ib = 1, idx_bdy(ib_bdy)%nblenrim(igrd)
             nbi => idx_bdy(ib_bdy)%nbi(ib,igrd)
             nbj => idx_bdy(ib_bdy)%nbj(ib,igrd)
+            IF( nbi == 1 .OR. nbi == jpi .OR. nbj == 1 .OR. nbj == jpj )  CYCLE
             zflagu => idx_bdy(ib_bdy)%flagu(ib,igrd)
             bdy_segs_surf = bdy_segs_surf + phu(nbi, nbj)                              &
                &                            * e2u(nbi, nbj) * ABS( zflagu )            &
@@ -206,6 +213,7 @@ CONTAINS
          DO ib = 1, idx_bdy(ib_bdy)%nblenrim(igrd)
             nbi => idx_bdy(ib_bdy)%nbi(ib,igrd)
             nbj => idx_bdy(ib_bdy)%nbj(ib,igrd)
+            IF( nbi == 1 .OR. nbi == jpi .OR. nbj == 1 .OR. nbj == jpj )  CYCLE
             zflagv => idx_bdy(ib_bdy)%flagv(ib,igrd)
             bdy_segs_surf = bdy_segs_surf + phv(nbi, nbj)                              &
                &                            * e1v(nbi, nbj) * ABS( zflagv )            &

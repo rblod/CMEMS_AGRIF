@@ -28,12 +28,12 @@ MODULE trcsms
 
    !!----------------------------------------------------------------------
    !! NEMO/TOP 4.0 , NEMO Consortium (2018)
-   !! $Id: trcsms.F90 10068 2018-08-28 14:09:04Z nicolasmartin $ 
+   !! $Id: trcsms.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE trc_sms( kt )
+   SUBROUTINE trc_sms( kt, Kbb, Kmm , Krhs )
       !!---------------------------------------------------------------------
       !!                     ***  ROUTINE trc_sms  ***
       !!
@@ -41,23 +41,24 @@ CONTAINS
       !!
       !! ** Method  : -  call the main routine of of each defined tracer model
       !! -------------------------------------------------------------------------------------
-      INTEGER, INTENT( in ) ::   kt      ! ocean time-step index      
+      INTEGER, INTENT( in ) ::   kt        ! ocean time-step index      
+      INTEGER, INTENT( in ) ::   Kbb, Kmm, Krhs ! time level indices
       !!
       CHARACTER (len=25) :: charout
       !!---------------------------------------------------------------------
       !
       IF( ln_timing )   CALL timing_start('trc_sms')
       !
-      IF( ln_pisces  )   CALL trc_sms_pisces ( kt )    ! main program of PISCES 
-      IF( ll_cfc     )   CALL trc_sms_cfc    ( kt )    ! surface fluxes of CFC
-      IF( ln_c14     )   CALL trc_sms_c14    ( kt )    ! surface fluxes of C14
-      IF( ln_age     )   CALL trc_sms_age    ( kt )    ! Age tracer
-      IF( ln_my_trc  )   CALL trc_sms_my_trc ( kt )    ! MY_TRC  tracers
+      IF( ln_pisces  )   CALL trc_sms_pisces ( kt, Kbb, Kmm, Krhs )    ! main program of PISCES 
+      IF( ll_cfc     )   CALL trc_sms_cfc    ( kt, Kbb, Kmm, Krhs )    ! surface fluxes of CFC
+      IF( ln_c14     )   CALL trc_sms_c14    ( kt, Kbb, Kmm, Krhs )    ! surface fluxes of C14
+      IF( ln_age     )   CALL trc_sms_age    ( kt, Kbb, Kmm, Krhs )    ! Age tracer
+      IF( ln_my_trc  )   CALL trc_sms_my_trc ( kt, Kbb, Kmm, Krhs )    ! MY_TRC  tracers
 
-      IF(ln_ctl) THEN      ! print mean trends (used for debugging)
+      IF(sn_cfctl%l_prttrc) THEN                       ! print mean trends (used for debugging)
          WRITE(charout, FMT="('sms ')")
          CALL prt_ctl_trc_info( charout )
-         CALL prt_ctl_trc( tab4d=trn, mask=tmask, clinfo=ctrcnm )
+         CALL prt_ctl_trc( tab4d=tr(:,:,:,:,Kmm), mask=tmask, clinfo=ctrcnm )
       ENDIF
       !
       IF( ln_timing )   CALL timing_stop('trc_sms')

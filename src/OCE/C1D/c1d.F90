@@ -31,7 +31,7 @@ MODULE c1d
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: c1d.F90 10068 2018-08-28 14:09:04Z nicolasmartin $ 
+   !! $Id: c1d.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!======================================================================
 CONTAINS
@@ -49,13 +49,11 @@ CONTAINS
       NAMELIST/namc1d/ rn_lat1d, rn_lon1d , ln_c1d_locpt
       !!----------------------------------------------------------------------
       !
-      REWIND( numnam_ref )              ! Namelist namc1d in reference namelist : Tracer advection scheme
       READ  ( numnam_ref, namc1d, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namc1d in reference namelist', lwp )
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namc1d in reference namelist' )
       !
-      REWIND( numnam_cfg )              ! Namelist namtra_adv in configuration namelist : Tracer advection scheme
       READ  ( numnam_cfg, namc1d, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namc1d in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namc1d in configuration namelist' )
       IF(lwm) WRITE ( numond, namc1d )
       !
       IF(lwp) THEN                    ! Control print

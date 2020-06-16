@@ -12,11 +12,8 @@ MODULE par_oce
    IMPLICIT NONE
    PUBLIC
 
-   ! zoom starting position
-   INTEGER       ::   jpizoom          !: left bottom (i,j) indices of the zoom
-   INTEGER       ::   jpjzoom          !: in data domain indices
-
-  CHARACTER(lc) ::   cp_cfg           !: name of the configuration
+   INTEGER , PUBLIC                                      ::   nn_dttrc      !: frequency of step on passive tracers
+   CHARACTER(lc) ::   cp_cfg           !: name of the configuration
    CHARACTER(lc) ::   cp_cfz           !: name of the zoom of configuration
    INTEGER       ::   jp_cfg           !: resolution of the configuration
 

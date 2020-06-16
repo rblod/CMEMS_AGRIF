@@ -35,5 +35,5 @@
 %USER_INC            -I$XIOS_INC %NCDF_INC
 %USER_LIB            -L$XIOS_LIB -lxios %NCDF_LIB -lstdc++
 
-%CC                  cc
+%CC                  mpicc
 %CFLAGS              -O0

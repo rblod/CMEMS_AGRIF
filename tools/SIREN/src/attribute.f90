@@ -2,8 +2,6 @@
 ! NEMO system team, System and Interface for oceanic RElocable Nesting
 !----------------------------------------------------------------------
 !
-! MODULE: att
-!
 ! DESCRIPTION:
 !> @brief 
 !> This module manage attribute of variable or file.
@@ -78,28 +76,34 @@
 !>    - tl_att\%i_id
 !>
 !> @author J.Paul
-! REVISION HISTORY:
+!>
 !> @date November, 2013 - Initial Version
 !> @date November, 2014 
 !> - Fix memory leaks bug
 !> @date September, 2015
 !> - manage useless (dummy) attributes
-!
-!> @note Software governed by the CeCILL licence     (./LICENSE)
+!> @date May, 2019
+!> - read number of element for each dummy array in configuration file
+!>
+!> @note Software governed by the CeCILL licence     (NEMOGCM/NEMO_CeCILL.txt)
 !----------------------------------------------------------------------
 MODULE att
+
    USE netcdf                          ! nf90 library
    USE global                          ! global variable
    USE kind                            ! F90 kind parameter
    USE logger                          ! log file manager
    USE fct                             ! basic useful function
+
    IMPLICIT NONE
+
    ! NOTE_avoid_public_variables_if_possible
 
    ! type and variable
    PUBLIC :: TATT       !< attribute structure
 
-   PRIVATE :: cm_dumatt !< dummy attribute array
+   PRIVATE :: im_ndumatt   !< number of elt in dummy attribute array
+   PRIVATE :: cm_dumatt    !< dummy attribute array
 
    ! function and subroutine
    PUBLIC :: att_init       !< initialize attribute structure
@@ -140,7 +144,8 @@ MODULE att
       REAL(dp), DIMENSION(:), POINTER :: d_value => NULL() !< attribute value if type SHORT,INT,FLOAT or DOUBLE
    END TYPE TATT
 
-   CHARACTER(LEN=lc), DIMENSION(ip_maxdumcfg), SAVE :: cm_dumatt !< dummy attribute
+   INTEGER(i4)                               , SAVE :: im_ndumatt !< number of elt in dummy attribute array
+   CHARACTER(LEN=lc), DIMENSION(ip_maxdumcfg), SAVE :: cm_dumatt  !< dummy attribute
 
    INTERFACE att_init
       MODULE PROCEDURE att__init_c    
@@ -174,6 +179,9 @@ MODULE att
    END INTERFACE
 
 CONTAINS
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION att__copy_arr(td_att) &
+         & RESULT(tf_att)      
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine copy a array of attribute structure in another one
@@ -195,12 +203,13 @@ CONTAINS
    !> @param[in] td_att   array of attribute structure
    !> @return copy of input array of attribute structure
    !-------------------------------------------------------------------
-   FUNCTION att__copy_arr( td_att )
+
       IMPLICIT NONE
+
       ! Argument
-      TYPE(TATT), DIMENSION(:), INTENT(IN) :: td_att
+      TYPE(TATT), DIMENSION(:)  , INTENT(IN) :: td_att
       ! function
-      TYPE(TATT), DIMENSION(SIZE(td_att(:))) :: att__copy_arr
+      TYPE(TATT), DIMENSION(SIZE(td_att(:))) :: tf_att
 
       ! local variable
       ! loop indices
@@ -208,10 +217,13 @@ CONTAINS
       !----------------------------------------------------------------
 
       DO ji=1,SIZE(td_att(:))
-         att__copy_arr(ji)=att_copy(td_att(ji))
+         tf_att(ji)=att_copy(td_att(ji))
       ENDDO
 
    END FUNCTION att__copy_arr
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION att__copy_unit(td_att) &
+         & RESULT (tf_att)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine copy an attribute structure in another one.
@@ -234,37 +246,42 @@ CONTAINS
    !> @param[in] td_att   attribute structure
    !> @return copy of input attribute structure
    !-------------------------------------------------------------------
-   FUNCTION att__copy_unit( td_att )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TATT), INTENT(IN)  :: td_att
+
       ! function
-      TYPE(TATT) :: att__copy_unit
+      TYPE(TATT)              :: tf_att
 
       ! local variable
       REAL(dp)         , DIMENSION(:), ALLOCATABLE :: dl_value
       !----------------------------------------------------------------
 
       ! copy attribute variable
-      att__copy_unit%c_name  = TRIM(td_att%c_name)
-      att__copy_unit%i_id    = td_att%i_id
-      att__copy_unit%i_type  = td_att%i_type
-      att__copy_unit%i_len   = td_att%i_len
-      att__copy_unit%c_value = TRIM(td_att%c_value)
+      tf_att%c_name  = TRIM(td_att%c_name)
+      tf_att%i_id    = td_att%i_id
+      tf_att%i_type  = td_att%i_type
+      tf_att%i_len   = td_att%i_len
+      tf_att%c_value = TRIM(td_att%c_value)
 
       ! copy attribute pointer in an independant variable
-      IF( ASSOCIATED(att__copy_unit%d_value) ) DEALLOCATE(att__copy_unit%d_value)
+      IF( ASSOCIATED(tf_att%d_value) ) DEALLOCATE(tf_att%d_value)
       IF( ASSOCIATED(td_att%d_value) )THEN
          ALLOCATE( dl_value(td_att%i_len) )
          dl_value(:) = td_att%d_value(:)
 
-         ALLOCATE( att__copy_unit%d_value(att__copy_unit%i_len) )
-         att__copy_unit%d_value(:) = dl_value(:)
+         ALLOCATE( tf_att%d_value(tf_att%i_len) )
+         tf_att%d_value(:) = dl_value(:)
 
          DEALLOCATE( dl_value )
       ENDIF
 
    END FUNCTION att__copy_unit
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION att_get_index(td_att, cd_name) &
+         & RESULT(if_idx)
    !-------------------------------------------------------------------
    !> @brief This function return attribute index, in a array of attribute structure,
    !> given attribute name.<br/>
@@ -278,11 +295,15 @@ CONTAINS
    !> @param[in] cd_name   attribute name
    !> @return attribute index
    !-------------------------------------------------------------------
-   INTEGER(i4) FUNCTION att_get_index( td_att, cd_name )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TATT),       DIMENSION(:), INTENT(IN) :: td_att
       CHARACTER(LEN=*),               INTENT(IN) :: cd_name
+
+      ! function
+      INTEGER(i4)                                :: if_idx
 
       ! local variable
       INTEGER(i4) :: il_size
@@ -290,17 +311,20 @@ CONTAINS
       ! loop indices
       INTEGER(i4) :: ji
       !----------------------------------------------------------------
-      att_get_index=0
+      if_idx=0
 
       il_size=SIZE(td_att(:))
       DO ji=1,il_size
          IF( TRIM(td_att(ji)%c_name) == TRIM(cd_name) )THEN
-            att_get_index=ji
+            if_idx=ji
             EXIT
          ENDIF
       ENDDO
 
    END FUNCTION att_get_index
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION att_get_id(td_att, cd_name) &
+         & RESULT (if_id)
    !-------------------------------------------------------------------
    !> @brief This function return attribute id, read from a file.<br/>
    !> @details
@@ -315,11 +339,15 @@ CONTAINS
    !> @param[in] cd_name   attribute name
    !> @return attribute id
    !-------------------------------------------------------------------
-   INTEGER(i4) FUNCTION att_get_id( td_att, cd_name )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TATT),       DIMENSION(:), INTENT(IN) :: td_att
       CHARACTER(LEN=*),               INTENT(IN) :: cd_name
+
+      ! function
+      INTEGER(i4)                                :: if_id
 
       ! local variable
       INTEGER(i4) :: il_size
@@ -327,17 +355,20 @@ CONTAINS
       ! loop indices
       INTEGER(i4) :: ji
       !----------------------------------------------------------------
-      att_get_id=0
+      if_id=0
 
       il_size=SIZE(td_att(:))
       DO ji=1,il_size
          IF( TRIM(td_att(ji)%c_name) == TRIM(cd_name) )THEN
-            att_get_id=td_att(ji)%i_id
+            if_id=td_att(ji)%i_id
             EXIT
          ENDIF
       ENDDO
 
    END FUNCTION att_get_id
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION att__init_c(cd_name, cd_value) &
+         & RESULT (tf_att)
    !-------------------------------------------------------------------
    !> @brief This function initialize an attribute structure with character
    !> value. 
@@ -349,27 +380,34 @@ CONTAINS
    !> @param[in] cd_value  attribute value
    !> @return attribute structure
    !-------------------------------------------------------------------
-   TYPE(TATT) FUNCTION att__init_c( cd_name, cd_value )
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*), INTENT(IN) :: cd_name
       CHARACTER(LEN=*), INTENT(IN) :: cd_value
+
+      ! function
+      TYPE(TATT)                   :: tf_att
       !----------------------------------------------------------------
  
       ! clean attribute
-      CALL att_clean(att__init_c)
+      CALL att_clean(tf_att)
 
       CALL logger_trace( &
       &  " ATT INIT: attribute name: "//TRIM(ADJUSTL(cd_name))//&
       &  " attribute value "//TRIM(ADJUSTL(cd_value)) )
 
-      att__init_c%c_name=TRIM(ADJUSTL(cd_name))
-      att__init_c%i_type=NF90_CHAR
+      tf_att%c_name=TRIM(ADJUSTL(cd_name))
+      tf_att%i_type=NF90_CHAR
 
-      att__init_c%c_value=TRIM(ADJUSTL(cd_value))
-      att__init_c%i_len=LEN( TRIM(ADJUSTL(cd_value)) )
+      tf_att%c_value=TRIM(ADJUSTL(cd_value))
+      tf_att%i_len=LEN( TRIM(ADJUSTL(cd_value)) )
 
    END FUNCTION att__init_c
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION att__init_dp(cd_name, dd_value, id_type) &
+         & RESULT (tf_att)
    !-------------------------------------------------------------------
    !> @brief This function initialize an attribute structure with array 
    !> of real(8) value.
@@ -384,13 +422,16 @@ CONTAINS
    !> @param[in] id_type   type of the variable to be saved
    !> @return attribute structure
    !-------------------------------------------------------------------
-   TYPE(TATT) FUNCTION att__init_dp( cd_name, dd_value, id_type )
+
       IMPLICIT NONE
 
       ! Argument
       CHARACTER(LEN=*),               INTENT(IN) :: cd_name
       REAL(dp),         DIMENSION(:), INTENT(IN) :: dd_value
       INTEGER(i4)                   , INTENT(IN), OPTIONAL :: id_type
+
+      ! function
+      TYPE(TATT)                                 :: tf_att
 
       ! local value
       INTEGER(i4)       :: il_len
@@ -401,7 +442,7 @@ CONTAINS
       !----------------------------------------------------------------
 
       ! clean attribute
-      CALL att_clean(att__init_dp)
+      CALL att_clean(tf_att)
 
       ! array size
       il_len=size(dd_value(:))
@@ -416,23 +457,26 @@ CONTAINS
       &  " ATT INIT: attribute name: "//TRIM(ADJUSTL(cd_name))//&
       &  " attribute value "//TRIM(ADJUSTL(cl_value)) )
 
-      att__init_dp%c_name=TRIM(ADJUSTL(cd_name))
+      tf_att%c_name=TRIM(ADJUSTL(cd_name))
 
       IF( PRESENT(id_type) )THEN
-         att__init_dp%i_type=id_type
+         tf_att%i_type=id_type
       ELSE
-         att__init_dp%i_type=NF90_DOUBLE
+         tf_att%i_type=NF90_DOUBLE
       ENDIF
 
-      IF( ASSOCIATED(att__init_dp%d_value) )THEN
-         DEALLOCATE(att__init_dp%d_value)
+      IF( ASSOCIATED(tf_att%d_value) )THEN
+         DEALLOCATE(tf_att%d_value)
       ENDIF
-      ALLOCATE(att__init_dp%d_value(il_len))
+      ALLOCATE(tf_att%d_value(il_len))
 
-      att__init_dp%d_value(:)=dd_value(:)
-      att__init_dp%i_len=il_len
+      tf_att%d_value(:)=dd_value(:)
+      tf_att%i_len=il_len
 
    END FUNCTION att__init_dp
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION att__init_dp_0d(cd_name, dd_value, id_type) &
+         & RESULT (tf_att)
    !-------------------------------------------------------------------
    !> @brief This function initialize an attribute structure with 
    !> real(8) value 
@@ -447,19 +491,23 @@ CONTAINS
    !> @param[in] id_type   type of the variable to be saved
    !> @return attribute structure
    !-------------------------------------------------------------------
-   TYPE(TATT) FUNCTION att__init_dp_0d( cd_name, dd_value, id_type )
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*), INTENT(IN) :: cd_name
       REAL(dp),         INTENT(IN) :: dd_value
       INTEGER(i4)     , INTENT(IN), OPTIONAL :: id_type
+
+      ! function
+      TYPE(TATT)                   :: tf_att
 
       ! local value
       CHARACTER(LEN=lc) :: cl_value
       !----------------------------------------------------------------
 
       ! clean attribute
-      CALL att_clean(att__init_dp_0d)
+      CALL att_clean(tf_att)
       
       cl_value="(/"//TRIM(fct_str(dd_value))//"/)"
 
@@ -467,23 +515,26 @@ CONTAINS
       &  " ATT INIT: attribute name: "//TRIM(ADJUSTL(cd_name))//&
       &  " attribute value "//TRIM(ADJUSTL(cl_value)) )
 
-      att__init_dp_0d%c_name=TRIM(ADJUSTL(cd_name))
+      tf_att%c_name=TRIM(ADJUSTL(cd_name))
 
       IF( PRESENT(id_type) )THEN
-         att__init_dp_0d%i_type=id_type
+         tf_att%i_type=id_type
       ELSE
-         att__init_dp_0d%i_type=NF90_DOUBLE
+         tf_att%i_type=NF90_DOUBLE
       ENDIF
 
-      IF( ASSOCIATED(att__init_dp_0d%d_value) )THEN
-         DEALLOCATE(att__init_dp_0d%d_value)
+      IF( ASSOCIATED(tf_att%d_value) )THEN
+         DEALLOCATE(tf_att%d_value)
       ENDIF
-      ALLOCATE(att__init_dp_0d%d_value(1))
+      ALLOCATE(tf_att%d_value(1))
 
-      att__init_dp_0d%d_value(1)=dd_value
-      att__init_dp_0d%i_len=1
+      tf_att%d_value(1)=dd_value
+      tf_att%i_len=1
 
    END FUNCTION att__init_dp_0d
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION att__init_sp(cd_name, rd_value, id_type) &
+         & RESULT (tf_att)
    !-------------------------------------------------------------------
    !> @brief This function initialize an attribute structure with array 
    !> of real(4) value.
@@ -498,12 +549,16 @@ CONTAINS
    !> @param[in] id_type   type of the variable to be saved
    !> @return attribute structure
    !-------------------------------------------------------------------
-   TYPE(TATT) FUNCTION att__init_sp( cd_name, rd_value, id_type )
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),               INTENT(IN) :: cd_name
       REAL(sp),         DIMENSION(:), INTENT(IN) :: rd_value
       INTEGER(i4)                   , INTENT(IN), OPTIONAL :: id_type
+
+      ! function
+      TYPE(TATT)                                 :: tf_att
 
       ! local value
       INTEGER(i4)       :: il_len
@@ -514,7 +569,7 @@ CONTAINS
       !----------------------------------------------------------------
 
       ! clean attribute
-      CALL att_clean(att__init_sp)
+      CALL att_clean(tf_att)
       
       ! array size
       il_len=size(rd_value(:))
@@ -523,29 +578,35 @@ CONTAINS
       DO ji=1,il_len-1
          cl_value=TRIM(cl_value)//TRIM(fct_str(rd_value(ji)))//","
       ENDDO
+      CALL logger_trace( &
+      &  " ATT INIT: attribute name: il_len "//fct_str(il_len)&
+      )
       cl_value=TRIM(cl_value)//TRIM(fct_str(rd_value(il_len)))//"/)"
 
       CALL logger_trace( &
       &  " ATT INIT: attribute name: "//TRIM(ADJUSTL(cd_name))//&
       &  " attribute value "//TRIM(ADJUSTL(cl_value)) )      
 
-      att__init_sp%c_name=TRIM(ADJUSTL(cd_name))
+      tf_att%c_name=TRIM(ADJUSTL(cd_name))
 
       IF( PRESENT(id_type) )THEN
-         att__init_sp%i_type=id_type
+         tf_att%i_type=id_type
       ELSE
-         att__init_sp%i_type=NF90_FLOAT
+         tf_att%i_type=NF90_FLOAT
       ENDIF
 
-      IF( ASSOCIATED(att__init_sp%d_value) )THEN
-         DEALLOCATE(att__init_sp%d_value)
+      IF( ASSOCIATED(tf_att%d_value) )THEN
+         DEALLOCATE(tf_att%d_value)
       ENDIF
-      ALLOCATE(att__init_sp%d_value(il_len))
+      ALLOCATE(tf_att%d_value(il_len))
 
-      att__init_sp%d_value(:)=REAL(rd_value(:),dp)
-      att__init_sp%i_len=il_len
+      tf_att%d_value(:)=REAL(rd_value(:),dp)
+      tf_att%i_len=il_len
 
    END FUNCTION att__init_sp
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION att__init_sp_0d(cd_name, rd_value, id_type) &
+         & RESULT (tf_att)
    !-------------------------------------------------------------------
    !> @brief This function initialize an attribute structure with 
    !> real(4) value. 
@@ -560,19 +621,23 @@ CONTAINS
    !> @param[in] id_type   type of the variable to be saved
    !> @return attribute structure
    !-------------------------------------------------------------------
-   TYPE(TATT) FUNCTION att__init_sp_0d( cd_name, rd_value, id_type )
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*), INTENT(IN) :: cd_name
       REAL(sp),         INTENT(IN) :: rd_value
       INTEGER(i4)     , INTENT(IN), OPTIONAL :: id_type
+
+      ! function
+      TYPE(TATT)                   :: tf_att
 
       ! local value
       CHARACTER(LEN=lc) :: cl_value
       !----------------------------------------------------------------
 
       ! clean attribute
-      CALL att_clean(att__init_sp_0d)
+      CALL att_clean(tf_att)
       
       cl_value="(/"//TRIM(fct_str(rd_value))//"/)"
 
@@ -580,23 +645,26 @@ CONTAINS
       &  " ATT INIT: attribute name: "//TRIM(ADJUSTL(cd_name))//&
       &  " attribute value "//TRIM(ADJUSTL(cl_value)) )      
 
-      att__init_sp_0d%c_name=TRIM(ADJUSTL(cd_name))
+      tf_att%c_name=TRIM(ADJUSTL(cd_name))
 
       IF( PRESENT(id_type) )THEN
-         att__init_sp_0d%i_type=id_type
+         tf_att%i_type=id_type
       ELSE
-         att__init_sp_0d%i_type=NF90_FLOAT
+         tf_att%i_type=NF90_FLOAT
       ENDIF
 
-      IF( ASSOCIATED(att__init_sp_0d%d_value) )THEN
-         DEALLOCATE(att__init_sp_0d%d_value)
+      IF( ASSOCIATED(tf_att%d_value) )THEN
+         DEALLOCATE(tf_att%d_value)
       ENDIF
-      ALLOCATE(att__init_sp_0d%d_value(1))
+      ALLOCATE(tf_att%d_value(1))
 
-      att__init_sp_0d%d_value(1)=REAL(rd_value,dp)
-      att__init_sp_0d%i_len=1
+      tf_att%d_value(1)=REAL(rd_value,dp)
+      tf_att%i_len=1
 
    END FUNCTION att__init_sp_0d
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION att__init_i1(cd_name, bd_value, id_type) &
+         & RESULT (tf_att)
    !-------------------------------------------------------------------
    !> @brief This function initialize an attribute structure with array 
    !> of integer(1) value.
@@ -611,12 +679,16 @@ CONTAINS
    !> @param[in] id_type   type of the variable to be saved
    !> @return attribute structure
    !-------------------------------------------------------------------
-   TYPE(TATT) FUNCTION att__init_i1( cd_name, bd_value, id_type )
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),               INTENT(IN) :: cd_name
       INTEGER(i1),      DIMENSION(:), INTENT(IN) :: bd_value
       INTEGER(i4)                   , INTENT(IN), OPTIONAL :: id_type
+
+      ! function
+      TYPE(TATT)                                 :: tf_att
 
       ! local value
       INTEGER(i4)       :: il_len
@@ -627,7 +699,7 @@ CONTAINS
       !----------------------------------------------------------------
 
       ! clean attribute
-      CALL att_clean(att__init_i1)
+      CALL att_clean(tf_att)
       
       ! array size
       il_len=size(bd_value(:))
@@ -642,23 +714,26 @@ CONTAINS
       &  " ATT INIT: attribute name: "//TRIM(ADJUSTL(cd_name))//&
       &  " attribute value "//TRIM(ADJUSTL(cl_value)) )      
 
-      att__init_i1%c_name=TRIM(ADJUSTL(cd_name))
+      tf_att%c_name=TRIM(ADJUSTL(cd_name))
 
       IF( PRESENT(id_type) )THEN
-         att__init_i1%i_type=id_type
+         tf_att%i_type=id_type
       ELSE
-         att__init_i1%i_type=NF90_BYTE
+         tf_att%i_type=NF90_BYTE
       ENDIF
 
-      IF( ASSOCIATED(att__init_i1%d_value) )THEN
-         DEALLOCATE(att__init_i1%d_value)
+      IF( ASSOCIATED(tf_att%d_value) )THEN
+         DEALLOCATE(tf_att%d_value)
       ENDIF
-      ALLOCATE(att__init_i1%d_value(il_len))
+      ALLOCATE(tf_att%d_value(il_len))
 
-      att__init_i1%d_value(:)=REAL(bd_value(:),dp)
-      att__init_i1%i_len=il_len
+      tf_att%d_value(:)=REAL(bd_value(:),dp)
+      tf_att%i_len=il_len
 
    END FUNCTION att__init_i1
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION att__init_i1_0d(cd_name, bd_value, id_type) &
+         & RESULT (tf_att)
    !-------------------------------------------------------------------
    !> @brief This function initialize an attribute structure with 
    !> integer(1) value. 
@@ -673,19 +748,23 @@ CONTAINS
    !> @param[in] id_type   type of the variable to be saved
    !> @return attribute structure
    !-------------------------------------------------------------------
-   TYPE(TATT) FUNCTION att__init_i1_0d( cd_name, bd_value, id_type )
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*), INTENT(IN) :: cd_name
       INTEGER(i1),      INTENT(IN) :: bd_value
       INTEGER(i4)     , INTENT(IN), OPTIONAL :: id_type
+
+      ! function
+      TYPE(TATT)                   :: tf_att
 
       !local value
       CHARACTER(LEN=lc) :: cl_value
       !----------------------------------------------------------------
 
       ! clean attribute
-      CALL att_clean(att__init_i1_0d)
+      CALL att_clean(tf_att)
       
       cl_value="(/"//TRIM(fct_str(bd_value))//"/)"
 
@@ -693,23 +772,26 @@ CONTAINS
       &  " ATT INIT: attribute name: "//TRIM(ADJUSTL(cd_name))//&
       &  " attibute value "//TRIM(ADJUSTL(cl_value)) )      
 
-      att__init_i1_0d%c_name=TRIM(ADJUSTL(cd_name))
+      tf_att%c_name=TRIM(ADJUSTL(cd_name))
 
       IF( PRESENT(id_type) )THEN
-         att__init_i1_0d%i_type=id_type
+         tf_att%i_type=id_type
       ELSE
-         att__init_i1_0d%i_type=NF90_BYTE
+         tf_att%i_type=NF90_BYTE
       ENDIF      
 
-      IF( ASSOCIATED(att__init_i1_0d%d_value) )THEN
-         DEALLOCATE(att__init_i1_0d%d_value)
+      IF( ASSOCIATED(tf_att%d_value) )THEN
+         DEALLOCATE(tf_att%d_value)
       ENDIF
-      ALLOCATE(att__init_i1_0d%d_value(1))
+      ALLOCATE(tf_att%d_value(1))
 
-      att__init_i1_0d%d_value(1)=REAL(bd_value,dp)
-      att__init_i1_0d%i_len=1
+      tf_att%d_value(1)=REAL(bd_value,dp)
+      tf_att%i_len=1
 
    END FUNCTION att__init_i1_0d
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION att__init_i2(cd_name, sd_value, id_type) &
+         & RESULT (tf_att)
    !-------------------------------------------------------------------
    !> @brief This function initialize an attribute structure with array 
    !> of integer(2) value.
@@ -724,12 +806,16 @@ CONTAINS
    !> @param[in] id_type   type of the variable to be saved
    !> @return attribute structure
    !-------------------------------------------------------------------
-   TYPE(TATT) FUNCTION att__init_i2( cd_name, sd_value, id_type )
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),               INTENT(IN) :: cd_name
       INTEGER(i2),      DIMENSION(:), INTENT(IN) :: sd_value
       INTEGER(i4)                   , INTENT(IN), OPTIONAL :: id_type
+
+      ! function
+      TYPE(TATT)                                 :: tf_att
 
       ! local value
       INTEGER(i4)       :: il_len
@@ -740,7 +826,7 @@ CONTAINS
       !----------------------------------------------------------------
 
       ! clean attribute
-      CALL att_clean(att__init_i2)
+      CALL att_clean(tf_att)
       
       ! array size
       il_len=size(sd_value(:))
@@ -755,23 +841,26 @@ CONTAINS
       &  " ATT INIT: attribute name: "//TRIM(ADJUSTL(cd_name))//&
       &  " attribute value "//TRIM(ADJUSTL(cl_value)) )      
 
-      att__init_i2%c_name=TRIM(ADJUSTL(cd_name))
+      tf_att%c_name=TRIM(ADJUSTL(cd_name))
 
       IF( PRESENT(id_type) )THEN
-         att__init_i2%i_type=id_type
+         tf_att%i_type=id_type
       ELSE
-         att__init_i2%i_type=NF90_SHORT
+         tf_att%i_type=NF90_SHORT
       ENDIF
 
-      IF( ASSOCIATED(att__init_i2%d_value) )THEN
-         DEALLOCATE(att__init_i2%d_value)
+      IF( ASSOCIATED(tf_att%d_value) )THEN
+         DEALLOCATE(tf_att%d_value)
       ENDIF
-      ALLOCATE(att__init_i2%d_value(il_len))
+      ALLOCATE(tf_att%d_value(il_len))
 
-      att__init_i2%d_value(:)=REAL(sd_value(:),dp)
-      att__init_i2%i_len=il_len
+      tf_att%d_value(:)=REAL(sd_value(:),dp)
+      tf_att%i_len=il_len
 
    END FUNCTION att__init_i2
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION att__init_i2_0d(cd_name, sd_value, id_type) &
+         & RESULT (tf_att)
    !-------------------------------------------------------------------
    !> @brief This function initialize an attribute structure with 
    !> integer(2) value. 
@@ -786,19 +875,23 @@ CONTAINS
    !> @param[in] id_type   type of the variable to be saved
    !> @return attribute structure
    !-------------------------------------------------------------------
-   TYPE(TATT) FUNCTION att__init_i2_0d( cd_name, sd_value, id_type )
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*), INTENT(IN) :: cd_name
       INTEGER(i2),      INTENT(IN) :: sd_value
       INTEGER(i4)     , INTENT(IN), OPTIONAL :: id_type
+
+      ! function
+      TYPE(TATT)                   :: tf_att
 
       !local value
       CHARACTER(LEN=lc) :: cl_value
       !----------------------------------------------------------------
 
       ! clean attribute
-      CALL att_clean(att__init_i2_0d)
+      CALL att_clean(tf_att)
       
       cl_value="(/"//TRIM(fct_str(sd_value))//"/)"
 
@@ -806,23 +899,26 @@ CONTAINS
       &  " ATT INIT: attribute name: "//TRIM(ADJUSTL(cd_name))//&
       &  " attibute value "//TRIM(ADJUSTL(cl_value)) )      
 
-      att__init_i2_0d%c_name=TRIM(ADJUSTL(cd_name))
+      tf_att%c_name=TRIM(ADJUSTL(cd_name))
 
       IF( PRESENT(id_type) )THEN
-         att__init_i2_0d%i_type=id_type
+         tf_att%i_type=id_type
       ELSE
-         att__init_i2_0d%i_type=NF90_SHORT
+         tf_att%i_type=NF90_SHORT
       ENDIF
 
-      IF( ASSOCIATED(att__init_i2_0d%d_value) )THEN
-         DEALLOCATE(att__init_i2_0d%d_value)
+      IF( ASSOCIATED(tf_att%d_value) )THEN
+         DEALLOCATE(tf_att%d_value)
       ENDIF
-      ALLOCATE(att__init_i2_0d%d_value(1))
+      ALLOCATE(tf_att%d_value(1))
 
-      att__init_i2_0d%d_value(1)=REAL(sd_value,dp)
-      att__init_i2_0d%i_len=1
+      tf_att%d_value(1)=REAL(sd_value,dp)
+      tf_att%i_len=1
 
    END FUNCTION att__init_i2_0d
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION att__init_i4(cd_name, id_value, id_type) &
+         & RESULT(tf_att)
    !-------------------------------------------------------------------
    !> @brief This function initialize an attribute structure with array 
    !> of integer(4) value.
@@ -837,12 +933,16 @@ CONTAINS
    !> @param[in] id_type   type of the variable to be saved
    !> @return attribute structure
    !-------------------------------------------------------------------
-   TYPE(TATT) FUNCTION att__init_i4( cd_name, id_value, id_type )
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),               INTENT(IN) :: cd_name
       INTEGER(i4),      DIMENSION(:), INTENT(IN) :: id_value
       INTEGER(i4)                   , INTENT(IN), OPTIONAL :: id_type
+
+      ! function
+      TYPE(TATT)                                 :: tf_att
 
       ! local value
       INTEGER(i4)       :: il_len
@@ -853,7 +953,7 @@ CONTAINS
       !----------------------------------------------------------------
 
       ! clean attribute
-      CALL att_clean(att__init_i4)
+      CALL att_clean(tf_att)
       
       ! array size
       il_len=size(id_value(:))
@@ -868,23 +968,26 @@ CONTAINS
       &  " ATT INIT: attribute name: "//TRIM(ADJUSTL(cd_name))//&
       &  " attribute value "//TRIM(ADJUSTL(cl_value)) )      
 
-      att__init_i4%c_name=TRIM(ADJUSTL(cd_name))
+      tf_att%c_name=TRIM(ADJUSTL(cd_name))
 
       IF( PRESENT(id_type) )THEN
-         att__init_i4%i_type=id_type
+         tf_att%i_type=id_type
       ELSE
-         att__init_i4%i_type=NF90_INT
+         tf_att%i_type=NF90_INT
       ENDIF
 
-      IF( ASSOCIATED(att__init_i4%d_value) )THEN
-         DEALLOCATE(att__init_i4%d_value)
+      IF( ASSOCIATED(tf_att%d_value) )THEN
+         DEALLOCATE(tf_att%d_value)
       ENDIF
-      ALLOCATE(att__init_i4%d_value(il_len))
+      ALLOCATE(tf_att%d_value(il_len))
 
-      att__init_i4%d_value(:)=REAL(id_value(:),dp)
-      att__init_i4%i_len=il_len
+      tf_att%d_value(:)=REAL(id_value(:),dp)
+      tf_att%i_len=il_len
 
    END FUNCTION att__init_i4
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION att__init_i4_0d(cd_name, id_value, id_type) &
+         & RESULT (tf_att)
    !-------------------------------------------------------------------
    !> @brief This function initialize an attribute structure with 
    !> integer(4) value. 
@@ -899,19 +1002,23 @@ CONTAINS
    !> @param[in] id_type   type of the variable to be saved
    !> @return attribute structure
    !-------------------------------------------------------------------
-   TYPE(TATT) FUNCTION att__init_i4_0d( cd_name, id_value, id_type )
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*), INTENT(IN) :: cd_name
       INTEGER(i4),      INTENT(IN) :: id_value
       INTEGER(i4)     , INTENT(IN), OPTIONAL :: id_type
+
+      ! function
+      TYPE(TATT)                   :: tf_att
 
       !local value
       CHARACTER(LEN=lc) :: cl_value
       !----------------------------------------------------------------
 
       ! clean attribute
-      CALL att_clean(att__init_i4_0d)
+      CALL att_clean(tf_att)
       
       cl_value="(/"//TRIM(fct_str(id_value))//"/)"
 
@@ -919,23 +1026,26 @@ CONTAINS
       &  " ATT INIT: attribute name: "//TRIM(ADJUSTL(cd_name))//&
       &  " attibute value "//TRIM(ADJUSTL(cl_value)) )      
 
-      att__init_i4_0d%c_name=TRIM(ADJUSTL(cd_name))
+      tf_att%c_name=TRIM(ADJUSTL(cd_name))
 
       IF( PRESENT(id_type) )THEN
-         att__init_i4_0d%i_type=id_type
+         tf_att%i_type=id_type
       ELSE
-         att__init_i4_0d%i_type=NF90_INT
+         tf_att%i_type=NF90_INT
       ENDIF
 
-      IF( ASSOCIATED(att__init_i4_0d%d_value) )THEN
-         DEALLOCATE(att__init_i4_0d%d_value)
+      IF( ASSOCIATED(tf_att%d_value) )THEN
+         DEALLOCATE(tf_att%d_value)
       ENDIF
-      ALLOCATE(att__init_i4_0d%d_value(1))
+      ALLOCATE(tf_att%d_value(1))
 
-      att__init_i4_0d%d_value(1)=REAL(id_value,dp)
-      att__init_i4_0d%i_len=1
+      tf_att%d_value(1)=REAL(id_value,dp)
+      tf_att%i_len=1
 
    END FUNCTION att__init_i4_0d
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION att__init_i8(cd_name, kd_value, id_type) &
+         & RESULT (tf_att)
    !-------------------------------------------------------------------
    !> @brief This function initialize an attribute structure with array 
    !> of integer(8) value.
@@ -950,12 +1060,16 @@ CONTAINS
    !> @param[in] id_type   type of the variable to be saved
    !> @return attribute structure
    !-------------------------------------------------------------------
-   TYPE(TATT) FUNCTION att__init_i8( cd_name, kd_value, id_type )
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*),               INTENT(IN) :: cd_name
       INTEGER(i8),      DIMENSION(:), INTENT(IN) :: kd_value
       INTEGER(i4)                   , INTENT(IN), OPTIONAL :: id_type
+
+      ! function
+      TYPE(TATT)                                 :: tf_att
 
       ! local value
       INTEGER(i4)       :: il_len
@@ -966,7 +1080,7 @@ CONTAINS
       !----------------------------------------------------------------
 
       ! clean attribute
-      CALL att_clean(att__init_i8)
+      CALL att_clean(tf_att)
       
       ! array size
       il_len=size(kd_value(:))
@@ -981,23 +1095,26 @@ CONTAINS
       &  " ATT INIT: attribute name: "//TRIM(ADJUSTL(cd_name))//&
       &  " attibute value "//TRIM(ADJUSTL(cl_value)) )      
 
-      att__init_i8%c_name=TRIM(ADJUSTL(cd_name))
+      tf_att%c_name=TRIM(ADJUSTL(cd_name))
 
       IF( PRESENT(id_type) )THEN
-         att__init_i8%i_type=id_type
+         tf_att%i_type=id_type
       ELSE
-         att__init_i8%i_type=NF90_INT
+         tf_att%i_type=NF90_INT
       ENDIF
 
-      IF( ASSOCIATED(att__init_i8%d_value) )THEN
-         DEALLOCATE(att__init_i8%d_value)
+      IF( ASSOCIATED(tf_att%d_value) )THEN
+         DEALLOCATE(tf_att%d_value)
       ENDIF
-      ALLOCATE(att__init_i8%d_value(il_len))
+      ALLOCATE(tf_att%d_value(il_len))
 
-      att__init_i8%d_value(:)=REAL(kd_value(:),dp)
-      att__init_i8%i_len=il_len
+      tf_att%d_value(:)=REAL(kd_value(:),dp)
+      tf_att%i_len=il_len
 
    END FUNCTION att__init_i8
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION att__init_i8_0d(cd_name, kd_value, id_type) &
+         & RESULT (tf_att)
    !-------------------------------------------------------------------
    !> @brief This function initialize an attribute structure with 
    !> integer(8) value. 
@@ -1012,19 +1129,23 @@ CONTAINS
    !> @param[in] id_type   type of the variable to be saved
    !> @return attribute structure
    !-------------------------------------------------------------------
-   TYPE(TATT) FUNCTION att__init_i8_0d( cd_name, kd_value, id_type )
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*), INTENT(IN) :: cd_name
       INTEGER(i8),      INTENT(IN) :: kd_value
       INTEGER(i4)     , INTENT(IN), OPTIONAL :: id_type
+
+      ! function
+      TYPE(TATT)                   :: tf_att
 
       ! local value
       CHARACTER(LEN=lc) :: cl_value
       !----------------------------------------------------------------
 
       ! clean attribute
-      CALL att_clean(att__init_i8_0d)
+      CALL att_clean(tf_att)
       
       cl_value="(/"//TRIM(fct_str(kd_value))//"/)"
 
@@ -1032,23 +1153,25 @@ CONTAINS
       &  " ATT INIT: attribute name: "//TRIM(ADJUSTL(cd_name))//&
       &  " attibute value "//TRIM(ADJUSTL(cl_value)) )      
 
-      att__init_i8_0d%c_name=TRIM(ADJUSTL(cd_name))
+      tf_att%c_name=TRIM(ADJUSTL(cd_name))
 
       IF( PRESENT(id_type) )THEN
-         att__init_i8_0d%i_type=id_type
+         tf_att%i_type=id_type
       ELSE
-         att__init_i8_0d%i_type=NF90_INT
+         tf_att%i_type=NF90_INT
       ENDIF
 
-      IF( ASSOCIATED(att__init_i8_0d%d_value) )THEN
-         DEALLOCATE(att__init_i8_0d%d_value)
+      IF( ASSOCIATED(tf_att%d_value) )THEN
+         DEALLOCATE(tf_att%d_value)
       ENDIF
-      ALLOCATE(att__init_i8_0d%d_value(1))
+      ALLOCATE(tf_att%d_value(1))
 
-      att__init_i8_0d%d_value(1)=REAL(kd_value,dp)
-      att__init_i8_0d%i_len=1
+      tf_att%d_value(1)=REAL(kd_value,dp)
+      tf_att%i_len=1
 
    END FUNCTION att__init_i8_0d
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE att__print_arr(td_att)
    !-------------------------------------------------------------------
    !> @brief This subroutine print informations of an array of attribute. 
    !>
@@ -1057,7 +1180,7 @@ CONTAINS
    !>
    !> @param[in] td_att array of attribute structure
    !-------------------------------------------------------------------
-   SUBROUTINE att__print_arr(td_att)
+
       IMPLICIT NONE
 
       ! Argument      
@@ -1072,6 +1195,8 @@ CONTAINS
       ENDDO
 
    END SUBROUTINE att__print_arr
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE att__print_unit(td_att)
    !-------------------------------------------------------------------
    !> @brief This subroutine print attribute information.
    !>
@@ -1082,7 +1207,7 @@ CONTAINS
    !
    !> @param[in] td_att attribute structure
    !-------------------------------------------------------------------
-   SUBROUTINE att__print_unit(td_att)
+
       IMPLICIT NONE
 
       ! Argument      
@@ -1204,17 +1329,22 @@ CONTAINS
          &        " value : ",TRIM(ADJUSTL(cl_value))
 
    END SUBROUTINE att__print_unit
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE att__clean_unit(td_att)
    !-------------------------------------------------------------------
    !> @brief 
    !>  This subroutine clean attribute strcuture.
    !
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !> @date January, 2019 
+   !> - nullify array inside attribute structure
+   !>
    !> @param[inout] td_att attribute strcuture
    !-------------------------------------------------------------------
-   SUBROUTINE att__clean_unit( td_att )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TATT),  INTENT(INOUT) :: td_att
 
@@ -1228,12 +1358,15 @@ CONTAINS
       IF( ASSOCIATED(td_att%d_value) )THEN
          ! clean value
          DEALLOCATE(td_att%d_value)
+         NULLIFY(td_att%d_value)
       ENDIF
 
       ! replace by empty structure
       td_att=att_copy(tl_att)
 
    END SUBROUTINE att__clean_unit
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE att__clean_arr(td_att)
    !-------------------------------------------------------------------
    !> @brief 
    !>  This subroutine clean array of attribute strcuture.
@@ -1243,8 +1376,9 @@ CONTAINS
    !
    !> @param[inout] td_att attribute strcuture
    !-------------------------------------------------------------------
-   SUBROUTINE att__clean_arr( td_att )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TATT), DIMENSION(:), INTENT(INOUT) :: td_att
 
@@ -1258,6 +1392,8 @@ CONTAINS
       ENDDO
 
    END SUBROUTINE att__clean_arr
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE att_get_dummy(cd_dummy)
    !-------------------------------------------------------------------
    !> @brief This subroutine fill dummy attribute array
    !
@@ -1265,11 +1401,14 @@ CONTAINS
    !> @date September, 2015 - Initial Version
    !> @date Marsh, 2016
    !> - close file (bugfix)
-   !
+   !> @date May, 2019
+   !> - read number of dummy element 
+   !>
    !> @param[in] cd_dummy dummy configuration file
    !-------------------------------------------------------------------
-   SUBROUTINE att_get_dummy( cd_dummy )
+
       IMPLICIT NONE
+
       ! Argument
       CHARACTER(LEN=*), INTENT(IN) :: cd_dummy
 
@@ -1279,14 +1418,18 @@ CONTAINS
 
       LOGICAL       :: ll_exist
 
-      ! loop indices
       ! namelist
+      INTEGER(i4)                                :: in_ndumvar
+      INTEGER(i4)                                :: in_ndumdim
+      INTEGER(i4)                                :: in_ndumatt
       CHARACTER(LEN=lc), DIMENSION(ip_maxdumcfg) :: cn_dumvar
       CHARACTER(LEN=lc), DIMENSION(ip_maxdumcfg) :: cn_dumdim
       CHARACTER(LEN=lc), DIMENSION(ip_maxdumcfg) :: cn_dumatt
-
       !----------------------------------------------------------------
       NAMELIST /namdum/ &   !< dummy namelist
+      &  in_ndumvar,&       !< number of dummy elt in variable array
+      &  in_ndumdim,&       !< number of dummy elt in dimension array
+      &  in_ndumatt,&       !< number of dummy elt in attribute array
       &  cn_dumvar, &       !< variable  name
       &  cn_dumdim, &       !< dimension name
       &  cn_dumatt          !< attribute name
@@ -1313,44 +1456,61 @@ CONTAINS
          ENDIF
    
          READ( il_fileid, NML = namdum )
-         cm_dumatt(:)=cn_dumatt(:)
+         im_ndumatt  = in_ndumatt
+         cm_dumatt(:)= cn_dumatt(:)
 
          CLOSE( il_fileid )
+
+         IF( im_ndumatt > ip_maxdumcfg )THEN
+            CALL logger_fatal("ATT GET dUMMY : too much dummy attributes &
+            &     ( >"//fct_str(ip_maxdumcfg)//" ). &
+            &     set ip_maxdumcfg to higher value.")
+         ENDIF
 
       ENDIF
    
    END SUBROUTINE att_get_dummy
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION att_is_dummy(td_att) &
+         & RESULT (lf_dummy)
    !-------------------------------------------------------------------
    !> @brief This function check if attribute is defined as dummy attribute
    !> in configuraton file
    !>
    !> @author J.Paul
    !> @date September, 2015 - Initial Version
-   !
+   !> @date, May, 2019
+   !> - use number of dummy elt in do-loop
+   !>
    !> @param[in] td_att attribute structure
    !> @return true if attribute is dummy attribute
    !-------------------------------------------------------------------
-   FUNCTION att_is_dummy(td_att)
+
       IMPLICIT NONE
 
       ! Argument      
       TYPE(TATT), INTENT(IN) :: td_att
       
       ! function
-      LOGICAL :: att_is_dummy
+      LOGICAL                :: lf_dummy
       
       ! loop indices
       INTEGER(i4) :: ji
       !----------------------------------------------------------------
 
-      att_is_dummy=.FALSE.
-      DO ji=1,ip_maxdumcfg
+      CALL logger_trace("ATT IS DUMMY : check if attribute is useless")
+
+      lf_dummy=.FALSE.
+      DO ji=1,im_ndumatt
          IF( fct_lower(td_att%c_name) == fct_lower(cm_dumatt(ji)) )THEN
-            att_is_dummy=.TRUE.
+            lf_dummy=.TRUE.
             EXIT
          ENDIF
       ENDDO
 
+      CALL logger_trace("ATT IS DUMMY : check ok")
+
    END FUNCTION att_is_dummy
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 END MODULE att
 

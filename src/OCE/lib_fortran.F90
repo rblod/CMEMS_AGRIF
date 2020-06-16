@@ -62,9 +62,11 @@ MODULE lib_fortran
    END INTERFACE
 #endif
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: lib_fortran.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: lib_fortran.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -214,17 +216,15 @@ CONTAINS
       IF( SIZE(p2d,1) /= jpi ) CALL ctl_stop( 'STOP', 'wrong call of sum3x3_2d, the first dimension is not equal to jpi' ) 
       IF( SIZE(p2d,2) /= jpj ) CALL ctl_stop( 'STOP', 'wrong call of sum3x3_2d, the second dimension is not equal to jpj' ) 
       !
-      DO jj = 1, jpj
-         DO ji = 1, jpi 
-            IF( MOD(mig(ji), 3) == 1 .AND. MOD(mjg(jj), 3) == 1 ) THEN   ! bottom left corber of a 3x3 box
-               ji2 = MIN(mig(ji)+2, jpiglo) - nimpp + 1                  ! right position of the box
-               jj2 = MIN(mjg(jj)+2, jpjglo) - njmpp + 1                  ! upper position of the box
-               IF( ji2 <= jpi .AND. jj2 <= jpj ) THEN                    ! the box is fully included in the local mpi domain
-                  p2d(ji:ji2,jj:jj2) = SUM(p2d(ji:ji2,jj:jj2))
-               ENDIF
+      DO_2D_11_11
+         IF( MOD(mig(ji), 3) == 1 .AND. MOD(mjg(jj), 3) == 1 ) THEN   ! bottom left corber of a 3x3 box
+            ji2 = MIN(mig(ji)+2, jpiglo) - nimpp + 1                  ! right position of the box
+            jj2 = MIN(mjg(jj)+2, jpjglo) - njmpp + 1                  ! upper position of the box
+            IF( ji2 <= jpi .AND. jj2 <= jpj ) THEN                    ! the box is fully included in the local mpi domain
+               p2d(ji:ji2,jj:jj2) = SUM(p2d(ji:ji2,jj:jj2))
             ENDIF
-         END DO
-      END DO
+         ENDIF
+      END_2D
       CALL lbc_lnk( 'lib_fortran', p2d, 'T', 1. )
       IF( nbondi /= -1 ) THEN
          IF( MOD(mig(    1), 3) == 1 )   p2d(    1,:) = p2d(    2,:)
@@ -263,17 +263,15 @@ CONTAINS
       ipn = SIZE(p3d,3)
       !
       DO jn = 1, ipn
-         DO jj = 1, jpj
-            DO ji = 1, jpi 
-               IF( MOD(mig(ji), 3) == 1 .AND. MOD(mjg(jj), 3) == 1 ) THEN   ! bottom left corber of a 3x3 box
-                  ji2 = MIN(mig(ji)+2, jpiglo) - nimpp + 1                  ! right position of the box
-                  jj2 = MIN(mjg(jj)+2, jpjglo) - njmpp + 1                  ! upper position of the box
-                  IF( ji2 <= jpi .AND. jj2 <= jpj ) THEN                    ! the box is fully included in the local mpi domain
-                     p3d(ji:ji2,jj:jj2,jn) = SUM(p3d(ji:ji2,jj:jj2,jn))
-                  ENDIF
+         DO_2D_11_11
+            IF( MOD(mig(ji), 3) == 1 .AND. MOD(mjg(jj), 3) == 1 ) THEN   ! bottom left corber of a 3x3 box
+               ji2 = MIN(mig(ji)+2, jpiglo) - nimpp + 1                  ! right position of the box
+               jj2 = MIN(mjg(jj)+2, jpjglo) - njmpp + 1                  ! upper position of the box
+               IF( ji2 <= jpi .AND. jj2 <= jpj ) THEN                    ! the box is fully included in the local mpi domain
+                  p3d(ji:ji2,jj:jj2,jn) = SUM(p3d(ji:ji2,jj:jj2,jn))
                ENDIF
-            END DO
-         END DO
+            ENDIF
+         END_2D
       END DO
       CALL lbc_lnk( 'lib_fortran', p3d, 'T', 1. )
       IF( nbondi /= -1 ) THEN

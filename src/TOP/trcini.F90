@@ -20,11 +20,10 @@ MODULE trcini
    USE trcnam          ! Namelist read
    USE daymod          ! calendar manager
    USE prtctl_trc      ! Print control passive tracers (prt_ctl_trc_init routine)
-   USE trcsub          ! variables to substep passive tracers
    USE trcrst
    USE lib_mpp         ! distribued memory computing library
    USE trcice          ! tracers in sea ice
-   USE trcbc,   only : trc_bc_ini ! generalized Boundary Conditions
+   USE trcbc           ! generalized Boundary Conditions
  
    IMPLICIT NONE
    PRIVATE
@@ -33,12 +32,12 @@ MODULE trcini
 
    !!----------------------------------------------------------------------
    !! NEMO/TOP 4.0 , NEMO Consortium (2018)
-   !! $Id: trcini.F90 10425 2018-12-19 21:54:16Z smasson $ 
+   !! $Id: trcini.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
    
-   SUBROUTINE trc_init
+   SUBROUTINE trc_init( Kbb, Kmm, Kaa )
       !!---------------------------------------------------------------------
       !!                     ***  ROUTINE trc_init  ***
       !!
@@ -50,6 +49,7 @@ CONTAINS
       !!              - set initial tracer fields (either read restart 
       !!                or read data or analytical formulation
       !!---------------------------------------------------------------------
+      INTEGER, INTENT(in) :: Kbb, Kmm, Kaa   ! time level indices
       !
       IF( ln_timing )   CALL timing_start('trc_init')
       !
@@ -57,9 +57,9 @@ CONTAINS
       IF(lwp) WRITE(numout,*) 'trc_init : initial set up of the passive tracers'
       IF(lwp) WRITE(numout,*) '~~~~~~~~'
       !
-      CALL trc_ini_ctl   ! control 
       CALL trc_nam       ! read passive tracers namelists
       CALL top_alloc()   ! allocate TOP arrays
+
       !
       IF(.NOT.ln_trcdta )   ln_trc_ini(:) = .FALSE.
       !
@@ -67,45 +67,30 @@ CONTAINS
       IF( ln_rsttr .AND. .NOT. l_offline ) CALL trc_rst_cal( nit000, 'READ' )   ! calendar
       IF(lwp) WRITE(numout,*)
       !
-      CALL trc_ini_sms   ! SMS
-      CALL trc_ini_trp   ! passive tracers transport
-      CALL trc_ice_ini   ! Tracers in sea ice
+      CALL trc_ini_sms( Kmm )   ! SMS
+      CALL trc_ini_trp          ! passive tracers transport
+      CALL trc_ice_ini          ! Tracers in sea ice
       !
-      IF(lwm) CALL ctl_opn( numstr, 'tracer.stat', 'REPLACE', 'FORMATTED', 'SEQUENTIAL', -1, numout, lwp , narea )
+      IF( lwm .AND. sn_cfctl%l_trcstat ) THEN
+         CALL ctl_opn( numstr, 'tracer.stat', 'REPLACE', 'FORMATTED', 'SEQUENTIAL', -1, numout, lwp , narea )
+      ENDIF
       !
-      CALL trc_ini_state  !  passive tracers initialisation : from a restart or from clim
-      IF( nn_dttrc /= 1 ) &
-      CALL trc_sub_ini    ! Initialize variables for substepping passive tracers
+      CALL trc_ini_state( Kbb, Kmm, Kaa )  !  passive tracers initialisation : from a restart or from clim
       !
-      CALL trc_ini_inv   ! Inventories
+      CALL trc_ini_inv( Kmm )              ! Inventories
       !
       IF( ln_timing )   CALL timing_stop('trc_init')
       !
    END SUBROUTINE trc_init
 
 
-   SUBROUTINE trc_ini_ctl
-      !!----------------------------------------------------------------------
-      !!                     ***  ROUTINE trc_ini_ctl  ***
-      !! ** Purpose :        Control  + ocean volume
-      !!----------------------------------------------------------------------
-      INTEGER ::   jk    ! dummy loop indices
-      !
-      ! Define logical parameter ton control dirunal cycle in TOP
-      l_trcdm2dc = ln_dm2dc .OR. ( ln_cpl .AND. ncpl_qsr_freq /= 1 )
-      l_trcdm2dc = l_trcdm2dc  .AND. .NOT. l_offline
-      IF( l_trcdm2dc .AND. lwp )   CALL ctl_warn( 'Coupling with passive tracers and used of diurnal cycle.',   &
-         &                           'Computation of a daily mean shortwave for some biogeochemical models ' )
-      !
-   END SUBROUTINE trc_ini_ctl
-
-
-   SUBROUTINE trc_ini_inv
+   SUBROUTINE trc_ini_inv( Kmm )
       !!----------------------------------------------------------------------
       !!                     ***  ROUTINE trc_ini_stat  ***
       !! ** Purpose :      passive tracers inventories at initialsation phase
       !!----------------------------------------------------------------------
-      INTEGER ::  jk, jn    ! dummy loop indices
+      INTEGER, INTENT(in) ::   Kmm    ! time level index
+      INTEGER             ::  jk, jn  ! dummy loop indices
       CHARACTER (len=25) :: charout
       !!----------------------------------------------------------------------
       !
@@ -115,14 +100,14 @@ CONTAINS
       !
       !                          ! masked grid volume
       DO jk = 1, jpk
-         cvol(:,:,jk) = e1e2t(:,:) * e3t_n(:,:,jk) * tmask(:,:,jk)
+         cvol(:,:,jk) = e1e2t(:,:) * e3t(:,:,jk,Kmm) * tmask(:,:,jk)
       END DO
       !                          ! total volume of the ocean 
       areatot = glob_sum( 'trcini', cvol(:,:,:) )
       !
       trai(:) = 0._wp            ! initial content of all tracers
       DO jn = 1, jptra
-         trai(jn) = trai(jn) + glob_sum( 'trcini', trn(:,:,:,jn) * cvol(:,:,:)   )
+         trai(jn) = trai(jn) + glob_sum( 'trcini', tr(:,:,:,jn,Kmm) * cvol(:,:,:)   )
       END DO
 
       IF(lwp) THEN               ! control print
@@ -137,18 +122,18 @@ CONTAINS
          WRITE(numout,*)
       ENDIF
       IF(lwp) WRITE(numout,*)
-      IF(ln_ctl) THEN            ! print mean trends (used for debugging)
+      IF(sn_cfctl%l_prttrc) THEN            ! print mean trends (used for debugging)
          CALL prt_ctl_trc_init
          WRITE(charout, FMT="('ini ')")
          CALL prt_ctl_trc_info( charout )
-         CALL prt_ctl_trc( tab4d=trn, mask=tmask, clinfo=ctrcnm )
+         CALL prt_ctl_trc( tab4d=tr(:,:,:,:,Kmm), mask=tmask, clinfo=ctrcnm )
       ENDIF
 9000  FORMAT('      tracer nb : ',i2,'      name :',a10,'      initial content :',e18.10)
       !
    END SUBROUTINE trc_ini_inv
 
 
-   SUBROUTINE trc_ini_sms
+   SUBROUTINE trc_ini_sms( Kmm )
       !!----------------------------------------------------------------------
       !!                     ***  ROUTINE trc_ini_sms  ***
       !! ** Purpose :   SMS initialisation
@@ -159,6 +144,7 @@ CONTAINS
       USE trcini_age     ! age initialisation
       USE trcini_my_trc  ! MY_TRC   initialisation
       !
+      INTEGER, INTENT(in) ::   Kmm ! time level indices
       INTEGER :: jn
       !!----------------------------------------------------------------------
       !
@@ -172,13 +158,22 @@ CONTAINS
          ln_trc_cbc(jn) =       sn_tracer(jn)%llcbc
          ln_trc_obc(jn) =       sn_tracer(jn)%llobc
       END DO
+      !
+      IF( .NOT.ln_trcbc ) THEN
+         DO jn = 1, jp_bgc
+            ln_trc_sbc(jn) = .FALSE.
+            ln_trc_cbc(jn) = .FALSE.
+            ln_trc_obc(jn) = .FALSE.
+         END DO
+      ENDIF
+     
+      lltrcbc = ( COUNT(ln_trc_sbc) + COUNT(ln_trc_obc) + COUNT(ln_trc_cbc) ) > 0 
       !    
-      IF( ln_pisces      )   CALL trc_ini_pisces     !  PISCES model
-      IF( ln_my_trc      )   CALL trc_ini_my_trc     !  MY_TRC model
-      IF( ll_cfc         )   CALL trc_ini_cfc        !  CFC's
-      IF( ln_c14         )   CALL trc_ini_c14        !  C14 model
-      IF( ln_age         )   CALL trc_ini_age        !  AGE
-      IF( .NOT.ln_pisces ) ALLOCATE( profsed(2) )
+      IF( ln_pisces      )   CALL trc_ini_pisces( Kmm )     !  PISCES model
+      IF( ln_my_trc      )   CALL trc_ini_my_trc( Kmm )     !  MY_TRC model
+      IF( ll_cfc         )   CALL trc_ini_cfc   ( Kmm )     !  CFC's
+      IF( ln_c14         )   CALL trc_ini_c14   ( Kmm )     !  C14 model
+      IF( ln_age         )   CALL trc_ini_age   ( Kmm )     !  AGE
       !
       IF(lwp) THEN                   ! control print
          WRITE(numout,*)
@@ -189,6 +184,11 @@ CONTAINS
             WRITE(numout,9001) jn, TRIM(ctrcnm(jn)), ln_trc_ini(jn), ln_trc_sbc(jn),ln_trc_cbc(jn),ln_trc_obc(jn)
          END DO
       ENDIF
+      IF( lwp .AND. ln_trcbc .AND. lltrcbc ) THEN
+         WRITE(numout,*)
+         WRITE(numout,*) ' Applying tracer boundary conditions '
+      ENDIF
+     
 9001  FORMAT(3x,i3,1x,a10,3x,l2,3x,l2,3x,l2,3x,l2)
       !
    END SUBROUTINE trc_ini_sms
@@ -219,7 +219,7 @@ CONTAINS
    END SUBROUTINE trc_ini_trp
 
 
-   SUBROUTINE trc_ini_state
+   SUBROUTINE trc_ini_state( Kbb, Kmm, Kaa )
       !!----------------------------------------------------------------------
       !!                     ***  ROUTINE trc_ini_state ***
       !! ** Purpose :          Initialisation of passive tracer concentration 
@@ -228,17 +228,21 @@ CONTAINS
       USE trcrst          ! passive tracers restart
       USE trcdta          ! initialisation from files
       !
-      INTEGER :: jn, jl   ! dummy loop indices
+      INTEGER, INTENT(in) :: Kbb, Kmm, Kaa   ! time level index
+      INTEGER             :: jn, jl          ! dummy loop indices
       !!----------------------------------------------------------------------
       !
-      IF( ln_trcdta )   CALL trc_dta_ini( jptra )      ! set initial tracers values
+      IF( ln_trcdta )   CALL trc_dta_ini( jptra )           ! set initial tracers values
       !
-      IF( ln_my_trc )   CALL trc_bc_ini ( jptra )      ! set tracers Boundary Conditions
+      IF( ln_trcbc .AND. lltrcbc )  THEN 
+        CALL trc_bc_ini ( jptra, Kmm  )            ! set tracers Boundary Conditions
+        CALL trc_bc     ( nit000, Kmm, tr, Kaa )   ! tracers: surface and lateral Boundary Conditions
+      ENDIF
       !
       !
       IF( ln_rsttr ) THEN              ! restart from a file
         !
-        CALL trc_rst_read
+        CALL trc_rst_read( Kbb, Kmm )
         !
       ELSE                             ! Initialisation of tracer from a file that may also be used for damping
 !!gm BUG ?   if damping and restart, what's happening ?
@@ -247,7 +251,7 @@ CONTAINS
             DO jn = 1, jptra
                IF( ln_trc_ini(jn) ) THEN
                   jl = n_trc_index(jn) 
-                  CALL trc_dta( nit000, sf_trcdta(jl), rf_trfac(jl), trn(:,:,:,jn) )
+                  CALL trc_dta( nit000, Kmm, sf_trcdta(jl), rf_trfac(jl), tr(:,:,:,jn,Kmm) )
                   !
                   ! deallocate data structure if data are not used for damping
                   IF( .NOT.ln_trcdmp .AND. .NOT.ln_trcdmp_clo ) THEN
@@ -261,12 +265,12 @@ CONTAINS
             !
         ENDIF
         !
-        trb(:,:,:,:) = trn(:,:,:,:)
+        tr(:,:,:,:,Kbb) = tr(:,:,:,:,Kmm)
         ! 
       ENDIF
       !
-      tra(:,:,:,:) = 0._wp
-      !                                                         ! Partial top/bottom cell: GRADh(trn)
+      tr(:,:,:,:,Kaa) = 0._wp
+      !                                                         ! Partial top/bottom cell: GRADh(tr(Kmm))
    END SUBROUTINE trc_ini_state
 
 

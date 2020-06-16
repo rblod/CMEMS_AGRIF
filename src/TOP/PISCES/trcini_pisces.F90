@@ -26,28 +26,29 @@ MODULE trcini_pisces
 
    !!----------------------------------------------------------------------
    !! NEMO/TOP 4.0 , NEMO Consortium (2018)
-   !! $Id: trcini_pisces.F90 10425 2018-12-19 21:54:16Z smasson $ 
+   !! $Id: trcini_pisces.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE trc_ini_pisces
+   SUBROUTINE trc_ini_pisces( Kmm )
       !!----------------------------------------------------------------------
       !!                   ***  ROUTINE trc_ini_pisces ***
       !!
       !! ** Purpose :   Initialisation of the PISCES biochemical model
       !!----------------------------------------------------------------------
+      INTEGER, INTENT(in)  ::  Kmm      ! time level indices
       !
       CALL trc_nam_pisces
       !
-      IF( ln_p4z .OR. ln_p5z ) THEN  ;   CALL p4z_ini   !  PISCES
-      ELSE                           ;   CALL p2z_ini   !  LOBSTER
+      IF( ln_p4z .OR. ln_p5z ) THEN  ;   CALL p4z_ini( Kmm )   !  PISCES
+      ELSE                           ;   CALL p2z_ini( Kmm )   !  LOBSTER
       ENDIF
 
    END SUBROUTINE trc_ini_pisces
 
 
-   SUBROUTINE p4z_ini
+   SUBROUTINE p4z_ini( Kmm )
       !!----------------------------------------------------------------------
       !!                   ***  ROUTINE p4z_ini ***
       !!
@@ -57,7 +58,7 @@ CONTAINS
       USE p4zche          !  Chemical model
       USE p4zsink         !  vertical flux of particulate matter due to sinking
       USE p4zopt          !  optical model
-      USE p4zsbc          !  Boundary conditions
+      USE p4zbc          !  Boundary conditions
       USE p4zfechem       !  Iron chemistry
       USE p4zrem          !  Remineralisation of organic matter
       USE p4zflx          !  Gas exchange
@@ -76,6 +77,7 @@ CONTAINS
       USE p5zmeso         !  Sources and sinks of mesozooplankton
       USE p5zmort         !  Mortality terms for phytoplankton
       !
+      INTEGER, INTENT(in)  ::  Kmm      ! time level indices
       REAL(wp), SAVE ::   sco2   =  2.312e-3_wp
       REAL(wp), SAVE ::   alka0  =  2.426e-3_wp
       REAL(wp), SAVE ::   oxyg0  =  177.6e-6_wp 
@@ -188,49 +190,49 @@ CONTAINS
       ! Initialization of tracer concentration in case of  no restart 
       !--------------------------------------------------------------
       IF( .NOT.ln_rsttr ) THEN  
-         trn(:,:,:,jpdic) = sco2
-         trn(:,:,:,jpdoc) = bioma0
-         trn(:,:,:,jptal) = alka0
-         trn(:,:,:,jpoxy) = oxyg0
-         trn(:,:,:,jpcal) = bioma0
-         trn(:,:,:,jppo4) = po4 / po4r
-         trn(:,:,:,jppoc) = bioma0
-         trn(:,:,:,jpgoc) = bioma0
-         trn(:,:,:,jpbfe) = bioma0 * 5.e-6
-         trn(:,:,:,jpsil) = silic1
-         trn(:,:,:,jpdsi) = bioma0 * 0.15
-         trn(:,:,:,jpgsi) = bioma0 * 5.e-6
-         trn(:,:,:,jpphy) = bioma0
-         trn(:,:,:,jpdia) = bioma0
-         trn(:,:,:,jpzoo) = bioma0
-         trn(:,:,:,jpmes) = bioma0
-         trn(:,:,:,jpfer) = 0.6E-9
-         trn(:,:,:,jpsfe) = bioma0 * 5.e-6
-         trn(:,:,:,jpdfe) = bioma0 * 5.e-6
-         trn(:,:,:,jpnfe) = bioma0 * 5.e-6
-         trn(:,:,:,jpnch) = bioma0 * 12. / 55.
-         trn(:,:,:,jpdch) = bioma0 * 12. / 55.
-         trn(:,:,:,jpno3) = no3
-         trn(:,:,:,jpnh4) = bioma0
+         tr(:,:,:,jpdic,Kmm) = sco2
+         tr(:,:,:,jpdoc,Kmm) = bioma0
+         tr(:,:,:,jptal,Kmm) = alka0
+         tr(:,:,:,jpoxy,Kmm) = oxyg0
+         tr(:,:,:,jpcal,Kmm) = bioma0
+         tr(:,:,:,jppo4,Kmm) = po4 / po4r
+         tr(:,:,:,jppoc,Kmm) = bioma0
+         tr(:,:,:,jpgoc,Kmm) = bioma0
+         tr(:,:,:,jpbfe,Kmm) = bioma0 * 5.e-6
+         tr(:,:,:,jpsil,Kmm) = silic1
+         tr(:,:,:,jpdsi,Kmm) = bioma0 * 0.15
+         tr(:,:,:,jpgsi,Kmm) = bioma0 * 5.e-6
+         tr(:,:,:,jpphy,Kmm) = bioma0
+         tr(:,:,:,jpdia,Kmm) = bioma0
+         tr(:,:,:,jpzoo,Kmm) = bioma0
+         tr(:,:,:,jpmes,Kmm) = bioma0
+         tr(:,:,:,jpfer,Kmm) = 0.6E-9
+         tr(:,:,:,jpsfe,Kmm) = bioma0 * 5.e-6
+         tr(:,:,:,jpdfe,Kmm) = bioma0 * 5.e-6
+         tr(:,:,:,jpnfe,Kmm) = bioma0 * 5.e-6
+         tr(:,:,:,jpnch,Kmm) = bioma0 * 12. / 55.
+         tr(:,:,:,jpdch,Kmm) = bioma0 * 12. / 55.
+         tr(:,:,:,jpno3,Kmm) = no3
+         tr(:,:,:,jpnh4,Kmm) = bioma0
          IF( ln_ligand) THEN
-            trn(:,:,:,jplgw) = 0.6E-9
+            tr(:,:,:,jplgw,Kmm) = 0.6E-9
          ENDIF
          IF( ln_p5z ) THEN
-            trn(:,:,:,jpdon) = bioma0
-            trn(:,:,:,jpdop) = bioma0
-            trn(:,:,:,jppon) = bioma0
-            trn(:,:,:,jppop) = bioma0
-            trn(:,:,:,jpgon) = bioma0
-            trn(:,:,:,jpgop) = bioma0
-            trn(:,:,:,jpnph) = bioma0
-            trn(:,:,:,jppph) = bioma0
-            trn(:,:,:,jppic) = bioma0
-            trn(:,:,:,jpnpi) = bioma0
-            trn(:,:,:,jpppi) = bioma0
-            trn(:,:,:,jpndi) = bioma0
-            trn(:,:,:,jppdi) = bioma0
-            trn(:,:,:,jppfe) = bioma0 * 5.e-6
-            trn(:,:,:,jppch) = bioma0 * 12. / 55.
+            tr(:,:,:,jpdon,Kmm) = bioma0
+            tr(:,:,:,jpdop,Kmm) = bioma0
+            tr(:,:,:,jppon,Kmm) = bioma0
+            tr(:,:,:,jppop,Kmm) = bioma0
+            tr(:,:,:,jpgon,Kmm) = bioma0
+            tr(:,:,:,jpgop,Kmm) = bioma0
+            tr(:,:,:,jpnph,Kmm) = bioma0
+            tr(:,:,:,jppph,Kmm) = bioma0
+            tr(:,:,:,jppic,Kmm) = bioma0
+            tr(:,:,:,jpnpi,Kmm) = bioma0
+            tr(:,:,:,jpppi,Kmm) = bioma0
+            tr(:,:,:,jpndi,Kmm) = bioma0
+            tr(:,:,:,jppdi,Kmm) = bioma0
+            tr(:,:,:,jppfe,Kmm) = bioma0 * 5.e-6
+            tr(:,:,:,jppch,Kmm) = bioma0 * 12. / 55.
          ENDIF
          ! initialize the half saturation constant for silicate
          ! ----------------------------------------------------
@@ -253,7 +255,7 @@ CONTAINS
          CALL p5z_lim_init       !  co-limitations by the various nutrients
          CALL p5z_prod_init      !  phytoplankton growth rate over the global ocean.
       ENDIF
-      CALL p4z_sbc_init          !  boundary conditions
+      CALL p4z_bc_init( Kmm )    !  boundary conditions
       CALL p4z_fechem_init       !  Iron chemistry
       CALL p4z_rem_init          !  remineralisation
       CALL p4z_poc_init          !  remineralisation of organic particles
@@ -274,11 +276,10 @@ CONTAINS
         & CALL p4z_flx_init      !  gas exchange 
 
       ! Initialization of the sediment model
-      IF( ln_sediment) THEN
-         CALL sed_init
-      ELSE
-         ALLOCATE( profsed(2) )
-      ENDIF
+      IF( ln_sediment)   &
+        & CALL sed_init ! Initialization of the sediment model 
+
+      CALL p4z_sed_init          ! loss of organic matter in the sediments 
 
       IF(lwp) WRITE(numout,*) 
       IF(lwp) WRITE(numout,*) '   ==>>>   Initialization of PISCES tracers done'
@@ -287,7 +288,7 @@ CONTAINS
    END SUBROUTINE p4z_ini
 
 
-   SUBROUTINE p2z_ini
+   SUBROUTINE p2z_ini( Kmm )
       !!----------------------------------------------------------------------
       !!                   ***  ROUTINE p2z_ini ***
       !!
@@ -299,6 +300,7 @@ CONTAINS
       USE p2zbio
       USE p2zsed
       !
+      INTEGER, INTENT(in)  ::  Kmm      ! time level indices
       INTEGER  ::  ji, jj, jk, jn, ierr
       CHARACTER(len = 10)  ::  cltra
       !!----------------------------------------------------------------------
@@ -337,20 +339,20 @@ CONTAINS
       ! LOBSTER initialisation for GYRE : init NO3=f(density) by asklod AS Kremeur 2005-07
       ! ----------------------
       IF( .NOT. ln_rsttr ) THEN             ! in case of  no restart 
-         trn(:,:,:,jpdet) = 0.1 * tmask(:,:,:)
-         trn(:,:,:,jpzoo) = 0.1 * tmask(:,:,:)
-         trn(:,:,:,jpnh4) = 0.1 * tmask(:,:,:)
-         trn(:,:,:,jpphy) = 0.1 * tmask(:,:,:)
-         trn(:,:,:,jpdom) = 1.0 * tmask(:,:,:)
-         WHERE( rhd(:,:,:) <= 24.5e-3 )  ;  trn(:,:,:,jpno3) = 2._wp * tmask(:,:,:)
-         ELSE WHERE                      ;  trn(:,:,:,jpno3) = ( 15.55 * ( rhd(:,:,:) * 1000. ) - 380.11 ) * tmask(:,:,:)
+         tr(:,:,:,jpdet,Kmm) = 0.1 * tmask(:,:,:)
+         tr(:,:,:,jpzoo,Kmm) = 0.1 * tmask(:,:,:)
+         tr(:,:,:,jpnh4,Kmm) = 0.1 * tmask(:,:,:)
+         tr(:,:,:,jpphy,Kmm) = 0.1 * tmask(:,:,:)
+         tr(:,:,:,jpdom,Kmm) = 1.0 * tmask(:,:,:)
+         WHERE( rhd(:,:,:) <= 24.5e-3 )  ;  tr(:,:,:,jpno3,Kmm) = 2._wp * tmask(:,:,:)
+         ELSE WHERE                      ;  tr(:,:,:,jpno3,Kmm) = ( 15.55 * ( rhd(:,:,:) * 1000. ) - 380.11 ) * tmask(:,:,:)
          END WHERE                       
       ENDIF
-      !                       !  Namelist read
-      CALL p2z_opt_init       !  Optics parameters
-      CALL p2z_sed_init       !  sedimentation
-      CALL p2z_bio_init       !  biology
-      CALL p2z_exp_init       !  export 
+      !                        !  Namelist read
+      CALL p2z_opt_init        !  Optics parameters
+      CALL p2z_sed_init        !  sedimentation
+      CALL p2z_bio_init        !  biology
+      CALL p2z_exp_init( Kmm ) !  export 
       !
       IF(lwp) WRITE(numout,*) 
       IF(lwp) WRITE(numout,*) '   ==>>>   Initialization of LOBSTER tracers done'

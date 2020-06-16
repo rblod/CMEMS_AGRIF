@@ -75,7 +75,7 @@
       ipl = L_SIZE(ptab)   ! 4th    -
       ipf = F_SIZE(ptab)   ! 5th    -      use in "multi" case (array of pointers)
       !
-      IF( l_north_nogather ) THEN      !==  ????  ==!
+      IF( l_north_nogather ) THEN      !==  no allgather exchanges  ==!
 
          ALLOCATE(ipj_s(ipf))
 
@@ -199,27 +199,23 @@
                END DO; END DO
             ENDIF
          END DO
-         IF( l_isend ) THEN
-            DO jr = 1,nsndto
-               IF( nfipproc(isendto(jr),jpnj) /= narea-1 .AND. nfipproc(isendto(jr),jpnj) /= -1 ) THEN
-                  CALL mpi_wait( ml_req_nf(jr), ml_stat, ml_err )
-               ENDIF
-            END DO
-         ENDIF
+         DO jr = 1,nsndto
+            IF( nfipproc(isendto(jr),jpnj) /= narea-1 .AND. nfipproc(isendto(jr),jpnj) /= -1 ) THEN
+               CALL mpi_wait( ml_req_nf(jr), ml_stat, ml_err )
+            ENDIF
+         END DO
          !
          IF( ln_timing ) CALL tic_tac(.FALSE.)
          !
          ! North fold boundary condition
          !
          DO jf = 1, ipf
-            CALL lbc_nfd_nogather(ARRAY_IN(:,:,:,:,jf), ztabr(:,1:ipj_s(jf),:,:,jf), cd_nat LBC_ARG, psgn LBC_ARG )
+            CALL lbc_nfd_nogather( ARRAY_IN(:,:,:,:,jf), ztabr(:,1:ipj_s(jf),:,:,jf), cd_nat LBC_ARG, psgn LBC_ARG )
          END DO
          !
-         DEALLOCATE( zfoldwk )
-         DEALLOCATE( ztabr ) 
-         DEALLOCATE( jj_s ) 
-         DEALLOCATE( ipj_s ) 
-      ELSE                             !==  ????  ==!
+         DEALLOCATE( zfoldwk, ztabr, jj_s, ipj_s )
+         !
+      ELSE                             !==  allgather exchanges  ==!
          !
          ipj   = 4            ! 2nd dimension of message transfers (last j-lines)
          !

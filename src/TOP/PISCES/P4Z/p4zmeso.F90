@@ -43,14 +43,16 @@ MODULE p4zmeso
    REAL(wp), PUBLIC ::  epsher2min   !: minimum growth efficiency at high food for grazing 2
    REAL(wp), PUBLIC ::  grazflux     !: mesozoo flux feeding rate
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/TOP 4.0 , NEMO Consortium (2018)
-   !! $Id: p4zmeso.F90 10367 2018-12-03 11:35:19Z cetlod $ 
+   !! $Id: p4zmeso.F90 12839 2020-05-01 08:39:32Z cetlod $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE p4z_meso( kt, knt )
+   SUBROUTINE p4z_meso( kt, knt, Kbb, Krhs )
       !!---------------------------------------------------------------------
       !!                     ***  ROUTINE p4z_meso  ***
       !!
@@ -59,205 +61,192 @@ CONTAINS
       !! ** Method  : - ???
       !!---------------------------------------------------------------------
       INTEGER, INTENT(in) ::   kt, knt   ! ocean time step and ???
+      INTEGER, INTENT(in)  ::  Kbb, Krhs ! time level indices
       !
       INTEGER  :: ji, jj, jk
       REAL(wp) :: zcompadi, zcompaph, zcompapoc, zcompaz, zcompam
       REAL(wp) :: zgraze2 , zdenom, zdenom2
       REAL(wp) :: zfact   , zfood, zfoodlim, zproport, zbeta
       REAL(wp) :: zmortzgoc, zfrac, zfracfe, zratio, zratio2, zfracal, zgrazcal
-      REAL(wp) :: zepsherf, zepshert, zepsherv, zgrarsig, zgraztotc, zgraztotn, zgraztotf
+      REAL(wp) :: zepsherf, zepshert, zepsherv, zepsherq 
+      REAL(wp) :: zgrarsig, zgraztotc, zgraztotn, zgraztotf
       REAL(wp) :: zgrarem2, zgrafer2, zgrapoc2, zprcaca, zmortz, zgrasrat, zgrasratn
       REAL(wp) :: zrespz, ztortz, zgrazd, zgrazz, zgrazpof
       REAL(wp) :: zgrazn, zgrazpoc, zgraznf, zgrazf
       REAL(wp) :: zgrazfffp, zgrazfffg, zgrazffep, zgrazffeg
+      REAL(wp), DIMENSION(jpi,jpj,jpk) :: zgrazing2, zfezoo2, zz2ligprod
       CHARACTER (len=25) :: charout
-      REAL(wp), DIMENSION(jpi,jpj,jpk) :: zgrazing, zfezoo2
-      REAL(wp), ALLOCATABLE, DIMENSION(:,:,:) ::   zw3d, zz2ligprod
       !!---------------------------------------------------------------------
       !
       IF( ln_timing )   CALL timing_start('p4z_meso')
       !
-      zgrazing(:,:,:) = 0._wp
-      zfezoo2 (:,:,:) = 0._wp
-      !
-      IF (ln_ligand) THEN
-         ALLOCATE( zz2ligprod(jpi,jpj,jpk) )
-         zz2ligprod(:,:,:) = 0._wp
-      ENDIF
-      !
-      DO jk = 1, jpkm1
-         DO jj = 1, jpj
-            DO ji = 1, jpi
-               zcompam   = MAX( ( trb(ji,jj,jk,jpmes) - 1.e-9 ), 0.e0 )
-               zfact     = xstep * tgfunc2(ji,jj,jk) * zcompam
+      DO_3D_11_11( 1, jpkm1 )
+         zcompam   = MAX( ( tr(ji,jj,jk,jpmes,Kbb) - 1.e-9 ), 0.e0 )
+         zfact     = xstep * tgfunc2(ji,jj,jk) * zcompam
 
-               !  Respiration rates of both zooplankton
-               !  -------------------------------------
-               zrespz    = resrat2 * zfact * ( trb(ji,jj,jk,jpmes) / ( xkmort + trb(ji,jj,jk,jpmes) )  &
-               &           + 3. * nitrfac(ji,jj,jk) )
+         !  Respiration rates of both zooplankton
+         !  -------------------------------------
+         zrespz    = resrat2 * zfact * ( tr(ji,jj,jk,jpmes,Kbb) / ( xkmort + tr(ji,jj,jk,jpmes,Kbb) )  &
+         &           + 3. * nitrfac(ji,jj,jk) )
 
-               !  Zooplankton mortality. A square function has been selected with
-               !  no real reason except that it seems to be more stable and may mimic predation
-               !  ---------------------------------------------------------------
-               ztortz    = mzrat2 * 1.e6 * zfact * trb(ji,jj,jk,jpmes)  * (1. - nitrfac(ji,jj,jk) )
-               !
-               zcompadi  = MAX( ( trb(ji,jj,jk,jpdia) - xthresh2dia ), 0.e0 )
-               zcompaz   = MAX( ( trb(ji,jj,jk,jpzoo) - xthresh2zoo ), 0.e0 )
-               zcompapoc = MAX( ( trb(ji,jj,jk,jppoc) - xthresh2poc ), 0.e0 )
-               ! Size effect of nanophytoplankton on grazing : the smaller it is, the less prone
-               ! it is to predation by mesozooplankton
-               ! -------------------------------------------------------------------------------
-               zcompaph  = MAX( ( trb(ji,jj,jk,jpphy) - xthresh2phy ), 0.e0 ) &
-                  &      * MIN(1., MAX( 0., ( quotan(ji,jj,jk) - 0.2) / 0.3 ) )
+         !  Zooplankton mortality. A square function has been selected with
+         !  no real reason except that it seems to be more stable and may mimic predation
+         !  ---------------------------------------------------------------
+         ztortz    = mzrat2 * 1.e6 * zfact * tr(ji,jj,jk,jpmes,Kbb)  * (1. - nitrfac(ji,jj,jk) )
+         !
+         zcompadi  = MAX( ( tr(ji,jj,jk,jpdia,Kbb) - xthresh2dia ), 0.e0 )
+         zcompaz   = MAX( ( tr(ji,jj,jk,jpzoo,Kbb) - xthresh2zoo ), 0.e0 )
+         zcompapoc = MAX( ( tr(ji,jj,jk,jppoc,Kbb) - xthresh2poc ), 0.e0 )
+         ! Size effect of nanophytoplankton on grazing : the smaller it is, the less prone
+         ! it is to predation by mesozooplankton
+         ! -------------------------------------------------------------------------------
+         zcompaph  = MAX( ( tr(ji,jj,jk,jpphy,Kbb) - xthresh2phy ), 0.e0 ) &
+            &      * MIN(1., MAX( 0., ( quotan(ji,jj,jk) - 0.2) / 0.3 ) )
 
-               !   Mesozooplankton grazing
-               !   ------------------------
-               zfood     = xpref2d * zcompadi + xpref2z * zcompaz + xpref2n * zcompaph + xpref2c * zcompapoc 
-               zfoodlim  = MAX( 0., zfood - MIN( 0.5 * zfood, xthresh2 ) )
-               zdenom    = zfoodlim / ( xkgraz2 + zfoodlim )
-               zdenom2   = zdenom / ( zfood + rtrn )
-               zgraze2   = grazrat2 * xstep * tgfunc2(ji,jj,jk) * trb(ji,jj,jk,jpmes) * (1. - nitrfac(ji,jj,jk)) 
+         !   Mesozooplankton grazing
+         !   ------------------------
+         zfood     = xpref2d * zcompadi + xpref2z * zcompaz + xpref2n * zcompaph + xpref2c * zcompapoc 
+         zfoodlim  = MAX( 0., zfood - MIN( 0.5 * zfood, xthresh2 ) )
+         zdenom    = zfoodlim / ( xkgraz2 + zfoodlim )
+         zdenom2   = zdenom / ( zfood + rtrn )
+         zgraze2   = grazrat2 * xstep * tgfunc2(ji,jj,jk) * tr(ji,jj,jk,jpmes,Kbb) * (1. - nitrfac(ji,jj,jk)) 
 
-               zgrazd    = zgraze2  * xpref2d  * zcompadi  * zdenom2 
-               zgrazz    = zgraze2  * xpref2z  * zcompaz   * zdenom2 
-               zgrazn    = zgraze2  * xpref2n  * zcompaph  * zdenom2 
-               zgrazpoc  = zgraze2  * xpref2c  * zcompapoc * zdenom2 
+         zgrazd    = zgraze2  * xpref2d  * zcompadi  * zdenom2 
+         zgrazz    = zgraze2  * xpref2z  * zcompaz   * zdenom2 
+         zgrazn    = zgraze2  * xpref2n  * zcompaph  * zdenom2 
+         zgrazpoc  = zgraze2  * xpref2c  * zcompapoc * zdenom2 
 
-               zgraznf   = zgrazn   * trb(ji,jj,jk,jpnfe) / ( trb(ji,jj,jk,jpphy) + rtrn)
-               zgrazf    = zgrazd   * trb(ji,jj,jk,jpdfe) / ( trb(ji,jj,jk,jpdia) + rtrn)
-               zgrazpof  = zgrazpoc * trb(ji,jj,jk,jpsfe) / ( trb(ji,jj,jk,jppoc) + rtrn)
+         zgraznf   = zgrazn   * tr(ji,jj,jk,jpnfe,Kbb) / ( tr(ji,jj,jk,jpphy,Kbb) + rtrn)
+         zgrazf    = zgrazd   * tr(ji,jj,jk,jpdfe,Kbb) / ( tr(ji,jj,jk,jpdia,Kbb) + rtrn)
+         zgrazpof  = zgrazpoc * tr(ji,jj,jk,jpsfe,Kbb) / ( tr(ji,jj,jk,jppoc,Kbb) + rtrn)
 
-               !  Mesozooplankton flux feeding on GOC
-               !  ----------------------------------
-               zgrazffeg = grazflux  * xstep * wsbio4(ji,jj,jk)      &
-               &           * tgfunc2(ji,jj,jk) * trb(ji,jj,jk,jpgoc) * trb(ji,jj,jk,jpmes) &
-               &           * (1. - nitrfac(ji,jj,jk))
-               zgrazfffg = zgrazffeg * trb(ji,jj,jk,jpbfe) / (trb(ji,jj,jk,jpgoc) + rtrn)
-               zgrazffep = grazflux  * xstep *  wsbio3(ji,jj,jk)     &
-               &           * tgfunc2(ji,jj,jk) * trb(ji,jj,jk,jppoc) * trb(ji,jj,jk,jpmes) &
-               &           * (1. - nitrfac(ji,jj,jk))
-               zgrazfffp = zgrazffep * trb(ji,jj,jk,jpsfe) / (trb(ji,jj,jk,jppoc) + rtrn)
-               !
-               zgraztotc = zgrazd + zgrazz + zgrazn + zgrazpoc + zgrazffep + zgrazffeg
-               ! Compute the proportion of filter feeders
-               zproport  = (zgrazffep + zgrazffeg)/(rtrn + zgraztotc)
-               ! Compute fractionation of aggregates. It is assumed that 
-               ! diatoms based aggregates are more prone to fractionation
-               ! since they are more porous (marine snow instead of fecal pellets)
-               zratio    = trb(ji,jj,jk,jpgsi) / ( trb(ji,jj,jk,jpgoc) + rtrn )
-               zratio2   = zratio * zratio
-               zfrac     = zproport * grazflux  * xstep * wsbio4(ji,jj,jk)      &
-               &          * trb(ji,jj,jk,jpgoc) * trb(ji,jj,jk,jpmes)          &
-               &          * ( 0.2 + 3.8 * zratio2 / ( 1.**2 + zratio2 ) )
-               zfracfe   = zfrac * trb(ji,jj,jk,jpbfe) / (trb(ji,jj,jk,jpgoc) + rtrn)
+         !  Mesozooplankton flux feeding on GOC
+         !  ----------------------------------
+         zgrazffeg = grazflux  * xstep * wsbio4(ji,jj,jk)      &
+         &           * tgfunc2(ji,jj,jk) * tr(ji,jj,jk,jpgoc,Kbb) * tr(ji,jj,jk,jpmes,Kbb) &
+         &           * (1. - nitrfac(ji,jj,jk))
+         zgrazfffg = zgrazffeg * tr(ji,jj,jk,jpbfe,Kbb) / (tr(ji,jj,jk,jpgoc,Kbb) + rtrn)
+         zgrazffep = grazflux  * xstep *  wsbio3(ji,jj,jk)     &
+         &           * tgfunc2(ji,jj,jk) * tr(ji,jj,jk,jppoc,Kbb) * tr(ji,jj,jk,jpmes,Kbb) &
+         &           * (1. - nitrfac(ji,jj,jk))
+         zgrazfffp = zgrazffep * tr(ji,jj,jk,jpsfe,Kbb) / (tr(ji,jj,jk,jppoc,Kbb) + rtrn)
+         !
+         zgraztotc = zgrazd + zgrazz + zgrazn + zgrazpoc + zgrazffep + zgrazffeg
+         ! Compute the proportion of filter feeders
+         zproport  = (zgrazffep + zgrazffeg)/(rtrn + zgraztotc)
+         ! Compute fractionation of aggregates. It is assumed that 
+         ! diatoms based aggregates are more prone to fractionation
+         ! since they are more porous (marine snow instead of fecal pellets)
+         zratio    = tr(ji,jj,jk,jpgsi,Kbb) / ( tr(ji,jj,jk,jpgoc,Kbb) + rtrn )
+         zratio2   = zratio * zratio
+         zfrac     = zproport * grazflux  * xstep * wsbio4(ji,jj,jk)      &
+         &          * tr(ji,jj,jk,jpgoc,Kbb) * tr(ji,jj,jk,jpmes,Kbb)          &
+         &          * ( 0.2 + 3.8 * zratio2 / ( 1.**2 + zratio2 ) )
+         zfracfe   = zfrac * tr(ji,jj,jk,jpbfe,Kbb) / (tr(ji,jj,jk,jpgoc,Kbb) + rtrn)
 
-               zgrazffep = zproport * zgrazffep
-               zgrazffeg = zproport * zgrazffeg
-               zgrazfffp = zproport * zgrazfffp
-               zgrazfffg = zproport * zgrazfffg
-               zgraztotc = zgrazd + zgrazz + zgrazn + zgrazpoc + zgrazffep + zgrazffeg
-               zgraztotn = zgrazd * quotad(ji,jj,jk) + zgrazz + zgrazn * quotan(ji,jj,jk)   &
-               &   + zgrazpoc + zgrazffep + zgrazffeg
-               zgraztotf = zgrazf + zgraznf + zgrazz * ferat3 + zgrazpof + zgrazfffp + zgrazfffg
+         zgrazffep = zproport * zgrazffep
+         zgrazffeg = zproport * zgrazffeg
+         zgrazfffp = zproport * zgrazfffp
+         zgrazfffg = zproport * zgrazfffg
+         zgraztotc = zgrazd + zgrazz + zgrazn + zgrazpoc + zgrazffep + zgrazffeg
+         zgraztotn = zgrazd * quotad(ji,jj,jk) + zgrazz + zgrazn * quotan(ji,jj,jk)   &
+         &   + zgrazpoc + zgrazffep + zgrazffeg
+         zgraztotf = zgrazf + zgraznf + zgrazz * ferat3 + zgrazpof + zgrazfffp + zgrazfffg
 
-               ! Total grazing ( grazing by microzoo is already computed in p4zmicro )
-               zgrazing(ji,jj,jk) = zgraztotc
+         ! Total grazing ( grazing by microzoo is already computed in p4zmicro )
+         zgrazing2(ji,jj,jk) = zgraztotc
 
-               !    Mesozooplankton efficiency
-               !    --------------------------
-               zgrasrat  =  ( zgraztotf + rtrn )/ ( zgraztotc + rtrn )
-               zgrasratn =  ( zgraztotn + rtrn )/ ( zgraztotc + rtrn )
-               zepshert  = MIN( 1., zgrasratn, zgrasrat / ferat3)
-               zbeta     = MAX(0., (epsher2 - epsher2min) )
-               zepsherf  = epsher2min + zbeta / ( 1.0 + 0.04E6 * 12. * zfood * zbeta ) 
-               zepsherv  = zepsherf * zepshert 
+         ! Mesozooplankton efficiency. 
+         ! We adopt a formulation proposed by Mitra et al. (2007)
+         ! The gross growth efficiency is controled by the most limiting nutrient.
+         ! Growth is also further decreased when the food quality is poor. This is currently
+         ! hard coded : it can be decreased by up to 50% (zepsherq)
+         ! GGE can also be decreased when food quantity is high, zepsherf (Montagnes and 
+         ! Fulton, 2012)
+         ! -----------------------------------------------------------------------------------
+         zgrasrat  =  ( zgraztotf + rtrn )/ ( zgraztotc + rtrn )
+         zgrasratn =  ( zgraztotn + rtrn )/ ( zgraztotc + rtrn )
+         zepshert  = MIN( 1., zgrasratn, zgrasrat / ferat3)
+         zbeta     = MAX(0., (epsher2 - epsher2min) )
+         zepsherf  = epsher2min + zbeta / ( 1.0 + 0.04E6 * 12. * zfood * zbeta ) 
+         zepsherq  = 0.5 + (1.0 - 0.5) * zepshert * ( 1.0 + 1.0 ) / ( zepshert + 1.0 )
+         zepsherv  = zepsherf * zepshert * zepsherq 
 
-               zgrarem2  = zgraztotc * ( 1. - zepsherv - unass2 ) &
-               &         + ( 1. - epsher2 - unass2 ) / ( 1. - epsher2 ) * ztortz
-               zgrafer2  = zgraztotc * MAX( 0. , ( 1. - unass2 ) * zgrasrat - ferat3 * zepsherv )    &
-               &         + ferat3 * ( ( 1. - epsher2 - unass2 ) /( 1. - epsher2 ) * ztortz )
-               zgrapoc2  = zgraztotc * unass2
+         zgrarem2  = zgraztotc * ( 1. - zepsherv - unass2 ) &
+         &         + ( 1. - epsher2 - unass2 ) / ( 1. - epsher2 ) * ztortz
+         zgrafer2  = zgraztotc * MAX( 0. , ( 1. - unass2 ) * zgrasrat - ferat3 * zepsherv )    &
+         &         + ferat3 * ( ( 1. - epsher2 - unass2 ) /( 1. - epsher2 ) * ztortz )
+         zgrapoc2  = zgraztotc * unass2
 
-               !   Update the arrays TRA which contain the biological sources and sinks
-               zgrarsig  = zgrarem2 * sigma2
-               tra(ji,jj,jk,jppo4) = tra(ji,jj,jk,jppo4) + zgrarsig
-               tra(ji,jj,jk,jpnh4) = tra(ji,jj,jk,jpnh4) + zgrarsig
-               tra(ji,jj,jk,jpdoc) = tra(ji,jj,jk,jpdoc) + zgrarem2 - zgrarsig
-               !
-               IF( ln_ligand ) THEN 
-                  tra(ji,jj,jk,jplgw) = tra(ji,jj,jk,jplgw) + (zgrarem2 - zgrarsig) * ldocz
-                  zz2ligprod(ji,jj,jk) = (zgrarem2 - zgrarsig) * ldocz
-               ENDIF
-               !
-               tra(ji,jj,jk,jpoxy) = tra(ji,jj,jk,jpoxy) - o2ut * zgrarsig
-               tra(ji,jj,jk,jpfer) = tra(ji,jj,jk,jpfer) + zgrafer2
-               zfezoo2(ji,jj,jk)   = zgrafer2
-               tra(ji,jj,jk,jpdic) = tra(ji,jj,jk,jpdic) + zgrarsig
-               tra(ji,jj,jk,jptal) = tra(ji,jj,jk,jptal) + rno3 * zgrarsig              
 
-               zmortz = ztortz + zrespz
-               zmortzgoc = unass2 / ( 1. - epsher2 ) * ztortz + zrespz
-               tra(ji,jj,jk,jpmes) = tra(ji,jj,jk,jpmes) - zmortz + zepsherv * zgraztotc 
-               tra(ji,jj,jk,jpdia) = tra(ji,jj,jk,jpdia) - zgrazd
-               tra(ji,jj,jk,jpzoo) = tra(ji,jj,jk,jpzoo) - zgrazz
-               tra(ji,jj,jk,jpphy) = tra(ji,jj,jk,jpphy) - zgrazn
-               tra(ji,jj,jk,jpnch) = tra(ji,jj,jk,jpnch) - zgrazn * trb(ji,jj,jk,jpnch) / ( trb(ji,jj,jk,jpphy) + rtrn )
-               tra(ji,jj,jk,jpdch) = tra(ji,jj,jk,jpdch) - zgrazd * trb(ji,jj,jk,jpdch) / ( trb(ji,jj,jk,jpdia) + rtrn )
-               tra(ji,jj,jk,jpdsi) = tra(ji,jj,jk,jpdsi) - zgrazd * trb(ji,jj,jk,jpdsi) / ( trb(ji,jj,jk,jpdia) + rtrn )
-               tra(ji,jj,jk,jpgsi) = tra(ji,jj,jk,jpgsi) + zgrazd * trb(ji,jj,jk,jpdsi) / ( trb(ji,jj,jk,jpdia) + rtrn )
-               tra(ji,jj,jk,jpnfe) = tra(ji,jj,jk,jpnfe) - zgraznf
-               tra(ji,jj,jk,jpdfe) = tra(ji,jj,jk,jpdfe) - zgrazf
+         !   Update the arrays TRA which contain the biological sources and sinks
+         zgrarsig  = zgrarem2 * sigma2
+         tr(ji,jj,jk,jppo4,Krhs) = tr(ji,jj,jk,jppo4,Krhs) + zgrarsig
+         tr(ji,jj,jk,jpnh4,Krhs) = tr(ji,jj,jk,jpnh4,Krhs) + zgrarsig
+         tr(ji,jj,jk,jpdoc,Krhs) = tr(ji,jj,jk,jpdoc,Krhs) + zgrarem2 - zgrarsig
+         !
+         IF( ln_ligand ) THEN 
+            tr(ji,jj,jk,jplgw,Krhs) = tr(ji,jj,jk,jplgw,Krhs) + (zgrarem2 - zgrarsig) * ldocz
+            zz2ligprod(ji,jj,jk) = (zgrarem2 - zgrarsig) * ldocz
+         ENDIF
+         !
+         tr(ji,jj,jk,jpoxy,Krhs) = tr(ji,jj,jk,jpoxy,Krhs) - o2ut * zgrarsig
+         tr(ji,jj,jk,jpfer,Krhs) = tr(ji,jj,jk,jpfer,Krhs) + zgrafer2
+         zfezoo2(ji,jj,jk)   = zgrafer2
+         tr(ji,jj,jk,jpdic,Krhs) = tr(ji,jj,jk,jpdic,Krhs) + zgrarsig
+         tr(ji,jj,jk,jptal,Krhs) = tr(ji,jj,jk,jptal,Krhs) + rno3 * zgrarsig              
 
-               tra(ji,jj,jk,jppoc) = tra(ji,jj,jk,jppoc) - zgrazpoc - zgrazffep + zfrac
-               prodpoc(ji,jj,jk) = prodpoc(ji,jj,jk) + zfrac
-               conspoc(ji,jj,jk) = conspoc(ji,jj,jk) - zgrazpoc - zgrazffep
-               tra(ji,jj,jk,jpgoc) = tra(ji,jj,jk,jpgoc) + zmortzgoc - zgrazffeg + zgrapoc2 - zfrac
-               prodgoc(ji,jj,jk) = prodgoc(ji,jj,jk) + zmortzgoc + zgrapoc2
-               consgoc(ji,jj,jk) = consgoc(ji,jj,jk) - zgrazffeg - zfrac
-               tra(ji,jj,jk,jpsfe) = tra(ji,jj,jk,jpsfe) - zgrazpof - zgrazfffp + zfracfe
-               tra(ji,jj,jk,jpbfe) = tra(ji,jj,jk,jpbfe) + ferat3 * zmortzgoc - zgrazfffg     &
-                 &                + zgraztotf * unass2 - zfracfe
-               zfracal = trb(ji,jj,jk,jpcal) / (trb(ji,jj,jk,jppoc) + trb(ji,jj,jk,jpgoc) + rtrn )
-               zgrazcal = (zgrazffeg + zgrazpoc) * (1. - part2) * zfracal
-               ! calcite production
-               zprcaca = xfracal(ji,jj,jk) * zgrazn
-               prodcal(ji,jj,jk) = prodcal(ji,jj,jk) + zprcaca  ! prodcal=prodcal(nanophy)+prodcal(microzoo)+prodcal(mesozoo)
-               !
-               zprcaca = part2 * zprcaca
-               tra(ji,jj,jk,jpdic) = tra(ji,jj,jk,jpdic) + zgrazcal - zprcaca
-               tra(ji,jj,jk,jptal) = tra(ji,jj,jk,jptal) - 2. * ( zgrazcal + zprcaca )
-               tra(ji,jj,jk,jpcal) = tra(ji,jj,jk,jpcal) - zgrazcal + zprcaca
-            END DO
-         END DO
-      END DO
+         zmortz = ztortz + zrespz
+         zmortzgoc = unass2 / ( 1. - epsher2 ) * ztortz + zrespz
+         tr(ji,jj,jk,jpmes,Krhs) = tr(ji,jj,jk,jpmes,Krhs) - zmortz + zepsherv * zgraztotc 
+         tr(ji,jj,jk,jpdia,Krhs) = tr(ji,jj,jk,jpdia,Krhs) - zgrazd
+         tr(ji,jj,jk,jpzoo,Krhs) = tr(ji,jj,jk,jpzoo,Krhs) - zgrazz
+         tr(ji,jj,jk,jpphy,Krhs) = tr(ji,jj,jk,jpphy,Krhs) - zgrazn
+         tr(ji,jj,jk,jpnch,Krhs) = tr(ji,jj,jk,jpnch,Krhs) - zgrazn * tr(ji,jj,jk,jpnch,Kbb) / ( tr(ji,jj,jk,jpphy,Kbb) + rtrn )
+         tr(ji,jj,jk,jpdch,Krhs) = tr(ji,jj,jk,jpdch,Krhs) - zgrazd * tr(ji,jj,jk,jpdch,Kbb) / ( tr(ji,jj,jk,jpdia,Kbb) + rtrn )
+         tr(ji,jj,jk,jpdsi,Krhs) = tr(ji,jj,jk,jpdsi,Krhs) - zgrazd * tr(ji,jj,jk,jpdsi,Kbb) / ( tr(ji,jj,jk,jpdia,Kbb) + rtrn )
+         tr(ji,jj,jk,jpgsi,Krhs) = tr(ji,jj,jk,jpgsi,Krhs) + zgrazd * tr(ji,jj,jk,jpdsi,Kbb) / ( tr(ji,jj,jk,jpdia,Kbb) + rtrn )
+         tr(ji,jj,jk,jpnfe,Krhs) = tr(ji,jj,jk,jpnfe,Krhs) - zgraznf
+         tr(ji,jj,jk,jpdfe,Krhs) = tr(ji,jj,jk,jpdfe,Krhs) - zgrazf
+
+         tr(ji,jj,jk,jppoc,Krhs) = tr(ji,jj,jk,jppoc,Krhs) - zgrazpoc - zgrazffep + zfrac
+         prodpoc(ji,jj,jk) = prodpoc(ji,jj,jk) + zfrac
+         conspoc(ji,jj,jk) = conspoc(ji,jj,jk) - zgrazpoc - zgrazffep
+         tr(ji,jj,jk,jpgoc,Krhs) = tr(ji,jj,jk,jpgoc,Krhs) + zmortzgoc - zgrazffeg + zgrapoc2 - zfrac
+         prodgoc(ji,jj,jk) = prodgoc(ji,jj,jk) + zmortzgoc + zgrapoc2
+         consgoc(ji,jj,jk) = consgoc(ji,jj,jk) - zgrazffeg - zfrac
+         tr(ji,jj,jk,jpsfe,Krhs) = tr(ji,jj,jk,jpsfe,Krhs) - zgrazpof - zgrazfffp + zfracfe
+         tr(ji,jj,jk,jpbfe,Krhs) = tr(ji,jj,jk,jpbfe,Krhs) + ferat3 * zmortzgoc - zgrazfffg     &
+           &                + zgraztotf * unass2 - zfracfe
+         zfracal = tr(ji,jj,jk,jpcal,Kbb) / (tr(ji,jj,jk,jppoc,Kbb) + tr(ji,jj,jk,jpgoc,Kbb) + rtrn )
+         zgrazcal = (zgrazffeg + zgrazpoc) * (1. - part2) * zfracal
+         ! calcite production
+         zprcaca = xfracal(ji,jj,jk) * zgrazn
+         prodcal(ji,jj,jk) = prodcal(ji,jj,jk) + zprcaca  ! prodcal=prodcal(nanophy)+prodcal(microzoo)+prodcal(mesozoo)
+         !
+         zprcaca = part2 * zprcaca
+         tr(ji,jj,jk,jpdic,Krhs) = tr(ji,jj,jk,jpdic,Krhs) + zgrazcal - zprcaca
+         tr(ji,jj,jk,jptal,Krhs) = tr(ji,jj,jk,jptal,Krhs) - 2. * ( zgrazcal + zprcaca )
+         tr(ji,jj,jk,jpcal,Krhs) = tr(ji,jj,jk,jpcal,Krhs) - zgrazcal + zprcaca
+      END_3D
       !
       IF( lk_iomput .AND. knt == nrdttrc ) THEN
-         ALLOCATE( zw3d(jpi,jpj,jpk) )
-         IF( iom_use( "GRAZ2" ) ) THEN
-            zw3d(:,:,:) = zgrazing(:,:,:) * 1.e+3 * rfact2r * tmask(:,:,:)  !   Total grazing of phyto by zooplankton
-            CALL iom_put( "GRAZ2", zw3d )
+        CALL iom_put( "PCAL"  , prodcal(:,:,:) * 1.e+3  * rfact2r * tmask(:,:,:) )  !  Calcite production 
+        IF( iom_use("GRAZ2") ) THEN  !   Total grazing of phyto by zooplankton
+           zgrazing2(:,:,jpk) = 0._wp ;  CALL iom_put( "GRAZ2" , zgrazing2(:,:,:) * 1.e+3  * rfact2r * tmask(:,:,:) ) 
          ENDIF
-         IF( iom_use( "PCAL" ) ) THEN
-            zw3d(:,:,:) = prodcal(:,:,:) * 1.e+3 * rfact2r * tmask(:,:,:)   !  Calcite production
-            CALL iom_put( "PCAL", zw3d )  
+         IF( iom_use("FEZOO2") ) THEN  
+           zfezoo2 (:,:,jpk) = 0._wp ; CALL iom_put( "FEZOO2", zfezoo2(:,:,:) * 1e9 * 1.e+3 * rfact2r * tmask(:,:,:) )
          ENDIF
-         IF( iom_use( "FEZOO2" ) ) THEN
-            zw3d(:,:,:) = zfezoo2(:,:,:) * 1e9 * 1.e+3 * rfact2r * tmask(:,:,:)   !
-            CALL iom_put( "FEZOO2", zw3d )
+         IF( ln_ligand ) THEN
+            zz2ligprod(:,:,jpk) = 0._wp ; CALL iom_put( "LPRODZ2", zz2ligprod(:,:,:) * 1e9 * 1.e+3 * rfact2r * tmask(:,:,:)  )
          ENDIF
-         IF( iom_use( "LPRODZ2" ) .AND. ln_ligand )  THEN
-            zw3d(:,:,:) = zz2ligprod(:,:,:) * 1e9 * 1.e+3 * rfact2r * tmask(:,:,:)
-            CALL iom_put( "LPRODZ2"  , zw3d )
-         ENDIF
-         DEALLOCATE( zw3d )
       ENDIF
       !
-      IF (ln_ligand)  DEALLOCATE( zz2ligprod )
-      !
-      IF(ln_ctl)   THEN  ! print mean trends (used for debugging)
+      IF(sn_cfctl%l_prttrc)   THEN  ! print mean trends (used for debugging)
         WRITE(charout, FMT="('meso')")
         CALL prt_ctl_trc_info(charout)
-        CALL prt_ctl_trc(tab4d=tra, mask=tmask, clinfo=ctrcnm)
+        CALL prt_ctl_trc(tab4d=tr(:,:,:,:,Krhs), mask=tmask, clinfo=ctrcnm)
       ENDIF
       !
       IF( ln_timing )   CALL timing_stop('p4z_meso')
@@ -289,12 +278,10 @@ CONTAINS
          WRITE(numout,*) '~~~~~~~~~~~~~'
       ENDIF
       !
-      REWIND( numnatp_ref )              ! Namelist nampismes in reference namelist : Pisces mesozooplankton
       READ  ( numnatp_ref, namp4zmes, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namp4zmes in reference namelist', lwp )
-      REWIND( numnatp_cfg )              ! Namelist nampismes in configuration namelist : Pisces mesozooplankton
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namp4zmes in reference namelist' )
       READ  ( numnatp_cfg, namp4zmes, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namp4zmes in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namp4zmes in configuration namelist' )
       IF(lwm) WRITE( numonp, namp4zmes )
       !
       IF(lwp) THEN                         ! control print

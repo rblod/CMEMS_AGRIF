@@ -48,6 +48,7 @@ MODULE agrif_types
   INTEGER ::   N, type_bathy_interp
   ! 
   INTEGER ::   jpizoom, jpjzoom, npt_connect, npt_copy
+  INTEGER ::   parent_jperio
   !      
   REAL*8 ::   rn_hmin
   REAL*8 ::   ppkth2, ppacr2, ppkth, ppacr, ppdzmin, pphmax, smoothing_factor, e3zps_min, e3zps_rat
@@ -70,7 +71,8 @@ MODULE agrif_types
   NAMELIST /input_output/iom_activated
   !
   NAMELIST /coarse_grid_files/parent_coordinate_file, parent_bathy_level, parent_level_name, &
-     &                                                parent_bathy_meter, parent_meter_name, parent_domcfg_out
+     &                                                parent_bathy_meter, parent_meter_name, parent_domcfg_out, &
+     &                                                parent_jperio
   !      
   NAMELIST /bathymetry/new_topo, elevation_database, elevation_name, smoothing, smoothing_factor,  &
                        ln_agrif_domain, npt_connect, npt_copy, removeclosedseas, type_bathy_interp, rn_hmin      
@@ -187,6 +189,11 @@ CONTAINS
           nbghostcellsfine = 0
           nxfin = (imax-imin+1)*irafx
           nyfin = (jmax-jmin+1)*irafy
+       ENDIF
+       !
+       IF( .NOT.partial_steps ) THEN
+          WRITE(*,*) 'E R R O R: partial_steps must be set to true otherwise very thin bottom layers can be created'
+          STOP
        ENDIF
        !
     ELSE

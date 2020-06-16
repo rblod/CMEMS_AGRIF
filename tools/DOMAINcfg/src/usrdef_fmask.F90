@@ -13,7 +13,6 @@ MODULE usrdef_fmask
    !!----------------------------------------------------------------------
    !!   usr_def_fmask  : alteration of f-point land/ocean mask in some straits
    !!----------------------------------------------------------------------
-   USE oce             ! ocean dynamics and tracers
    USE dom_oce         ! ocean space and time domain
    !
    USE in_out_manager  ! I/O manager

@@ -2,8 +2,6 @@
 ! NEMO system team, System and Interface for oceanic RElocable Nesting
 !----------------------------------------------------------------------
 !
-! MODULE: interp
-!
 ! DESCRIPTION:
 !> @brief 
 !> This module manage linear interpolation on regular grid.
@@ -22,12 +20,11 @@
 !>
 !> @author
 !> J.Paul
-! REVISION HISTORY:
+!>
 !> @date September, 2014 - Initial version
 !>
-!> @note Software governed by the CeCILL licence     (./LICENSE)
+!> @note Software governed by the CeCILL licence     (NEMOGCM/NEMO_CeCILL.txt)
 !----------------------------------------------------------------------
-
 MODULE interp_linear
 
    USE netcdf                          ! nf90 library
@@ -54,7 +51,10 @@ MODULE interp_linear
    PRIVATE :: interp_linear__get_weight2D !< compute interpoaltion weight for 2D array.
    PRIVATE :: interp_linear__get_weight1D !< compute interpoaltion weight for 1D array.
 
-CONTAINS   
+CONTAINS
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE interp_linear_fill(dd_value, dd_fill, id_detect, &
+         &                       id_rho, ld_even, ld_discont)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute horizontal linear interpolation on 4D array of value. 
@@ -72,9 +72,9 @@ CONTAINS
    !> @param[in] ld_even      even refinment or not 
    !> @param[in] ld_discont   longitudinal discontinuity (-180°/180°, 0°/360°) or not
    !-------------------------------------------------------------------
-   SUBROUTINE interp_linear_fill(dd_value, dd_fill, id_detect, &
-   &                             id_rho, ld_even, ld_discont )
+
       IMPLICIT NONE
+
       ! Argument
       REAL(dp)        , DIMENSION(:,:,:,:), INTENT(INOUT) :: dd_value 
       REAL(dp)                            , INTENT(IN   ) :: dd_fill 
@@ -162,6 +162,12 @@ CONTAINS
       DEALLOCATE(dl_weight_J)
  
    END SUBROUTINE interp_linear_fill
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE interp_linear__2D(dd_value,  dd_fill,   &
+         &                      id_detect,            &
+         &                      dd_weight,            &
+         &                      id_rhoi, id_rhoj,     &
+         &                      ld_discont)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute linear interpolation on 2D array of value. 
@@ -180,13 +186,9 @@ CONTAINS
    !> @param[in] ld_even      even refinment or not 
    !> @param[in] ld_discont   longitudinal discontinuity (-180°/180°, 0°/360°) or not
    !-------------------------------------------------------------------
-   SUBROUTINE interp_linear__2D( dd_value,  dd_fill,   &
-      &                          id_detect,            &
-      &                          dd_weight,            &
-      &                          id_rhoi, id_rhoj,     &
-      &                          ld_discont )
 
       IMPLICIT NONE
+
       ! Argument
       REAL(dp)        , DIMENSION(:,:), INTENT(INOUT) :: dd_value 
       REAL(dp)                        , INTENT(IN   ) :: dd_fill 
@@ -297,6 +299,12 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE interp_linear__2D
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE interp_linear__1D(dd_value,  dd_fill,   &
+         &                      id_detect,            &
+         &                      dd_weight,            &
+         &                      id_rhoi,              &
+         &                      ld_discont)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute linear interpolation on 1D array of value. 
@@ -313,13 +321,9 @@ CONTAINS
    !> @param[in] ld_even      even refinment or not 
    !> @param[in] ld_discont   longitudinal discontinuity (-180°/180°, 0°/360°) or not
    !-------------------------------------------------------------------
-   SUBROUTINE interp_linear__1D( dd_value,  dd_fill,   &
-      &                          id_detect,            &
-      &                          dd_weight,            &
-      &                          id_rhoi,              &
-      &                          ld_discont )
 
       IMPLICIT NONE
+
       ! Argument
       REAL(dp)        , DIMENSION(:)  , INTENT(INOUT) :: dd_value 
       REAL(dp)                        , INTENT(IN   ) :: dd_fill 
@@ -411,6 +415,9 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE interp_linear__1D
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION interp_linear__2D_coef(dd_value, dd_fill) &
+         & RESULT (df_coef)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute 2D array of coefficient for linear interpolation. 
@@ -421,14 +428,15 @@ CONTAINS
    !> @param[in] dd_value  2D array of value
    !> @param[in] dd_fill   FillValue of variable
    !-------------------------------------------------------------------
-   FUNCTION interp_linear__2D_coef( dd_value, dd_fill )
+
       IMPLICIT NONE
+
       ! Argument
       REAL(dp), DIMENSION(:,:)  , INTENT(IN) :: dd_value 
       REAL(dp)                  , INTENT(IN) :: dd_fill 
 
       ! function
-      REAL(dp), DIMENSION(4) :: interp_linear__2D_coef
+      REAL(dp), DIMENSION(4)                 :: df_coef
 
       ! local variable
       REAL(dp), DIMENSION(4,4), PARAMETER :: dl_matrix = RESHAPE( &
@@ -442,12 +450,16 @@ CONTAINS
 
       !----------------------------------------------------------------
       ! init
-      interp_linear__2D_coef(:)=dd_fill
+      df_coef(:)=dd_fill
 
       dl_vect( 1: 4)=PACK(dd_value(:,:),.TRUE. )
-      interp_linear__2D_coef(:)=MATMUL(dl_matrix(:,:),dl_vect(:))
+      df_coef(:)=MATMUL(dl_matrix(:,:),dl_vect(:))
 
    END FUNCTION interp_linear__2D_coef
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE interp_linear__2D_fill(dd_value, id_detect, &
+         &                           dd_weight, dd_coef,  &
+         &                           dd_fill, id_rhoi, id_rhoj)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute linear interpolation of a 2D array of value. 
@@ -463,10 +475,9 @@ CONTAINS
    !> @param[in] id_rhoi      refinement factor in i-direction 
    !> @param[in] id_rhoj      refinement factor in j-direction
    !-------------------------------------------------------------------
-   SUBROUTINE interp_linear__2D_fill( dd_value, id_detect, &
-   &                                  dd_weight, dd_coef,  &
-   &                                  dd_fill, id_rhoi, id_rhoj )
+
       IMPLICIT NONE
+
       ! Argument
       REAL(dp)        , DIMENSION(:,:), INTENT(INOUT) :: dd_value 
       INTEGER(i4)     , DIMENSION(:,:), INTENT(INOUT) :: id_detect
@@ -508,6 +519,9 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE interp_linear__2D_fill
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION interp_linear__1D_coef(dd_value, dd_fill) &
+         & RESULT (df_coef)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute 1D array of coefficient for linear interpolation. 
@@ -518,14 +532,15 @@ CONTAINS
    !> @param[in] dd_value  1D array of value
    !> @param[in] dd_fill   FillValue of variable
    !-------------------------------------------------------------------
-   FUNCTION interp_linear__1D_coef( dd_value, dd_fill )
+
       IMPLICIT NONE
+
       ! Argument
       REAL(dp), DIMENSION(:)  , INTENT(IN) :: dd_value 
       REAL(dp)                , INTENT(IN) :: dd_fill  
 
       ! function
-      REAL(dp), DIMENSION(2) :: interp_linear__1D_coef
+      REAL(dp), DIMENSION(2)               :: df_coef
 
       ! local variable
       REAL(dp), DIMENSION(2,2), PARAMETER :: dl_matrix = RESHAPE( &
@@ -537,12 +552,16 @@ CONTAINS
 
       !----------------------------------------------------------------
       ! init
-      interp_linear__1D_coef(:)=dd_fill
+      df_coef(:)=dd_fill
 
       dl_vect( 1: 2)=PACK(dd_value(:),.TRUE. )
-      interp_linear__1D_coef(:)=MATMUL(dl_matrix(:,:),dl_vect(:))
+      df_coef(:)=MATMUL(dl_matrix(:,:),dl_vect(:))
 
    END FUNCTION interp_linear__1D_coef
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE interp_linear__1D_fill(dd_value, id_detect, &
+         &                           dd_weight, dd_coef,  &
+         &                           dd_fill, id_rho)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute linear interpolation of a 1D array of value. 
@@ -557,10 +576,9 @@ CONTAINS
    !> @param[in] ld_even      even refinment or not
    !> @param[in] id_rho       refinement factor
    !-------------------------------------------------------------------
-   SUBROUTINE interp_linear__1D_fill( dd_value, id_detect, &
-   &                                  dd_weight, dd_coef,  &
-   &                                  dd_fill, id_rho )
+
       IMPLICIT NONE
+
       ! Argument
       REAL(dp)        , DIMENSION(:)  , INTENT(INOUT) :: dd_value 
       INTEGER(i4)     , DIMENSION(:)  , INTENT(INOUT) :: id_detect
@@ -594,6 +612,8 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE interp_linear__1D_fill
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE interp_linear__get_weight2D(dd_weight, id_rho, ld_even)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute interpoaltion weight for 2D array. 
@@ -605,13 +625,15 @@ CONTAINS
    !> @param[in] ld_even   even refinment or not
    !> @param[in] id_rho    refinement factor 
    !-------------------------------------------------------------------
-   SUBROUTINE interp_linear__get_weight2D(dd_weight, &
-   &                                     id_rho, ld_even)
+
       IMPLICIT NONE
+
       ! Argument
+
       REAL(dp)   , DIMENSION(:,:), INTENT(INOUT) :: dd_weight
       INTEGER(I4), DIMENSION(:)  , INTENT(IN   ) :: id_rho
       LOGICAL    , DIMENSION(:)  , INTENT(IN   ) :: ld_even
+
       ! local variable
       REAL(dp)                  :: dl_dx
       REAL(dp)                  :: dl_x      
@@ -663,6 +685,8 @@ CONTAINS
       ENDDO
 
    END SUBROUTINE interp_linear__get_weight2D
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE interp_linear__get_weight1D(dd_weight, id_rho, ld_even)
    !-------------------------------------------------------------------
    !> @brief
    !> This subroutine compute interpoaltion weight for 1D array. 
@@ -674,9 +698,9 @@ CONTAINS
    !> @param[in] ld_even   even refinment or not
    !> @param[in] id_rho    refinement factor 
    !-------------------------------------------------------------------
-   SUBROUTINE interp_linear__get_weight1D(dd_weight, &
-   &                                     id_rho, ld_even)
+
       IMPLICIT NONE
+
       ! Argument
       REAL(dp)   , DIMENSION(:,:), INTENT(INOUT) :: dd_weight
       INTEGER(I4)                , INTENT(IN   ) :: id_rho
@@ -707,4 +731,5 @@ CONTAINS
       ENDDO
 
    END SUBROUTINE interp_linear__get_weight1D
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 END MODULE interp_linear

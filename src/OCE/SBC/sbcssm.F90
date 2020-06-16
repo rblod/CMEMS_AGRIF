@@ -33,12 +33,12 @@ MODULE sbcssm
    
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: sbcssm.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: sbcssm.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE sbc_ssm( kt )
+   SUBROUTINE sbc_ssm( kt, Kbb, Kmm )
       !!---------------------------------------------------------------------
       !!                     ***  ROUTINE sbc_oce  ***
       !!                     
@@ -52,6 +52,7 @@ CONTAINS
       !!      is add to ssh_m when ln_apr_dyn = T. Required for sea-ice dynamics.
       !!---------------------------------------------------------------------
       INTEGER, INTENT(in) ::   kt   ! ocean time step
+      INTEGER, INTENT(in) ::   Kbb, Kmm   ! ocean time level indices
       !
       INTEGER  ::   ji, jj               ! loop index
       REAL(wp) ::   zcoef, zf_sbc       ! local scalar
@@ -59,27 +60,23 @@ CONTAINS
       !!---------------------------------------------------------------------
       !
       !                                        !* surface T-, U-, V- ocean level variables (T, S, depth, velocity)
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-            zts(ji,jj,jp_tem) = tsn(ji,jj,mikt(ji,jj),jp_tem)
-            zts(ji,jj,jp_sal) = tsn(ji,jj,mikt(ji,jj),jp_sal)
-         END DO
-      END DO
+      zts(:,:,jp_tem) = ts(:,:,1,jp_tem,Kmm)
+      zts(:,:,jp_sal) = ts(:,:,1,jp_sal,Kmm)
       !
       IF( nn_fsbc == 1 ) THEN                             !   Instantaneous surface fields        !
          !                                                ! ---------------------------------------- !
-         ssu_m(:,:) = ub(:,:,1)
-         ssv_m(:,:) = vb(:,:,1)
+         ssu_m(:,:) = uu(:,:,1,Kbb)
+         ssv_m(:,:) = vv(:,:,1,Kbb)
          IF( l_useCT )  THEN    ;   sst_m(:,:) = eos_pt_from_ct( zts(:,:,jp_tem), zts(:,:,jp_sal) )
-         ELSE                    ;   sst_m(:,:) = zts(:,:,jp_tem)
+         ELSE                   ;   sst_m(:,:) = zts(:,:,jp_tem)
          ENDIF
          sss_m(:,:) = zts(:,:,jp_sal)
          !                          ! removed inverse barometer ssh when Patm forcing is used (for sea-ice dynamics)
-         IF( ln_apr_dyn ) THEN   ;   ssh_m(:,:) = sshn(:,:) - 0.5 * ( ssh_ib(:,:) + ssh_ibb(:,:) )
-         ELSE                    ;   ssh_m(:,:) = sshn(:,:)
+         IF( ln_apr_dyn ) THEN   ;   ssh_m(:,:) = ssh(:,:,Kmm) - 0.5 * ( ssh_ib(:,:) + ssh_ibb(:,:) )
+         ELSE                    ;   ssh_m(:,:) = ssh(:,:,Kmm)
          ENDIF
          !
-         e3t_m(:,:) = e3t_n(:,:,1)
+         e3t_m(:,:) = e3t(:,:,1,Kmm)
          !
          frq_m(:,:) = fraqsr_1lev(:,:)
          !
@@ -91,18 +88,18 @@ CONTAINS
             IF(lwp) WRITE(numout,*) 'sbc_ssm : mean fields initialised to instantaneous values'
             IF(lwp) WRITE(numout,*) '~~~~~~~   '
             zcoef = REAL( nn_fsbc - 1, wp )
-            ssu_m(:,:) = zcoef * ub(:,:,1)
-            ssv_m(:,:) = zcoef * vb(:,:,1)
+            ssu_m(:,:) = zcoef * uu(:,:,1,Kbb)
+            ssv_m(:,:) = zcoef * vv(:,:,1,Kbb)
             IF( l_useCT )  THEN    ;   sst_m(:,:) = zcoef * eos_pt_from_ct( zts(:,:,jp_tem), zts(:,:,jp_sal) )
             ELSE                    ;   sst_m(:,:) = zcoef * zts(:,:,jp_tem)
             ENDIF
             sss_m(:,:) = zcoef * zts(:,:,jp_sal)
             !                          ! removed inverse barometer ssh when Patm forcing is used (for sea-ice dynamics)
-            IF( ln_apr_dyn ) THEN   ;   ssh_m(:,:) = zcoef * ( sshn(:,:) - 0.5 * ( ssh_ib(:,:) + ssh_ibb(:,:) ) )
-            ELSE                    ;   ssh_m(:,:) = zcoef * sshn(:,:)
+            IF( ln_apr_dyn ) THEN   ;   ssh_m(:,:) = zcoef * ( ssh(:,:,Kmm) - 0.5 * ( ssh_ib(:,:) + ssh_ibb(:,:) ) )
+            ELSE                    ;   ssh_m(:,:) = zcoef *   ssh(:,:,Kmm)
             ENDIF
             !
-            e3t_m(:,:) = zcoef * e3t_n(:,:,1)
+            e3t_m(:,:) = zcoef * e3t(:,:,1,Kmm)
             !
             frq_m(:,:) = zcoef * fraqsr_1lev(:,:)
             !                                             ! ---------------------------------------- !
@@ -119,18 +116,18 @@ CONTAINS
          !                                                ! ---------------------------------------- !
          !                                                !        Cumulate at each time step        !
          !                                                ! ---------------------------------------- !
-         ssu_m(:,:) = ssu_m(:,:) + ub(:,:,1)
-         ssv_m(:,:) = ssv_m(:,:) + vb(:,:,1)
+         ssu_m(:,:) = ssu_m(:,:) + uu(:,:,1,Kbb)
+         ssv_m(:,:) = ssv_m(:,:) + vv(:,:,1,Kbb)
          IF( l_useCT )  THEN     ;   sst_m(:,:) = sst_m(:,:) + eos_pt_from_ct( zts(:,:,jp_tem), zts(:,:,jp_sal) )
          ELSE                    ;   sst_m(:,:) = sst_m(:,:) + zts(:,:,jp_tem)
          ENDIF
          sss_m(:,:) = sss_m(:,:) + zts(:,:,jp_sal)
          !                          ! removed inverse barometer ssh when Patm forcing is used (for sea-ice dynamics)
-         IF( ln_apr_dyn ) THEN   ;   ssh_m(:,:) = ssh_m(:,:) + sshn(:,:) - 0.5 * ( ssh_ib(:,:) + ssh_ibb(:,:) )
-         ELSE                    ;   ssh_m(:,:) = ssh_m(:,:) + sshn(:,:)
+         IF( ln_apr_dyn ) THEN   ;   ssh_m(:,:) = ssh_m(:,:) + ssh(:,:,Kmm) - 0.5 * ( ssh_ib(:,:) + ssh_ibb(:,:) )
+         ELSE                    ;   ssh_m(:,:) = ssh_m(:,:) + ssh(:,:,Kmm)
          ENDIF
          !
-         e3t_m(:,:) = e3t_m(:,:) + e3t_n(:,:,1)
+         e3t_m(:,:) = e3t_m(:,:) + e3t(:,:,1,Kmm)
          !
          frq_m(:,:) = frq_m(:,:) + fraqsr_1lev(:,:)
 
@@ -183,7 +180,7 @@ CONTAINS
    END SUBROUTINE sbc_ssm
 
 
-   SUBROUTINE sbc_ssm_init
+   SUBROUTINE sbc_ssm_init( Kbb, Kmm )
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE sbc_ssm_init  ***
       !!
@@ -191,6 +188,7 @@ CONTAINS
       !!
       !! ** Action  : - read parameters
       !!----------------------------------------------------------------------
+      INTEGER, INTENT(in) ::   Kbb, Kmm   ! ocean time level indices
       REAL(wp) ::   zcoef, zf_sbc   ! local scalar
       !!----------------------------------------------------------------------
       !
@@ -241,14 +239,14 @@ CONTAINS
       IF( .NOT.l_ssm_mean ) THEN   ! default initialisation. needed by iceistate
          !
          IF(lwp) WRITE(numout,*) '   default initialisation of ss._m arrays'
-         ssu_m(:,:) = ub(:,:,1)
-         ssv_m(:,:) = vb(:,:,1)
-         IF( l_useCT )  THEN    ;   sst_m(:,:) = eos_pt_from_ct( tsn(:,:,1,jp_tem), tsn(:,:,1,jp_sal) )
-         ELSE                   ;   sst_m(:,:) = tsn(:,:,1,jp_tem)
+         ssu_m(:,:) = uu(:,:,1,Kbb)
+         ssv_m(:,:) = vv(:,:,1,Kbb)
+         IF( l_useCT )  THEN    ;   sst_m(:,:) = eos_pt_from_ct( ts(:,:,1,jp_tem,Kmm), ts(:,:,1,jp_sal,Kmm) )
+         ELSE                   ;   sst_m(:,:) = ts(:,:,1,jp_tem,Kmm)
          ENDIF
-         sss_m(:,:) = tsn  (:,:,1,jp_sal)
-         ssh_m(:,:) = sshn (:,:)
-         e3t_m(:,:) = e3t_n(:,:,1)
+         sss_m(:,:) = ts  (:,:,1,jp_sal,Kmm)
+         ssh_m(:,:) = ssh(:,:,Kmm)
+         e3t_m(:,:) = e3t (:,:,1,Kmm)
          frq_m(:,:) = 1._wp
          !
       ENDIF

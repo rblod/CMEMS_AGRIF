@@ -87,25 +87,27 @@ MODULE dynvor
    REAL(wp) ::   r1_12 = 1._wp / 12._wp   ! 1/12
    
    !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: dynvor.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: dynvor.F90 12793 2020-04-22 10:41:35Z smasson $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE dyn_vor( kt )
+   SUBROUTINE dyn_vor( kt, Kmm, puu, pvv, Krhs )
       !!----------------------------------------------------------------------
       !!
       !! ** Purpose :   compute the lateral ocean tracer physics.
       !!
-      !! ** Action : - Update (ua,va) with the now vorticity term trend
+      !! ** Action : - Update (puu(:,:,:,Krhs),pvv(:,:,:,Krhs)) with the now vorticity term trend
       !!             - save the trends in (ztrdu,ztrdv) in 2 parts (relative
       !!               and planetary vorticity trends) and send them to trd_dyn 
       !!               for futher diagnostics (l_trddyn=T)
       !!----------------------------------------------------------------------
-      INTEGER, INTENT( in ) ::   kt   ! ocean time-step index
+      INTEGER                             , INTENT( in  ) ::   kt          ! ocean time-step index
+      INTEGER                             , INTENT( in  ) ::   Kmm, Krhs   ! ocean time level indices
+      REAL(wp), DIMENSION(jpi,jpj,jpk,jpt), INTENT(inout) ::   puu, pvv    ! ocean velocity field and RHS of momentum equation
       !
       REAL(wp), ALLOCATABLE, DIMENSION(:,:,:) ::  ztrdu, ztrdv
       !!----------------------------------------------------------------------
@@ -116,37 +118,37 @@ CONTAINS
          !
          ALLOCATE( ztrdu(jpi,jpj,jpk), ztrdv(jpi,jpj,jpk) )
          !
-         ztrdu(:,:,:) = ua(:,:,:)            !* planetary vorticity trend (including Stokes-Coriolis force)
-         ztrdv(:,:,:) = va(:,:,:)
+         ztrdu(:,:,:) = puu(:,:,:,Krhs)            !* planetary vorticity trend (including Stokes-Coriolis force)
+         ztrdv(:,:,:) = pvv(:,:,:,Krhs)
          SELECT CASE( nvor_scheme )
-         CASE( np_ENS )           ;   CALL vor_ens( kt, ncor, un , vn , ua, va )   ! enstrophy conserving scheme
-            IF( ln_stcor )            CALL vor_ens( kt, ncor, usd, vsd, ua, va )   ! add the Stokes-Coriolis trend
-         CASE( np_ENE, np_MIX )   ;   CALL vor_ene( kt, ncor, un , vn , ua, va )   ! energy conserving scheme
-            IF( ln_stcor )            CALL vor_ene( kt, ncor, usd, vsd, ua, va )   ! add the Stokes-Coriolis trend
-         CASE( np_ENT )           ;   CALL vor_enT( kt, ncor, un , vn , ua, va )   ! energy conserving scheme (T-pts)
-            IF( ln_stcor )            CALL vor_enT( kt, ncor, usd, vsd, ua, va )   ! add the Stokes-Coriolis trend
-         CASE( np_EET )           ;   CALL vor_eeT( kt, ncor, un , vn , ua, va )   ! energy conserving scheme (een with e3t)
-            IF( ln_stcor )            CALL vor_eeT( kt, ncor, usd, vsd, ua, va )   ! add the Stokes-Coriolis trend
-         CASE( np_EEN )           ;   CALL vor_een( kt, ncor, un , vn , ua, va )   ! energy & enstrophy scheme
-            IF( ln_stcor )            CALL vor_een( kt, ncor, usd, vsd, ua, va )   ! add the Stokes-Coriolis trend
+         CASE( np_ENS )           ;   CALL vor_ens( kt, Kmm, ncor, puu(:,:,:,Kmm) , pvv(:,:,:,Kmm) , puu(:,:,:,Krhs), pvv(:,:,:,Krhs) )   ! enstrophy conserving scheme
+            IF( ln_stcor )            CALL vor_ens( kt, Kmm, ncor, usd, vsd, puu(:,:,:,Krhs), pvv(:,:,:,Krhs) )   ! add the Stokes-Coriolis trend
+         CASE( np_ENE, np_MIX )   ;   CALL vor_ene( kt, Kmm, ncor, puu(:,:,:,Kmm) , pvv(:,:,:,Kmm) , puu(:,:,:,Krhs), pvv(:,:,:,Krhs) )   ! energy conserving scheme
+            IF( ln_stcor )            CALL vor_ene( kt, Kmm, ncor, usd, vsd, puu(:,:,:,Krhs), pvv(:,:,:,Krhs) )   ! add the Stokes-Coriolis trend
+         CASE( np_ENT )           ;   CALL vor_enT( kt, Kmm, ncor, puu(:,:,:,Kmm) , pvv(:,:,:,Kmm) , puu(:,:,:,Krhs), pvv(:,:,:,Krhs) )   ! energy conserving scheme (T-pts)
+            IF( ln_stcor )            CALL vor_enT( kt, Kmm, ncor, usd, vsd, puu(:,:,:,Krhs), pvv(:,:,:,Krhs) )   ! add the Stokes-Coriolis trend
+         CASE( np_EET )           ;   CALL vor_eeT( kt, Kmm, ncor, puu(:,:,:,Kmm) , pvv(:,:,:,Kmm) , puu(:,:,:,Krhs), pvv(:,:,:,Krhs) )   ! energy conserving scheme (een with e3t)
+            IF( ln_stcor )            CALL vor_eeT( kt, Kmm, ncor, usd, vsd, puu(:,:,:,Krhs), pvv(:,:,:,Krhs) )   ! add the Stokes-Coriolis trend
+         CASE( np_EEN )           ;   CALL vor_een( kt, Kmm, ncor, puu(:,:,:,Kmm) , pvv(:,:,:,Kmm) , puu(:,:,:,Krhs), pvv(:,:,:,Krhs) )   ! energy & enstrophy scheme
+            IF( ln_stcor )            CALL vor_een( kt, Kmm, ncor, usd, vsd, puu(:,:,:,Krhs), pvv(:,:,:,Krhs) )   ! add the Stokes-Coriolis trend
          END SELECT
-         ztrdu(:,:,:) = ua(:,:,:) - ztrdu(:,:,:)
-         ztrdv(:,:,:) = va(:,:,:) - ztrdv(:,:,:)
-         CALL trd_dyn( ztrdu, ztrdv, jpdyn_pvo, kt )
+         ztrdu(:,:,:) = puu(:,:,:,Krhs) - ztrdu(:,:,:)
+         ztrdv(:,:,:) = pvv(:,:,:,Krhs) - ztrdv(:,:,:)
+         CALL trd_dyn( ztrdu, ztrdv, jpdyn_pvo, kt, Kmm )
          !
          IF( n_dynadv /= np_LIN_dyn ) THEN   !* relative vorticity or metric trend (only in non-linear case)
-            ztrdu(:,:,:) = ua(:,:,:)
-            ztrdv(:,:,:) = va(:,:,:)
+            ztrdu(:,:,:) = puu(:,:,:,Krhs)
+            ztrdv(:,:,:) = pvv(:,:,:,Krhs)
             SELECT CASE( nvor_scheme )
-            CASE( np_ENT )           ;   CALL vor_enT( kt, nrvm, un , vn , ua, va )  ! energy conserving scheme (T-pts)
-            CASE( np_EET )           ;   CALL vor_eeT( kt, nrvm, un , vn , ua, va )  ! energy conserving scheme (een with e3t)
-            CASE( np_ENE )           ;   CALL vor_ene( kt, nrvm, un , vn , ua, va )  ! energy conserving scheme
-            CASE( np_ENS, np_MIX )   ;   CALL vor_ens( kt, nrvm, un , vn , ua, va )  ! enstrophy conserving scheme
-            CASE( np_EEN )           ;   CALL vor_een( kt, nrvm, un , vn , ua, va )  ! energy & enstrophy scheme
+            CASE( np_ENT )           ;   CALL vor_enT( kt, Kmm, nrvm, puu(:,:,:,Kmm) , pvv(:,:,:,Kmm) , puu(:,:,:,Krhs), pvv(:,:,:,Krhs) )  ! energy conserving scheme (T-pts)
+            CASE( np_EET )           ;   CALL vor_eeT( kt, Kmm, nrvm, puu(:,:,:,Kmm) , pvv(:,:,:,Kmm) , puu(:,:,:,Krhs), pvv(:,:,:,Krhs) )  ! energy conserving scheme (een with e3t)
+            CASE( np_ENE )           ;   CALL vor_ene( kt, Kmm, nrvm, puu(:,:,:,Kmm) , pvv(:,:,:,Kmm) , puu(:,:,:,Krhs), pvv(:,:,:,Krhs) )  ! energy conserving scheme
+            CASE( np_ENS, np_MIX )   ;   CALL vor_ens( kt, Kmm, nrvm, puu(:,:,:,Kmm) , pvv(:,:,:,Kmm) , puu(:,:,:,Krhs), pvv(:,:,:,Krhs) )  ! enstrophy conserving scheme
+            CASE( np_EEN )           ;   CALL vor_een( kt, Kmm, nrvm, puu(:,:,:,Kmm) , pvv(:,:,:,Kmm) , puu(:,:,:,Krhs), pvv(:,:,:,Krhs) )  ! energy & enstrophy scheme
             END SELECT
-            ztrdu(:,:,:) = ua(:,:,:) - ztrdu(:,:,:)
-            ztrdv(:,:,:) = va(:,:,:) - ztrdv(:,:,:)
-            CALL trd_dyn( ztrdu, ztrdv, jpdyn_rvo, kt )
+            ztrdu(:,:,:) = puu(:,:,:,Krhs) - ztrdu(:,:,:)
+            ztrdv(:,:,:) = pvv(:,:,:,Krhs) - ztrdv(:,:,:)
+            CALL trd_dyn( ztrdu, ztrdv, jpdyn_rvo, kt, Kmm )
          ENDIF
          !
          DEALLOCATE( ztrdu, ztrdv )
@@ -155,38 +157,38 @@ CONTAINS
          !
          SELECT CASE ( nvor_scheme )      !==  vorticity trend added to the general trend  ==!
          CASE( np_ENT )                        !* energy conserving scheme  (T-pts)
-                             CALL vor_enT( kt, ntot, un , vn , ua, va )   ! total vorticity trend
-            IF( ln_stcor )   CALL vor_enT( kt, ncor, usd, vsd, ua, va )   ! add the Stokes-Coriolis trend
+                             CALL vor_enT( kt, Kmm, ntot, puu(:,:,:,Kmm) , pvv(:,:,:,Kmm) , puu(:,:,:,Krhs), pvv(:,:,:,Krhs) )   ! total vorticity trend
+            IF( ln_stcor )   CALL vor_enT( kt, Kmm, ncor, usd, vsd, puu(:,:,:,Krhs), pvv(:,:,:,Krhs) )   ! add the Stokes-Coriolis trend
          CASE( np_EET )                        !* energy conserving scheme (een scheme using e3t)
-                             CALL vor_eeT( kt, ntot, un , vn , ua, va )   ! total vorticity trend
-            IF( ln_stcor )   CALL vor_eeT( kt, ncor, usd, vsd, ua, va )   ! add the Stokes-Coriolis trend
+                             CALL vor_eeT( kt, Kmm, ntot, puu(:,:,:,Kmm) , pvv(:,:,:,Kmm) , puu(:,:,:,Krhs), pvv(:,:,:,Krhs) )   ! total vorticity trend
+            IF( ln_stcor )   CALL vor_eeT( kt, Kmm, ncor, usd, vsd, puu(:,:,:,Krhs), pvv(:,:,:,Krhs) )   ! add the Stokes-Coriolis trend
          CASE( np_ENE )                        !* energy conserving scheme
-                             CALL vor_ene( kt, ntot, un , vn , ua, va )   ! total vorticity trend
-            IF( ln_stcor )   CALL vor_ene( kt, ncor, usd, vsd, ua, va )   ! add the Stokes-Coriolis trend
+                             CALL vor_ene( kt, Kmm, ntot, puu(:,:,:,Kmm) , pvv(:,:,:,Kmm) , puu(:,:,:,Krhs), pvv(:,:,:,Krhs) )   ! total vorticity trend
+            IF( ln_stcor )   CALL vor_ene( kt, Kmm, ncor, usd, vsd, puu(:,:,:,Krhs), pvv(:,:,:,Krhs) )   ! add the Stokes-Coriolis trend
          CASE( np_ENS )                        !* enstrophy conserving scheme
-                             CALL vor_ens( kt, ntot, un , vn , ua, va )  ! total vorticity trend
-            IF( ln_stcor )   CALL vor_ens( kt, ncor, usd, vsd, ua, va )  ! add the Stokes-Coriolis trend
+                             CALL vor_ens( kt, Kmm, ntot, puu(:,:,:,Kmm) , pvv(:,:,:,Kmm) , puu(:,:,:,Krhs), pvv(:,:,:,Krhs) )  ! total vorticity trend
+            IF( ln_stcor )   CALL vor_ens( kt, Kmm, ncor, usd, vsd, puu(:,:,:,Krhs), pvv(:,:,:,Krhs) )  ! add the Stokes-Coriolis trend
          CASE( np_MIX )                        !* mixed ene-ens scheme
-                             CALL vor_ens( kt, nrvm, un , vn , ua, va )   ! relative vorticity or metric trend (ens)
-                             CALL vor_ene( kt, ncor, un , vn , ua, va )   ! planetary vorticity trend (ene)
-            IF( ln_stcor )   CALL vor_ene( kt, ncor, usd, vsd, ua, va )   ! add the Stokes-Coriolis trend
+                             CALL vor_ens( kt, Kmm, nrvm, puu(:,:,:,Kmm) , pvv(:,:,:,Kmm) , puu(:,:,:,Krhs), pvv(:,:,:,Krhs) )   ! relative vorticity or metric trend (ens)
+                             CALL vor_ene( kt, Kmm, ncor, puu(:,:,:,Kmm) , pvv(:,:,:,Kmm) , puu(:,:,:,Krhs), pvv(:,:,:,Krhs) )   ! planetary vorticity trend (ene)
+            IF( ln_stcor )   CALL vor_ene( kt, Kmm, ncor, usd, vsd, puu(:,:,:,Krhs), pvv(:,:,:,Krhs) )   ! add the Stokes-Coriolis trend
          CASE( np_EEN )                        !* energy and enstrophy conserving scheme
-                             CALL vor_een( kt, ntot, un , vn , ua, va )   ! total vorticity trend
-            IF( ln_stcor )   CALL vor_een( kt, ncor, usd, vsd, ua, va )   ! add the Stokes-Coriolis trend
+                             CALL vor_een( kt, Kmm, ntot, puu(:,:,:,Kmm) , pvv(:,:,:,Kmm) , puu(:,:,:,Krhs), pvv(:,:,:,Krhs) )   ! total vorticity trend
+            IF( ln_stcor )   CALL vor_een( kt, Kmm, ncor, usd, vsd, puu(:,:,:,Krhs), pvv(:,:,:,Krhs) )   ! add the Stokes-Coriolis trend
          END SELECT
          !
       ENDIF
       !
       !                       ! print sum trends (used for debugging)
-      IF(ln_ctl) CALL prt_ctl( tab3d_1=ua, clinfo1=' vor  - Ua: ', mask1=umask,               &
-         &                     tab3d_2=va, clinfo2=       ' Va: ', mask2=vmask, clinfo3='dyn' )
+      IF(sn_cfctl%l_prtctl) CALL prt_ctl( tab3d_1=puu(:,:,:,Krhs), clinfo1=' vor  - Ua: ', mask1=umask,               &
+         &                                tab3d_2=pvv(:,:,:,Krhs), clinfo2=       ' Va: ', mask2=vmask, clinfo3='dyn' )
       !
       IF( ln_timing )   CALL timing_stop('dyn_vor')
       !
    END SUBROUTINE dyn_vor
 
 
-   SUBROUTINE vor_enT( kt, kvor, pu, pv, pu_rhs, pv_rhs )
+   SUBROUTINE vor_enT( kt, Kmm, kvor, pu, pv, pu_rhs, pv_rhs )
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE vor_enT  ***
       !!
@@ -202,9 +204,10 @@ CONTAINS
       !!          vorv = 1/bv  mi[ ( mi(mj(bf*rvor))+bt*f_t)/e3f  mj[un] ]
       !!       where rvor is the relative vorticity at f-point
       !!
-      !! ** Action : - Update (ua,va) with the now vorticity term trend
+      !! ** Action : - Update (pu_rhs,pv_rhs) with the now vorticity term trend
       !!----------------------------------------------------------------------
       INTEGER                         , INTENT(in   ) ::   kt               ! ocean time-step index
+      INTEGER                         , INTENT(in   ) ::   Kmm              ! ocean time level index
       INTEGER                         , INTENT(in   ) ::   kvor             ! total, planetary, relative, or metric
       REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(inout) ::   pu, pv           ! now velocities
       REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(inout) ::   pu_rhs, pv_rhs   ! total v-trend
@@ -225,18 +228,14 @@ CONTAINS
       SELECT CASE( kvor )                 !==  volume weighted vorticity considered  ==!
       CASE ( np_RVO )                           !* relative vorticity
          DO jk = 1, jpkm1                                 ! Horizontal slab
-            DO jj = 1, jpjm1
-               DO ji = 1, jpim1
-                  zwz(ji,jj,jk) = (  e2v(ji+1,jj) * pv(ji+1,jj,jk) - e2v(ji,jj) * pv(ji,jj,jk)  &
-                     &             - e1u(ji,jj+1) * pu(ji,jj+1,jk) + e1u(ji,jj) * pu(ji,jj,jk)  ) * r1_e1e2f(ji,jj)
-               END DO
-            END DO
+            DO_2D_10_10
+               zwz(ji,jj,jk) = (  e2v(ji+1,jj) * pv(ji+1,jj,jk) - e2v(ji,jj) * pv(ji,jj,jk)  &
+                  &             - e1u(ji,jj+1) * pu(ji,jj+1,jk) + e1u(ji,jj) * pu(ji,jj,jk)  ) * r1_e1e2f(ji,jj)
+            END_2D
             IF( ln_dynvor_msk ) THEN                     ! mask/unmask relative vorticity 
-               DO jj = 1, jpjm1
-                  DO ji = 1, jpim1
-                     zwz(ji,jj,jk) = zwz(ji,jj,jk) * fmask(ji,jj,jk)
-                  END DO
-               END DO
+               DO_2D_10_10
+                  zwz(ji,jj,jk) = zwz(ji,jj,jk) * fmask(ji,jj,jk)
+               END_2D
             ENDIF
          END DO
 
@@ -244,18 +243,14 @@ CONTAINS
 
       CASE ( np_CRV )                           !* Coriolis + relative vorticity
          DO jk = 1, jpkm1                                 ! Horizontal slab
-            DO jj = 1, jpjm1
-               DO ji = 1, jpim1                          ! relative vorticity
-                  zwz(ji,jj,jk) = (   e2v(ji+1,jj) * pv(ji+1,jj,jk) - e2v(ji,jj) * pv(ji,jj,jk)   &
-                     &              - e1u(ji,jj+1) * pu(ji,jj+1,jk) + e1u(ji,jj) * pu(ji,jj,jk)   ) * r1_e1e2f(ji,jj)
-               END DO
-            END DO
+            DO_2D_10_10
+               zwz(ji,jj,jk) = (   e2v(ji+1,jj) * pv(ji+1,jj,jk) - e2v(ji,jj) * pv(ji,jj,jk)   &
+                  &              - e1u(ji,jj+1) * pu(ji,jj+1,jk) + e1u(ji,jj) * pu(ji,jj,jk)   ) * r1_e1e2f(ji,jj)
+            END_2D
             IF( ln_dynvor_msk ) THEN                     ! mask/unmask relative vorticity 
-               DO jj = 1, jpjm1
-                  DO ji = 1, jpim1
-                     zwz(ji,jj,jk) = zwz(ji,jj,jk) * fmask(ji,jj,jk)
-                  END DO
-               END DO
+               DO_2D_10_10
+                  zwz(ji,jj,jk) = zwz(ji,jj,jk) * fmask(ji,jj,jk)
+               END_2D
             ENDIF
          END DO
 
@@ -269,59 +264,49 @@ CONTAINS
 
          SELECT CASE( kvor )                 !==  volume weighted vorticity considered  ==!
          CASE ( np_COR )                           !* Coriolis (planetary vorticity)
-            zwt(:,:) = ff_t(:,:) * e1e2t(:,:)*e3t_n(:,:,jk)
+            zwt(:,:) = ff_t(:,:) * e1e2t(:,:)*e3t(:,:,jk,Kmm)
          CASE ( np_RVO )                           !* relative vorticity
-            DO jj = 2, jpj
-               DO ji = 2, jpi   ! vector opt.
-                  zwt(ji,jj) = r1_4 * (   zwz(ji-1,jj  ,jk) + zwz(ji,jj  ,jk)   &
-                     &                  + zwz(ji-1,jj-1,jk) + zwz(ji,jj-1,jk) ) * e1e2t(ji,jj)*e3t_n(ji,jj,jk)
-               END DO
-            END DO
+            DO_2D_01_01
+               zwt(ji,jj) = r1_4 * (   zwz(ji-1,jj  ,jk) + zwz(ji,jj  ,jk)   &
+                  &                  + zwz(ji-1,jj-1,jk) + zwz(ji,jj-1,jk) ) * e1e2t(ji,jj)*e3t(ji,jj,jk,Kmm)
+            END_2D
          CASE ( np_MET )                           !* metric term
-            DO jj = 2, jpj
-               DO ji = 2, jpi
-                  zwt(ji,jj) = (   ( pv(ji,jj,jk) + pv(ji,jj-1,jk) ) * di_e2u_2(ji,jj)   &
-                     &           - ( pu(ji,jj,jk) + pu(ji-1,jj,jk) ) * dj_e1v_2(ji,jj)   ) * e3t_n(ji,jj,jk)
-               END DO
-            END DO
+            DO_2D_01_01
+               zwt(ji,jj) = (   ( pv(ji,jj,jk) + pv(ji,jj-1,jk) ) * di_e2u_2(ji,jj)   &
+                  &           - ( pu(ji,jj,jk) + pu(ji-1,jj,jk) ) * dj_e1v_2(ji,jj)   ) * e3t(ji,jj,jk,Kmm)
+            END_2D
          CASE ( np_CRV )                           !* Coriolis + relative vorticity
-            DO jj = 2, jpj
-               DO ji = 2, jpi   ! vector opt.
-                  zwt(ji,jj) = (  ff_t(ji,jj) + r1_4 * ( zwz(ji-1,jj  ,jk) + zwz(ji,jj  ,jk)    &
-                     &                                 + zwz(ji-1,jj-1,jk) + zwz(ji,jj-1,jk) )  ) * e1e2t(ji,jj)*e3t_n(ji,jj,jk)
-               END DO
-            END DO
+            DO_2D_01_01
+               zwt(ji,jj) = (  ff_t(ji,jj) + r1_4 * ( zwz(ji-1,jj  ,jk) + zwz(ji,jj  ,jk)    &
+                  &                                 + zwz(ji-1,jj-1,jk) + zwz(ji,jj-1,jk) )  ) * e1e2t(ji,jj)*e3t(ji,jj,jk,Kmm)
+            END_2D
          CASE ( np_CME )                           !* Coriolis + metric
-            DO jj = 2, jpj
-               DO ji = 2, jpi   ! vector opt.
-                  zwt(ji,jj) = (  ff_t(ji,jj) * e1e2t(ji,jj)                           &
-                       &        + ( pv(ji,jj,jk) + pv(ji,jj-1,jk) ) * di_e2u_2(ji,jj)  &
-                       &        - ( pu(ji,jj,jk) + pu(ji-1,jj,jk) ) * dj_e1v_2(ji,jj)  ) * e3t_n(ji,jj,jk)
-               END DO
-            END DO
+            DO_2D_01_01
+               zwt(ji,jj) = (  ff_t(ji,jj) * e1e2t(ji,jj)                           &
+                    &        + ( pv(ji,jj,jk) + pv(ji,jj-1,jk) ) * di_e2u_2(ji,jj)  &
+                    &        - ( pu(ji,jj,jk) + pu(ji-1,jj,jk) ) * dj_e1v_2(ji,jj)  ) * e3t(ji,jj,jk,Kmm)
+            END_2D
          CASE DEFAULT                                             ! error
             CALL ctl_stop('STOP','dyn_vor: wrong value for kvor'  )
          END SELECT
          !
          !                                   !==  compute and add the vorticity term trend  =!
-         DO jj = 2, jpjm1
-            DO ji = 2, jpim1   ! vector opt.
-               pu_rhs(ji,jj,jk) = pu_rhs(ji,jj,jk) + r1_4 * r1_e1e2u(ji,jj) / e3u_n(ji,jj,jk)                    &
-                  &                                * (  zwt(ji+1,jj) * ( pv(ji+1,jj,jk) + pv(ji+1,jj-1,jk) )   &
-                  &                                   + zwt(ji  ,jj) * ( pv(ji  ,jj,jk) + pv(ji  ,jj-1,jk) )   )
-                  !
-               pv_rhs(ji,jj,jk) = pv_rhs(ji,jj,jk) - r1_4 * r1_e1e2v(ji,jj) / e3v_n(ji,jj,jk)                    &
-                  &                                * (  zwt(ji,jj+1) * ( pu(ji,jj+1,jk) + pu(ji-1,jj+1,jk) )   & 
-                  &                                   + zwt(ji,jj  ) * ( pu(ji,jj  ,jk) + pu(ji-1,jj  ,jk) )   ) 
-            END DO  
-         END DO  
+         DO_2D_00_00
+            pu_rhs(ji,jj,jk) = pu_rhs(ji,jj,jk) + r1_4 * r1_e1e2u(ji,jj) / e3u(ji,jj,jk,Kmm)                    &
+               &                                * (  zwt(ji+1,jj) * ( pv(ji+1,jj,jk) + pv(ji+1,jj-1,jk) )   &
+               &                                   + zwt(ji  ,jj) * ( pv(ji  ,jj,jk) + pv(ji  ,jj-1,jk) )   )
+               !
+            pv_rhs(ji,jj,jk) = pv_rhs(ji,jj,jk) - r1_4 * r1_e1e2v(ji,jj) / e3v(ji,jj,jk,Kmm)                    &
+               &                                * (  zwt(ji,jj+1) * ( pu(ji,jj+1,jk) + pu(ji-1,jj+1,jk) )   & 
+               &                                   + zwt(ji,jj  ) * ( pu(ji,jj  ,jk) + pu(ji-1,jj  ,jk) )   ) 
+         END_2D
          !                                             ! ===============
       END DO                                           !   End of slab
       !                                                ! ===============
    END SUBROUTINE vor_enT
 
 
-   SUBROUTINE vor_ene( kt, kvor, pun, pvn, pua, pva )
+   SUBROUTINE vor_ene( kt, Kmm, kvor, pu, pv, pu_rhs, pv_rhs )
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE vor_ene  ***
       !!
@@ -333,18 +318,19 @@ CONTAINS
       !!       horizontal kinetic energy.
       !!         The general trend of momentum is increased due to the vorticity 
       !!       term which is given by:
-      !!          voru = 1/e1u  mj-1[ (rvor+f)/e3f  mi(e1v*e3v vn) ]
-      !!          vorv = 1/e2v  mi-1[ (rvor+f)/e3f  mj(e2u*e3u un) ]
+      !!          voru = 1/e1u  mj-1[ (rvor+f)/e3f  mi(e1v*e3v pvv(:,:,:,Kmm)) ]
+      !!          vorv = 1/e2v  mi-1[ (rvor+f)/e3f  mj(e2u*e3u puu(:,:,:,Kmm)) ]
       !!       where rvor is the relative vorticity
       !!
-      !! ** Action : - Update (ua,va) with the now vorticity term trend
+      !! ** Action : - Update (pu_rhs,pv_rhs) with the now vorticity term trend
       !!
       !! References : Sadourny, r., 1975, j. atmos. sciences, 32, 680-689.
       !!----------------------------------------------------------------------
       INTEGER                         , INTENT(in   ) ::   kt          ! ocean time-step index
+      INTEGER                         , INTENT(in   ) ::   Kmm              ! ocean time level index
       INTEGER                         , INTENT(in   ) ::   kvor        ! total, planetary, relative, or metric
-      REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(inout) ::   pun, pvn    ! now velocities
-      REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(inout) ::   pua, pva    ! total v-trend
+      REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(inout) ::   pu, pv    ! now velocities
+      REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(inout) ::   pu_rhs, pv_rhs    ! total v-trend
       !
       INTEGER  ::   ji, jj, jk           ! dummy loop indices
       REAL(wp) ::   zx1, zy1, zx2, zy2   ! local scalars
@@ -365,71 +351,59 @@ CONTAINS
          CASE ( np_COR )                           !* Coriolis (planetary vorticity)
             zwz(:,:) = ff_f(:,:) 
          CASE ( np_RVO )                           !* relative vorticity
-            DO jj = 1, jpjm1
-               DO ji = 1, fs_jpim1   ! vector opt.
-                  zwz(ji,jj) = (  e2v(ji+1,jj  ) * pvn(ji+1,jj  ,jk) - e2v(ji,jj) * pvn(ji,jj,jk)    &
-                     &          - e1u(ji  ,jj+1) * pun(ji  ,jj+1,jk) + e1u(ji,jj) * pun(ji,jj,jk)  ) * r1_e1e2f(ji,jj)
-               END DO
-            END DO
+            DO_2D_10_10
+               zwz(ji,jj) = (  e2v(ji+1,jj  ) * pv(ji+1,jj  ,jk) - e2v(ji,jj) * pv(ji,jj,jk)    &
+                  &          - e1u(ji  ,jj+1) * pu(ji  ,jj+1,jk) + e1u(ji,jj) * pu(ji,jj,jk)  ) * r1_e1e2f(ji,jj)
+            END_2D
          CASE ( np_MET )                           !* metric term
-            DO jj = 1, jpjm1
-               DO ji = 1, fs_jpim1   ! vector opt.
-                  zwz(ji,jj) = ( pvn(ji+1,jj  ,jk) + pvn(ji,jj,jk) ) * di_e2v_2e1e2f(ji,jj)   &
-                     &       - ( pun(ji  ,jj+1,jk) + pun(ji,jj,jk) ) * dj_e1u_2e1e2f(ji,jj)
-               END DO
-            END DO
+            DO_2D_10_10
+               zwz(ji,jj) = ( pv(ji+1,jj  ,jk) + pv(ji,jj,jk) ) * di_e2v_2e1e2f(ji,jj)   &
+                  &       - ( pu(ji  ,jj+1,jk) + pu(ji,jj,jk) ) * dj_e1u_2e1e2f(ji,jj)
+            END_2D
          CASE ( np_CRV )                           !* Coriolis + relative vorticity
-            DO jj = 1, jpjm1
-               DO ji = 1, fs_jpim1   ! vector opt.
-                  zwz(ji,jj) = ff_f(ji,jj) + (  e2v(ji+1,jj) * pvn(ji+1,jj,jk) - e2v(ji,jj) * pvn(ji,jj,jk)      &
-                     &                        - e1u(ji,jj+1) * pun(ji,jj+1,jk) + e1u(ji,jj) * pun(ji,jj,jk)  ) * r1_e1e2f(ji,jj)
-               END DO
-            END DO
+            DO_2D_10_10
+               zwz(ji,jj) = ff_f(ji,jj) + (  e2v(ji+1,jj) * pv(ji+1,jj,jk) - e2v(ji,jj) * pv(ji,jj,jk)      &
+                  &                        - e1u(ji,jj+1) * pu(ji,jj+1,jk) + e1u(ji,jj) * pu(ji,jj,jk)  ) * r1_e1e2f(ji,jj)
+            END_2D
          CASE ( np_CME )                           !* Coriolis + metric
-            DO jj = 1, jpjm1
-               DO ji = 1, fs_jpim1   ! vector opt.
-                  zwz(ji,jj) = ff_f(ji,jj) + ( pvn(ji+1,jj  ,jk) + pvn(ji,jj,jk) ) * di_e2v_2e1e2f(ji,jj)   &
-                     &                     - ( pun(ji  ,jj+1,jk) + pun(ji,jj,jk) ) * dj_e1u_2e1e2f(ji,jj)
-               END DO
-            END DO
+            DO_2D_10_10
+               zwz(ji,jj) = ff_f(ji,jj) + ( pv(ji+1,jj  ,jk) + pv(ji,jj,jk) ) * di_e2v_2e1e2f(ji,jj)   &
+                  &                     - ( pu(ji  ,jj+1,jk) + pu(ji,jj,jk) ) * dj_e1u_2e1e2f(ji,jj)
+            END_2D
          CASE DEFAULT                                             ! error
             CALL ctl_stop('STOP','dyn_vor: wrong value for kvor'  )
          END SELECT
          !
          IF( ln_dynvor_msk ) THEN          !==  mask/unmask vorticity ==!
-            DO jj = 1, jpjm1
-               DO ji = 1, fs_jpim1   ! vector opt.
-                  zwz(ji,jj) = zwz(ji,jj) * fmask(ji,jj,jk)
-               END DO
-            END DO
+            DO_2D_10_10
+               zwz(ji,jj) = zwz(ji,jj) * fmask(ji,jj,jk)
+            END_2D
          ENDIF
 
          IF( ln_sco ) THEN
-            zwz(:,:) = zwz(:,:) / e3f_n(:,:,jk)
-            zwx(:,:) = e2u(:,:) * e3u_n(:,:,jk) * pun(:,:,jk)
-            zwy(:,:) = e1v(:,:) * e3v_n(:,:,jk) * pvn(:,:,jk)
+            zwz(:,:) = zwz(:,:) / e3f(:,:,jk)
+            zwx(:,:) = e2u(:,:) * e3u(:,:,jk,Kmm) * pu(:,:,jk)
+            zwy(:,:) = e1v(:,:) * e3v(:,:,jk,Kmm) * pv(:,:,jk)
          ELSE
-            zwx(:,:) = e2u(:,:) * pun(:,:,jk)
-            zwy(:,:) = e1v(:,:) * pvn(:,:,jk)
+            zwx(:,:) = e2u(:,:) * pu(:,:,jk)
+            zwy(:,:) = e1v(:,:) * pv(:,:,jk)
          ENDIF
          !                                   !==  compute and add the vorticity term trend  =!
-         DO jj = 2, jpjm1
-            DO ji = fs_2, fs_jpim1   ! vector opt.
-               zy1 = zwy(ji,jj-1) + zwy(ji+1,jj-1)
-               zy2 = zwy(ji,jj  ) + zwy(ji+1,jj  )
-               zx1 = zwx(ji-1,jj) + zwx(ji-1,jj+1)
-               zx2 = zwx(ji  ,jj) + zwx(ji  ,jj+1)
-               pua(ji,jj,jk) = pua(ji,jj,jk) + r1_4 * r1_e1u(ji,jj) * ( zwz(ji  ,jj-1) * zy1 + zwz(ji,jj) * zy2 )
-               pva(ji,jj,jk) = pva(ji,jj,jk) - r1_4 * r1_e2v(ji,jj) * ( zwz(ji-1,jj  ) * zx1 + zwz(ji,jj) * zx2 ) 
-            END DO  
-         END DO  
+         DO_2D_00_00
+            zy1 = zwy(ji,jj-1) + zwy(ji+1,jj-1)
+            zy2 = zwy(ji,jj  ) + zwy(ji+1,jj  )
+            zx1 = zwx(ji-1,jj) + zwx(ji-1,jj+1)
+            zx2 = zwx(ji  ,jj) + zwx(ji  ,jj+1)
+            pu_rhs(ji,jj,jk) = pu_rhs(ji,jj,jk) + r1_4 * r1_e1u(ji,jj) * ( zwz(ji  ,jj-1) * zy1 + zwz(ji,jj) * zy2 )
+            pv_rhs(ji,jj,jk) = pv_rhs(ji,jj,jk) - r1_4 * r1_e2v(ji,jj) * ( zwz(ji-1,jj  ) * zx1 + zwz(ji,jj) * zx2 ) 
+         END_2D
          !                                             ! ===============
       END DO                                           !   End of slab
       !                                                ! ===============
    END SUBROUTINE vor_ene
 
 
-   SUBROUTINE vor_ens( kt, kvor, pun, pvn, pua, pva )
+   SUBROUTINE vor_ens( kt, Kmm, kvor, pu, pv, pu_rhs, pv_rhs )
       !!----------------------------------------------------------------------
       !!                ***  ROUTINE vor_ens  ***
       !!
@@ -440,19 +414,20 @@ CONTAINS
       !!      and the Sadourny (1975) flux FORM formulation : conserves the
       !!      potential enstrophy of a horizontally non-divergent flow. the
       !!      trend of the vorticity term is given by:
-      !!          voru = 1/e1u  mj-1[ (rvor+f)/e3f ]  mj-1[ mi(e1v*e3v vn) ]
-      !!          vorv = 1/e2v  mi-1[ (rvor+f)/e3f ]  mi-1[ mj(e2u*e3u un) ]
-      !!      Add this trend to the general momentum trend (ua,va):
-      !!          (ua,va) = (ua,va) + ( voru , vorv )
+      !!          voru = 1/e1u  mj-1[ (rvor+f)/e3f ]  mj-1[ mi(e1v*e3v pvv(:,:,:,Kmm)) ]
+      !!          vorv = 1/e2v  mi-1[ (rvor+f)/e3f ]  mi-1[ mj(e2u*e3u puu(:,:,:,Kmm)) ]
+      !!      Add this trend to the general momentum trend:
+      !!          (u(rhs),v(Krhs)) = (u(rhs),v(Krhs)) + ( voru , vorv )
       !!
-      !! ** Action : - Update (ua,va) arrays with the now vorticity term trend
+      !! ** Action : - Update (pu_rhs,pv_rhs)) arrays with the now vorticity term trend
       !!
       !! References : Sadourny, r., 1975, j. atmos. sciences, 32, 680-689.
       !!----------------------------------------------------------------------
       INTEGER                         , INTENT(in   ) ::   kt          ! ocean time-step index
+      INTEGER                         , INTENT(in   ) ::   Kmm              ! ocean time level index
       INTEGER                         , INTENT(in   ) ::   kvor        ! total, planetary, relative, or metric
-      REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(inout) ::   pun, pvn    ! now velocities
-      REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(inout) ::   pua, pva    ! total v-trend
+      REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(inout) ::   pu, pv    ! now velocities
+      REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(inout) ::   pu_rhs, pv_rhs    ! total v-trend
       !
       INTEGER  ::   ji, jj, jk   ! dummy loop indices
       REAL(wp) ::   zuav, zvau   ! local scalars
@@ -472,71 +447,59 @@ CONTAINS
          CASE ( np_COR )                           !* Coriolis (planetary vorticity)
             zwz(:,:) = ff_f(:,:) 
          CASE ( np_RVO )                           !* relative vorticity
-            DO jj = 1, jpjm1
-               DO ji = 1, fs_jpim1   ! vector opt.
-                  zwz(ji,jj) = (  e2v(ji+1,jj  ) * pvn(ji+1,jj  ,jk) - e2v(ji,jj) * pvn(ji,jj,jk)    &
-                     &          - e1u(ji  ,jj+1) * pun(ji  ,jj+1,jk) + e1u(ji,jj) * pun(ji,jj,jk)  ) * r1_e1e2f(ji,jj)
-               END DO
-            END DO
+            DO_2D_10_10
+               zwz(ji,jj) = (  e2v(ji+1,jj  ) * pv(ji+1,jj  ,jk) - e2v(ji,jj) * pv(ji,jj,jk)    &
+                  &          - e1u(ji  ,jj+1) * pu(ji  ,jj+1,jk) + e1u(ji,jj) * pu(ji,jj,jk)  ) * r1_e1e2f(ji,jj)
+            END_2D
          CASE ( np_MET )                           !* metric term
-            DO jj = 1, jpjm1
-               DO ji = 1, fs_jpim1   ! vector opt.
-                  zwz(ji,jj) = ( pvn(ji+1,jj  ,jk) + pvn(ji,jj,jk) ) * di_e2v_2e1e2f(ji,jj)   &
-                     &       - ( pun(ji  ,jj+1,jk) + pun(ji,jj,jk) ) * dj_e1u_2e1e2f(ji,jj)
-               END DO
-            END DO
+            DO_2D_10_10
+               zwz(ji,jj) = ( pv(ji+1,jj  ,jk) + pv(ji,jj,jk) ) * di_e2v_2e1e2f(ji,jj)   &
+                  &       - ( pu(ji  ,jj+1,jk) + pu(ji,jj,jk) ) * dj_e1u_2e1e2f(ji,jj)
+            END_2D
          CASE ( np_CRV )                           !* Coriolis + relative vorticity
-            DO jj = 1, jpjm1
-               DO ji = 1, fs_jpim1   ! vector opt.
-                  zwz(ji,jj) = ff_f(ji,jj) + (  e2v(ji+1,jj  ) * pvn(ji+1,jj  ,jk) - e2v(ji,jj) * pvn(ji,jj,jk)  &
-                     &                        - e1u(ji  ,jj+1) * pun(ji  ,jj+1,jk) + e1u(ji,jj) * pun(ji,jj,jk)  ) * r1_e1e2f(ji,jj)
-               END DO
-            END DO
+            DO_2D_10_10
+               zwz(ji,jj) = ff_f(ji,jj) + (  e2v(ji+1,jj  ) * pv(ji+1,jj  ,jk) - e2v(ji,jj) * pv(ji,jj,jk)  &
+                  &                        - e1u(ji  ,jj+1) * pu(ji  ,jj+1,jk) + e1u(ji,jj) * pu(ji,jj,jk)  ) * r1_e1e2f(ji,jj)
+            END_2D
          CASE ( np_CME )                           !* Coriolis + metric
-            DO jj = 1, jpjm1
-               DO ji = 1, fs_jpim1   ! vector opt.
-                  zwz(ji,jj) = ff_f(ji,jj) + ( pvn(ji+1,jj  ,jk) + pvn(ji,jj,jk) ) * di_e2v_2e1e2f(ji,jj)   &
-                     &                     - ( pun(ji  ,jj+1,jk) + pun(ji,jj,jk) ) * dj_e1u_2e1e2f(ji,jj)
-               END DO
-            END DO
+            DO_2D_10_10
+               zwz(ji,jj) = ff_f(ji,jj) + ( pv(ji+1,jj  ,jk) + pv(ji,jj,jk) ) * di_e2v_2e1e2f(ji,jj)   &
+                  &                     - ( pu(ji  ,jj+1,jk) + pu(ji,jj,jk) ) * dj_e1u_2e1e2f(ji,jj)
+            END_2D
          CASE DEFAULT                                             ! error
             CALL ctl_stop('STOP','dyn_vor: wrong value for kvor'  )
          END SELECT
          !
          IF( ln_dynvor_msk ) THEN           !==  mask/unmask vorticity ==!
-            DO jj = 1, jpjm1
-               DO ji = 1, fs_jpim1   ! vector opt.
-                  zwz(ji,jj) = zwz(ji,jj) * fmask(ji,jj,jk)
-               END DO
-            END DO
+            DO_2D_10_10
+               zwz(ji,jj) = zwz(ji,jj) * fmask(ji,jj,jk)
+            END_2D
          ENDIF
          !
          IF( ln_sco ) THEN                   !==  horizontal fluxes  ==!
-            zwz(:,:) = zwz(:,:) / e3f_n(:,:,jk)
-            zwx(:,:) = e2u(:,:) * e3u_n(:,:,jk) * pun(:,:,jk)
-            zwy(:,:) = e1v(:,:) * e3v_n(:,:,jk) * pvn(:,:,jk)
+            zwz(:,:) = zwz(:,:) / e3f(:,:,jk)
+            zwx(:,:) = e2u(:,:) * e3u(:,:,jk,Kmm) * pu(:,:,jk)
+            zwy(:,:) = e1v(:,:) * e3v(:,:,jk,Kmm) * pv(:,:,jk)
          ELSE
-            zwx(:,:) = e2u(:,:) * pun(:,:,jk)
-            zwy(:,:) = e1v(:,:) * pvn(:,:,jk)
+            zwx(:,:) = e2u(:,:) * pu(:,:,jk)
+            zwy(:,:) = e1v(:,:) * pv(:,:,jk)
          ENDIF
          !                                   !==  compute and add the vorticity term trend  =!
-         DO jj = 2, jpjm1
-            DO ji = fs_2, fs_jpim1   ! vector opt.
-               zuav = r1_8 * r1_e1u(ji,jj) * (  zwy(ji  ,jj-1) + zwy(ji+1,jj-1)  &
-                  &                           + zwy(ji  ,jj  ) + zwy(ji+1,jj  )  )
-               zvau =-r1_8 * r1_e2v(ji,jj) * (  zwx(ji-1,jj  ) + zwx(ji-1,jj+1)  &
-                  &                           + zwx(ji  ,jj  ) + zwx(ji  ,jj+1)  )
-               pua(ji,jj,jk) = pua(ji,jj,jk) + zuav * ( zwz(ji  ,jj-1) + zwz(ji,jj) )
-               pva(ji,jj,jk) = pva(ji,jj,jk) + zvau * ( zwz(ji-1,jj  ) + zwz(ji,jj) )
-            END DO  
-         END DO  
+         DO_2D_00_00
+            zuav = r1_8 * r1_e1u(ji,jj) * (  zwy(ji  ,jj-1) + zwy(ji+1,jj-1)  &
+               &                           + zwy(ji  ,jj  ) + zwy(ji+1,jj  )  )
+            zvau =-r1_8 * r1_e2v(ji,jj) * (  zwx(ji-1,jj  ) + zwx(ji-1,jj+1)  &
+               &                           + zwx(ji  ,jj  ) + zwx(ji  ,jj+1)  )
+            pu_rhs(ji,jj,jk) = pu_rhs(ji,jj,jk) + zuav * ( zwz(ji  ,jj-1) + zwz(ji,jj) )
+            pv_rhs(ji,jj,jk) = pv_rhs(ji,jj,jk) + zvau * ( zwz(ji-1,jj  ) + zwz(ji,jj) )
+         END_2D
          !                                             ! ===============
       END DO                                           !   End of slab
       !                                                ! ===============
    END SUBROUTINE vor_ens
 
 
-   SUBROUTINE vor_een( kt, kvor, pun, pvn, pua, pva )
+   SUBROUTINE vor_een( kt, Kmm, kvor, pu, pv, pu_rhs, pv_rhs )
       !!----------------------------------------------------------------------
       !!                ***  ROUTINE vor_een  ***
       !!
@@ -547,16 +510,17 @@ CONTAINS
       !!      and the Arakawa and Lamb (1980) flux form formulation : conserves 
       !!      both the horizontal kinetic energy and the potential enstrophy
       !!      when horizontal divergence is zero (see the NEMO documentation)
-      !!      Add this trend to the general momentum trend (ua,va).
+      !!      Add this trend to the general momentum trend (pu_rhs,pv_rhs).
       !!
-      !! ** Action : - Update (ua,va) with the now vorticity term trend
+      !! ** Action : - Update (pu_rhs,pv_rhs) with the now vorticity term trend
       !!
       !! References : Arakawa and Lamb 1980, Mon. Wea. Rev., 109, 18-36
       !!----------------------------------------------------------------------
       INTEGER                         , INTENT(in   ) ::   kt          ! ocean time-step index
+      INTEGER                         , INTENT(in   ) ::   Kmm              ! ocean time level index
       INTEGER                         , INTENT(in   ) ::   kvor        ! total, planetary, relative, or metric
-      REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(inout) ::   pun, pvn    ! now velocities
-      REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(inout) ::   pua, pva    ! total v-trend
+      REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(inout) ::   pu, pv    ! now velocities
+      REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(inout) ::   pu_rhs, pv_rhs    ! total v-trend
       !
       INTEGER  ::   ji, jj, jk   ! dummy loop indices
       INTEGER  ::   ierr         ! local integer
@@ -579,75 +543,59 @@ CONTAINS
          !
          SELECT CASE( nn_een_e3f )           ! == reciprocal of e3 at F-point
          CASE ( 0 )                                   ! original formulation  (masked averaging of e3t divided by 4)
-            DO jj = 1, jpjm1
-               DO ji = 1, fs_jpim1   ! vector opt.
-                  ze3f = (  e3t_n(ji,jj+1,jk)*tmask(ji,jj+1,jk) + e3t_n(ji+1,jj+1,jk)*tmask(ji+1,jj+1,jk)   &
-                     &    + e3t_n(ji,jj  ,jk)*tmask(ji,jj  ,jk) + e3t_n(ji+1,jj  ,jk)*tmask(ji+1,jj  ,jk)  )
-                  IF( ze3f /= 0._wp ) THEN   ;   z1_e3f(ji,jj) = 4._wp / ze3f
-                  ELSE                       ;   z1_e3f(ji,jj) = 0._wp
-                  ENDIF
-               END DO
-            END DO
+            DO_2D_10_10
+               ze3f = (  e3t(ji,jj+1,jk,Kmm)*tmask(ji,jj+1,jk) + e3t(ji+1,jj+1,jk,Kmm)*tmask(ji+1,jj+1,jk)   &
+                  &    + e3t(ji,jj  ,jk,Kmm)*tmask(ji,jj  ,jk) + e3t(ji+1,jj  ,jk,Kmm)*tmask(ji+1,jj  ,jk)  )
+               IF( ze3f /= 0._wp ) THEN   ;   z1_e3f(ji,jj) = 4._wp / ze3f
+               ELSE                       ;   z1_e3f(ji,jj) = 0._wp
+               ENDIF
+            END_2D
          CASE ( 1 )                                   ! new formulation  (masked averaging of e3t divided by the sum of mask)
-            DO jj = 1, jpjm1
-               DO ji = 1, fs_jpim1   ! vector opt.
-                  ze3f = (  e3t_n(ji,jj+1,jk)*tmask(ji,jj+1,jk) + e3t_n(ji+1,jj+1,jk)*tmask(ji+1,jj+1,jk)   &
-                     &    + e3t_n(ji,jj  ,jk)*tmask(ji,jj  ,jk) + e3t_n(ji+1,jj  ,jk)*tmask(ji+1,jj  ,jk)  )
-                  zmsk = (                    tmask(ji,jj+1,jk) +                     tmask(ji+1,jj+1,jk)   &
-                     &                      + tmask(ji,jj  ,jk) +                     tmask(ji+1,jj  ,jk)  )
-                  IF( ze3f /= 0._wp ) THEN   ;   z1_e3f(ji,jj) = zmsk / ze3f
-                  ELSE                       ;   z1_e3f(ji,jj) = 0._wp
-                  ENDIF
-               END DO
-            END DO
+            DO_2D_10_10
+               ze3f = (  e3t(ji,jj+1,jk,Kmm)*tmask(ji,jj+1,jk) + e3t(ji+1,jj+1,jk,Kmm)*tmask(ji+1,jj+1,jk)   &
+                  &    + e3t(ji,jj  ,jk,Kmm)*tmask(ji,jj  ,jk) + e3t(ji+1,jj  ,jk,Kmm)*tmask(ji+1,jj  ,jk)  )
+               zmsk = (                    tmask(ji,jj+1,jk) +                     tmask(ji+1,jj+1,jk)   &
+                  &                      + tmask(ji,jj  ,jk) +                     tmask(ji+1,jj  ,jk)  )
+               IF( ze3f /= 0._wp ) THEN   ;   z1_e3f(ji,jj) = zmsk / ze3f
+               ELSE                       ;   z1_e3f(ji,jj) = 0._wp
+               ENDIF
+            END_2D
          END SELECT
          !
          SELECT CASE( kvor )                 !==  vorticity considered  ==!
          CASE ( np_COR )                           !* Coriolis (planetary vorticity)
-            DO jj = 1, jpjm1
-               DO ji = 1, fs_jpim1   ! vector opt.
-                  zwz(ji,jj,jk) = ff_f(ji,jj) * z1_e3f(ji,jj)
-               END DO
-            END DO
+            DO_2D_10_10
+               zwz(ji,jj,jk) = ff_f(ji,jj) * z1_e3f(ji,jj)
+            END_2D
          CASE ( np_RVO )                           !* relative vorticity
-            DO jj = 1, jpjm1
-               DO ji = 1, fs_jpim1   ! vector opt.
-                  zwz(ji,jj,jk) = ( e2v(ji+1,jj  ) * pvn(ji+1,jj,jk) - e2v(ji,jj) * pvn(ji,jj,jk)  &
-                     &            - e1u(ji  ,jj+1) * pun(ji,jj+1,jk) + e1u(ji,jj) * pun(ji,jj,jk)  ) * r1_e1e2f(ji,jj)*z1_e3f(ji,jj)
-               END DO
-            END DO
+            DO_2D_10_10
+               zwz(ji,jj,jk) = ( e2v(ji+1,jj  ) * pv(ji+1,jj,jk) - e2v(ji,jj) * pv(ji,jj,jk)  &
+                  &            - e1u(ji  ,jj+1) * pu(ji,jj+1,jk) + e1u(ji,jj) * pu(ji,jj,jk)  ) * r1_e1e2f(ji,jj)*z1_e3f(ji,jj)
+            END_2D
          CASE ( np_MET )                           !* metric term
-            DO jj = 1, jpjm1
-               DO ji = 1, fs_jpim1   ! vector opt.
-                  zwz(ji,jj,jk) = (   ( pvn(ji+1,jj,jk) + pvn(ji,jj,jk) ) * di_e2v_2e1e2f(ji,jj)   &
-                     &              - ( pun(ji,jj+1,jk) + pun(ji,jj,jk) ) * dj_e1u_2e1e2f(ji,jj)   ) * z1_e3f(ji,jj)
-               END DO
-            END DO
+            DO_2D_10_10
+               zwz(ji,jj,jk) = (   ( pv(ji+1,jj,jk) + pv(ji,jj,jk) ) * di_e2v_2e1e2f(ji,jj)   &
+                  &              - ( pu(ji,jj+1,jk) + pu(ji,jj,jk) ) * dj_e1u_2e1e2f(ji,jj)   ) * z1_e3f(ji,jj)
+            END_2D
          CASE ( np_CRV )                           !* Coriolis + relative vorticity
-            DO jj = 1, jpjm1
-               DO ji = 1, fs_jpim1   ! vector opt.
-                  zwz(ji,jj,jk) = (  ff_f(ji,jj) + (  e2v(ji+1,jj  ) * pvn(ji+1,jj,jk) - e2v(ji,jj) * pvn(ji,jj,jk)      &
-                     &                              - e1u(ji  ,jj+1) * pun(ji,jj+1,jk) + e1u(ji,jj) * pun(ji,jj,jk)  )   &
-                     &                           * r1_e1e2f(ji,jj)   ) * z1_e3f(ji,jj)
-               END DO
-            END DO
+            DO_2D_10_10
+               zwz(ji,jj,jk) = (  ff_f(ji,jj) + (  e2v(ji+1,jj  ) * pv(ji+1,jj,jk) - e2v(ji,jj) * pv(ji,jj,jk)      &
+                  &                              - e1u(ji  ,jj+1) * pu(ji,jj+1,jk) + e1u(ji,jj) * pu(ji,jj,jk)  )   &
+                  &                           * r1_e1e2f(ji,jj)   ) * z1_e3f(ji,jj)
+            END_2D
          CASE ( np_CME )                           !* Coriolis + metric
-            DO jj = 1, jpjm1
-               DO ji = 1, fs_jpim1   ! vector opt.
-                  zwz(ji,jj,jk) = (   ff_f(ji,jj) + ( pvn(ji+1,jj  ,jk) + pvn(ji,jj,jk) ) * di_e2v_2e1e2f(ji,jj)   &
-                     &                            - ( pun(ji  ,jj+1,jk) + pun(ji,jj,jk) ) * dj_e1u_2e1e2f(ji,jj)   ) * z1_e3f(ji,jj)
-               END DO
-            END DO
+            DO_2D_10_10
+               zwz(ji,jj,jk) = (   ff_f(ji,jj) + ( pv(ji+1,jj  ,jk) + pv(ji,jj,jk) ) * di_e2v_2e1e2f(ji,jj)   &
+                  &                            - ( pu(ji  ,jj+1,jk) + pu(ji,jj,jk) ) * dj_e1u_2e1e2f(ji,jj)   ) * z1_e3f(ji,jj)
+            END_2D
          CASE DEFAULT                                             ! error
             CALL ctl_stop('STOP','dyn_vor: wrong value for kvor'  )
          END SELECT
          !
          IF( ln_dynvor_msk ) THEN          !==  mask/unmask vorticity ==!
-            DO jj = 1, jpjm1
-               DO ji = 1, fs_jpim1   ! vector opt.
-                  zwz(ji,jj,jk) = zwz(ji,jj,jk) * fmask(ji,jj,jk)
-               END DO
-            END DO
+            DO_2D_10_10
+               zwz(ji,jj,jk) = zwz(ji,jj,jk) * fmask(ji,jj,jk)
+            END_2D
          ENDIF
       END DO                                           !   End of slab
          !
@@ -656,8 +604,8 @@ CONTAINS
       DO jk = 1, jpkm1                                 ! Horizontal slab
          !
          !                                   !==  horizontal fluxes  ==!
-         zwx(:,:) = e2u(:,:) * e3u_n(:,:,jk) * pun(:,:,jk)
-         zwy(:,:) = e1v(:,:) * e3v_n(:,:,jk) * pvn(:,:,jk)
+         zwx(:,:) = e2u(:,:) * e3u(:,:,jk,Kmm) * pu(:,:,jk)
+         zwy(:,:) = e1v(:,:) * e3v(:,:,jk,Kmm) * pv(:,:,jk)
 
          !                                   !==  compute and add the vorticity term trend  =!
          jj = 2
@@ -669,23 +617,21 @@ CONTAINS
                ztsw(ji,jj) = zwz(ji  ,jj-1,jk) + zwz(ji-1,jj-1,jk) + zwz(ji-1,jj  ,jk)
          END DO
          DO jj = 3, jpj
-            DO ji = fs_2, jpi   ! vector opt. ok because we start at jj = 3
+            DO ji = 2, jpi   ! vector opt. ok because we start at jj = 3
                ztne(ji,jj) = zwz(ji-1,jj  ,jk) + zwz(ji  ,jj  ,jk) + zwz(ji  ,jj-1,jk)
                ztnw(ji,jj) = zwz(ji-1,jj-1,jk) + zwz(ji-1,jj  ,jk) + zwz(ji  ,jj  ,jk)
                ztse(ji,jj) = zwz(ji  ,jj  ,jk) + zwz(ji  ,jj-1,jk) + zwz(ji-1,jj-1,jk)
                ztsw(ji,jj) = zwz(ji  ,jj-1,jk) + zwz(ji-1,jj-1,jk) + zwz(ji-1,jj  ,jk)
             END DO
          END DO
-         DO jj = 2, jpjm1
-            DO ji = fs_2, fs_jpim1   ! vector opt.
-               zua = + r1_12 * r1_e1u(ji,jj) * (  ztne(ji,jj  ) * zwy(ji  ,jj  ) + ztnw(ji+1,jj) * zwy(ji+1,jj  )   &
-                  &                             + ztse(ji,jj  ) * zwy(ji  ,jj-1) + ztsw(ji+1,jj) * zwy(ji+1,jj-1) )
-               zva = - r1_12 * r1_e2v(ji,jj) * (  ztsw(ji,jj+1) * zwx(ji-1,jj+1) + ztse(ji,jj+1) * zwx(ji  ,jj+1)   &
-                  &                             + ztnw(ji,jj  ) * zwx(ji-1,jj  ) + ztne(ji,jj  ) * zwx(ji  ,jj  ) )
-               pua(ji,jj,jk) = pua(ji,jj,jk) + zua
-               pva(ji,jj,jk) = pva(ji,jj,jk) + zva
-            END DO  
-         END DO  
+         DO_2D_00_00
+            zua = + r1_12 * r1_e1u(ji,jj) * (  ztne(ji,jj  ) * zwy(ji  ,jj  ) + ztnw(ji+1,jj) * zwy(ji+1,jj  )   &
+               &                             + ztse(ji,jj  ) * zwy(ji  ,jj-1) + ztsw(ji+1,jj) * zwy(ji+1,jj-1) )
+            zva = - r1_12 * r1_e2v(ji,jj) * (  ztsw(ji,jj+1) * zwx(ji-1,jj+1) + ztse(ji,jj+1) * zwx(ji  ,jj+1)   &
+               &                             + ztnw(ji,jj  ) * zwx(ji-1,jj  ) + ztne(ji,jj  ) * zwx(ji  ,jj  ) )
+            pu_rhs(ji,jj,jk) = pu_rhs(ji,jj,jk) + zua
+            pv_rhs(ji,jj,jk) = pv_rhs(ji,jj,jk) + zva
+         END_2D
          !                                             ! ===============
       END DO                                           !   End of slab
       !                                                ! ===============
@@ -693,7 +639,7 @@ CONTAINS
 
 
 
-   SUBROUTINE vor_eeT( kt, kvor, pun, pvn, pua, pva )
+   SUBROUTINE vor_eeT( kt, Kmm, kvor, pu, pv, pu_rhs, pv_rhs )
       !!----------------------------------------------------------------------
       !!                ***  ROUTINE vor_eeT  ***
       !!
@@ -704,16 +650,17 @@ CONTAINS
       !!      and the Arakawa and Lamb (1980) vector form formulation using 
       !!      a modified version of Arakawa and Lamb (1980) scheme (see vor_een).
       !!      The change consists in 
-      !!      Add this trend to the general momentum trend (ua,va).
+      !!      Add this trend to the general momentum trend (pu_rhs,pv_rhs).
       !!
-      !! ** Action : - Update (ua,va) with the now vorticity term trend
+      !! ** Action : - Update (pu_rhs,pv_rhs) with the now vorticity term trend
       !!
       !! References : Arakawa and Lamb 1980, Mon. Wea. Rev., 109, 18-36
       !!----------------------------------------------------------------------
       INTEGER                         , INTENT(in   ) ::   kt          ! ocean time-step index
+      INTEGER                         , INTENT(in   ) ::   Kmm              ! ocean time level index
       INTEGER                         , INTENT(in   ) ::   kvor        ! total, planetary, relative, or metric
-      REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(inout) ::   pun, pvn    ! now velocities
-      REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(inout) ::   pua, pva    ! total v-trend
+      REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(inout) ::   pu, pv    ! now velocities
+      REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(inout) ::   pu_rhs, pv_rhs    ! total v-trend
       !
       INTEGER  ::   ji, jj, jk     ! dummy loop indices
       INTEGER  ::   ierr           ! local integer
@@ -737,51 +684,39 @@ CONTAINS
          !
          SELECT CASE( kvor )                 !==  vorticity considered  ==!
          CASE ( np_COR )                           !* Coriolis (planetary vorticity)
-            DO jj = 1, jpjm1
-               DO ji = 1, fs_jpim1   ! vector opt.
-                  zwz(ji,jj,jk) = ff_f(ji,jj)
-               END DO
-            END DO
+            DO_2D_10_10
+               zwz(ji,jj,jk) = ff_f(ji,jj)
+            END_2D
          CASE ( np_RVO )                           !* relative vorticity
-            DO jj = 1, jpjm1
-               DO ji = 1, fs_jpim1   ! vector opt.
-                  zwz(ji,jj,jk) = (  e2v(ji+1,jj  ) * pvn(ji+1,jj  ,jk) - e2v(ji,jj) * pvn(ji,jj,jk)    &
-                     &             - e1u(ji  ,jj+1) * pun(ji  ,jj+1,jk) + e1u(ji,jj) * pun(ji,jj,jk)  ) &
-                     &          * r1_e1e2f(ji,jj)
-               END DO
-            END DO
+            DO_2D_10_10
+               zwz(ji,jj,jk) = (  e2v(ji+1,jj  ) * pv(ji+1,jj  ,jk) - e2v(ji,jj) * pv(ji,jj,jk)    &
+                  &             - e1u(ji  ,jj+1) * pu(ji  ,jj+1,jk) + e1u(ji,jj) * pu(ji,jj,jk)  ) &
+                  &          * r1_e1e2f(ji,jj)
+            END_2D
          CASE ( np_MET )                           !* metric term
-            DO jj = 1, jpjm1
-               DO ji = 1, fs_jpim1   ! vector opt.
-                  zwz(ji,jj,jk) = ( pvn(ji+1,jj  ,jk) + pvn(ji,jj,jk) ) * di_e2v_2e1e2f(ji,jj)   &
-                     &          - ( pun(ji  ,jj+1,jk) + pun(ji,jj,jk) ) * dj_e1u_2e1e2f(ji,jj)
-               END DO
-            END DO
+            DO_2D_10_10
+               zwz(ji,jj,jk) = ( pv(ji+1,jj  ,jk) + pv(ji,jj,jk) ) * di_e2v_2e1e2f(ji,jj)   &
+                  &          - ( pu(ji  ,jj+1,jk) + pu(ji,jj,jk) ) * dj_e1u_2e1e2f(ji,jj)
+            END_2D
          CASE ( np_CRV )                           !* Coriolis + relative vorticity
-            DO jj = 1, jpjm1
-               DO ji = 1, fs_jpim1   ! vector opt.
-                  zwz(ji,jj,jk) = (  ff_f(ji,jj) + (  e2v(ji+1,jj  ) * pvn(ji+1,jj  ,jk) - e2v(ji,jj) * pvn(ji,jj,jk)    &
-                     &                              - e1u(ji  ,jj+1) * pun(ji  ,jj+1,jk) + e1u(ji,jj) * pun(ji,jj,jk)  ) &
-                     &                         * r1_e1e2f(ji,jj)    )
-               END DO
-            END DO
+            DO_2D_10_10
+               zwz(ji,jj,jk) = (  ff_f(ji,jj) + (  e2v(ji+1,jj  ) * pv(ji+1,jj  ,jk) - e2v(ji,jj) * pv(ji,jj,jk)    &
+                  &                              - e1u(ji  ,jj+1) * pu(ji  ,jj+1,jk) + e1u(ji,jj) * pu(ji,jj,jk)  ) &
+                  &                         * r1_e1e2f(ji,jj)    )
+            END_2D
          CASE ( np_CME )                           !* Coriolis + metric
-            DO jj = 1, jpjm1
-               DO ji = 1, fs_jpim1   ! vector opt.
-                  zwz(ji,jj,jk) = ff_f(ji,jj) + ( pvn(ji+1,jj  ,jk) + pvn(ji,jj,jk) ) * di_e2v_2e1e2f(ji,jj)   &
-                     &                        - ( pun(ji  ,jj+1,jk) + pun(ji,jj,jk) ) * dj_e1u_2e1e2f(ji,jj)
-               END DO
-            END DO
+            DO_2D_10_10
+               zwz(ji,jj,jk) = ff_f(ji,jj) + ( pv(ji+1,jj  ,jk) + pv(ji,jj,jk) ) * di_e2v_2e1e2f(ji,jj)   &
+                  &                        - ( pu(ji  ,jj+1,jk) + pu(ji,jj,jk) ) * dj_e1u_2e1e2f(ji,jj)
+            END_2D
          CASE DEFAULT                                             ! error
             CALL ctl_stop('STOP','dyn_vor: wrong value for kvor'  )
          END SELECT
          !
          IF( ln_dynvor_msk ) THEN          !==  mask/unmask vorticity ==!
-            DO jj = 1, jpjm1
-               DO ji = 1, fs_jpim1   ! vector opt.
-                  zwz(ji,jj,jk) = zwz(ji,jj,jk) * fmask(ji,jj,jk)
-               END DO
-            END DO
+            DO_2D_10_10
+               zwz(ji,jj,jk) = zwz(ji,jj,jk) * fmask(ji,jj,jk)
+            END_2D
          ENDIF
       END DO
       !
@@ -790,38 +725,36 @@ CONTAINS
       DO jk = 1, jpkm1                                 ! Horizontal slab
 
       !                                   !==  horizontal fluxes  ==!
-         zwx(:,:) = e2u(:,:) * e3u_n(:,:,jk) * pun(:,:,jk)
-         zwy(:,:) = e1v(:,:) * e3v_n(:,:,jk) * pvn(:,:,jk)
+         zwx(:,:) = e2u(:,:) * e3u(:,:,jk,Kmm) * pu(:,:,jk)
+         zwy(:,:) = e1v(:,:) * e3v(:,:,jk,Kmm) * pv(:,:,jk)
 
          !                                   !==  compute and add the vorticity term trend  =!
          jj = 2
          ztne(1,:) = 0   ;   ztnw(1,:) = 0   ;   ztse(1,:) = 0   ;   ztsw(1,:) = 0
          DO ji = 2, jpi          ! split in 2 parts due to vector opt.
-               z1_e3t = 1._wp / e3t_n(ji,jj,jk)
+               z1_e3t = 1._wp / e3t(ji,jj,jk,Kmm)
                ztne(ji,jj) = ( zwz(ji-1,jj  ,jk) + zwz(ji  ,jj  ,jk) + zwz(ji  ,jj-1,jk) ) * z1_e3t
                ztnw(ji,jj) = ( zwz(ji-1,jj-1,jk) + zwz(ji-1,jj  ,jk) + zwz(ji  ,jj  ,jk) ) * z1_e3t
                ztse(ji,jj) = ( zwz(ji  ,jj  ,jk) + zwz(ji  ,jj-1,jk) + zwz(ji-1,jj-1,jk) ) * z1_e3t
                ztsw(ji,jj) = ( zwz(ji  ,jj-1,jk) + zwz(ji-1,jj-1,jk) + zwz(ji-1,jj  ,jk) ) * z1_e3t
          END DO
          DO jj = 3, jpj
-            DO ji = fs_2, jpi   ! vector opt. ok because we start at jj = 3
-               z1_e3t = 1._wp / e3t_n(ji,jj,jk)
+            DO ji = 2, jpi   ! vector opt. ok because we start at jj = 3
+               z1_e3t = 1._wp / e3t(ji,jj,jk,Kmm)
                ztne(ji,jj) = ( zwz(ji-1,jj  ,jk) + zwz(ji  ,jj  ,jk) + zwz(ji  ,jj-1,jk) ) * z1_e3t
                ztnw(ji,jj) = ( zwz(ji-1,jj-1,jk) + zwz(ji-1,jj  ,jk) + zwz(ji  ,jj  ,jk) ) * z1_e3t
                ztse(ji,jj) = ( zwz(ji  ,jj  ,jk) + zwz(ji  ,jj-1,jk) + zwz(ji-1,jj-1,jk) ) * z1_e3t
                ztsw(ji,jj) = ( zwz(ji  ,jj-1,jk) + zwz(ji-1,jj-1,jk) + zwz(ji-1,jj  ,jk) ) * z1_e3t
             END DO
          END DO
-         DO jj = 2, jpjm1
-            DO ji = fs_2, fs_jpim1   ! vector opt.
-               zua = + r1_12 * r1_e1u(ji,jj) * (  ztne(ji,jj  ) * zwy(ji  ,jj  ) + ztnw(ji+1,jj) * zwy(ji+1,jj  )   &
-                  &                             + ztse(ji,jj  ) * zwy(ji  ,jj-1) + ztsw(ji+1,jj) * zwy(ji+1,jj-1) )
-               zva = - r1_12 * r1_e2v(ji,jj) * (  ztsw(ji,jj+1) * zwx(ji-1,jj+1) + ztse(ji,jj+1) * zwx(ji  ,jj+1)   &
-                  &                             + ztnw(ji,jj  ) * zwx(ji-1,jj  ) + ztne(ji,jj  ) * zwx(ji  ,jj  ) )
-               pua(ji,jj,jk) = pua(ji,jj,jk) + zua
-               pva(ji,jj,jk) = pva(ji,jj,jk) + zva
-            END DO  
-         END DO  
+         DO_2D_00_00
+            zua = + r1_12 * r1_e1u(ji,jj) * (  ztne(ji,jj  ) * zwy(ji  ,jj  ) + ztnw(ji+1,jj) * zwy(ji+1,jj  )   &
+               &                             + ztse(ji,jj  ) * zwy(ji  ,jj-1) + ztsw(ji+1,jj) * zwy(ji+1,jj-1) )
+            zva = - r1_12 * r1_e2v(ji,jj) * (  ztsw(ji,jj+1) * zwx(ji-1,jj+1) + ztse(ji,jj+1) * zwx(ji  ,jj+1)   &
+               &                             + ztnw(ji,jj  ) * zwx(ji-1,jj  ) + ztne(ji,jj  ) * zwx(ji  ,jj  ) )
+            pu_rhs(ji,jj,jk) = pu_rhs(ji,jj,jk) + zua
+            pv_rhs(ji,jj,jk) = pv_rhs(ji,jj,jk) + zva
+         END_2D
          !                                             ! ===============
       END DO                                           !   End of slab
       !                                                ! ===============
@@ -848,12 +781,10 @@ CONTAINS
          WRITE(numout,*) '~~~~~~~~~~~~'
       ENDIF
       !
-      REWIND( numnam_ref )              ! Namelist namdyn_vor in reference namelist : Vorticity scheme options
       READ  ( numnam_ref, namdyn_vor, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namdyn_vor in reference namelist', lwp )
-      REWIND( numnam_cfg )              ! Namelist namdyn_vor in configuration namelist : Vorticity scheme options
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namdyn_vor in reference namelist' )
       READ  ( numnam_cfg, namdyn_vor, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namdyn_vor in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namdyn_vor in configuration namelist' )
       IF(lwm) WRITE ( numond, namdyn_vor )
       !
       IF(lwp) THEN                    ! Namelist print
@@ -876,14 +807,10 @@ CONTAINS
       IF(lwp) WRITE(numout,*)
       IF(lwp) WRITE(numout,*) '      change fmask value in the angles (T)           ln_vorlat = ', ln_vorlat
       IF( ln_vorlat .AND. ( ln_dynvor_ene .OR. ln_dynvor_ens .OR. ln_dynvor_mix ) ) THEN
-         DO jk = 1, jpk
-            DO jj = 1, jpjm1
-               DO ji = 1, jpim1
-                  IF(    tmask(ji,jj+1,jk) + tmask(ji+1,jj+1,jk)              &
-                     & + tmask(ji,jj  ,jk) + tmask(ji+1,jj+1,jk) == 3._wp )   fmask(ji,jj,jk) = 1._wp
-               END DO
-            END DO
-         END DO
+         DO_3D_10_10( 1, jpk )
+            IF(    tmask(ji,jj+1,jk) + tmask(ji+1,jj+1,jk)              &
+               & + tmask(ji,jj  ,jk) + tmask(ji+1,jj  ,jk) == 3._wp )   fmask(ji,jj,jk) = 1._wp
+         END_3D
          !
          CALL lbc_lnk( 'dynvor', fmask, 'F', 1._wp )      ! Lateral boundary conditions on fmask
          !
@@ -919,22 +846,18 @@ CONTAINS
          SELECT CASE( nvor_scheme )    ! pre-computed gradients for the metric term:
          CASE( np_ENT )                      !* T-point metric term :   pre-compute di(e2u)/2 and dj(e1v)/2
             ALLOCATE( di_e2u_2(jpi,jpj), dj_e1v_2(jpi,jpj) )
-            DO jj = 2, jpjm1
-               DO ji = 2, jpim1
-                  di_e2u_2(ji,jj) = ( e2u(ji,jj) - e2u(ji-1,jj  ) ) * 0.5_wp
-                  dj_e1v_2(ji,jj) = ( e1v(ji,jj) - e1v(ji  ,jj-1) ) * 0.5_wp
-               END DO
-            END DO
+            DO_2D_00_00
+               di_e2u_2(ji,jj) = ( e2u(ji,jj) - e2u(ji-1,jj  ) ) * 0.5_wp
+               dj_e1v_2(ji,jj) = ( e1v(ji,jj) - e1v(ji  ,jj-1) ) * 0.5_wp
+            END_2D
             CALL lbc_lnk_multi( 'dynvor', di_e2u_2, 'T', -1. , dj_e1v_2, 'T', -1. )   ! Lateral boundary conditions
             !
          CASE DEFAULT                        !* F-point metric term :   pre-compute di(e2u)/(2*e1e2f) and dj(e1v)/(2*e1e2f)
             ALLOCATE( di_e2v_2e1e2f(jpi,jpj), dj_e1u_2e1e2f(jpi,jpj) )
-            DO jj = 1, jpjm1
-               DO ji = 1, jpim1
-                  di_e2v_2e1e2f(ji,jj) = ( e2v(ji+1,jj  ) - e2v(ji,jj) )  * 0.5 * r1_e1e2f(ji,jj)
-                  dj_e1u_2e1e2f(ji,jj) = ( e1u(ji  ,jj+1) - e1u(ji,jj) )  * 0.5 * r1_e1e2f(ji,jj)
-               END DO
-            END DO
+            DO_2D_10_10
+               di_e2v_2e1e2f(ji,jj) = ( e2v(ji+1,jj  ) - e2v(ji,jj) )  * 0.5 * r1_e1e2f(ji,jj)
+               dj_e1u_2e1e2f(ji,jj) = ( e1u(ji  ,jj+1) - e1u(ji,jj) )  * 0.5 * r1_e1e2f(ji,jj)
+            END_2D
             CALL lbc_lnk_multi( 'dynvor', di_e2v_2e1e2f, 'F', -1. , dj_e1u_2e1e2f, 'F', -1. )   ! Lateral boundary conditions
          END SELECT
          !

@@ -40,22 +40,22 @@ MODULE tramle
    REAL(wp)        ::      rn_rho_c_mle        ! Density criterion for definition of MLD used by FK
 
    REAL(wp) ::   r5_21 = 5.e0 / 21.e0   ! factor used in mle streamfunction computation
-   REAL(wp) ::   rb_c                   ! ML buoyancy criteria = g rho_c /rau0 where rho_c is defined in zdfmld
+   REAL(wp) ::   rb_c                   ! ML buoyancy criteria = g rho_c /rho0 where rho_c is defined in zdfmld
    REAL(wp) ::   rc_f                   ! MLE coefficient (= rn_ce / (5 km * fo) ) in nn_mle=1 case
 
    REAL(wp), ALLOCATABLE, SAVE, DIMENSION(:,:) ::   rfu, rfv   ! modified Coriolis parameter (f+tau) at u- & v-pts
    REAL(wp), ALLOCATABLE, SAVE, DIMENSION(:,:) ::   r1_ft      ! inverse of the modified Coriolis parameter at t-pts
 
    !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: tramle.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: tramle.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE tra_mle_trp( kt, kit000, pu, pv, pw, cdtype )
+   SUBROUTINE tra_mle_trp( kt, kit000, pu, pv, pw, cdtype, Kmm )
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE tra_mle_trp  ***
       !!
@@ -70,7 +70,7 @@ CONTAINS
       !!              and added to the input velocity :
       !!                p.n = p.n + z._mle
       !!
-      !! ** Action  : - (pun,pvn,pwn) increased by the mle transport
+      !! ** Action  : - (pu,pv,pw) increased by the mle transport
       !!                CAUTION, the transport is not updated at the last line/raw
       !!                         this may be a problem for some advection schemes
       !!
@@ -79,6 +79,7 @@ CONTAINS
       !!----------------------------------------------------------------------
       INTEGER                         , INTENT(in   ) ::   kt         ! ocean time-step index
       INTEGER                         , INTENT(in   ) ::   kit000     ! first time step index
+      INTEGER                         , INTENT(in   ) ::   Kmm        ! ocean time level index
       CHARACTER(len=3)                , INTENT(in   ) ::   cdtype     ! =TRA or TRC (tracer indicator)
       REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(inout) ::   pu         ! in : 3 ocean transport components
       REAL(wp), DIMENSION(jpi,jpj,jpk), INTENT(inout) ::   pv         ! out: same 3  transport components
@@ -97,13 +98,9 @@ CONTAINS
       !                                                ! compute from the 10m density to deal with the diurnal cycle
       inml_mle(:,:) = mbkt(:,:) + 1                    ! init. to number of ocean w-level (T-level + 1)
       IF ( nla10 > 0 ) THEN                            ! avoid case where first level is thicker than 10m
-         DO jk = jpkm1, nlb10, -1                      ! from the bottom to nlb10 (10m)
-            DO jj = 1, jpj
-               DO ji = 1, jpi                          ! index of the w-level at the ML based
-                  IF( rhop(ji,jj,jk) > rhop(ji,jj,nla10) + rn_rho_c_mle )   inml_mle(ji,jj) = jk      ! Mixed layer
-               END DO
-            END DO
-         END DO
+         DO_3DS_11_11( jpkm1, nlb10, -1 )
+            IF( rhop(ji,jj,jk) > rhop(ji,jj,nla10) + rn_rho_c_mle )   inml_mle(ji,jj) = jk      ! Mixed layer
+         END_3D
       ENDIF
       ikmax = MIN( MAXVAL( inml_mle(:,:) ), jpkm1 )                  ! max level of the computation
       !
@@ -111,42 +108,32 @@ CONTAINS
       zmld(:,:) = 0._wp                      !==   Horizontal shape of the MLE  ==!
       zbm (:,:) = 0._wp
       zn2 (:,:) = 0._wp
-      DO jk = 1, ikmax                                 ! MLD and mean buoyancy and N2 over the mixed layer
-         DO jj = 1, jpj
-            DO ji = 1, jpi
-               zc = e3t_n(ji,jj,jk) * REAL( MIN( MAX( 0, inml_mle(ji,jj)-jk ) , 1  )  )    ! zc being 0 outside the ML t-points
-               zmld(ji,jj) = zmld(ji,jj) + zc
-               zbm (ji,jj) = zbm (ji,jj) + zc * (rau0 - rhop(ji,jj,jk) ) * r1_rau0
-               zn2 (ji,jj) = zn2 (ji,jj) + zc * (rn2(ji,jj,jk)+rn2(ji,jj,jk+1))*0.5_wp
-            END DO
-         END DO
-      END DO
+      DO_3D_11_11( 1, ikmax )
+         zc = e3t(ji,jj,jk,Kmm) * REAL( MIN( MAX( 0, inml_mle(ji,jj)-jk ) , 1  )  )    ! zc being 0 outside the ML t-points
+         zmld(ji,jj) = zmld(ji,jj) + zc
+         zbm (ji,jj) = zbm (ji,jj) + zc * (rho0 - rhop(ji,jj,jk) ) * r1_rho0
+         zn2 (ji,jj) = zn2 (ji,jj) + zc * (rn2(ji,jj,jk)+rn2(ji,jj,jk+1))*0.5_wp
+      END_3D
 
       SELECT CASE( nn_mld_uv )                         ! MLD at u- & v-pts
       CASE ( 0 )                                               != min of the 2 neighbour MLDs
-         DO jj = 1, jpjm1
-            DO ji = 1, fs_jpim1   ! vector opt.
-               zhu(ji,jj) = MIN( zmld(ji+1,jj), zmld(ji,jj) )
-               zhv(ji,jj) = MIN( zmld(ji,jj+1), zmld(ji,jj) )
-            END DO
-         END DO
+         DO_2D_10_10
+            zhu(ji,jj) = MIN( zmld(ji+1,jj), zmld(ji,jj) )
+            zhv(ji,jj) = MIN( zmld(ji,jj+1), zmld(ji,jj) )
+         END_2D
       CASE ( 1 )                                               != average of the 2 neighbour MLDs
-         DO jj = 1, jpjm1
-            DO ji = 1, fs_jpim1   ! vector opt.
-               zhu(ji,jj) = ( zmld(ji+1,jj) + zmld(ji,jj) ) * 0.5_wp
-               zhv(ji,jj) = ( zmld(ji,jj+1) + zmld(ji,jj) ) * 0.5_wp
-            END DO
-         END DO
+         DO_2D_10_10
+            zhu(ji,jj) = ( zmld(ji+1,jj) + zmld(ji,jj) ) * 0.5_wp
+            zhv(ji,jj) = ( zmld(ji,jj+1) + zmld(ji,jj) ) * 0.5_wp
+         END_2D
       CASE ( 2 )                                               != max of the 2 neighbour MLDs
-         DO jj = 1, jpjm1
-            DO ji = 1, fs_jpim1   ! vector opt.
-               zhu(ji,jj) = MAX( zmld(ji+1,jj), zmld(ji,jj) )
-               zhv(ji,jj) = MAX( zmld(ji,jj+1), zmld(ji,jj) )
-            END DO
-         END DO
+         DO_2D_10_10
+            zhu(ji,jj) = MAX( zmld(ji+1,jj), zmld(ji,jj) )
+            zhv(ji,jj) = MAX( zmld(ji,jj+1), zmld(ji,jj) )
+         END_2D
       END SELECT
       !                                                ! convert density into buoyancy
-      zbm(:,:) = + grav * zbm(:,:) / MAX( e3t_n(:,:,1), zmld(:,:) )
+      zbm(:,:) = + grav * zbm(:,:) / MAX( e3t(:,:,1,Kmm), zmld(:,:) )
       !
       !
       !                                      !==  Magnitude of the MLE stream function  ==!
@@ -157,80 +144,64 @@ CONTAINS
       !                                                      (not *e3u as divided by e3u at the end)
       !
       IF( nn_mle == 0 ) THEN           ! Fox-Kemper et al. 2010 formulation
-         DO jj = 1, jpjm1
-            DO ji = 1, fs_jpim1   ! vector opt.
-               zpsim_u(ji,jj) = rn_ce * zhu(ji,jj) * zhu(ji,jj)  * e2_e1u(ji,jj)                                            &
-                  &           * ( zbm(ji+1,jj) - zbm(ji,jj) ) * MIN( 111.e3_wp , e1u(ji,jj) )   &
-                  &           / (  MAX( rn_lf * rfu(ji,jj) , SQRT( rb_c * zhu(ji,jj) ) )   )
-                  !
-               zpsim_v(ji,jj) = rn_ce * zhv(ji,jj) * zhv(ji,jj)  * e1_e2v(ji,jj)                                            &
-                  &           * ( zbm(ji,jj+1) - zbm(ji,jj) ) * MIN( 111.e3_wp , e2v(ji,jj) )   &
-                  &           / (  MAX( rn_lf * rfv(ji,jj) , SQRT( rb_c * zhv(ji,jj) ) )   )
-            END DO
-         END DO
+         DO_2D_10_10
+            zpsim_u(ji,jj) = rn_ce * zhu(ji,jj) * zhu(ji,jj)  * e2_e1u(ji,jj)                                            &
+               &           * ( zbm(ji+1,jj) - zbm(ji,jj) ) * MIN( 111.e3_wp , e1u(ji,jj) )   &
+               &           / (  MAX( rn_lf * rfu(ji,jj) , SQRT( rb_c * zhu(ji,jj) ) )   )
+               !
+            zpsim_v(ji,jj) = rn_ce * zhv(ji,jj) * zhv(ji,jj)  * e1_e2v(ji,jj)                                            &
+               &           * ( zbm(ji,jj+1) - zbm(ji,jj) ) * MIN( 111.e3_wp , e2v(ji,jj) )   &
+               &           / (  MAX( rn_lf * rfv(ji,jj) , SQRT( rb_c * zhv(ji,jj) ) )   )
+         END_2D
          !
       ELSEIF( nn_mle == 1 ) THEN       ! New formulation (Lf = 5km fo/ff with fo=Coriolis parameter at latitude rn_lat)
-         DO jj = 1, jpjm1
-            DO ji = 1, fs_jpim1   ! vector opt.
-               zpsim_u(ji,jj) = rc_f *   zhu(ji,jj)   * zhu(ji,jj)   * e2_e1u(ji,jj)               &
-                  &                  * ( zbm(ji+1,jj) - zbm(ji,jj) ) * MIN( 111.e3_wp , e1u(ji,jj) )
-                  !
-               zpsim_v(ji,jj) = rc_f *   zhv(ji,jj)   * zhv(ji,jj)   * e1_e2v(ji,jj)               &
-                  &                  * ( zbm(ji,jj+1) - zbm(ji,jj) ) * MIN( 111.e3_wp , e2v(ji,jj) )
-            END DO
-         END DO
+         DO_2D_10_10
+            zpsim_u(ji,jj) = rc_f *   zhu(ji,jj)   * zhu(ji,jj)   * e2_e1u(ji,jj)               &
+               &                  * ( zbm(ji+1,jj) - zbm(ji,jj) ) * MIN( 111.e3_wp , e1u(ji,jj) )
+               !
+            zpsim_v(ji,jj) = rc_f *   zhv(ji,jj)   * zhv(ji,jj)   * e1_e2v(ji,jj)               &
+               &                  * ( zbm(ji,jj+1) - zbm(ji,jj) ) * MIN( 111.e3_wp , e2v(ji,jj) )
+         END_2D
       ENDIF
       !
       IF( nn_conv == 1 ) THEN              ! No MLE in case of convection
-         DO jj = 1, jpjm1
-            DO ji = 1, fs_jpim1   ! vector opt.
-               IF( MIN( zn2(ji,jj) , zn2(ji+1,jj) ) < 0._wp )   zpsim_u(ji,jj) = 0._wp
-               IF( MIN( zn2(ji,jj) , zn2(ji,jj+1) ) < 0._wp )   zpsim_v(ji,jj) = 0._wp
-            END DO
-         END DO
+         DO_2D_10_10
+            IF( MIN( zn2(ji,jj) , zn2(ji+1,jj) ) < 0._wp )   zpsim_u(ji,jj) = 0._wp
+            IF( MIN( zn2(ji,jj) , zn2(ji,jj+1) ) < 0._wp )   zpsim_v(ji,jj) = 0._wp
+         END_2D
       ENDIF
       !
       !                                      !==  structure function value at uw- and vw-points  ==!
-      DO jj = 1, jpjm1
-         DO ji = 1, fs_jpim1   ! vector opt.
-            zhu(ji,jj) = 1._wp / zhu(ji,jj)                   ! hu --> 1/hu
-            zhv(ji,jj) = 1._wp / zhv(ji,jj)
-         END DO
-      END DO
+      DO_2D_10_10
+         zhu(ji,jj) = 1._wp / zhu(ji,jj)                   ! hu --> 1/hu
+         zhv(ji,jj) = 1._wp / zhv(ji,jj)
+      END_2D
       !
       zpsi_uw(:,:,:) = 0._wp
       zpsi_vw(:,:,:) = 0._wp
       !
-      DO jk = 2, ikmax                                ! start from 2 : surface value = 0
-         DO jj = 1, jpjm1
-            DO ji = 1, fs_jpim1   ! vector opt.
-               zcuw = 1._wp - ( gdepw_n(ji+1,jj,jk) + gdepw_n(ji,jj,jk) ) * zhu(ji,jj)
-               zcvw = 1._wp - ( gdepw_n(ji,jj+1,jk) + gdepw_n(ji,jj,jk) ) * zhv(ji,jj)
-               zcuw = zcuw * zcuw
-               zcvw = zcvw * zcvw
-               zmuw = MAX(  0._wp , ( 1._wp - zcuw ) * ( 1._wp + r5_21 * zcuw )  )
-               zmvw = MAX(  0._wp , ( 1._wp - zcvw ) * ( 1._wp + r5_21 * zcvw )  )
-               !
-               zpsi_uw(ji,jj,jk) = zpsim_u(ji,jj) * zmuw * umask(ji,jj,jk)
-               zpsi_vw(ji,jj,jk) = zpsim_v(ji,jj) * zmvw * vmask(ji,jj,jk)
-            END DO
-         END DO
-      END DO
+      DO_3D_10_10( 2, ikmax )
+         zcuw = 1._wp - ( gdepw(ji+1,jj,jk,Kmm) + gdepw(ji,jj,jk,Kmm) ) * zhu(ji,jj)
+         zcvw = 1._wp - ( gdepw(ji,jj+1,jk,Kmm) + gdepw(ji,jj,jk,Kmm) ) * zhv(ji,jj)
+         zcuw = zcuw * zcuw
+         zcvw = zcvw * zcvw
+         zmuw = MAX(  0._wp , ( 1._wp - zcuw ) * ( 1._wp + r5_21 * zcuw )  )
+         zmvw = MAX(  0._wp , ( 1._wp - zcvw ) * ( 1._wp + r5_21 * zcvw )  )
+         !
+         zpsi_uw(ji,jj,jk) = zpsim_u(ji,jj) * zmuw * umask(ji,jj,jk)
+         zpsi_vw(ji,jj,jk) = zpsim_v(ji,jj) * zmvw * vmask(ji,jj,jk)
+      END_3D
       !
       !                                      !==  transport increased by the MLE induced transport ==!
       DO jk = 1, ikmax
-         DO jj = 1, jpjm1                          ! CAUTION pu,pv must be defined at row/column i=1 / j=1
-            DO ji = 1, fs_jpim1   ! vector opt.
-               pu(ji,jj,jk) = pu(ji,jj,jk) + ( zpsi_uw(ji,jj,jk) - zpsi_uw(ji,jj,jk+1) )
-               pv(ji,jj,jk) = pv(ji,jj,jk) + ( zpsi_vw(ji,jj,jk) - zpsi_vw(ji,jj,jk+1) )
-            END DO
-         END DO
-         DO jj = 2, jpjm1
-            DO ji = fs_2, fs_jpim1   ! vector opt.
-               pw(ji,jj,jk) = pw(ji,jj,jk) - ( zpsi_uw(ji,jj,jk) - zpsi_uw(ji-1,jj,jk)   &
-                  &                          + zpsi_vw(ji,jj,jk) - zpsi_vw(ji,jj-1,jk) )
-            END DO
-         END DO
+         DO_2D_10_10
+            pu(ji,jj,jk) = pu(ji,jj,jk) + ( zpsi_uw(ji,jj,jk) - zpsi_uw(ji,jj,jk+1) )
+            pv(ji,jj,jk) = pv(ji,jj,jk) + ( zpsi_vw(ji,jj,jk) - zpsi_vw(ji,jj,jk+1) )
+         END_2D
+         DO_2D_00_00
+            pw(ji,jj,jk) = pw(ji,jj,jk) - ( zpsi_uw(ji,jj,jk) - zpsi_uw(ji-1,jj,jk)   &
+               &                          + zpsi_vw(ji,jj,jk) - zpsi_vw(ji,jj-1,jk) )
+         END_2D
       END DO
 
       IF( cdtype == 'TRA') THEN              !==  outputs  ==!
@@ -265,13 +236,11 @@ CONTAINS
       NAMELIST/namtra_mle/ ln_mle , nn_mle, rn_ce, rn_lf, rn_time, rn_lat, nn_mld_uv, nn_conv, rn_rho_c_mle
       !!----------------------------------------------------------------------
 
-      REWIND( numnam_ref )              ! Namelist namtra_mle in reference namelist : Tracer advection scheme
       READ  ( numnam_ref, namtra_mle, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namtra_mle in reference namelist', lwp )
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namtra_mle in reference namelist' )
 
-      REWIND( numnam_cfg )              ! Namelist namtra_mle in configuration namelist : Tracer advection scheme
       READ  ( numnam_cfg, namtra_mle, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namtra_mle in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namtra_mle in configuration namelist' )
       IF(lwm) WRITE ( numond, namtra_mle )
 
       IF(lwp) THEN                     ! Namelist print
@@ -303,7 +272,7 @@ CONTAINS
       !
       IF( ln_mle ) THEN                ! MLE initialisation
          !
-         rb_c = grav * rn_rho_c_mle /rau0        ! Mixed Layer buoyancy criteria
+         rb_c = grav * rn_rho_c_mle /rho0        ! Mixed Layer buoyancy criteria
          IF(lwp) WRITE(numout,*)
          IF(lwp) WRITE(numout,*) '      ML buoyancy criteria = ', rb_c, ' m/s2 '
          IF(lwp) WRITE(numout,*) '      associated ML density criteria defined in zdfmxl = ', rho_c, 'kg/m3'
@@ -312,14 +281,12 @@ CONTAINS
             ALLOCATE( rfu(jpi,jpj) , rfv(jpi,jpj) , STAT= ierr )
             IF( ierr /= 0 )   CALL ctl_stop( 'tra_adv_mle_init: failed to allocate arrays' )
             z1_t2 = 1._wp / ( rn_time * rn_time )
-            DO jj = 2, jpj                           ! "coriolis+ time^-1" at u- & v-points
-               DO ji = fs_2, jpi   ! vector opt.
-                  zfu = ( ff_f(ji,jj) + ff_f(ji,jj-1) ) * 0.5_wp
-                  zfv = ( ff_f(ji,jj) + ff_f(ji-1,jj) ) * 0.5_wp
-                  rfu(ji,jj) = SQRT(  zfu * zfu + z1_t2 )
-                  rfv(ji,jj) = SQRT(  zfv * zfv + z1_t2 )
-               END DO
-            END DO
+            DO_2D_01_01
+               zfu = ( ff_f(ji,jj) + ff_f(ji,jj-1) ) * 0.5_wp
+               zfv = ( ff_f(ji,jj) + ff_f(ji-1,jj) ) * 0.5_wp
+               rfu(ji,jj) = SQRT(  zfu * zfu + z1_t2 )
+               rfv(ji,jj) = SQRT(  zfv * zfv + z1_t2 )
+            END_2D
             CALL lbc_lnk_multi( 'tramle', rfu, 'U', 1. , rfv, 'V', 1. )
             !
          ELSEIF( nn_mle == 1 ) THEN           ! MLE array allocation & initialisation

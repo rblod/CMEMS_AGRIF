@@ -43,9 +43,11 @@ MODULE icethd_do
    REAL(wp) ::   rn_vfraz      ! threshold drift speed for collection of bottom frazil ice
    REAL(wp) ::   rn_Cfraz      ! squeezing coefficient for collection of bottom frazil ice
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/ICE 4.0 , NEMO Consortium (2018)
-   !! $Id: icethd_do.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: icethd_do.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -112,10 +114,9 @@ CONTAINS
       !!-----------------------------------------------------------------------!
 
       IF( ln_icediachk )   CALL ice_cons_hsm( 0, 'icethd_do', rdiag_v, rdiag_s, rdiag_t, rdiag_fv, rdiag_fs, rdiag_ft )
+      IF( ln_icediachk )   CALL ice_cons2D  ( 0, 'icethd_do',  diag_v,  diag_s,  diag_t,  diag_fv,  diag_fs,  diag_ft )
 
-      CALL ice_var_agg(1)
-      CALL ice_var_glo2eqv
-
+      at_i(:,:) = SUM( a_i, dim=3 )
       !------------------------------------------------------------------------------!
       ! 1) Collection thickness of ice formed in leads and polynyas
       !------------------------------------------------------------------------------!    
@@ -129,8 +130,8 @@ CONTAINS
       zvrel(:,:) = 0._wp
 
       ! Default new ice thickness
-      WHERE( qlead(:,:) < 0._wp )   ;   ht_i_new(:,:) = rn_hinew
-      ELSEWHERE                     ;   ht_i_new(:,:) = 0._wp
+      WHERE( qlead(:,:) < 0._wp  .AND. tau_icebfr(:,:) == 0._wp )   ;   ht_i_new(:,:) = rn_hinew ! if cooling and no landfast
+      ELSEWHERE                                                     ;   ht_i_new(:,:) = 0._wp
       END WHERE
 
       IF( ln_frazil ) THEN
@@ -139,54 +140,55 @@ CONTAINS
          !
          ! Physical constants
          zhicrit = 0.04                                          ! frazil ice thickness
-         ztwogp  = 2. * rau0 / ( grav * 0.3 * ( rau0 - rhoi ) )  ! reduced grav
+         ztwogp  = 2. * rho0 / ( grav * 0.3 * ( rho0 - rhoi ) )  ! reduced grav
          zsqcd   = 1.0 / SQRT( 1.3 * zcai )                      ! 1/SQRT(airdensity*drag)
          zgamafr = 0.03
          !
-         DO jj = 2, jpjm1
-            DO ji = 2, jpim1
-               IF ( qlead(ji,jj) < 0._wp .AND. tau_icebfr(ji,jj) == 0._wp ) THEN ! activated if cooling and no landfast
-                  ! -- Wind stress -- !
-                  ztaux         = ( utau_ice(ji-1,jj  ) * umask(ji-1,jj  ,1)   &
-                     &          +   utau_ice(ji  ,jj  ) * umask(ji  ,jj  ,1) ) * 0.5_wp
-                  ztauy         = ( vtau_ice(ji  ,jj-1) * vmask(ji  ,jj-1,1)   &
-                     &          +   vtau_ice(ji  ,jj  ) * vmask(ji  ,jj  ,1) ) * 0.5_wp
-                  ! Square root of wind stress
-                  ztenagm       =  SQRT( SQRT( ztaux * ztaux + ztauy * ztauy ) )
+         DO_2D_00_00
+            IF ( qlead(ji,jj) < 0._wp .AND. tau_icebfr(ji,jj) == 0._wp ) THEN ! activated if cooling and no landfast
+               ! -- Wind stress -- !
+               ztaux         = ( utau_ice(ji-1,jj  ) * umask(ji-1,jj  ,1)   &
+                  &          +   utau_ice(ji  ,jj  ) * umask(ji  ,jj  ,1) ) * 0.5_wp
+               ztauy         = ( vtau_ice(ji  ,jj-1) * vmask(ji  ,jj-1,1)   &
+                  &          +   vtau_ice(ji  ,jj  ) * vmask(ji  ,jj  ,1) ) * 0.5_wp
+               ! Square root of wind stress
+               ztenagm       =  SQRT( SQRT( ztaux * ztaux + ztauy * ztauy ) )
 
-                  ! -- Frazil ice velocity -- !
-                  rswitch = MAX( 0._wp, SIGN( 1._wp , ztenagm - epsi10 ) )
-                  zvfrx   = rswitch * zgamafr * zsqcd * ztaux / MAX( ztenagm, epsi10 )
-                  zvfry   = rswitch * zgamafr * zsqcd * ztauy / MAX( ztenagm, epsi10 )
+               ! -- Frazil ice velocity -- !
+               rswitch = MAX( 0._wp, SIGN( 1._wp , ztenagm - epsi10 ) )
+               zvfrx   = rswitch * zgamafr * zsqcd * ztaux / MAX( ztenagm, epsi10 )
+               zvfry   = rswitch * zgamafr * zsqcd * ztauy / MAX( ztenagm, epsi10 )
 
-                  ! -- Pack ice velocity -- !
-                  zvgx    = ( u_ice(ji-1,jj  ) * umask(ji-1,jj  ,1)  + u_ice(ji,jj) * umask(ji,jj,1) ) * 0.5_wp
-                  zvgy    = ( v_ice(ji  ,jj-1) * vmask(ji  ,jj-1,1)  + v_ice(ji,jj) * vmask(ji,jj,1) ) * 0.5_wp
+               ! -- Pack ice velocity -- !
+               zvgx    = ( u_ice(ji-1,jj  ) * umask(ji-1,jj  ,1)  + u_ice(ji,jj) * umask(ji,jj,1) ) * 0.5_wp
+               zvgy    = ( v_ice(ji  ,jj-1) * vmask(ji  ,jj-1,1)  + v_ice(ji,jj) * vmask(ji,jj,1) ) * 0.5_wp
 
-                  ! -- Relative frazil/pack ice velocity -- !
-                  rswitch      = MAX( 0._wp, SIGN( 1._wp , at_i(ji,jj) - epsi10 ) )
-                  zvrel2       = MAX(  ( zvfrx - zvgx ) * ( zvfrx - zvgx )   &
-                     &               + ( zvfry - zvgy ) * ( zvfry - zvgy ) , 0.15 * 0.15 ) * rswitch
-                  zvrel(ji,jj) = SQRT( zvrel2 )
+               ! -- Relative frazil/pack ice velocity -- !
+               rswitch      = MAX( 0._wp, SIGN( 1._wp , at_i(ji,jj) - epsi10 ) )
+               zvrel2       = MAX(  ( zvfrx - zvgx ) * ( zvfrx - zvgx )   &
+                  &               + ( zvfry - zvgy ) * ( zvfry - zvgy ) , 0.15 * 0.15 ) * rswitch
+               zvrel(ji,jj) = SQRT( zvrel2 )
 
-                  ! -- new ice thickness (iterative loop) -- !
-                  ht_i_new(ji,jj) = zhicrit +   ( zhicrit + 0.1 )    &
-                     &                   / ( ( zhicrit + 0.1 ) * ( zhicrit + 0.1 ) -  zhicrit * zhicrit ) * ztwogp * zvrel2
+               ! -- new ice thickness (iterative loop) -- !
+               ht_i_new(ji,jj) = zhicrit +   ( zhicrit + 0.1 )    &
+                  &                   / ( ( zhicrit + 0.1 ) * ( zhicrit + 0.1 ) -  zhicrit * zhicrit ) * ztwogp * zvrel2
 
-                  iter = 1
-                  DO WHILE ( iter < 20 ) 
-                     zf  = ( ht_i_new(ji,jj) - zhicrit ) * ( ht_i_new(ji,jj) * ht_i_new(ji,jj) - zhicrit * zhicrit ) -   &
-                        &    ht_i_new(ji,jj) * zhicrit * ztwogp * zvrel2
-                     zfp = ( ht_i_new(ji,jj) - zhicrit ) * ( 3.0 * ht_i_new(ji,jj) + zhicrit ) - zhicrit * ztwogp * zvrel2
+               iter = 1
+               DO WHILE ( iter < 20 ) 
+                  zf  = ( ht_i_new(ji,jj) - zhicrit ) * ( ht_i_new(ji,jj) * ht_i_new(ji,jj) - zhicrit * zhicrit ) -   &
+                     &    ht_i_new(ji,jj) * zhicrit * ztwogp * zvrel2
+                  zfp = ( ht_i_new(ji,jj) - zhicrit ) * ( 3.0 * ht_i_new(ji,jj) + zhicrit ) - zhicrit * ztwogp * zvrel2
 
-                     ht_i_new(ji,jj) = ht_i_new(ji,jj) - zf / MAX( zfp, epsi20 )
-                     iter = iter + 1
-                  END DO
-                  !
-               ENDIF
+                  ht_i_new(ji,jj) = ht_i_new(ji,jj) - zf / MAX( zfp, epsi20 )
+                  iter = iter + 1
+               END DO
                !
-            END DO 
-         END DO 
+               ! bound ht_i_new (though I don't see why it should be necessary)
+               ht_i_new(ji,jj) = MAX( 0.01_wp, MIN( ht_i_new(ji,jj), hi_max(jpl) ) )
+               !
+            ENDIF
+            !
+         END_2D
          ! 
          CALL lbc_lnk_multi( 'icethd_do', zvrel, 'T', 1., ht_i_new, 'T', 1.  )
 
@@ -199,14 +201,12 @@ CONTAINS
 
       ! Identify grid points where new ice forms
       npti = 0   ;   nptidx(:) = 0
-      DO jj = 1, jpj
-         DO ji = 1, jpi
-            IF ( qlead(ji,jj)  <  0._wp .AND. tau_icebfr(ji,jj) == 0._wp ) THEN
-               npti = npti + 1
-               nptidx( npti ) = (jj - 1) * jpi + ji
-            ENDIF
-         END DO
-      END DO
+      DO_2D_11_11
+         IF ( qlead(ji,jj)  <  0._wp .AND. tau_icebfr(ji,jj) == 0._wp ) THEN
+            npti = npti + 1
+            nptidx( npti ) = (jj - 1) * jpi + ji
+         ENDIF
+      END_2D
 
       ! Move from 2-D to 1-D vectors
       IF ( npti > 0 ) THEN
@@ -288,13 +288,13 @@ CONTAINS
             zQm           = zfmdt * zEw                            ! heat to the ocean >0 associated with mass flux  
 
             ! Contribution to heat flux to the ocean [W.m-2], >0  
-            hfx_thd_1d(ji) = hfx_thd_1d(ji) + zfmdt * zEw * r1_rdtice
+            hfx_thd_1d(ji) = hfx_thd_1d(ji) + zfmdt * zEw * r1_Dt_ice
             ! Total heat flux used in this process [W.m-2]  
-            hfx_opw_1d(ji) = hfx_opw_1d(ji) - zfmdt * zdE * r1_rdtice
+            hfx_opw_1d(ji) = hfx_opw_1d(ji) - zfmdt * zdE * r1_Dt_ice
             ! mass flux
-            wfx_opw_1d(ji) = wfx_opw_1d(ji) - zv_newice(ji) * rhoi * r1_rdtice
+            wfx_opw_1d(ji) = wfx_opw_1d(ji) - zv_newice(ji) * rhoi * r1_Dt_ice
             ! salt flux
-            sfx_opw_1d(ji) = sfx_opw_1d(ji) - zv_newice(ji) * rhoi * zs_newice(ji) * r1_rdtice
+            sfx_opw_1d(ji) = sfx_opw_1d(ji) - zv_newice(ji) * rhoi * zs_newice(ji) * r1_Dt_ice
          END DO
          
          zv_frazb(1:npti) = 0._wp
@@ -318,14 +318,14 @@ CONTAINS
          !------------------------------------------------------------------------------!
 
          ! --- lateral ice growth --- !
-         ! If lateral ice growth gives an ice concentration gt 1, then
+         ! If lateral ice growth gives an ice concentration > amax, then
          ! we keep the excessive volume in memory and attribute it later to bottom accretion
          DO ji = 1, npti
-            IF ( za_newice(ji) >  ( rn_amax_1d(ji) - at_i_1d(ji) ) ) THEN
-               zda_res(ji)   = za_newice(ji) - ( rn_amax_1d(ji) - at_i_1d(ji) )
+            IF ( za_newice(ji) >  MAX( 0._wp, rn_amax_1d(ji) - at_i_1d(ji) ) ) THEN ! max is for roundoff error
+               zda_res(ji)   = za_newice(ji) - MAX( 0._wp, rn_amax_1d(ji) - at_i_1d(ji) )
                zdv_res(ji)   = zda_res  (ji) * zh_newice(ji) 
-               za_newice(ji) = za_newice(ji) - zda_res  (ji)
-               zv_newice(ji) = zv_newice(ji) - zdv_res  (ji)
+               za_newice(ji) = MAX( 0._wp, za_newice(ji) - zda_res  (ji) )
+               zv_newice(ji) = MAX( 0._wp, zv_newice(ji) - zdv_res  (ji) )
             ELSE
                zda_res(ji) = 0._wp
                zdv_res(ji) = 0._wp
@@ -418,6 +418,7 @@ CONTAINS
       ENDIF ! npti > 0
       !
       IF( ln_icediachk )   CALL ice_cons_hsm(1, 'icethd_do', rdiag_v, rdiag_s, rdiag_t, rdiag_fv, rdiag_fs, rdiag_ft)
+      IF( ln_icediachk )   CALL ice_cons2D  (1, 'icethd_do',  diag_v,  diag_s,  diag_t,  diag_fv,  diag_fs,  diag_ft)
       !
    END SUBROUTINE ice_thd_do
 
@@ -439,12 +440,10 @@ CONTAINS
       NAMELIST/namthd_do/ rn_hinew, ln_frazil, rn_maxfraz, rn_vfraz, rn_Cfraz
       !!-------------------------------------------------------------------
       !
-      REWIND( numnam_ice_ref )              ! Namelist namthd_do in reference namelist : Ice thermodynamics
       READ  ( numnam_ice_ref, namthd_do, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namthd_do in reference namelist', lwp )
-      REWIND( numnam_ice_cfg )              ! Namelist namthd_do in configuration namelist : Ice thermodynamics
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namthd_do in reference namelist' )
       READ  ( numnam_ice_cfg, namthd_do, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namthd_do in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namthd_do in configuration namelist' )
       IF(lwm) WRITE( numoni, namthd_do )
       !
       IF(lwp) THEN                          ! control print

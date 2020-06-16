@@ -1,58 +1,74 @@
 \documentclass[../main/NEMO_manual]{subfiles}
 
 \begin{document}
-% ================================================================
-% Chapter stochastic parametrization of EOS (STO)
-% ================================================================
+
 \chapter{Stochastic Parametrization of EOS (STO)}
 \label{chap:STO}
 
-Authors: P.-A. Bouttier
+\thispagestyle{plain}
 
-\minitoc
+\chaptertoc
 
-\newpage
+\paragraph{Changes record} ~\\
 
-The stochastic parametrization module aims to explicitly simulate uncertainties in the model.
-More particularly, \cite{Brankart_OM2013} has shown that,
-because of the nonlinearity of the seawater equation of state, unresolved scales represent a major source of
-uncertainties in the computation of the large scale horizontal density gradient (from T/S large scale fields),
-and that the impact of these uncertainties can be simulated by
-random processes representing unresolved T/S fluctuations.
+{\footnotesize
+  \begin{tabularx}{\textwidth}{l||X|X}
+    Release & Author(s) & Modifications \\
+    \hline
+    {\em   4.0} & {\em ...} & {\em ...} \\
+    {\em   3.6} & {\em ...} & {\em ...} \\
+    {\em   3.4} & {\em ...} & {\em ...} \\
+    {\em <=3.4} & {\em ...} & {\em ...}
+  \end{tabularx}
+}
 
-The stochastic formulation of the equation of state can be written as:
+% \vfill
+% \begin{figure}[b]
+%% =================================================================================================
+% \subsubsection*{Changes record}
+% \begin{tabular}{l||l|m{0.65\linewidth}}
+%    Release   & Author        & Modifications \\
+%    {\em 4.0.1} & {\em C. Levy} & {\em 4.0.1 update}  \\
+%    {\em 3.6} & {\em P.-A. Bouttier} & {\em initial version}  \\
+% \end{tabular}
+% \end{figure}
+
+\clearpage
+
+As a result of the nonlinearity of the seawater equation of state, unresolved scales represent a major source of uncertainties in the computation of the large-scale horizontal density gradient from the large-scale temperature and salinity fields. Following  \cite{brankart_OM13}, the impact of these uncertainties can be simulated by random processes representing unresolved T/S fluctuations. The Stochastic Parametrization of EOS (STO) module implements this parametrization.
+
+As detailed in \cite{brankart_OM13}, the stochastic formulation of the equation of state can be written as:
 \begin{equation}
-  \label{eq:eos_sto}
+  \label{eq:STO_eos_sto}
   \rho = \frac{1}{2} \sum_{i=1}^m\{ \rho[T+\Delta T_i,S+\Delta S_i,p_o(z)] + \rho[T-\Delta T_i,S-\Delta S_i,p_o(z)] \}
 \end{equation}
 where $p_o(z)$ is the reference pressure depending on the depth and,
-$\Delta T_i$ and $\Delta S_i$ are a set of T/S perturbations defined as
+$\Delta T_i$ and $\Delta S_i$ (i=1,m) is a set of T/S perturbations defined as
 the scalar product of the respective local T/S gradients with random walks $\mathbf{\xi}$:
 \begin{equation}
-  \label{eq:sto_pert}
+  \label{eq:STO_sto_pert}
   \Delta T_i = \mathbf{\xi}_i \cdot \nabla T \qquad \hbox{and} \qquad \Delta S_i = \mathbf{\xi}_i \cdot \nabla S
 \end{equation}
-$\mathbf{\xi}_i$ are produced by a first-order autoregressive processes (AR-1) with
+$\mathbf{\xi}_i$ are produced by a first-order autoregressive process (AR-1) with
 a parametrized decorrelation time scale, and horizontal and vertical standard deviations $\sigma_s$.
 $\mathbf{\xi}$ are uncorrelated over the horizontal and fully correlated along the vertical.
 
-
+%% =================================================================================================
 \section{Stochastic processes}
 \label{sec:STO_the_details}
 
-The starting point of our implementation of stochastic parameterizations in NEMO is to observe that
-many existing parameterizations are based on autoregressive processes,
+There are many existing parameterizations based on autoregressive processes,
 which are used as a basic source of randomness to transform a deterministic model into a probabilistic model.
-A generic approach is thus to add one single new module in NEMO,
-generating processes with appropriate statistics to simulate each kind of uncertainty in the model
-(see \cite{Brankart_al_GMD2015} for more details).
+The generic approach here is to a new STO module,
+generating processes features with appropriate statistics to simulate these uncertainties in the model
+(see \cite{brankart.candille.ea_GMD15} for more details).
 
-In practice, at every model grid point,
+In practice, at each model grid point,
 independent Gaussian autoregressive processes~$\xi^{(i)},\,i=1,\ldots,m$ are first generated using
 the same basic equation:
 
 \begin{equation}
-  \label{eq:autoreg}
+  \label{eq:STO_autoreg}
   \xi^{(i)}_{k+1} = a^{(i)} \xi^{(i)}_k + b^{(i)} w^{(i)} + c^{(i)}
 \end{equation}
 
@@ -62,12 +78,11 @@ $a^{(i)}$, $b^{(i)}$, $c^{(i)}$ are parameters defining the mean ($\mu^{(i)}$) s
 correlation timescale ($\tau^{(i)}$) of each process:
 
 \begin{itemize}
-\item
-  for order~1 processes, $w^{(i)}$ is a Gaussian white noise, with zero mean and standard deviation equal to~1,
+\item for order~1 processes, $w^{(i)}$ is a Gaussian white noise, with zero mean and standard deviation equal to~1,
   and the parameters $a^{(i)}$, $b^{(i)}$, $c^{(i)}$ are given by:
 
   \[
-    % \label{eq:ord1}
+    % \label{eq:STO_ord1}
     \left\{
       \begin{array}{l}
         a^{(i)} = \varphi \\
@@ -77,14 +92,13 @@ correlation timescale ($\tau^{(i)}$) of each process:
     \right.
   \]
 
-\item
-  for order~$n>1$ processes, $w^{(i)}$ is an order~$n-1$ autoregressive process, with zero mean,
+\item for order~$n>1$ processes, $w^{(i)}$ is an order~$n-1$ autoregressive process, with zero mean,
   standard deviation equal to~$\sigma^{(i)}$;
   correlation timescale equal to~$\tau^{(i)}$;
   and the parameters $a^{(i)}$, $b^{(i)}$, $c^{(i)}$ are given by:
 
   \begin{equation}
-    \label{eq:ord2}
+    \label{eq:STO_ord2}
     \left\{
       \begin{array}{l}
         a^{(i)} = \varphi \\
@@ -100,78 +114,96 @@ correlation timescale ($\tau^{(i)}$) of each process:
 
 \noindent
 In this way, higher order processes can be easily generated recursively using the same piece of code implementing
-(\autoref{eq:autoreg}), and using succesively processes from order $0$ to~$n-1$ as~$w^{(i)}$.
-The parameters in (\autoref{eq:ord2}) are computed so that this recursive application of
-(\autoref{eq:autoreg}) leads to processes with the required standard deviation and correlation timescale,
+\autoref{eq:STO_autoreg}, and using successive processes from order $0$ to~$n-1$ as~$w^{(i)}$.
+The parameters in \autoref{eq:STO_ord2} are computed so that this recursive application of
+\autoref{eq:STO_autoreg} leads to processes with the required standard deviation and correlation timescale,
 with the additional condition that the $n-1$ first derivatives of the autocorrelation function are equal to
-zero at~$t=0$, so that the resulting processes become smoother and smoother as $n$ is increased.
+zero at~$t=0$, so that the resulting processes become smoother and smoother as $n$ increases.
 
 Overall, this method provides quite a simple and generic way of generating a wide class of stochastic processes.
 However, this also means that new model parameters are needed to specify each of these stochastic processes.
-As in any parameterization of lacking physics, a very important issues then to tune these new parameters using
+As in any parameterization, the main issue is to tune the parameters using
 either first principles, model simulations, or real-world observations.
+The parameters are set by default as described in \cite{brankart_OM13}, which has been shown in the paper
+to give good results for a global low resolution (2°) \NEMO\ configuration. where this parametrization produces a major effect on the average large-scale circulation, especilally in regions of intense mesoscale activity.
+The set of parameters will need further investigation to find appropriate values
+for any other configuration or resolution of the model.
 
+%% =================================================================================================
 \section{Implementation details}
 \label{sec:STO_thech_details}
 
-%---------------------------------------namsbc--------------------------------------------------
+The code implementing stochastic parametrisation is located in the src/OCE/STO directory.
+It contains three modules :
+% \begin{description}
 
-\nlst{namsto}
-%--------------------------------------------------------------------------------------------------------------
+\mdl{stopar} : define the Stochastic parameters and their time evolution
 
-The computer code implementing stochastic parametrisations can be found in the STO directory.
-It involves three modules : 
-\begin{description}
-\item[\mdl{stopar}:]
-  define the Stochastic parameters and their time evolution.
-\item[\mdl{storng}:]
-  a random number generator based on (and includes) the 64-bit KISS (Keep It Simple Stupid) random number generator
-  distributed by George Marsaglia
-  (see \href{https://groups.google.com/forum/#!searchin/comp.lang.fortran/64-bit$20KISS$20RNGs}{here})
-\item[\mdl{stopts}:]
-  stochastic parametrisation associated with the non-linearity of the equation of seawater,
-  implementing \autoref{eq:sto_pert} and specific piece of code in
-  the equation of state implementing \autoref{eq:eos_sto}.
-\end{description}
+\mdl{storng} : random number generator based on and including the 64-bit KISS (Keep It Simple Stupid) random number generator distributed by George Marsaglia
 
-The \mdl{stopar} module has 3 public routines to be called by the model (in our case, NEMO):
+\mdl{stopts} : stochastic parametrisation associated with the non-linearity of the equation of
+ seawater, implementing \autoref{eq:STO_sto_pert} so as specifics in the equation of state
+ implementing \autoref{eq:STO_eos_sto}.
+% \end{description}
 
-The first routine (\rou{sto\_par}) is a direct implementation of (\autoref{eq:autoreg}),
+The \mdl{stopar} module includes three public routines called in the model:
+
+(\rou{sto\_par}) is a direct implementation of \autoref{eq:STO_autoreg},
 applied at each model grid point (in 2D or 3D), and called at each model time step ($k$) to
 update every autoregressive process ($i=1,\ldots,m$).
 This routine also includes a filtering operator, applied to $w^{(i)}$,
 to introduce a spatial correlation between the stochastic processes.
 
-The second routine (\rou{sto\_par\_init}) is an initialization routine mainly dedicated to
-the computation of parameters $a^{(i)}, b^{(i)}, c^{(i)}$ for each autoregressive process,
+(\rou{sto\_par\_init}) is the initialization routine computing
+the values $a^{(i)}, b^{(i)}, c^{(i)}$ for each autoregressive process,
 as a function of the statistical properties required by the model user
-(mean, standard deviation, time correlation, order of the process,\ldots). 
-
-Parameters for the processes can be specified through the following \ngn{namsto} namelist parameters:
-\begin{description}
-\item[\np{nn\_sto\_eos}:]   number of independent random walks
-\item[\np{rn\_eos\_stdxy}:] random walk horz. standard deviation (in grid points)
-\item[\np{rn\_eos\_stdz}:]  random walk vert. standard deviation (in grid points)
-\item[\np{rn\_eos\_tcor}:]  random walk time correlation (in timesteps)
-\item[\np{nn\_eos\_ord}:]   order of autoregressive processes
-\item[\np{nn\_eos\_flt}:]   passes of Laplacian filter
-\item[\np{rn\_eos\_lim}:]   limitation factor (default = 3.0)
-\end{description}
+(mean, standard deviation, time correlation, order of the process,\ldots).
 This routine also includes the initialization (seeding) of the random number generator.
 
-The third routine (\rou{sto\_rst\_write}) writes a restart file
-(which suffix name is given by \np{cn\_storst\_out} namelist parameter) containing the current value of
-all autoregressive processes to allow restarting a simulation from where it has been interrupted.
-This file also contains the current state of the random number generator.
-When \np{ln\_rststo} is set to \forcode{.true.}),
-the restart file (which suffix name is given by \np{cn\_storst\_in} namelist parameter) is read by
+(\rou{sto\_rst\_write}) writes a restart file
+(which suffix name is given by \np{cn_storst_out}{cn\_storst\_out} namelist parameter) containing the current value of
+all autoregressive processes to allow creating the file needed for a restart.
+This restart file also contains the current state of the random number generator.
+When \np{ln_rststo}{ln\_rststo} is set to \forcode{.true.}),
+the restart file (which suffix name is given by \np{cn_storst_in}{cn\_storst\_in} namelist parameter) is read by
 the initialization routine (\rou{sto\_par\_init}).
 The simulation will continue exactly as if it was not interrupted only
-when \np{ln\_rstseed} is set to \forcode{.true.},
-\ie when the state of the random number generator is read in the restart file.
+when \np{ln_rstseed}{ln\_rstseed} is set to \forcode{.true.},
+\ie\ when the state of the random number generator is read in the restart file.\\
 
-\biblio
+The implementation includes the basics for a few possible stochastic parametrisations including equation of state,
+lateral diffusion, horizontal pressure gradient, ice strength, trend, tracers dynamics.
+As for this release, only the stochastic parametrisation of equation of state is fully available and tested. \\
 
-\pindex
+Options and parameters \\
+
+The \np{ln_sto_eos}{ln\_sto\_eos} namelist variable activates stochastic parametrisation of equation of state.
+By default it set to \forcode{.false.}) and not active.
+The set of parameters is available in \nam{sto}{sto} namelist
+(only the subset for equation of state stochastic parametrisation is listed below):
+
+\begin{listing}
+  \nlst{namsto}
+  \caption{\forcode{&namsto}}
+  \label{lst:namsto}
+\end{listing}
+
+The variables of stochastic paramtetrisation itself (based on the global 2° experiments as in \cite{brankart_OM13} are:
+
+\begin{description}
+\item [{\np{nn_sto_eos}{nn\_sto\_eos}:}]     number of independent random walks
+\item [{\np{rn_eos_stdxy}{rn\_eos\_stdxy}:}] random walk horizontal standard deviation
+  (in grid points)
+\item [{\np{rn_eos_stdz}{rn\_eos\_stdz}:}]   random walk vertical standard deviation
+  (in grid points)
+\item [{\np{rn_eos_tcor}{rn\_eos\_tcor}:}]   random walk time correlation (in timesteps)
+\item [{\np{nn_eos_ord}{nn\_eos\_ord}:}]     order of autoregressive processes
+\item [{\np{nn_eos_flt}{nn\_eos\_flt}:}]     passes of Laplacian filter
+\item [{\np{rn_eos_lim}{rn\_eos\_lim}:}]     limitation factor (default = 3.0)
+\end{description}
+
+The first four parameters define the stochastic part of equation of state.
+
+\subinc{\input{../../global/epilogue}}
 
 \end{document}

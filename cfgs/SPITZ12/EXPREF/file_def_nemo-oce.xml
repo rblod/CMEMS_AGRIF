@@ -80,19 +80,19 @@
 
         <file id="file15" name_suffix="_scalar" description="scalar variables" >
           <!-- global drifts (conservation checks) -->
-          <field field_ref="bgtemper"     grid_ref="grid_1point"   name="bgtemper"    />
-          <field field_ref="bgsaline"     grid_ref="grid_1point"   name="bgsaline"    />
-          <field field_ref="bgheatco"     grid_ref="grid_1point"   name="bgheatco"    />
-          <field field_ref="bgheatfx"     grid_ref="grid_1point"   name="bgheatfx"    />
-          <field field_ref="bgsaltco"     grid_ref="grid_1point"   name="bgsaltco"    />
-          <field field_ref="bgvolssh"     grid_ref="grid_1point"   name="bgvolssh"    />
-          <field field_ref="bgvole3t"     grid_ref="grid_1point"   name="bgvole3t"    />
+          <field field_ref="bgtemper"     name="bgtemper"    />
+          <field field_ref="bgsaline"     name="bgsaline"    />
+          <field field_ref="bgheatco"     name="bgheatco"    />
+          <field field_ref="bgheatfx"     name="bgheatfx"    />
+          <field field_ref="bgsaltco"     name="bgsaltco"    />
+          <field field_ref="bgvolssh"     name="bgvolssh"    />
+          <field field_ref="bgvole3t"     name="bgvole3t"    />
 
           <!-- global surface forcings  -->
-          <field field_ref="bgfrcvol"     grid_ref="grid_1point"   name="bgfrcvol"    />
-          <field field_ref="bgfrctem"     grid_ref="grid_1point"   name="bgfrctem"    />
-          <field field_ref="bgfrchfx"     grid_ref="grid_1point"   name="bgfrchfx"    />
-          <field field_ref="bgfrcsal"     grid_ref="grid_1point"   name="bgfrcsal"    />
+          <field field_ref="bgfrcvol"     name="bgfrcvol"    />
+          <field field_ref="bgfrctem"     name="bgfrctem"    />
+          <field field_ref="bgfrchfx"     name="bgfrchfx"    />
+          <field field_ref="bgfrcsal"     name="bgfrcsal"    />
         </file>
 
       </file_group> 

@@ -45,7 +45,8 @@ depending on their type and status.
  |namelist <br/> __n__         | bn_  | sn_  | in_  | kn_  | rn_  | dn_  | ln_  | cn_  | yn_  | tn_  |
  |dummy argument <br/> __d__   | bd_  | sd_  | id_  | kd_  | rd_  | dd_  | ld_  | cd_  | yd_  | td_  |
  |local <br/> __l__            | bl_  | sl_  | il_  | kl_  | rl_  | dl_  | ll_  | cl_  | yl_  | tl_  |
- |loop control       |      |      | j?   |      |      |      |      |      |      |      |
+ |function result <br/> __f__  | bf_  | sf_  | if_  | kf_  | rf_  | df_  | lf_  | cf_  | yf_  | tf_  |
+ |loop control                 |      |      | j?   |      |      |      |      |      |      |      |
 
 # Naming conventions : structure {#namstr}
 The structure name should be written in capital letter, and start with

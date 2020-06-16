@@ -6,10 +6,6 @@ MODULE flo_oce
    !! History :   OPA  ! 1999-10  (CLIPPER projet)
    !!   NEMO      1.0  ! 2002-11  (G. Madec, A. Bozec)  F90: Free form and module
    !!----------------------------------------------------------------------
-#if   defined   key_floats
-   !!----------------------------------------------------------------------
-   !!   'key_floats'                                        drifting floats
-   !!----------------------------------------------------------------------
    USE par_oce         ! ocean parameters
    USE in_out_manager  ! I/O manager
    USE lib_mpp         ! MPP library
@@ -19,10 +15,9 @@ MODULE flo_oce
 
    PUBLIC   flo_oce_alloc   ! Routine called in floats.F90
 
-   LOGICAL, PUBLIC, PARAMETER ::   lk_floats = .TRUE.    !: float flag
-
    !! float parameters
    !! ----------------
+   LOGICAL, PUBLIC ::   ln_floats   !: Activate floats or not
    INTEGER, PUBLIC ::   jpnfl       !: total number of floats during the run
    INTEGER, PUBLIC ::   jpnnewflo   !: number of floats added in a new run
    INTEGER, PUBLIC ::   jpnrstflo   !: number of floats for the restart
@@ -50,7 +45,7 @@ MODULE flo_oce
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: flo_oce.F90 10425 2018-12-19 21:54:16Z smasson $ 
+   !! $Id: flo_oce.F90 11536 2019-09-11 13:54:18Z smasson $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -66,13 +61,6 @@ CONTAINS
       CALL mpp_sum ( 'flo_oce', flo_oce_alloc )
       IF( flo_oce_alloc /= 0 )   CALL ctl_stop( 'STOP', 'flo_oce_alloc: failed to allocate arrays' )
    END FUNCTION flo_oce_alloc
-
-#else
-   !!----------------------------------------------------------------------
-   !!   Default option :                                 NO drifting floats
-   !!----------------------------------------------------------------------
-   LOGICAL, PUBLIC, PARAMETER ::   lk_floats = .FALSE.   !: float flag
-#endif
 
    !!======================================================================
 END MODULE flo_oce

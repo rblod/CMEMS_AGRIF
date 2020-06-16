@@ -31,6 +31,7 @@ MODULE icevar
    !!                        - vt_i(jpi,jpj)
    !!                        - vt_s(jpi,jpj)
    !!                        - at_i(jpi,jpj)
+   !!                        - st_i(jpi,jpj)
    !!                        - et_s(jpi,jpj)  total snow heat content
    !!                        - et_i(jpi,jpj)  total ice thermal content 
    !!                        - sm_i(jpi,jpj)  mean ice salinity
@@ -43,12 +44,12 @@ MODULE icevar
    !!   ice_var_salprof   : salinity profile in the ice
    !!   ice_var_salprof1d : salinity profile in the ice 1D
    !!   ice_var_zapsmall  : remove very small area and volume
-   !!   ice_var_zapneg    : remove negative ice fields (to debug the advection scheme UM3-5)
-   !!   ice_var_itd       : convert 1-cat to jpl-cat
-   !!   ice_var_itd2      : convert N-cat to jpl-cat
+   !!   ice_var_zapneg    : remove negative ice fields
+   !!   ice_var_roundoff  : remove negative values arising from roundoff erros
    !!   ice_var_bv        : brine volume
    !!   ice_var_enthalpy  : compute ice and snow enthalpies from temperature
    !!   ice_var_sshdyn    : compute equivalent ssh in lead
+   !!   ice_var_itd       : convert N-cat to M-cat
    !!----------------------------------------------------------------------
    USE dom_oce        ! ocean space and time domain
    USE phycst         ! physical constants (ocean directory) 
@@ -70,15 +71,21 @@ MODULE icevar
    PUBLIC   ice_var_salprof1d    
    PUBLIC   ice_var_zapsmall
    PUBLIC   ice_var_zapneg
-   PUBLIC   ice_var_itd
-   PUBLIC   ice_var_itd2
+   PUBLIC   ice_var_roundoff
    PUBLIC   ice_var_bv           
    PUBLIC   ice_var_enthalpy           
    PUBLIC   ice_var_sshdyn
+   PUBLIC   ice_var_itd
 
+   INTERFACE ice_var_itd
+      MODULE PROCEDURE ice_var_itd_1c1c, ice_var_itd_Nc1c, ice_var_itd_1cMc, ice_var_itd_NcMc
+   END INTERFACE
+
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/ICE 4.0 , NEMO Consortium (2018)
-   !! $Id: icevar.F90 10555 2019-01-22 11:36:01Z clem $
+   !! $Id: icevar.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -98,25 +105,31 @@ CONTAINS
       !!-------------------------------------------------------------------
       !
       !                                      ! integrated values
-      vt_i(:,:) =       SUM( v_i(:,:,:)           , dim=3 )
-      vt_s(:,:) =       SUM( v_s(:,:,:)           , dim=3 )
-      at_i(:,:) =       SUM( a_i(:,:,:)           , dim=3 )
-      et_s(:,:)  = SUM( SUM( e_s(:,:,:,:), dim=4 ), dim=3 )
-      et_i(:,:)  = SUM( SUM( e_i(:,:,:,:), dim=4 ), dim=3 )
+      vt_i(:,:) =       SUM( v_i (:,:,:)           , dim=3 )
+      vt_s(:,:) =       SUM( v_s (:,:,:)           , dim=3 )
+      st_i(:,:) =       SUM( sv_i(:,:,:)           , dim=3 )
+      at_i(:,:) =       SUM( a_i (:,:,:)           , dim=3 )
+      et_s(:,:)  = SUM( SUM( e_s (:,:,:,:), dim=4 ), dim=3 )
+      et_i(:,:)  = SUM( SUM( e_i (:,:,:,:), dim=4 ), dim=3 )
       !
       at_ip(:,:) = SUM( a_ip(:,:,:), dim=3 ) ! melt ponds
       vt_ip(:,:) = SUM( v_ip(:,:,:), dim=3 )
       !
       ato_i(:,:) = 1._wp - at_i(:,:)         ! open water fraction  
-
+      !
+      !!GS: tm_su always needed by ABL over sea-ice
+      ALLOCATE( z1_at_i(jpi,jpj) )
+      WHERE( at_i(:,:) > epsi20 )   ;   z1_at_i(:,:) = 1._wp / at_i(:,:)
+      ELSEWHERE                     ;   z1_at_i(:,:) = 0._wp
+      END WHERE
+      tm_su(:,:) = SUM( t_su(:,:,:) * a_i(:,:,:) , dim=3 ) * z1_at_i(:,:)
+      WHERE( at_i(:,:)<=epsi20 ) tm_su(:,:) = rt0
+      !
       ! The following fields are calculated for diagnostics and outputs only
       ! ==> Do not use them for other purposes
       IF( kn > 1 ) THEN
          !
-         ALLOCATE( z1_at_i(jpi,jpj) , z1_vt_i(jpi,jpj) , z1_vt_s(jpi,jpj) )
-         WHERE( at_i(:,:) > epsi20 )   ;   z1_at_i(:,:) = 1._wp / at_i(:,:)
-         ELSEWHERE                     ;   z1_at_i(:,:) = 0._wp
-         END WHERE
+         ALLOCATE( z1_vt_i(jpi,jpj) , z1_vt_s(jpi,jpj) )
          WHERE( vt_i(:,:) > epsi20 )   ;   z1_vt_i(:,:) = 1._wp / vt_i(:,:)
          ELSEWHERE                     ;   z1_vt_i(:,:) = 0._wp
          END WHERE
@@ -129,10 +142,9 @@ CONTAINS
          hm_s(:,:) = vt_s(:,:) * z1_at_i(:,:)
          !         
          !                          ! mean temperature (K), salinity and age
-         tm_su(:,:) = SUM( t_su(:,:,:) * a_i(:,:,:) , dim=3 ) * z1_at_i(:,:)
          tm_si(:,:) = SUM( t_si(:,:,:) * a_i(:,:,:) , dim=3 ) * z1_at_i(:,:)
          om_i (:,:) = SUM( oa_i(:,:,:)              , dim=3 ) * z1_at_i(:,:)
-         sm_i (:,:) = SUM( sv_i(:,:,:)              , dim=3 ) * z1_vt_i(:,:)
+         sm_i (:,:) =      st_i(:,:)                          * z1_vt_i(:,:)
          !
          tm_i(:,:) = 0._wp
          tm_s(:,:) = 0._wp
@@ -147,14 +159,21 @@ CONTAINS
          !
          !                           ! put rt0 where there is no ice
          WHERE( at_i(:,:)<=epsi20 )
-            tm_su(:,:) = rt0
             tm_si(:,:) = rt0
             tm_i (:,:) = rt0
             tm_s (:,:) = rt0
          END WHERE
-
-         DEALLOCATE( z1_at_i , z1_vt_i , z1_vt_s )
+         !
+         !                           ! mean melt pond depth
+         WHERE( at_ip(:,:) > epsi20 )   ;   hm_ip(:,:) = vt_ip(:,:) / at_ip(:,:)
+         ELSEWHERE                      ;   hm_ip(:,:) = 0._wp
+         END WHERE         
+         !
+         DEALLOCATE( z1_vt_i , z1_vt_s )
+         !
       ENDIF
+      !
+      DEALLOCATE( z1_at_i )
       !
    END SUBROUTINE ice_var_agg
 
@@ -223,24 +242,20 @@ CONTAINS
       !-------------------
       zlay_i   = REAL( nlay_i , wp )    ! number of layers
       DO jl = 1, jpl
-         DO jk = 1, nlay_i
-            DO jj = 1, jpj
-               DO ji = 1, jpi
-                  IF ( v_i(ji,jj,jl) > epsi20 ) THEN     !--- icy area 
-                     !
-                     ze_i             =   e_i (ji,jj,jk,jl) * z1_v_i(ji,jj,jl) * zlay_i               ! Energy of melting e(S,T) [J.m-3]
-                     ztmelts          = - sz_i(ji,jj,jk,jl) * rTmlt                                 ! Ice layer melt temperature [C]
-                     ! Conversion q(S,T) -> T (second order equation)
-                     zbbb             = ( rcp - rcpi ) * ztmelts + ze_i * r1_rhoi - rLfus
-                     zccc             = SQRT( MAX( zbbb * zbbb - 4._wp * rcpi * rLfus * ztmelts , 0._wp) )
-                     t_i(ji,jj,jk,jl) = MAX( -100._wp , MIN( -( zbbb + zccc ) * 0.5_wp * r1_rcpi , ztmelts ) ) + rt0   ! [K] with bounds: -100 < t_i < ztmelts
-                     !
-                  ELSE                                !--- no ice
-                     t_i(ji,jj,jk,jl) = rt0
-                  ENDIF
-               END DO
-            END DO
-         END DO
+         DO_3D_11_11( 1, nlay_i )
+            IF ( v_i(ji,jj,jl) > epsi20 ) THEN     !--- icy area 
+               !
+               ze_i             =   e_i (ji,jj,jk,jl) * z1_v_i(ji,jj,jl) * zlay_i             ! Energy of melting e(S,T) [J.m-3]
+               ztmelts          = - sz_i(ji,jj,jk,jl) * rTmlt                                 ! Ice layer melt temperature [C]
+               ! Conversion q(S,T) -> T (second order equation)
+               zbbb             = ( rcp - rcpi ) * ztmelts + ze_i * r1_rhoi - rLfus
+               zccc             = SQRT( MAX( zbbb * zbbb - 4._wp * rcpi * rLfus * ztmelts , 0._wp) )
+               t_i(ji,jj,jk,jl) = MAX( -100._wp , MIN( -( zbbb + zccc ) * 0.5_wp * r1_rcpi , ztmelts ) ) + rt0   ! [K] with bounds: -100 < t_i < ztmelts
+               !
+            ELSE                                   !--- no ice
+               t_i(ji,jj,jk,jl) = rt0
+            ENDIF
+         END_3D
       END DO
 
       !--------------------
@@ -257,9 +272,9 @@ CONTAINS
       END DO
       !
       ! integrated values 
-      vt_i (:,:) = SUM( v_i, dim=3 )
-      vt_s (:,:) = SUM( v_s, dim=3 )
-      at_i (:,:) = SUM( a_i, dim=3 )
+      vt_i (:,:) = SUM( v_i , dim=3 )
+      vt_s (:,:) = SUM( v_s , dim=3 )
+      at_i (:,:) = SUM( a_i , dim=3 )
       !
    END SUBROUTINE ice_var_glo2eqv
 
@@ -331,27 +346,21 @@ CONTAINS
          !
          z1_dS = 1._wp / ( zsi1 - zsi0 )
          DO jl = 1, jpl
-            DO jj = 1, jpj
-               DO ji = 1, jpi
-                  zalpha(ji,jj,jl) = MAX(  0._wp , MIN( ( zsi1 - s_i(ji,jj,jl) ) * z1_dS , 1._wp )  )
-                  !                             ! force a constant profile when SSS too low (Baltic Sea)
-                  IF( 2._wp * s_i(ji,jj,jl) >= sss_m(ji,jj) )   zalpha(ji,jj,jl) = 0._wp  
-               END DO
-            END DO
+            DO_2D_11_11
+               zalpha(ji,jj,jl) = MAX(  0._wp , MIN( ( zsi1 - s_i(ji,jj,jl) ) * z1_dS , 1._wp )  )
+               !                             ! force a constant profile when SSS too low (Baltic Sea)
+               IF( 2._wp * s_i(ji,jj,jl) >= sss_m(ji,jj) )   zalpha(ji,jj,jl) = 0._wp  
+            END_2D
          END DO
          !
          ! Computation of the profile
          DO jl = 1, jpl
-            DO jk = 1, nlay_i
-               DO jj = 1, jpj
-                  DO ji = 1, jpi
-                     !                          ! linear profile with 0 surface value
-                     zs0 = z_slope_s(ji,jj,jl) * ( REAL(jk,wp) - 0.5_wp ) * h_i(ji,jj,jl) * r1_nlay_i
-                     zs  = zalpha(ji,jj,jl) * zs0 + ( 1._wp - zalpha(ji,jj,jl) ) * s_i(ji,jj,jl)     ! weighting the profile
-                     sz_i(ji,jj,jk,jl) = MIN( rn_simax, MAX( zs, rn_simin ) )
-                  END DO
-               END DO
-            END DO
+            DO_3D_11_11( 1, nlay_i )
+               !                          ! linear profile with 0 surface value
+               zs0 = z_slope_s(ji,jj,jl) * ( REAL(jk,wp) - 0.5_wp ) * h_i(ji,jj,jl) * r1_nlay_i
+               zs  = zalpha(ji,jj,jl) * zs0 + ( 1._wp - zalpha(ji,jj,jl) ) * s_i(ji,jj,jl)     ! weighting the profile
+               sz_i(ji,jj,jk,jl) = MIN( rn_simax, MAX( zs, rn_simin ) )
+            END_3D
          END DO
          !
          DEALLOCATE( z_slope_s , zalpha )
@@ -476,59 +485,55 @@ CONTAINS
          !-----------------------------------------------------------------
          ! Zap ice energy and use ocean heat to melt ice
          !-----------------------------------------------------------------
-         DO jk = 1, nlay_i
-            DO jj = 1 , jpj
-               DO ji = 1 , jpi
-                  ! update exchanges with ocean
-                  hfx_res(ji,jj)   = hfx_res(ji,jj) - (1._wp - zswitch(ji,jj) ) * e_i(ji,jj,jk,jl) * r1_rdtice ! W.m-2 <0
-                  e_i(ji,jj,jk,jl) = e_i(ji,jj,jk,jl) * zswitch(ji,jj)
-                  t_i(ji,jj,jk,jl) = t_i(ji,jj,jk,jl) * zswitch(ji,jj) + rt0 * ( 1._wp - zswitch(ji,jj) )
-               END DO
-            END DO
-         END DO
+         DO_3D_11_11( 1, nlay_i )
+            ! update exchanges with ocean
+            hfx_res(ji,jj)   = hfx_res(ji,jj) - (1._wp - zswitch(ji,jj) ) * e_i(ji,jj,jk,jl) * r1_Dt_ice ! W.m-2 <0
+            e_i(ji,jj,jk,jl) = e_i(ji,jj,jk,jl) * zswitch(ji,jj)
+            t_i(ji,jj,jk,jl) = t_i(ji,jj,jk,jl) * zswitch(ji,jj) + rt0 * ( 1._wp - zswitch(ji,jj) )
+         END_3D
          !
-         DO jk = 1, nlay_s
-            DO jj = 1 , jpj
-               DO ji = 1 , jpi
-                  ! update exchanges with ocean
-                  hfx_res(ji,jj)   = hfx_res(ji,jj) - (1._wp - zswitch(ji,jj) ) * e_s(ji,jj,jk,jl) * r1_rdtice ! W.m-2 <0
-                  e_s(ji,jj,jk,jl) = e_s(ji,jj,jk,jl) * zswitch(ji,jj)
-                  t_s(ji,jj,jk,jl) = t_s(ji,jj,jk,jl) * zswitch(ji,jj) + rt0 * ( 1._wp - zswitch(ji,jj) )
-               END DO
-            END DO
-         END DO
+         DO_3D_11_11( 1, nlay_s )
+            ! update exchanges with ocean
+            hfx_res(ji,jj)   = hfx_res(ji,jj) - (1._wp - zswitch(ji,jj) ) * e_s(ji,jj,jk,jl) * r1_Dt_ice ! W.m-2 <0
+            e_s(ji,jj,jk,jl) = e_s(ji,jj,jk,jl) * zswitch(ji,jj)
+            t_s(ji,jj,jk,jl) = t_s(ji,jj,jk,jl) * zswitch(ji,jj) + rt0 * ( 1._wp - zswitch(ji,jj) )
+         END_3D
          !
          !-----------------------------------------------------------------
          ! zap ice and snow volume, add water and salt to ocean
          !-----------------------------------------------------------------
-         DO jj = 1 , jpj
-            DO ji = 1 , jpi
-               ! update exchanges with ocean
-               sfx_res(ji,jj)  = sfx_res(ji,jj) + (1._wp - zswitch(ji,jj) ) * sv_i(ji,jj,jl)   * rhoi * r1_rdtice
-               wfx_res(ji,jj)  = wfx_res(ji,jj) + (1._wp - zswitch(ji,jj) ) * v_i (ji,jj,jl)   * rhoi * r1_rdtice
-               wfx_res(ji,jj)  = wfx_res(ji,jj) + (1._wp - zswitch(ji,jj) ) * v_s (ji,jj,jl)   * rhos * r1_rdtice
-               !
-               a_i  (ji,jj,jl) = a_i (ji,jj,jl) * zswitch(ji,jj)
-               v_i  (ji,jj,jl) = v_i (ji,jj,jl) * zswitch(ji,jj)
-               v_s  (ji,jj,jl) = v_s (ji,jj,jl) * zswitch(ji,jj)
-               t_su (ji,jj,jl) = t_su(ji,jj,jl) * zswitch(ji,jj) + t_bo(ji,jj) * ( 1._wp - zswitch(ji,jj) )
-               oa_i (ji,jj,jl) = oa_i(ji,jj,jl) * zswitch(ji,jj)
-               sv_i (ji,jj,jl) = sv_i(ji,jj,jl) * zswitch(ji,jj)
-               !
-               h_i (ji,jj,jl) = h_i (ji,jj,jl) * zswitch(ji,jj)
-               h_s (ji,jj,jl) = h_s (ji,jj,jl) * zswitch(ji,jj)
-               !
-               a_ip (ji,jj,jl) = a_ip (ji,jj,jl) * zswitch(ji,jj)
-               v_ip (ji,jj,jl) = v_ip (ji,jj,jl) * zswitch(ji,jj)
-               !
-            END DO
-         END DO
+         DO_2D_11_11
+            ! update exchanges with ocean
+            sfx_res(ji,jj)  = sfx_res(ji,jj) + (1._wp - zswitch(ji,jj) ) * sv_i(ji,jj,jl)   * rhoi * r1_Dt_ice
+            wfx_res(ji,jj)  = wfx_res(ji,jj) + (1._wp - zswitch(ji,jj) ) * v_i (ji,jj,jl)   * rhoi * r1_Dt_ice
+            wfx_res(ji,jj)  = wfx_res(ji,jj) + (1._wp - zswitch(ji,jj) ) * v_s (ji,jj,jl)   * rhos * r1_Dt_ice
+            !
+            a_i  (ji,jj,jl) = a_i (ji,jj,jl) * zswitch(ji,jj)
+            v_i  (ji,jj,jl) = v_i (ji,jj,jl) * zswitch(ji,jj)
+            v_s  (ji,jj,jl) = v_s (ji,jj,jl) * zswitch(ji,jj)
+            t_su (ji,jj,jl) = t_su(ji,jj,jl) * zswitch(ji,jj) + t_bo(ji,jj) * ( 1._wp - zswitch(ji,jj) )
+            oa_i (ji,jj,jl) = oa_i(ji,jj,jl) * zswitch(ji,jj)
+            sv_i (ji,jj,jl) = sv_i(ji,jj,jl) * zswitch(ji,jj)
+            !
+            h_i (ji,jj,jl) = h_i (ji,jj,jl) * zswitch(ji,jj)
+            h_s (ji,jj,jl) = h_s (ji,jj,jl) * zswitch(ji,jj)
+            !
+            a_ip (ji,jj,jl) = a_ip (ji,jj,jl) * zswitch(ji,jj)
+            v_ip (ji,jj,jl) = v_ip (ji,jj,jl) * zswitch(ji,jj)
+            !
+         END_2D
          !
       END DO 
 
       ! to be sure that at_i is the sum of a_i(jl)
-      at_i (:,:) = SUM( a_i(:,:,:), dim=3 )
-      vt_i (:,:) = SUM( v_i(:,:,:), dim=3 )
+      at_i (:,:) = SUM( a_i (:,:,:), dim=3 )
+      vt_i (:,:) = SUM( v_i (:,:,:), dim=3 )
+!!clem add?
+!      vt_s (:,:) = SUM( v_s (:,:,:), dim=3 )
+!      st_i (:,:) = SUM( sv_i(:,:,:), dim=3 )
+!      et_s(:,:)  = SUM( SUM( e_s (:,:,:,:), dim=4 ), dim=3 )
+!      et_i(:,:)  = SUM( SUM( e_i (:,:,:,:), dim=4 ), dim=3 )
+!!clem
 
       ! open water = 1 if at_i=0
       WHERE( at_i(:,:) == 0._wp )   ato_i(:,:) = 1._wp
@@ -536,14 +541,13 @@ CONTAINS
    END SUBROUTINE ice_var_zapsmall
 
 
-   SUBROUTINE ice_var_zapneg( pato_i, pv_i, pv_s, psv_i, poa_i, pa_i, pa_ip, pv_ip, pe_s, pe_i )
+   SUBROUTINE ice_var_zapneg( pdt, pato_i, pv_i, pv_s, psv_i, poa_i, pa_i, pa_ip, pv_ip, pe_s, pe_i )
       !!-------------------------------------------------------------------
       !!                   ***  ROUTINE ice_var_zapneg ***
       !!
       !! ** Purpose :   Remove negative sea ice fields and correct fluxes
       !!-------------------------------------------------------------------
-      INTEGER  ::   ji, jj, jl, jk   ! dummy loop indices
-      !
+      REAL(wp)                    , INTENT(in   ) ::   pdt        ! tracer time-step
       REAL(wp), DIMENSION(:,:)    , INTENT(inout) ::   pato_i     ! open water area
       REAL(wp), DIMENSION(:,:,:)  , INTENT(inout) ::   pv_i       ! ice volume
       REAL(wp), DIMENSION(:,:,:)  , INTENT(inout) ::   pv_s       ! snw volume
@@ -554,55 +558,52 @@ CONTAINS
       REAL(wp), DIMENSION(:,:,:)  , INTENT(inout) ::   pv_ip      ! melt pond volume
       REAL(wp), DIMENSION(:,:,:,:), INTENT(inout) ::   pe_s       ! snw heat content
       REAL(wp), DIMENSION(:,:,:,:), INTENT(inout) ::   pe_i       ! ice heat content
+      !
+      INTEGER  ::   ji, jj, jl, jk   ! dummy loop indices
+      REAL(wp) ::   z1_dt
       !!-------------------------------------------------------------------
       !
+      z1_dt = 1._wp / pdt
       !
       DO jl = 1, jpl       !==  loop over the categories  ==!
          !
+         ! make sure a_i=0 where v_i<=0
+         WHERE( pv_i(:,:,:) <= 0._wp )   pa_i(:,:,:) = 0._wp
+
          !----------------------------------------
          ! zap ice energy and send it to the ocean
          !----------------------------------------
-         DO jk = 1, nlay_i
-            DO jj = 1 , jpj
-               DO ji = 1 , jpi
-                  IF( pe_i(ji,jj,jk,jl) < 0._wp .OR. pa_i(ji,jj,jl) < 0._wp ) THEN
-                     hfx_res(ji,jj)   = hfx_res(ji,jj) - pe_i(ji,jj,jk,jl) * r1_rdtice ! W.m-2 >0
-                     pe_i(ji,jj,jk,jl) = 0._wp
-                  ENDIF
-               END DO
-            END DO
-         END DO
+         DO_3D_11_11( 1, nlay_i )
+            IF( pe_i(ji,jj,jk,jl) < 0._wp .OR. pa_i(ji,jj,jl) <= 0._wp ) THEN
+               hfx_res(ji,jj)   = hfx_res(ji,jj) - pe_i(ji,jj,jk,jl) * z1_dt ! W.m-2 >0
+               pe_i(ji,jj,jk,jl) = 0._wp
+            ENDIF
+         END_3D
          !
-         DO jk = 1, nlay_s
-            DO jj = 1 , jpj
-               DO ji = 1 , jpi
-                  IF( pe_s(ji,jj,jk,jl) < 0._wp .OR. pa_i(ji,jj,jl) < 0._wp ) THEN
-                     hfx_res(ji,jj)   = hfx_res(ji,jj) - pe_s(ji,jj,jk,jl) * r1_rdtice ! W.m-2 <0
-                     pe_s(ji,jj,jk,jl) = 0._wp
-                  ENDIF
-               END DO
-            END DO
-         END DO
+         DO_3D_11_11( 1, nlay_s )
+            IF( pe_s(ji,jj,jk,jl) < 0._wp .OR. pa_i(ji,jj,jl) <= 0._wp ) THEN
+               hfx_res(ji,jj)   = hfx_res(ji,jj) - pe_s(ji,jj,jk,jl) * z1_dt ! W.m-2 <0
+               pe_s(ji,jj,jk,jl) = 0._wp
+            ENDIF
+         END_3D
          !
          !-----------------------------------------------------
          ! zap ice and snow volume, add water and salt to ocean
          !-----------------------------------------------------
-         DO jj = 1 , jpj
-            DO ji = 1 , jpi
-               IF( pv_i(ji,jj,jl) < 0._wp .OR. pa_i(ji,jj,jl) < 0._wp ) THEN
-                  wfx_res(ji,jj)    = wfx_res(ji,jj) + pv_i (ji,jj,jl) * rhoi * r1_rdtice
-                  pv_i   (ji,jj,jl) = 0._wp
-               ENDIF
-               IF( pv_s(ji,jj,jl) < 0._wp .OR. pa_i(ji,jj,jl) < 0._wp ) THEN
-                  wfx_res(ji,jj)    = wfx_res(ji,jj) + pv_s (ji,jj,jl) * rhos * r1_rdtice
-                  pv_s   (ji,jj,jl) = 0._wp
-               ENDIF
-               IF( psv_i(ji,jj,jl) < 0._wp .OR. pa_i(ji,jj,jl) < 0._wp ) THEN
-                  sfx_res(ji,jj)    = sfx_res(ji,jj) + psv_i(ji,jj,jl) * rhoi * r1_rdtice
-                  psv_i  (ji,jj,jl) = 0._wp
-               ENDIF
-            END DO
-         END DO
+         DO_2D_11_11
+            IF( pv_i(ji,jj,jl) < 0._wp .OR. pa_i(ji,jj,jl) <= 0._wp ) THEN
+               wfx_res(ji,jj)    = wfx_res(ji,jj) + pv_i (ji,jj,jl) * rhoi * z1_dt
+               pv_i   (ji,jj,jl) = 0._wp
+            ENDIF
+            IF( pv_s(ji,jj,jl) < 0._wp .OR. pa_i(ji,jj,jl) <= 0._wp ) THEN
+               wfx_res(ji,jj)    = wfx_res(ji,jj) + pv_s (ji,jj,jl) * rhos * z1_dt
+               pv_s   (ji,jj,jl) = 0._wp
+            ENDIF
+            IF( psv_i(ji,jj,jl) < 0._wp .OR. pa_i(ji,jj,jl) <= 0._wp .OR. pv_i(ji,jj,jl) <= 0._wp ) THEN
+               sfx_res(ji,jj)    = sfx_res(ji,jj) + psv_i(ji,jj,jl) * rhoi * z1_dt
+               psv_i  (ji,jj,jl) = 0._wp
+            ENDIF
+         END_2D
          !
       END DO 
       !
@@ -615,281 +616,38 @@ CONTAINS
       !
    END SUBROUTINE ice_var_zapneg
 
+
+   SUBROUTINE ice_var_roundoff( pa_i, pv_i, pv_s, psv_i, poa_i, pa_ip, pv_ip, pe_s, pe_i )
+      !!-------------------------------------------------------------------
+      !!                   ***  ROUTINE ice_var_roundoff ***
+      !!
+      !! ** Purpose :   Remove negative sea ice values arising from roundoff errors
+      !!-------------------------------------------------------------------
+      REAL(wp), DIMENSION(:,:)  , INTENT(inout) ::   pa_i       ! ice concentration
+      REAL(wp), DIMENSION(:,:)  , INTENT(inout) ::   pv_i       ! ice volume
+      REAL(wp), DIMENSION(:,:)  , INTENT(inout) ::   pv_s       ! snw volume
+      REAL(wp), DIMENSION(:,:)  , INTENT(inout) ::   psv_i      ! salt content
+      REAL(wp), DIMENSION(:,:)  , INTENT(inout) ::   poa_i      ! age content
+      REAL(wp), DIMENSION(:,:)  , INTENT(inout) ::   pa_ip      ! melt pond fraction
+      REAL(wp), DIMENSION(:,:)  , INTENT(inout) ::   pv_ip      ! melt pond volume
+      REAL(wp), DIMENSION(:,:,:), INTENT(inout) ::   pe_s       ! snw heat content
+      REAL(wp), DIMENSION(:,:,:), INTENT(inout) ::   pe_i       ! ice heat content
+      !!-------------------------------------------------------------------
+      !
+      WHERE( pa_i (1:npti,:)   < 0._wp .AND. pa_i (1:npti,:)   > -epsi10 )   pa_i (1:npti,:)   = 0._wp   !  a_i must be >= 0
+      WHERE( pv_i (1:npti,:)   < 0._wp .AND. pv_i (1:npti,:)   > -epsi10 )   pv_i (1:npti,:)   = 0._wp   !  v_i must be >= 0
+      WHERE( pv_s (1:npti,:)   < 0._wp .AND. pv_s (1:npti,:)   > -epsi10 )   pv_s (1:npti,:)   = 0._wp   !  v_s must be >= 0
+      WHERE( psv_i(1:npti,:)   < 0._wp .AND. psv_i(1:npti,:)   > -epsi10 )   psv_i(1:npti,:)   = 0._wp   ! sv_i must be >= 0
+      WHERE( poa_i(1:npti,:)   < 0._wp .AND. poa_i(1:npti,:)   > -epsi10 )   poa_i(1:npti,:)   = 0._wp   ! oa_i must be >= 0
+      WHERE( pe_i (1:npti,:,:) < 0._wp .AND. pe_i (1:npti,:,:) > -epsi06 )   pe_i (1:npti,:,:) = 0._wp   !  e_i must be >= 0
+      WHERE( pe_s (1:npti,:,:) < 0._wp .AND. pe_s (1:npti,:,:) > -epsi06 )   pe_s (1:npti,:,:) = 0._wp   !  e_s must be >= 0
+      IF( ln_pnd_H12 ) THEN
+         WHERE( pa_ip(1:npti,:) < 0._wp .AND. pa_ip(1:npti,:) > -epsi10 )    pa_ip(1:npti,:)   = 0._wp   ! a_ip must be >= 0
+         WHERE( pv_ip(1:npti,:) < 0._wp .AND. pv_ip(1:npti,:) > -epsi10 )    pv_ip(1:npti,:)   = 0._wp   ! v_ip must be >= 0
+      ENDIF
+      !
+   END SUBROUTINE ice_var_roundoff
    
-   SUBROUTINE ice_var_itd( zhti, zhts, zati, zh_i, zh_s, za_i )
-      !!-------------------------------------------------------------------
-      !!                ***  ROUTINE ice_var_itd   ***
-      !!
-      !! ** Purpose :  converting 1-cat ice to multiple ice categories
-      !!
-      !!                  ice thickness distribution follows a gaussian law
-      !!               around the concentration of the most likely ice thickness
-      !!                           (similar as iceistate.F90)
-      !!
-      !! ** Method:   Iterative procedure
-      !!                
-      !!               1) Try to fill the jpl ice categories (bounds hi_max(0:jpl)) with a gaussian
-      !!
-      !!               2) Check whether the distribution conserves area and volume, positivity and
-      !!                  category boundaries
-      !!              
-      !!               3) If not (input ice is too thin), the last category is empty and
-      !!                  the number of categories is reduced (jpl-1)
-      !!
-      !!               4) Iterate until ok (SUM(itest(:) = 4)
-      !!
-      !! ** Arguments : zhti: 1-cat ice thickness
-      !!                zhts: 1-cat snow depth
-      !!                zati: 1-cat ice concentration
-      !!
-      !! ** Output    : jpl-cat 
-      !!
-      !!  (Example of application: BDY forcings when input are cell averaged)  
-      !!-------------------------------------------------------------------
-      INTEGER  :: ji, jk, jl             ! dummy loop indices
-      INTEGER  :: idim, i_fill, jl0  
-      REAL(wp) :: zarg, zV, zconv, zdh, zdv
-      REAL(wp), DIMENSION(:),   INTENT(in)    ::   zhti, zhts, zati    ! input ice/snow variables
-      REAL(wp), DIMENSION(:,:), INTENT(inout) ::   zh_i, zh_s, za_i ! output ice/snow variables
-      INTEGER , DIMENSION(4)                  ::   itest
-      !!-------------------------------------------------------------------
-      !
-      ! ----------------------------------------
-      ! distribution over the jpl ice categories
-      ! ----------------------------------------
-      ! a gaussian distribution for ice concentration is used
-      ! then we check whether the distribution fullfills
-      ! volume and area conservation, positivity and ice categories bounds
-      idim = SIZE( zhti , 1 )
-      zh_i(1:idim,1:jpl) = 0._wp
-      zh_s(1:idim,1:jpl) = 0._wp
-      za_i(1:idim,1:jpl) = 0._wp
-      !
-      DO ji = 1, idim
-         !
-         IF( zhti(ji) > 0._wp ) THEN
-            !
-            ! find which category (jl0) the input ice thickness falls into
-            jl0 = jpl
-            DO jl = 1, jpl
-               IF ( ( zhti(ji) >= hi_max(jl-1) ) .AND. ( zhti(ji) < hi_max(jl) ) ) THEN
-                  jl0 = jl
-                  CYCLE
-               ENDIF
-            END DO
-            !
-            itest(:) = 0
-            i_fill   = jpl + 1                                            !------------------------------------
-            DO WHILE ( ( SUM( itest(:) ) /= 4 ) .AND. ( i_fill >= 2 ) )   ! iterative loop on i_fill categories
-               !                                                          !------------------------------------
-               i_fill = i_fill - 1
-               !
-               zh_i(ji,1:jpl) = 0._wp
-               za_i(ji,1:jpl) = 0._wp
-               itest(:)       = 0      
-               !
-               IF ( i_fill == 1 ) THEN      !-- case very thin ice: fill only category 1
-                  zh_i(ji,1) = zhti(ji)
-                  za_i (ji,1) = zati (ji)
-               ELSE                         !-- case ice is thicker: fill categories >1
-                  ! thickness
-                  DO jl = 1, i_fill - 1
-                     zh_i(ji,jl) = hi_mean(jl)
-                  END DO
-                  !
-                  ! concentration
-                  za_i(ji,jl0) = zati(ji) / SQRT(REAL(jpl))
-                  DO jl = 1, i_fill - 1
-                     IF ( jl /= jl0 ) THEN
-                        zarg        = ( zh_i(ji,jl) - zhti(ji) ) / ( zhti(ji) * 0.5_wp )
-                        za_i(ji,jl) =   za_i (ji,jl0) * EXP(-zarg**2)
-                     ENDIF
-                  END DO
-                  !
-                  ! last category
-                  za_i(ji,i_fill) = zati(ji) - SUM( za_i(ji,1:i_fill-1) )
-                  zV = SUM( za_i(ji,1:i_fill-1) * zh_i(ji,1:i_fill-1) )
-                  zh_i(ji,i_fill) = ( zhti(ji) * zati(ji) - zV ) / MAX( za_i(ji,i_fill), epsi10 ) 
-                  !
-                  ! correction if concentration of upper cat is greater than lower cat
-                  !    (it should be a gaussian around jl0 but sometimes it is not)
-                  IF ( jl0 /= jpl ) THEN
-                     DO jl = jpl, jl0+1, -1
-                        IF ( za_i(ji,jl) > za_i(ji,jl-1) ) THEN
-                           zdv = zh_i(ji,jl) * za_i(ji,jl)
-                           zh_i(ji,jl    ) = 0._wp
-                           za_i (ji,jl    ) = 0._wp
-                           za_i (ji,1:jl-1) = za_i(ji,1:jl-1) + zdv / MAX( REAL(jl-1) * zhti(ji), epsi10 )
-                        END IF
-                     END DO
-                  ENDIF
-                  !
-               ENDIF
-               !
-               ! Compatibility tests
-               zconv = ABS( zati(ji) - SUM( za_i(ji,1:jpl) ) ) 
-               IF ( zconv < epsi06 )   itest(1) = 1                                        ! Test 1: area conservation
-               !
-               zconv = ABS( zhti(ji)*zati(ji) - SUM( za_i(ji,1:jpl)*zh_i(ji,1:jpl) ) )
-               IF ( zconv < epsi06 )   itest(2) = 1                                        ! Test 2: volume conservation
-               !
-               IF ( zh_i(ji,i_fill) >= hi_max(i_fill-1) )   itest(3) = 1                  ! Test 3: thickness of the last category is in-bounds ?
-               !
-               itest(4) = 1
-               DO jl = 1, i_fill
-                  IF ( za_i(ji,jl) < 0._wp ) itest(4) = 0                                ! Test 4: positivity of ice concentrations
-               END DO
-               !                                         !----------------------------
-            END DO                                       ! end iteration on categories
-            !                                            !----------------------------
-         ENDIF
-      END DO
-
-      ! Add Snow in each category where za_i is not 0
-      DO jl = 1, jpl
-         DO ji = 1, idim
-            IF( za_i(ji,jl) > 0._wp ) THEN
-               zh_s(ji,jl) = zh_i(ji,jl) * ( zhts(ji) / zhti(ji) )
-               ! In case snow load is in excess that would lead to transformation from snow to ice
-               ! Then, transfer the snow excess into the ice (different from icethd_dh)
-               zdh = MAX( 0._wp, ( rhos * zh_s(ji,jl) + ( rhoi - rau0 ) * zh_i(ji,jl) ) * r1_rau0 ) 
-               ! recompute h_i, h_s avoiding out of bounds values
-               zh_i(ji,jl) = MIN( hi_max(jl), zh_i(ji,jl) + zdh )
-               zh_s(ji,jl) = MAX( 0._wp, zh_s(ji,jl) - zdh * rhoi * r1_rhos )
-            ENDIF
-         END DO
-      END DO
-      !
-   END SUBROUTINE ice_var_itd
-
-
-   SUBROUTINE ice_var_itd2( zhti, zhts, zati, zh_i, zh_s, za_i )
-      !!-------------------------------------------------------------------
-      !!                ***  ROUTINE ice_var_itd2   ***
-      !!
-      !! ** Purpose :  converting N-cat ice to jpl ice categories
-      !!
-      !!                  ice thickness distribution follows a gaussian law
-      !!               around the concentration of the most likely ice thickness
-      !!                           (similar as iceistate.F90)
-      !!
-      !! ** Method:   Iterative procedure
-      !!                
-      !!               1) Fill ice cat that correspond to input thicknesses
-      !!                  Find the lowest(jlmin) and highest(jlmax) cat that are filled
-      !!
-      !!               2) Expand the filling to the cat jlmin-1 and jlmax+1
-      !!                   by removing 25% ice area from jlmin and jlmax (resp.) 
-      !!              
-      !!               3) Expand the filling to the empty cat between jlmin and jlmax 
-      !!                   by a) removing 25% ice area from the lower cat (ascendant loop jlmin=>jlmax)
-      !!                      b) removing 25% ice area from the higher cat (descendant loop jlmax=>jlmin)
-      !!
-      !! ** Arguments : zhti: N-cat ice thickness
-      !!                zhts: N-cat snow depth
-      !!                zati: N-cat ice concentration
-      !!
-      !! ** Output    : jpl-cat 
-      !!
-      !!  (Example of application: BDY forcings when inputs have N-cat /= jpl)  
-      !!-------------------------------------------------------------------
-      INTEGER  ::   ji, jl, jl1, jl2             ! dummy loop indices
-      INTEGER  ::   idim, icat  
-      INTEGER, PARAMETER ::   ztrans = 0.25_wp
-      REAL(wp), DIMENSION(:,:), INTENT(in)    ::   zhti, zhts, zati    ! input ice/snow variables
-      REAL(wp), DIMENSION(:,:), INTENT(inout) ::   zh_i, zh_s, za_i    ! output ice/snow variables
-      INTEGER , DIMENSION(:,:), ALLOCATABLE   ::   jlfil, jlfil2
-      INTEGER , DIMENSION(:)  , ALLOCATABLE   ::   jlmax, jlmin
-      !!-------------------------------------------------------------------
-      !
-      idim = SIZE( zhti, 1 )
-      icat = SIZE( zhti, 2 )
-      !
-      ALLOCATE( jlfil(idim,jpl), jlfil2(idim,jpl) )       ! allocate arrays
-      ALLOCATE( jlmin(idim), jlmax(idim) )
-
-      ! --- initialize output fields to 0 --- !
-      zh_i(1:idim,1:jpl) = 0._wp
-      zh_s(1:idim,1:jpl) = 0._wp
-      za_i(1:idim,1:jpl) = 0._wp
-      !
-      ! --- fill the categories --- !
-      !     find where cat-input = cat-output and fill cat-output fields  
-      jlmax(:) = 0
-      jlmin(:) = 999
-      jlfil(:,:) = 0
-      DO jl1 = 1, jpl
-         DO jl2 = 1, icat
-            DO ji = 1, idim
-               IF( hi_max(jl1-1) <= zhti(ji,jl2) .AND. hi_max(jl1) > zhti(ji,jl2) ) THEN
-                  ! fill the right category
-                  zh_i(ji,jl1) = zhti(ji,jl2)
-                  zh_s(ji,jl1) = zhts(ji,jl2)
-                  za_i(ji,jl1) = zati(ji,jl2)
-                  ! record categories that are filled
-                  jlmax(ji) = MAX( jlmax(ji), jl1 )
-                  jlmin(ji) = MIN( jlmin(ji), jl1 )
-                  jlfil(ji,jl1) = jl1
-               ENDIF
-            END DO
-         END DO
-      END DO
-      !
-      ! --- fill the gaps between categories --- !  
-      !     transfer from categories filled at the previous step to the empty ones in between
-      DO ji = 1, idim
-         jl1 = jlmin(ji)
-         jl2 = jlmax(ji)
-         IF( jl1 > 1 ) THEN
-            ! fill the lower cat (jl1-1)
-            za_i(ji,jl1-1) = ztrans * za_i(ji,jl1)
-            zh_i(ji,jl1-1) = hi_mean(jl1-1)
-            ! remove from cat jl1
-            za_i(ji,jl1  ) = ( 1._wp - ztrans ) * za_i(ji,jl1)
-         ENDIF
-         IF( jl2 < jpl ) THEN
-            ! fill the upper cat (jl2+1)
-            za_i(ji,jl2+1) = ztrans * za_i(ji,jl2)
-            zh_i(ji,jl2+1) = hi_mean(jl2+1)
-            ! remove from cat jl2
-            za_i(ji,jl2  ) = ( 1._wp - ztrans ) * za_i(ji,jl2)
-         ENDIF
-      END DO
-      !
-      jlfil2(:,:) = jlfil(:,:) 
-      ! fill categories from low to high
-      DO jl = 2, jpl-1
-         DO ji = 1, idim
-            IF( jlfil(ji,jl-1) /= 0 .AND. jlfil(ji,jl) == 0 ) THEN
-               ! fill high
-               za_i(ji,jl) = ztrans * za_i(ji,jl-1)
-               zh_i(ji,jl) = hi_mean(jl)
-               jlfil(ji,jl) = jl
-               ! remove low
-               za_i(ji,jl-1) = ( 1._wp - ztrans ) * za_i(ji,jl-1)
-            ENDIF
-         END DO
-      END DO
-      !
-      ! fill categories from high to low
-      DO jl = jpl-1, 2, -1
-         DO ji = 1, idim
-            IF( jlfil2(ji,jl+1) /= 0 .AND. jlfil2(ji,jl) == 0 ) THEN
-               ! fill low
-               za_i(ji,jl) = za_i(ji,jl) + ztrans * za_i(ji,jl+1)
-               zh_i(ji,jl) = hi_mean(jl) 
-               jlfil2(ji,jl) = jl
-               ! remove high
-               za_i(ji,jl+1) = ( 1._wp - ztrans ) * za_i(ji,jl+1)
-            ENDIF
-         END DO
-      END DO
-      !
-      DEALLOCATE( jlfil, jlfil2 )      ! deallocate arrays
-      DEALLOCATE( jlmin, jlmax )
-      !
-   END SUBROUTINE ice_var_itd2
-
 
    SUBROUTINE ice_var_bv
       !!-------------------------------------------------------------------
@@ -951,13 +709,14 @@ CONTAINS
       !
    END SUBROUTINE ice_var_enthalpy
 
+   
    FUNCTION ice_var_sshdyn(pssh, psnwice_mass, psnwice_mass_b)
       !!---------------------------------------------------------------------
       !!                   ***  ROUTINE ice_var_sshdyn  ***
       !!                     
       !! ** Purpose :  compute the equivalent ssh in lead when sea ice is embedded
       !!
-      !! ** Method  :  ssh_lead = ssh + (Mice + Msnow) / rau0
+      !! ** Method  :  ssh_lead = ssh + (Mice + Msnow) / rho0
       !!
       !! ** Reference : Jean-Michel Campin, John Marshall, David Ferreira,
       !!                Sea ice-ocean coupling using a rescaled vertical coordinate z*, 
@@ -987,7 +746,7 @@ CONTAINS
          !                                               = (1/nn_fsbc)^2 * (nn_fsbc^2 - {SUM[n], n=0,nn_fsbc-1})
          zintb = REAL( nn_fsbc + 1 ) / REAL( nn_fsbc ) * 0.5_wp
          !
-         zsnwiceload(:,:) = ( zintn * psnwice_mass(:,:) + zintb * psnwice_mass_b(:,:) ) * r1_rau0
+         zsnwiceload(:,:) = ( zintn * psnwice_mass(:,:) + zintb * psnwice_mass_b(:,:) ) * r1_rho0
          !
       ELSE
          zsnwiceload(:,:) = 0.0_wp
@@ -997,6 +756,449 @@ CONTAINS
       !
    END FUNCTION ice_var_sshdyn
 
+   
+   !!-------------------------------------------------------------------
+   !!                ***  INTERFACE ice_var_itd   ***
+   !!
+   !! ** Purpose :  converting N-cat ice to jpl ice categories
+   !!-------------------------------------------------------------------
+   SUBROUTINE ice_var_itd_1c1c( phti, phts, pati ,                       ph_i, ph_s, pa_i, &
+      &                         ptmi, ptms, ptmsu, psmi, patip, phtip,   pt_i, pt_s, pt_su, ps_i, pa_ip, ph_ip )
+      !!-------------------------------------------------------------------
+      !! ** Purpose :  converting 1-cat ice to 1 ice category
+      !!-------------------------------------------------------------------
+      REAL(wp), DIMENSION(:), INTENT(in)    ::   phti, phts, pati    ! input  ice/snow variables
+      REAL(wp), DIMENSION(:), INTENT(inout) ::   ph_i, ph_s, pa_i    ! output ice/snow variables
+      REAL(wp), DIMENSION(:), INTENT(in)    ::   ptmi, ptms, ptmsu, psmi, patip, phtip    ! input  ice/snow temp & sal & ponds
+      REAL(wp), DIMENSION(:), INTENT(inout) ::   pt_i, pt_s, pt_su, ps_i, pa_ip, ph_ip    ! output ice/snow temp & sal & ponds
+      !!-------------------------------------------------------------------
+      ! == thickness and concentration == !
+      ph_i(:) = phti(:)
+      ph_s(:) = phts(:)
+      pa_i(:) = pati(:)
+      !
+      ! == temperature and salinity and ponds == !
+      pt_i (:) = ptmi (:)
+      pt_s (:) = ptms (:)
+      pt_su(:) = ptmsu(:)
+      ps_i (:) = psmi (:)
+      pa_ip(:) = patip(:)
+      ph_ip(:) = phtip(:)
+      
+   END SUBROUTINE ice_var_itd_1c1c
+
+   SUBROUTINE ice_var_itd_Nc1c( phti, phts, pati ,                       ph_i, ph_s, pa_i, &
+      &                         ptmi, ptms, ptmsu, psmi, patip, phtip,   pt_i, pt_s, pt_su, ps_i, pa_ip, ph_ip )
+      !!-------------------------------------------------------------------
+      !! ** Purpose :  converting N-cat ice to 1 ice category
+      !!-------------------------------------------------------------------
+      REAL(wp), DIMENSION(:,:), INTENT(in)    ::   phti, phts, pati    ! input  ice/snow variables
+      REAL(wp), DIMENSION(:)  , INTENT(inout) ::   ph_i, ph_s, pa_i    ! output ice/snow variables
+      REAL(wp), DIMENSION(:,:), INTENT(in)    ::   ptmi, ptms, ptmsu, psmi, patip, phtip    ! input  ice/snow temp & sal & ponds
+      REAL(wp), DIMENSION(:)  , INTENT(inout) ::   pt_i, pt_s, pt_su, ps_i, pa_ip, ph_ip    ! output ice/snow temp & sal & ponds
+      !
+      REAL(wp), ALLOCATABLE, DIMENSION(:) ::   z1_ai, z1_vi, z1_vs
+      !
+      INTEGER ::   idim  
+      !!-------------------------------------------------------------------
+      !
+      idim = SIZE( phti, 1 )
+      !
+      ! == thickness and concentration == !
+      ALLOCATE( z1_ai(idim), z1_vi(idim), z1_vs(idim) )
+      !
+      pa_i(:) = SUM( pati(:,:), dim=2 )
+
+      WHERE( ( pa_i(:) ) /= 0._wp )   ;   z1_ai(:) = 1._wp / pa_i(:)
+      ELSEWHERE                       ;   z1_ai(:) = 0._wp
+      END WHERE
+
+      ph_i(:) = SUM( phti(:,:) * pati(:,:), dim=2 ) * z1_ai(:)
+      ph_s(:) = SUM( phts(:,:) * pati(:,:), dim=2 ) * z1_ai(:)
+      !
+      ! == temperature and salinity == !
+      WHERE( ( pa_i(:) * ph_i(:) ) /= 0._wp )   ;   z1_vi(:) = 1._wp / ( pa_i(:) * ph_i(:) )
+      ELSEWHERE                                 ;   z1_vi(:) = 0._wp
+      END WHERE
+      WHERE( ( pa_i(:) * ph_s(:) ) /= 0._wp )   ;   z1_vs(:) = 1._wp / ( pa_i(:) * ph_s(:) )
+      ELSEWHERE                                 ;   z1_vs(:) = 0._wp
+      END WHERE
+      pt_i (:) = SUM( ptmi (:,:) * pati(:,:) * phti(:,:), dim=2 ) * z1_vi(:)
+      pt_s (:) = SUM( ptms (:,:) * pati(:,:) * phts(:,:), dim=2 ) * z1_vs(:)
+      pt_su(:) = SUM( ptmsu(:,:) * pati(:,:)            , dim=2 ) * z1_ai(:)
+      ps_i (:) = SUM( psmi (:,:) * pati(:,:) * phti(:,:), dim=2 ) * z1_vi(:)
+
+      ! == ponds == !
+      pa_ip(:) = SUM( patip(:,:), dim=2 )
+      WHERE( pa_ip(:) /= 0._wp )   ;   ph_ip(:) = SUM( phtip(:,:) * patip(:,:), dim=2 ) / pa_ip(:)
+      ELSEWHERE                    ;   ph_ip(:) = 0._wp
+      END WHERE
+      !
+      DEALLOCATE( z1_ai, z1_vi, z1_vs )
+      !
+   END SUBROUTINE ice_var_itd_Nc1c
+   
+   SUBROUTINE ice_var_itd_1cMc( phti, phts, pati ,                       ph_i, ph_s, pa_i, &
+      &                         ptmi, ptms, ptmsu, psmi, patip, phtip,   pt_i, pt_s, pt_su, ps_i, pa_ip, ph_ip )
+      !!-------------------------------------------------------------------
+      !!
+      !! ** Purpose :  converting 1-cat ice to jpl ice categories
+      !!
+      !!
+      !! ** Method:   ice thickness distribution follows a gamma function from Abraham et al. (2015)
+      !!              it has the property of conserving total concentration and volume
+      !!              
+      !!
+      !! ** Arguments : phti: 1-cat ice thickness
+      !!                phts: 1-cat snow depth
+      !!                pati: 1-cat ice concentration
+      !!
+      !! ** Output    : jpl-cat 
+      !!
+      !!  Abraham, C., Steiner, N., Monahan, A. and Michel, C., 2015.
+      !!               Effects of subgrid‐scale snow thickness variability on radiative transfer in sea ice.
+      !!               Journal of Geophysical Research: Oceans, 120(8), pp.5597-5614 
+      !!-------------------------------------------------------------------
+      REAL(wp), DIMENSION(:),   INTENT(in)    ::   phti, phts, pati    ! input  ice/snow variables
+      REAL(wp), DIMENSION(:,:), INTENT(inout) ::   ph_i, ph_s, pa_i    ! output ice/snow variables
+      REAL(wp), DIMENSION(:)  , INTENT(in)    ::   ptmi, ptms, ptmsu, psmi, patip, phtip    ! input  ice/snow temp & sal & ponds
+      REAL(wp), DIMENSION(:,:), INTENT(inout) ::   pt_i, pt_s, pt_su, ps_i, pa_ip, ph_ip    ! output ice/snow temp & sal & ponds
+      !
+      REAL(wp), ALLOCATABLE, DIMENSION(:) ::   zfra, z1_hti
+      INTEGER  ::   ji, jk, jl
+      INTEGER  ::   idim
+      REAL(wp) ::   zv, zdh
+      !!-------------------------------------------------------------------
+      !
+      idim = SIZE( phti , 1 )
+      !
+      ph_i(1:idim,1:jpl) = 0._wp
+      ph_s(1:idim,1:jpl) = 0._wp
+      pa_i(1:idim,1:jpl) = 0._wp
+      !
+      ALLOCATE( z1_hti(idim) )
+      WHERE( phti(:) /= 0._wp )   ;   z1_hti(:) = 1._wp / phti(:)
+      ELSEWHERE                   ;   z1_hti(:) = 0._wp
+      END WHERE
+      !
+      ! == thickness and concentration == !
+      ! for categories 1:jpl-1, integrate the gamma function from hi_max(jl-1) to hi_max(jl)
+      DO jl = 1, jpl-1
+         DO ji = 1, idim
+            !
+            IF( phti(ji) > 0._wp ) THEN
+               ! concentration : integrate ((4A/H^2)xexp(-2x/H))dx from x=hi_max(jl-1) to hi_max(jl)
+               pa_i(ji,jl) = pati(ji) * z1_hti(ji) * (  ( phti(ji) + 2.*hi_max(jl-1) ) * EXP( -2.*hi_max(jl-1)*z1_hti(ji) ) &
+                  &                                   - ( phti(ji) + 2.*hi_max(jl  ) ) * EXP( -2.*hi_max(jl  )*z1_hti(ji) ) )
+               !
+               ! volume : integrate ((4A/H^2)x^2exp(-2x/H))dx from x=hi_max(jl-1) to hi_max(jl)
+               zv = pati(ji) * z1_hti(ji) * (  ( phti(ji)*phti(ji) + 2.*phti(ji)*hi_max(jl-1) + 2.*hi_max(jl-1)*hi_max(jl-1) ) &
+                  &                            * EXP( -2.*hi_max(jl-1)*z1_hti(ji) ) &
+                  &                          - ( phti(ji)*phti(ji) + 2.*phti(ji)*hi_max(jl) + 2.*hi_max(jl)*hi_max(jl) ) &
+                  &                            * EXP(-2.*hi_max(jl)*z1_hti(ji)) )
+               ! thickness
+               IF( pa_i(ji,jl) > epsi06 ) THEN
+                  ph_i(ji,jl) = zv / pa_i(ji,jl)
+               ELSE
+                  ph_i(ji,jl) = 0.
+                  pa_i(ji,jl) = 0.
+               ENDIF
+            ENDIF
+            !
+         ENDDO
+      ENDDO
+      !
+      ! for the last category (jpl), integrate the gamma function from hi_max(jpl-1) to infinity
+      DO ji = 1, idim
+         !
+         IF( phti(ji) > 0._wp ) THEN
+            ! concentration : integrate ((4A/H^2)xexp(-2x/H))dx from x=hi_max(jpl-1) to infinity
+            pa_i(ji,jpl) = pati(ji) * z1_hti(ji) * ( phti(ji) + 2.*hi_max(jpl-1) ) * EXP( -2.*hi_max(jpl-1)*z1_hti(ji) )
+
+            ! volume : integrate ((4A/H^2)x^2exp(-2x/H))dx from x=hi_max(jpl-1) to infinity
+            zv = pati(ji) * z1_hti(ji) * ( phti(ji)*phti(ji) + 2.*phti(ji)*hi_max(jpl-1) + 2.*hi_max(jpl-1)*hi_max(jpl-1) ) &
+               &                         * EXP( -2.*hi_max(jpl-1)*z1_hti(ji) )
+            ! thickness
+            IF( pa_i(ji,jpl) > epsi06 ) THEN
+               ph_i(ji,jpl) = zv / pa_i(ji,jpl)
+            else
+               ph_i(ji,jpl) = 0.
+               pa_i(ji,jpl) = 0.
+            ENDIF
+         ENDIF
+         !
+      ENDDO
+      !
+      ! Add Snow in each category where pa_i is not 0
+      DO jl = 1, jpl
+         DO ji = 1, idim
+            IF( pa_i(ji,jl) > 0._wp ) THEN
+               ph_s(ji,jl) = ph_i(ji,jl) * phts(ji) * z1_hti(ji)
+               ! In case snow load is in excess that would lead to transformation from snow to ice
+               ! Then, transfer the snow excess into the ice (different from icethd_dh)
+               zdh = MAX( 0._wp, ( rhos * ph_s(ji,jl) + ( rhoi - rho0 ) * ph_i(ji,jl) ) * r1_rho0 ) 
+               ! recompute h_i, h_s avoiding out of bounds values
+               ph_i(ji,jl) = MIN( hi_max(jl), ph_i(ji,jl) + zdh )
+               ph_s(ji,jl) = MAX( 0._wp, ph_s(ji,jl) - zdh * rhoi * r1_rhos )
+            ENDIF
+         END DO
+      END DO
+      !
+      DEALLOCATE( z1_hti )
+      !
+      ! == temperature and salinity == !
+      DO jl = 1, jpl
+         pt_i (:,jl) = ptmi (:)
+         pt_s (:,jl) = ptms (:)
+         pt_su(:,jl) = ptmsu(:)
+         ps_i (:,jl) = psmi (:)
+         ps_i (:,jl) = psmi (:)         
+      END DO
+      !
+      ! == ponds == !
+      ALLOCATE( zfra(idim) )
+      ! keep the same pond fraction atip/ati for each category
+      WHERE( pati(:) /= 0._wp )   ;   zfra(:) = patip(:) / pati(:)
+      ELSEWHERE                   ;   zfra(:) = 0._wp
+      END WHERE
+      DO jl = 1, jpl
+         pa_ip(:,jl) = zfra(:) * pa_i(:,jl)
+      END DO
+      ! keep the same v_ip/v_i ratio for each category
+      WHERE( ( phti(:) * pati(:) ) /= 0._wp )   ;   zfra(:) = ( phtip(:) * patip(:) ) / ( phti(:) * pati(:) )
+      ELSEWHERE                                 ;   zfra(:) = 0._wp
+      END WHERE
+      DO jl = 1, jpl
+         WHERE( pa_ip(:,jl) /= 0._wp )   ;   ph_ip(:,jl) = zfra(:) * ( ph_i(:,jl) * pa_i(:,jl) ) / pa_ip(:,jl)
+         ELSEWHERE                       ;   ph_ip(:,jl) = 0._wp
+         END WHERE
+      END DO
+      DEALLOCATE( zfra )
+      !
+   END SUBROUTINE ice_var_itd_1cMc
+
+   SUBROUTINE ice_var_itd_NcMc( phti, phts, pati ,                       ph_i, ph_s, pa_i, &
+      &                         ptmi, ptms, ptmsu, psmi, patip, phtip,   pt_i, pt_s, pt_su, ps_i, pa_ip, ph_ip )
+      !!-------------------------------------------------------------------
+      !!
+      !! ** Purpose :  converting N-cat ice to jpl ice categories
+      !!
+      !!                  ice thickness distribution follows a gaussian law
+      !!               around the concentration of the most likely ice thickness
+      !!                           (similar as iceistate.F90)
+      !!
+      !! ** Method:   Iterative procedure
+      !!                
+      !!               1) Fill ice cat that correspond to input thicknesses
+      !!                  Find the lowest(jlmin) and highest(jlmax) cat that are filled
+      !!
+      !!               2) Expand the filling to the cat jlmin-1 and jlmax+1
+       !!                   by removing 25% ice area from jlmin and jlmax (resp.) 
+      !!              
+      !!               3) Expand the filling to the empty cat between jlmin and jlmax 
+      !!                   by a) removing 25% ice area from the lower cat (ascendant loop jlmin=>jlmax)
+      !!                      b) removing 25% ice area from the higher cat (descendant loop jlmax=>jlmin)
+      !!
+      !! ** Arguments : phti: N-cat ice thickness
+      !!                phts: N-cat snow depth
+      !!                pati: N-cat ice concentration
+      !!
+      !! ** Output    : jpl-cat 
+      !!
+      !!  (Example of application: BDY forcings when inputs have N-cat /= jpl)  
+      !!-------------------------------------------------------------------
+      REAL(wp), DIMENSION(:,:), INTENT(in)    ::   phti, phts, pati    ! input  ice/snow variables
+      REAL(wp), DIMENSION(:,:), INTENT(inout) ::   ph_i, ph_s, pa_i    ! output ice/snow variables
+      REAL(wp), DIMENSION(:,:), INTENT(in)    ::   ptmi, ptms, ptmsu, psmi, patip, phtip    ! input  ice/snow temp & sal & ponds
+      REAL(wp), DIMENSION(:,:), INTENT(inout) ::   pt_i, pt_s, pt_su, ps_i, pa_ip, ph_ip    ! output ice/snow temp & sal & ponds
+      !
+      INTEGER , ALLOCATABLE, DIMENSION(:,:) ::   jlfil, jlfil2
+      INTEGER , ALLOCATABLE, DIMENSION(:)   ::   jlmax, jlmin
+      REAL(wp), ALLOCATABLE, DIMENSION(:)   ::   z1_ai, z1_vi, z1_vs, ztmp, zfra
+      !
+      REAL(wp), PARAMETER ::   ztrans = 0.25_wp
+      INTEGER  ::   ji, jl, jl1, jl2
+      INTEGER  ::   idim, icat  
+      !!-------------------------------------------------------------------
+      !
+      idim = SIZE( phti, 1 )
+      icat = SIZE( phti, 2 )
+      !
+      ! == thickness and concentration == !
+      !                                 ! ---------------------- !
+      IF( icat == jpl ) THEN            ! input cat = output cat !
+         !                              ! ---------------------- !
+         ph_i(:,:) = phti(:,:)
+         ph_s(:,:) = phts(:,:)
+         pa_i(:,:) = pati(:,:)
+         !
+         ! == temperature and salinity and ponds == !
+         pt_i (:,:) = ptmi (:,:)
+         pt_s (:,:) = ptms (:,:)
+         pt_su(:,:) = ptmsu(:,:)
+         ps_i (:,:) = psmi (:,:)
+         pa_ip(:,:) = patip(:,:)
+         ph_ip(:,:) = phtip(:,:)
+         !                              ! ---------------------- !
+      ELSEIF( icat == 1 ) THEN          ! input cat = 1          !
+         !                              ! ---------------------- !
+         CALL  ice_var_itd_1cMc( phti(:,1), phts(:,1), pati (:,1), &
+            &                    ph_i(:,:), ph_s(:,:), pa_i (:,:), &
+            &                    ptmi(:,1), ptms(:,1), ptmsu(:,1), psmi(:,1), patip(:,1), phtip(:,1), &
+            &                    pt_i(:,:), pt_s(:,:), pt_su(:,:), ps_i(:,:), pa_ip(:,:), ph_ip(:,:)  )
+         !                              ! ---------------------- !
+      ELSEIF( jpl == 1 ) THEN           ! output cat = 1         !
+         !                              ! ---------------------- !
+         CALL  ice_var_itd_Nc1c( phti(:,:), phts(:,:), pati (:,:), &
+            &                    ph_i(:,1), ph_s(:,1), pa_i (:,1), &
+            &                    ptmi(:,:), ptms(:,:), ptmsu(:,:), psmi(:,:), patip(:,:), phtip(:,:), &
+            &                    pt_i(:,1), pt_s(:,1), pt_su(:,1), ps_i(:,1), pa_ip(:,1), ph_ip(:,1)  )
+         !                              ! ----------------------- !
+      ELSE                              ! input cat /= output cat !
+         !                              ! ----------------------- !
+         
+         ALLOCATE( jlfil(idim,jpl), jlfil2(idim,jpl) )       ! allocate arrays
+         ALLOCATE( jlmin(idim), jlmax(idim) )
+
+         ! --- initialize output fields to 0 --- !
+         ph_i(1:idim,1:jpl) = 0._wp
+         ph_s(1:idim,1:jpl) = 0._wp
+         pa_i(1:idim,1:jpl) = 0._wp
+         !
+         ! --- fill the categories --- !
+         !     find where cat-input = cat-output and fill cat-output fields  
+         jlmax(:) = 0
+         jlmin(:) = 999
+         jlfil(:,:) = 0
+         DO jl1 = 1, jpl
+            DO jl2 = 1, icat
+               DO ji = 1, idim
+                  IF( hi_max(jl1-1) <= phti(ji,jl2) .AND. hi_max(jl1) > phti(ji,jl2) ) THEN
+                     ! fill the right category
+                     ph_i(ji,jl1) = phti(ji,jl2)
+                     ph_s(ji,jl1) = phts(ji,jl2)
+                     pa_i(ji,jl1) = pati(ji,jl2)
+                     ! record categories that are filled
+                     jlmax(ji) = MAX( jlmax(ji), jl1 )
+                     jlmin(ji) = MIN( jlmin(ji), jl1 )
+                     jlfil(ji,jl1) = jl1
+                  ENDIF
+               END DO
+            END DO
+         END DO
+         !
+         ! --- fill the gaps between categories --- !  
+         !     transfer from categories filled at the previous step to the empty ones in between
+         DO ji = 1, idim
+            jl1 = jlmin(ji)
+            jl2 = jlmax(ji)
+            IF( jl1 > 1 ) THEN
+               ! fill the lower cat (jl1-1)
+               pa_i(ji,jl1-1) = ztrans * pa_i(ji,jl1)
+               ph_i(ji,jl1-1) = hi_mean(jl1-1)
+               ! remove from cat jl1
+               pa_i(ji,jl1  ) = ( 1._wp - ztrans ) * pa_i(ji,jl1)
+            ENDIF
+            IF( jl2 < jpl ) THEN
+               ! fill the upper cat (jl2+1)
+               pa_i(ji,jl2+1) = ztrans * pa_i(ji,jl2)
+               ph_i(ji,jl2+1) = hi_mean(jl2+1)
+               ! remove from cat jl2
+               pa_i(ji,jl2  ) = ( 1._wp - ztrans ) * pa_i(ji,jl2)
+            ENDIF
+         END DO
+         !
+         jlfil2(:,:) = jlfil(:,:) 
+         ! fill categories from low to high
+         DO jl = 2, jpl-1
+            DO ji = 1, idim
+               IF( jlfil(ji,jl-1) /= 0 .AND. jlfil(ji,jl) == 0 ) THEN
+                  ! fill high
+                  pa_i(ji,jl) = ztrans * pa_i(ji,jl-1)
+                  ph_i(ji,jl) = hi_mean(jl)
+                  jlfil(ji,jl) = jl
+                  ! remove low
+                  pa_i(ji,jl-1) = ( 1._wp - ztrans ) * pa_i(ji,jl-1)
+               ENDIF
+            END DO
+         END DO
+         !
+         ! fill categories from high to low
+         DO jl = jpl-1, 2, -1
+            DO ji = 1, idim
+               IF( jlfil2(ji,jl+1) /= 0 .AND. jlfil2(ji,jl) == 0 ) THEN
+                  ! fill low
+                  pa_i(ji,jl) = pa_i(ji,jl) + ztrans * pa_i(ji,jl+1)
+                  ph_i(ji,jl) = hi_mean(jl) 
+                  jlfil2(ji,jl) = jl
+                  ! remove high
+                  pa_i(ji,jl+1) = ( 1._wp - ztrans ) * pa_i(ji,jl+1)
+               ENDIF
+            END DO
+         END DO
+         !
+         DEALLOCATE( jlfil, jlfil2 )      ! deallocate arrays
+         DEALLOCATE( jlmin, jlmax )
+         !
+         ! == temperature and salinity == !
+         !
+         ALLOCATE( z1_ai(idim), z1_vi(idim), z1_vs(idim), ztmp(idim) )
+         !
+         WHERE( SUM( pa_i(:,:), dim=2 ) /= 0._wp )               ;   z1_ai(:) = 1._wp / SUM( pa_i(:,:), dim=2 )
+         ELSEWHERE                                               ;   z1_ai(:) = 0._wp
+         END WHERE
+         WHERE( SUM( pa_i(:,:) * ph_i(:,:), dim=2 ) /= 0._wp )   ;   z1_vi(:) = 1._wp / SUM( pa_i(:,:) * ph_i(:,:), dim=2 )
+         ELSEWHERE                                               ;   z1_vi(:) = 0._wp
+         END WHERE
+         WHERE( SUM( pa_i(:,:) * ph_s(:,:), dim=2 ) /= 0._wp )   ;   z1_vs(:) = 1._wp / SUM( pa_i(:,:) * ph_s(:,:), dim=2 )
+         ELSEWHERE                                               ;   z1_vs(:) = 0._wp
+         END WHERE
+         !
+         ! fill all the categories with the same value
+         ztmp(:) = SUM( ptmi (:,:) * pati(:,:) * phti(:,:), dim=2 ) * z1_vi(:)
+         DO jl = 1, jpl
+            pt_i (:,jl) = ztmp(:)
+         END DO
+         ztmp(:) = SUM( ptms (:,:) * pati(:,:) * phts(:,:), dim=2 ) * z1_vs(:)
+         DO jl = 1, jpl
+            pt_s (:,jl) = ztmp(:)
+         END DO
+         ztmp(:) = SUM( ptmsu(:,:) * pati(:,:)            , dim=2 ) * z1_ai(:)
+         DO jl = 1, jpl
+            pt_su(:,jl) = ztmp(:)
+         END DO
+         ztmp(:) = SUM( psmi (:,:) * pati(:,:) * phti(:,:), dim=2 ) * z1_vi(:)
+         DO jl = 1, jpl
+            ps_i (:,jl) = ztmp(:)
+         END DO
+         !
+         DEALLOCATE( z1_ai, z1_vi, z1_vs, ztmp )
+         !
+         ! == ponds == !
+         ALLOCATE( zfra(idim) )
+         ! keep the same pond fraction atip/ati for each category
+         WHERE( SUM( pati(:,:), dim=2 ) /= 0._wp )   ;   zfra(:) = SUM( patip(:,:), dim=2 ) / SUM( pati(:,:), dim=2 )
+         ELSEWHERE                                   ;   zfra(:) = 0._wp
+         END WHERE
+         DO jl = 1, jpl
+            pa_ip(:,jl) = zfra(:) * pa_i(:,jl)
+         END DO
+         ! keep the same v_ip/v_i ratio for each category
+         WHERE( SUM( phti(:,:) * pati(:,:), dim=2 ) /= 0._wp )
+            zfra(:) = SUM( phtip(:,:) * patip(:,:), dim=2 ) / SUM( phti(:,:) * pati(:,:), dim=2 )
+         ELSEWHERE
+            zfra(:) = 0._wp
+         END WHERE
+         DO jl = 1, jpl
+            WHERE( pa_ip(:,jl) /= 0._wp )   ;   ph_ip(:,jl) = zfra(:) * ( ph_i(:,jl) * pa_i(:,jl) ) / pa_ip(:,jl)
+            ELSEWHERE                       ;   ph_ip(:,jl) = 0._wp
+            END WHERE
+         END DO
+         DEALLOCATE( zfra )
+         !
+      ENDIF
+      !
+   END SUBROUTINE ice_var_itd_NcMc
 
 #else
    !!----------------------------------------------------------------------

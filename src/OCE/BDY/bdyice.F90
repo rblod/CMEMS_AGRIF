@@ -40,7 +40,7 @@ MODULE bdyice
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: bdyice.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: bdyice.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -54,36 +54,70 @@ CONTAINS
       !!----------------------------------------------------------------------
       INTEGER, INTENT(in) ::   kt   ! Main time step counter
       !
-      INTEGER ::   jbdy   ! BDY set index
+      INTEGER ::   jbdy, ir                             ! BDY set index, rim index
+      INTEGER ::   ibeg, iend                           ! length of rim to be treated (rim 0 or rim 1)
+      LOGICAL ::   llrim0                               ! indicate if rim 0 is treated
+      LOGICAL, DIMENSION(4)  :: llsend1, llrecv1        ! indicate how communications are to be carried out
       !!----------------------------------------------------------------------
-      !
-      IF( ln_timing )   CALL timing_start('bdy_ice_thd')
+      ! controls
+      IF( ln_timing    )   CALL timing_start('bdy_ice_thd')                                                            ! timing
+      IF( ln_icediachk )   CALL ice_cons_hsm(0,'bdy_ice_thd', rdiag_v, rdiag_s, rdiag_t, rdiag_fv, rdiag_fs, rdiag_ft) ! conservation
+      IF( ln_icediachk )   CALL ice_cons2D  (0,'bdy_ice_thd',  diag_v,  diag_s,  diag_t,  diag_fv,  diag_fs,  diag_ft) ! conservation
       !
       CALL ice_var_glo2eqv
       !
-      DO jbdy = 1, nb_bdy
+      llsend1(:) = .false.   ;   llrecv1(:) = .false.
+      DO ir = 1, 0, -1   ! treat rim 1 before rim 0
+         IF( ir == 0 ) THEN   ;   llrim0 = .TRUE.
+         ELSE                 ;   llrim0 = .FALSE.
+         END IF
+         DO jbdy = 1, nb_bdy
+            !
+            SELECT CASE( cn_ice(jbdy) )
+            CASE('none')   ;   CYCLE
+            CASE('frs' )   ;   CALL bdy_ice_frs( idx_bdy(jbdy), dta_bdy(jbdy), kt, jbdy, llrim0 )
+            CASE DEFAULT
+               CALL ctl_stop( 'bdy_ice : unrecognised option for open boundaries for ice fields' )
+            END SELECT
+            !
+         END DO
          !
-         SELECT CASE( cn_ice(jbdy) )
-         CASE('none')   ;   CYCLE
-         CASE('frs' )   ;   CALL bdy_ice_frs( idx_bdy(jbdy), dta_bdy(jbdy), kt, jbdy )
-         CASE DEFAULT
-            CALL ctl_stop( 'bdy_ice : unrecognised option for open boundaries for ice fields' )
-         END SELECT
-         !
-      END DO
+         ! Update bdy points        
+         IF( nn_hls > 1 .AND. ir == 1 ) CYCLE   ! at least 2 halos will be corrected -> no need to correct rim 1 before rim 0
+         IF( nn_hls == 1 ) THEN   ;   llsend1(:) = .false.   ;   llrecv1(:) = .false.   ;   END IF
+         DO jbdy = 1, nb_bdy
+            IF( cn_ice(jbdy) == 'frs' ) THEN
+               llsend1(:) = llsend1(:) .OR. lsend_bdyint(jbdy,1,:,ir)   ! possibly every direction, T points
+               llrecv1(:) = llrecv1(:) .OR. lrecv_bdyint(jbdy,1,:,ir)   ! possibly every direction, T points
+            END IF
+         END DO   ! jbdy
+         IF( ANY(llsend1) .OR. ANY(llrecv1) ) THEN   ! if need to send/recv in at least one direction
+            ! exchange 3d arrays
+            CALL lbc_lnk_multi( 'bdyice', a_i , 'T', 1., h_i , 'T', 1., h_s , 'T', 1., oa_i, 'T', 1. &
+                 &                      , a_ip, 'T', 1., v_ip, 'T', 1., s_i , 'T', 1., t_su, 'T', 1. &
+                 &                      , v_i , 'T', 1., v_s , 'T', 1., sv_i, 'T', 1.                &
+                 &                      , kfillmode=jpfillnothing ,lsend=llsend1, lrecv=llrecv1      )
+            ! exchange 4d arrays :   third dimension = 1   and then   third dimension = jpk
+            CALL lbc_lnk_multi( 'bdyice', t_s , 'T', 1., e_s , 'T', 1., kfillmode=jpfillnothing ,lsend=llsend1, lrecv=llrecv1 )
+            CALL lbc_lnk_multi( 'bdyice', t_i , 'T', 1., e_i , 'T', 1., kfillmode=jpfillnothing ,lsend=llsend1, lrecv=llrecv1 )
+         END IF
+      END DO   ! ir
       !
       CALL ice_cor( kt , 0 )      ! -- In case categories are out of bounds, do a remapping
       !                           !    i.e. inputs have not the same ice thickness distribution (set by rn_himean)
       !                           !         than the regional simulation
       CALL ice_var_agg(1)
       !
-      IF( ln_icectl )   CALL ice_prt( kt, iiceprt, jiceprt, 1, ' - ice thermo bdy - ' )
-      IF( ln_timing )   CALL timing_stop('bdy_ice_thd')
+      ! controls
+      IF( ln_icectl    )   CALL ice_prt     ( kt, iiceprt, jiceprt, 1, ' - ice thermo bdy - ' )                        ! prints
+      IF( ln_icediachk )   CALL ice_cons_hsm(1,'bdy_ice_thd', rdiag_v, rdiag_s, rdiag_t, rdiag_fv, rdiag_fs, rdiag_ft) ! conservation
+      IF( ln_icediachk )   CALL ice_cons2D  (1,'bdy_ice_thd',  diag_v,  diag_s,  diag_t,  diag_fv,  diag_fs,  diag_ft) ! conservation
+      IF( ln_timing    )   CALL timing_stop ('bdy_ice_thd')                                                            ! timing
       !
    END SUBROUTINE bdy_ice
 
 
-   SUBROUTINE bdy_ice_frs( idx, dta, kt, jbdy )
+   SUBROUTINE bdy_ice_frs( idx, dta, kt, jbdy, llrim0 )
       !!------------------------------------------------------------------------------
       !!                 ***  SUBROUTINE bdy_ice_frs  ***
       !!                    
@@ -92,31 +126,51 @@ CONTAINS
       !! Reference : Engedahl H., 1995: Use of the flow relaxation scheme in a three-
       !!             dimensional baroclinic ocean model with realistic topography. Tellus, 365-382.
       !!------------------------------------------------------------------------------
-      TYPE(OBC_INDEX), INTENT(in) ::   idx     ! OBC indices
-      TYPE(OBC_DATA),  INTENT(in) ::   dta     ! OBC external data
-      INTEGER,         INTENT(in) ::   kt      ! main time-step counter
-      INTEGER,         INTENT(in) ::   jbdy    ! BDY set index
+      TYPE(OBC_INDEX), INTENT(in) ::   idx      ! OBC indices
+      TYPE(OBC_DATA),  INTENT(in) ::   dta      ! OBC external data
+      INTEGER,         INTENT(in) ::   kt       ! main time-step counter
+      INTEGER,         INTENT(in) ::   jbdy     ! BDY set index
+      LOGICAL,         INTENT(in) ::   llrim0   ! indicate if rim 0 is treated
       !
       INTEGER  ::   jpbound            ! 0 = incoming ice
       !                                ! 1 = outgoing ice
+      INTEGER  ::   ibeg, iend         ! length of rim to be treated (rim 0 or rim 1)
       INTEGER  ::   i_bdy, jgrd        ! dummy loop indices
       INTEGER  ::   ji, jj, jk, jl, ib, jb
       REAL(wp) ::   zwgt, zwgt1        ! local scalar
       REAL(wp) ::   ztmelts, zdh
+      REAL(wp), POINTER  :: flagu, flagv              ! short cuts
       !!------------------------------------------------------------------------------
       !
       jgrd = 1      ! Everything is at T-points here
+      IF( llrim0 ) THEN   ;   ibeg = 1                       ;   iend = idx%nblenrim0(jgrd)
+      ELSE                ;   ibeg = idx%nblenrim0(jgrd)+1   ;   iend = idx%nblenrim(jgrd)
+      END IF
       !
       DO jl = 1, jpl
-         DO i_bdy = 1, idx%nblenrim(jgrd)
+         DO i_bdy = ibeg, iend
             ji    = idx%nbi(i_bdy,jgrd)
             jj    = idx%nbj(i_bdy,jgrd)
             zwgt  = idx%nbw(i_bdy,jgrd)
             zwgt1 = 1.e0 - idx%nbw(i_bdy,jgrd)
-            a_i(ji,jj,jl) = ( a_i(ji,jj,jl) * zwgt1 + dta%a_i(i_bdy,jl) * zwgt ) * tmask(ji,jj,1)  ! Leads fraction 
-            h_i(ji,jj,jl) = ( h_i(ji,jj,jl) * zwgt1 + dta%h_i(i_bdy,jl) * zwgt ) * tmask(ji,jj,1)  ! Ice depth 
-            h_s(ji,jj,jl) = ( h_s(ji,jj,jl) * zwgt1 + dta%h_s(i_bdy,jl) * zwgt ) * tmask(ji,jj,1)  ! Snow depth
-
+            a_i (ji,jj,  jl) = ( a_i (ji,jj,  jl) * zwgt1 + dta%a_i(i_bdy,jl) * zwgt ) * tmask(ji,jj,1)  ! Ice  concentration 
+            h_i (ji,jj,  jl) = ( h_i (ji,jj,  jl) * zwgt1 + dta%h_i(i_bdy,jl) * zwgt ) * tmask(ji,jj,1)  ! Ice  depth 
+            h_s (ji,jj,  jl) = ( h_s (ji,jj,  jl) * zwgt1 + dta%h_s(i_bdy,jl) * zwgt ) * tmask(ji,jj,1)  ! Snow depth
+            t_i (ji,jj,:,jl) = ( t_i (ji,jj,:,jl) * zwgt1 + dta%t_i(i_bdy,jl) * zwgt ) * tmask(ji,jj,1)  ! Ice  temperature
+            t_s (ji,jj,:,jl) = ( t_s (ji,jj,:,jl) * zwgt1 + dta%t_s(i_bdy,jl) * zwgt ) * tmask(ji,jj,1)  ! Snow temperature
+            t_su(ji,jj,  jl) = ( t_su(ji,jj,  jl) * zwgt1 + dta%tsu(i_bdy,jl) * zwgt ) * tmask(ji,jj,1)  ! Surf temperature
+            s_i (ji,jj,  jl) = ( s_i (ji,jj,  jl) * zwgt1 + dta%s_i(i_bdy,jl) * zwgt ) * tmask(ji,jj,1)  ! Ice  salinity
+            a_ip(ji,jj,  jl) = ( a_ip(ji,jj,  jl) * zwgt1 + dta%aip(i_bdy,jl) * zwgt ) * tmask(ji,jj,1)  ! Ice  pond concentration
+            h_ip(ji,jj,  jl) = ( h_ip(ji,jj,  jl) * zwgt1 + dta%hip(i_bdy,jl) * zwgt ) * tmask(ji,jj,1)  ! Ice  pond depth
+            !
+            sz_i(ji,jj,:,jl) = s_i(ji,jj,jl)
+            !
+            ! make sure ponds = 0 if no ponds scheme
+            IF( .NOT.ln_pnd ) THEN
+               a_ip(ji,jj,jl) = 0._wp
+               h_ip(ji,jj,jl) = 0._wp
+            ENDIF
+            !
             ! -----------------
             ! Pathological case
             ! -----------------
@@ -124,68 +178,67 @@ CONTAINS
             ! very large transformation from snow to ice (see icethd_dh.F90)
 
             ! Then, a) transfer the snow excess into the ice (different from icethd_dh)
-            zdh = MAX( 0._wp, ( rhos * h_s(ji,jj,jl) + ( rhoi - rau0 ) * h_i(ji,jj,jl) ) * r1_rau0 )
+            zdh = MAX( 0._wp, ( rhos * h_s(ji,jj,jl) + ( rhoi - rho0 ) * h_i(ji,jj,jl) ) * r1_rho0 )
             ! Or, b) transfer all the snow into ice (if incoming ice is likely to melt as it comes into a warmer environment)
             !zdh = MAX( 0._wp, h_s(ji,jj,jl) * rhos / rhoi )
 
             ! recompute h_i, h_s
             h_i(ji,jj,jl) = MIN( hi_max(jl), h_i(ji,jj,jl) + zdh )
             h_s(ji,jj,jl) = MAX( 0._wp, h_s(ji,jj,jl) - zdh * rhoi / rhos ) 
-
+            !
          ENDDO
       ENDDO
-      CALL lbc_bdy_lnk( 'bdyice', a_i(:,:,:), 'T', 1., jbdy )
-      CALL lbc_bdy_lnk( 'bdyice', h_i(:,:,:), 'T', 1., jbdy )
-      CALL lbc_bdy_lnk( 'bdyice', h_s(:,:,:), 'T', 1., jbdy )
 
       DO jl = 1, jpl
-         DO i_bdy = 1, idx%nblenrim(jgrd)
+         DO i_bdy = ibeg, iend
             ji = idx%nbi(i_bdy,jgrd)
             jj = idx%nbj(i_bdy,jgrd)
-
+            flagu => idx%flagu(i_bdy,jgrd)
+            flagv => idx%flagv(i_bdy,jgrd)
             ! condition on ice thickness depends on the ice velocity
             ! if velocity is outward (strictly), then ice thickness, volume... must be equal to adjacent values
             jpbound = 0   ;   ib = ji   ;   jb = jj
             !
-            IF( u_ice(ji+1,jj  ) < 0. .AND. umask(ji-1,jj  ,1) == 0. )   jpbound = 1 ; ib = ji+1 ; jb = jj
-            IF( u_ice(ji-1,jj  ) > 0. .AND. umask(ji+1,jj  ,1) == 0. )   jpbound = 1 ; ib = ji-1 ; jb = jj
-            IF( v_ice(ji  ,jj+1) < 0. .AND. vmask(ji  ,jj-1,1) == 0. )   jpbound = 1 ; ib = ji   ; jb = jj+1
-            IF( v_ice(ji  ,jj-1) > 0. .AND. vmask(ji  ,jj+1,1) == 0. )   jpbound = 1 ; ib = ji   ; jb = jj-1
+            IF( flagu ==  1. )   THEN
+               IF( ji+1 > jpi )   CYCLE
+               IF( u_ice(ji  ,jj  ) < 0. )   jpbound = 1 ; ib = ji+1
+            END IF
+            IF( flagu == -1. )   THEN
+               IF( ji-1 < 1   )   CYCLE
+               IF( u_ice(ji-1,jj  ) < 0. )   jpbound = 1 ; ib = ji-1
+            END IF
+            IF( flagv ==  1. )   THEN
+               IF( jj+1 > jpj )   CYCLE
+               IF( v_ice(ji  ,jj  ) < 0. )   jpbound = 1 ; jb = jj+1
+            END IF
+            IF( flagv == -1. )   THEN
+               IF( jj-1 < 1   )   CYCLE
+               IF( v_ice(ji  ,jj-1) < 0. )   jpbound = 1 ; jb = jj-1
+            END IF
             !
             IF( nn_ice_dta(jbdy) == 0 )   jpbound = 0 ; ib = ji ; jb = jj   ! case ice boundaries = initial conditions
             !                                                               !      do not make state variables dependent on velocity
             !
             IF( a_i(ib,jb,jl) > 0._wp ) THEN   ! there is ice at the boundary
                !
-               a_i(ji,jj,jl) = a_i(ib,jb,jl) ! concentration
-               h_i(ji,jj,jl) = h_i(ib,jb,jl) ! thickness ice
-               h_s(ji,jj,jl) = h_s(ib,jb,jl) ! thickness snw
+               a_i (ji,jj,  jl) = a_i (ib,jb,  jl)
+               h_i (ji,jj,  jl) = h_i (ib,jb,  jl)
+               h_s (ji,jj,  jl) = h_s (ib,jb,  jl)
+               t_i (ji,jj,:,jl) = t_i (ib,jb,:,jl)
+               t_s (ji,jj,:,jl) = t_s (ib,jb,:,jl)
+               t_su(ji,jj,  jl) = t_su(ib,jb,  jl)
+               s_i (ji,jj,  jl) = s_i (ib,jb,  jl)
+               a_ip(ji,jj,  jl) = a_ip(ib,jb,  jl)
+               h_ip(ji,jj,  jl) = h_ip(ib,jb,  jl)
                !
-               SELECT CASE( jpbound )
-                  !
-               CASE( 0 )   ! velocity is inward
-                  !
-                  oa_i(ji,jj,  jl) = rn_ice_age(jbdy) * a_i(ji,jj,jl) ! age
-                  a_ip(ji,jj,  jl) = 0._wp                            ! pond concentration
-                  v_ip(ji,jj,  jl) = 0._wp                            ! pond volume
-                  t_su(ji,jj,  jl) = rn_ice_tem(jbdy)                 ! temperature surface
-                  t_s (ji,jj,:,jl) = rn_ice_tem(jbdy)                 ! temperature snw
-                  t_i (ji,jj,:,jl) = rn_ice_tem(jbdy)                 ! temperature ice
-                  s_i (ji,jj,  jl) = rn_ice_sal(jbdy)                 ! salinity
-                  sz_i(ji,jj,:,jl) = rn_ice_sal(jbdy)                 ! salinity profile
-                  !
-               CASE( 1 )   ! velocity is outward
-                  !
-                  oa_i(ji,jj,  jl) = oa_i(ib,jb,  jl) ! age
-                  a_ip(ji,jj,  jl) = a_ip(ib,jb,  jl) ! pond concentration
-                  v_ip(ji,jj,  jl) = v_ip(ib,jb,  jl) ! pond volume
-                  t_su(ji,jj,  jl) = t_su(ib,jb,  jl) ! temperature surface
-                  t_s (ji,jj,:,jl) = t_s (ib,jb,:,jl) ! temperature snw
-                  t_i (ji,jj,:,jl) = t_i (ib,jb,:,jl) ! temperature ice
-                  s_i (ji,jj,  jl) = s_i (ib,jb,  jl) ! salinity
-                  sz_i(ji,jj,:,jl) = sz_i(ib,jb,:,jl) ! salinity profile
-                  !
-               END SELECT
+               sz_i(ji,jj,:,jl) = sz_i(ib,jb,:,jl)
+               !
+               ! ice age
+               IF    ( jpbound == 0 ) THEN  ! velocity is inward
+                  oa_i(ji,jj,jl) = rice_age(jbdy) * a_i(ji,jj,jl)
+               ELSEIF( jpbound == 1 ) THEN  ! velocity is outward
+                  oa_i(ji,jj,jl) = oa_i(ib,jb,jl)
+               ENDIF
                !
                IF( nn_icesal == 1 ) THEN     ! if constant salinity
                   s_i (ji,jj  ,jl) = rn_icesal
@@ -210,6 +263,14 @@ CONTAINS
                   e_i(ji,jj,jk,jl) = e_i(ji,jj,jk,jl) * v_i(ji,jj,jl) * r1_nlay_i                            ! enthalpy in J/m2
                END DO
                !
+               ! melt ponds
+               IF( a_i(ji,jj,jl) > epsi10 ) THEN
+                  a_ip_frac(ji,jj,jl) = a_ip(ji,jj,jl) / a_i (ji,jj,jl)
+               ELSE
+                  a_ip_frac(ji,jj,jl) = 0._wp
+               ENDIF
+               v_ip(ji,jj,jl) = h_ip(ji,jj,jl) * a_ip(ji,jj,jl)
+               !
             ELSE   ! no ice at the boundary
                !
                a_i (ji,jj,  jl) = 0._wp
@@ -221,6 +282,11 @@ CONTAINS
                t_su(ji,jj,  jl) = rt0
                t_s (ji,jj,:,jl) = rt0
                t_i (ji,jj,:,jl) = rt0 
+
+               a_ip_frac(ji,jj,jl) = 0._wp
+               h_ip     (ji,jj,jl) = 0._wp
+               a_ip     (ji,jj,jl) = 0._wp
+               v_ip     (ji,jj,jl) = 0._wp
                
                IF( nn_icesal == 1 ) THEN     ! if constant salinity
                   s_i (ji,jj  ,jl) = rn_icesal
@@ -242,22 +308,6 @@ CONTAINS
          END DO
          !
       END DO ! jl
-
-      CALL lbc_bdy_lnk( 'bdyice', a_i (:,:,:)  , 'T', 1., jbdy )
-      CALL lbc_bdy_lnk( 'bdyice', h_i (:,:,:)  , 'T', 1., jbdy )
-      CALL lbc_bdy_lnk( 'bdyice', h_s (:,:,:)  , 'T', 1., jbdy )
-      CALL lbc_bdy_lnk( 'bdyice', oa_i(:,:,:)  , 'T', 1., jbdy )
-      CALL lbc_bdy_lnk( 'bdyice', a_ip(:,:,:)  , 'T', 1., jbdy )
-      CALL lbc_bdy_lnk( 'bdyice', v_ip(:,:,:)  , 'T', 1., jbdy )
-      CALL lbc_bdy_lnk( 'bdyice', s_i (:,:,:)  , 'T', 1., jbdy )
-      CALL lbc_bdy_lnk( 'bdyice', t_su(:,:,:)  , 'T', 1., jbdy )
-      CALL lbc_bdy_lnk( 'bdyice', v_i (:,:,:)  , 'T', 1., jbdy )
-      CALL lbc_bdy_lnk( 'bdyice', v_s (:,:,:)  , 'T', 1., jbdy )
-      CALL lbc_bdy_lnk( 'bdyice', sv_i(:,:,:)  , 'T', 1., jbdy )
-      CALL lbc_bdy_lnk( 'bdyice', t_s (:,:,:,:), 'T', 1., jbdy )
-      CALL lbc_bdy_lnk( 'bdyice', e_s (:,:,:,:), 'T', 1., jbdy )
-      CALL lbc_bdy_lnk( 'bdyice', t_i (:,:,:,:), 'T', 1., jbdy )
-      CALL lbc_bdy_lnk( 'bdyice', e_i (:,:,:,:), 'T', 1., jbdy )
       !      
    END SUBROUTINE bdy_ice_frs
 
@@ -275,79 +325,134 @@ CONTAINS
       !!------------------------------------------------------------------------------
       CHARACTER(len=1), INTENT(in)  ::   cd_type   ! nature of velocity grid-points
       !
-      INTEGER  ::   i_bdy, jgrd      ! dummy loop indices
-      INTEGER  ::   ji, jj           ! local scalar
-      INTEGER  ::   jbdy             ! BDY set index
+      INTEGER  ::   i_bdy, jgrd       ! dummy loop indices
+      INTEGER  ::   ji, jj            ! local scalar
+      INTEGER  ::   jbdy, ir     ! BDY set index, rim index
+      INTEGER  ::   ibeg, iend   ! length of rim to be treated (rim 0 or rim 1)
       REAL(wp) ::   zmsk1, zmsk2, zflag
+      LOGICAL, DIMENSION(4) :: llsend2, llrecv2, llsend3, llrecv3  ! indicate how communications are to be carried out
       !!------------------------------------------------------------------------------
       IF( ln_timing )   CALL timing_start('bdy_ice_dyn')
       !
-      DO jbdy=1, nb_bdy
-         !
-         SELECT CASE( cn_ice(jbdy) )
-         !
-         CASE('none')
-            CYCLE
+      llsend2(:) = .false.   ;   llrecv2(:) = .false.
+      llsend3(:) = .false.   ;   llrecv3(:) = .false.
+      DO ir = 1, 0, -1
+         DO jbdy = 1, nb_bdy
             !
-         CASE('frs')
-            !
-            IF( nn_ice_dta(jbdy) == 0 ) CYCLE            ! case ice boundaries = initial conditions 
-            !                                            !      do not change ice velocity (it is only computed by rheology)
-            SELECT CASE ( cd_type )
-            !     
-            CASE ( 'U' )  
-               jgrd = 2      ! u velocity
-               DO i_bdy = 1, idx_bdy(jbdy)%nblenrim(jgrd)
-                  ji    = idx_bdy(jbdy)%nbi(i_bdy,jgrd)
-                  jj    = idx_bdy(jbdy)%nbj(i_bdy,jgrd)
-                  zflag = idx_bdy(jbdy)%flagu(i_bdy,jgrd)
-                  !
-                  IF ( ABS( zflag ) == 1. ) THEN  ! eastern and western boundaries
-                     ! one of the two zmsk is always 0 (because of zflag)
-                     zmsk1 = 1._wp - MAX( 0.0_wp, SIGN ( 1.0_wp , - vt_i(ji+1,jj) ) ) ! 0 if no ice
-                     zmsk2 = 1._wp - MAX( 0.0_wp, SIGN ( 1.0_wp , - vt_i(ji-1,jj) ) ) ! 0 if no ice
-                     !  
-                     ! u_ice = u_ice of the adjacent grid point except if this grid point is ice-free (then do not change u_ice)
-                     u_ice (ji,jj) = u_ice(ji+1,jj) * 0.5_wp * ABS( zflag + 1._wp ) * zmsk1 + &
-                        &            u_ice(ji-1,jj) * 0.5_wp * ABS( zflag - 1._wp ) * zmsk2 + &
-                        &            u_ice(ji  ,jj) * ( 1._wp - MIN( 1._wp, zmsk1 + zmsk2 ) )
-                  ELSE                             ! everywhere else
-                     u_ice(ji,jj) = 0._wp
-                  ENDIF
-                  !
-               END DO
-               CALL lbc_bdy_lnk( 'bdyice', u_ice(:,:), 'U', -1., jbdy )
+            SELECT CASE( cn_ice(jbdy) )
                !
-            CASE ( 'V' )
-               jgrd = 3      ! v velocity
-               DO i_bdy = 1, idx_bdy(jbdy)%nblenrim(jgrd)
-                  ji    = idx_bdy(jbdy)%nbi(i_bdy,jgrd)
-                  jj    = idx_bdy(jbdy)%nbj(i_bdy,jgrd)
-                  zflag = idx_bdy(jbdy)%flagv(i_bdy,jgrd)
-                  !
-                  IF ( ABS( zflag ) == 1. ) THEN  ! northern and southern boundaries
-                     ! one of the two zmsk is always 0 (because of zflag)
-                     zmsk1 = 1._wp - MAX( 0.0_wp, SIGN ( 1.0_wp , - vt_i(ji,jj+1) ) ) ! 0 if no ice
-                     zmsk2 = 1._wp - MAX( 0.0_wp, SIGN ( 1.0_wp , - vt_i(ji,jj-1) ) ) ! 0 if no ice
-                     !  
-                     ! v_ice = v_ice of the adjacent grid point except if this grid point is ice-free (then do not change v_ice)
-                     v_ice (ji,jj) = v_ice(ji,jj+1) * 0.5_wp * ABS( zflag + 1._wp ) * zmsk1 + &
-                        &            v_ice(ji,jj-1) * 0.5_wp * ABS( zflag - 1._wp ) * zmsk2 + &
-                        &            v_ice(ji,jj  ) * ( 1._wp - MIN( 1._wp, zmsk1 + zmsk2 ) )
-                  ELSE                             ! everywhere else
-                     v_ice(ji,jj) = 0._wp
-                  ENDIF
-                  !
-               END DO
-               CALL lbc_bdy_lnk( 'bdyice', v_ice(:,:), 'V', -1., jbdy )
+            CASE('none')
+               CYCLE
                !
+            CASE('frs')
+               !
+               IF( nn_ice_dta(jbdy) == 0 ) CYCLE            ! case ice boundaries = initial conditions 
+               !                                            !      do not change ice velocity (it is only computed by rheology)
+               SELECT CASE ( cd_type )
+                  !     
+               CASE ( 'U' )  
+                  jgrd = 2      ! u velocity
+                  IF( ir == 0 ) THEN   ;   ibeg = 1                                 ;   iend = idx_bdy(jbdy)%nblenrim0(jgrd)
+                  ELSE                 ;   ibeg = idx_bdy(jbdy)%nblenrim0(jgrd)+1   ;   iend = idx_bdy(jbdy)%nblenrim(jgrd)
+                  END IF
+                  DO i_bdy = ibeg, iend
+                     ji    = idx_bdy(jbdy)%nbi(i_bdy,jgrd)
+                     jj    = idx_bdy(jbdy)%nbj(i_bdy,jgrd)
+                     zflag = idx_bdy(jbdy)%flagu(i_bdy,jgrd)
+                     !     i-1  i   i    |  !        i  i i+1 |  !          i  i i+1 |
+                     !      >  ice  >    |  !        o  > ice |  !          o  >  o  |      
+                     ! => set at u_ice(i-1) !  => set to O       !  => unchanged
+                     IF( zflag == -1. .AND. ji > 1 .AND. ji < jpi )   THEN  
+                        IF    ( vt_i(ji  ,jj) > 0. )   THEN   ;   u_ice(ji,jj) = u_ice(ji-1,jj) 
+                        ELSEIF( vt_i(ji+1,jj) > 0. )   THEN   ;   u_ice(ji,jj) = 0._wp
+                        END IF
+                     END IF
+                     ! |    i  i+1 i+1        !  |  i   i i+1        !  | i  i i+1
+                     ! |    >  ice  >         !  | ice  >  o         !  | o  >  o   
+                     ! => set at u_ice(i+1)   !     => set to O      !     =>  unchanged
+                     IF( zflag ==  1. .AND. ji+1 < jpi+1 )   THEN
+                        IF    ( vt_i(ji+1,jj) > 0. )   THEN   ;   u_ice(ji,jj) = u_ice(ji+1,jj)
+                        ELSEIF( vt_i(ji  ,jj) > 0. )   THEN   ;   u_ice(ji,jj) = 0._wp
+                        END IF
+                     END IF
+                     !
+                     IF( zflag ==  0. )   u_ice(ji,jj) = 0._wp   ! u_ice = 0  if north/south bdy  
+                     !
+                  END DO
+                  !
+               CASE ( 'V' )
+                  jgrd = 3      ! v velocity
+                  IF( ir == 0 ) THEN   ;   ibeg = 1                                 ;   iend = idx_bdy(jbdy)%nblenrim0(jgrd)
+                  ELSE                 ;   ibeg = idx_bdy(jbdy)%nblenrim0(jgrd)+1   ;   iend = idx_bdy(jbdy)%nblenrim(jgrd)
+                  END IF
+                  DO i_bdy = ibeg, iend
+                     ji    = idx_bdy(jbdy)%nbi(i_bdy,jgrd)
+                     jj    = idx_bdy(jbdy)%nbj(i_bdy,jgrd)
+                     zflag = idx_bdy(jbdy)%flagv(i_bdy,jgrd)
+                     !                         !      ice   (jj+1)       !       o    (jj+1)
+                     !       ^    (jj  )       !       ^    (jj  )       !       ^    (jj  )       
+                     !      ice   (jj  )       !       o    (jj  )       !       o    (jj  )       
+                     !       ^    (jj-1)       !                         !
+                     ! => set to u_ice(jj-1)   !  =>   set to 0          !   => unchanged        
+                     IF( zflag == -1. .AND. jj > 1 .AND. jj < jpj )   THEN                 
+                        IF    ( vt_i(ji,jj  ) > 0. )   THEN   ;   v_ice(ji,jj) = v_ice(ji,jj-1)
+                        ELSEIF( vt_i(ji,jj+1) > 0. )   THEN   ;   v_ice(ji,jj) = 0._wp
+                        END IF
+                     END IF
+                     !       ^    (jj+1)       !                         !              
+                     !      ice   (jj+1)       !       o    (jj+1)       !       o    (jj+1)       
+                     !       ^    (jj  )       !       ^    (jj  )       !       ^    (jj  )
+                     !   ________________      !  ____ice___(jj  )_      !  _____o____(jj  ) 
+                     ! => set to u_ice(jj+1)   !    => set to 0          !    => unchanged  
+                     IF( zflag ==  1. .AND. jj < jpj )   THEN              
+                        IF    ( vt_i(ji,jj+1) > 0. )   THEN   ;   v_ice(ji,jj) = v_ice(ji,jj+1)
+                        ELSEIF( vt_i(ji,jj  ) > 0. )   THEN   ;   v_ice(ji,jj) = 0._wp
+                        END IF
+                     END IF
+                     !
+                     IF( zflag ==  0. )   v_ice(ji,jj) = 0._wp   ! v_ice = 0  if west/east bdy  
+                     !
+                  END DO
+                  !
+               END SELECT
+               !
+            CASE DEFAULT
+               CALL ctl_stop( 'bdy_ice_dyn : unrecognised option for open boundaries for ice fields' )
             END SELECT
             !
-         CASE DEFAULT
-            CALL ctl_stop( 'bdy_ice_dyn : unrecognised option for open boundaries for ice fields' )
-         END SELECT
+         END DO    ! jbdy
          !
-      END DO
+         SELECT CASE ( cd_type )        
+         CASE ( 'U' ) 
+         IF( nn_hls > 1 .AND. ir == 1 ) CYCLE   ! at least 2 halos will be corrected -> no need to correct rim 1 before rim 0
+         IF( nn_hls == 1 ) THEN   ;   llsend2(:) = .false.   ;   llrecv2(:) = .false.   ;   END IF
+            DO jbdy = 1, nb_bdy
+               IF( cn_ice(jbdy) == 'frs' .AND. nn_ice_dta(jbdy) /= 0 ) THEN
+                  llsend2(:) = llsend2(:) .OR. lsend_bdyint(jbdy,2,:,ir)   ! possibly every direction, U points
+                  llsend2(1) = llsend2(1) .OR. lsend_bdyext(jbdy,2,1,ir)   ! neighbour might search point towards its west bdy
+                  llrecv2(:) = llrecv2(:) .OR. lrecv_bdyint(jbdy,2,:,ir)   ! possibly every direction, U points
+                  llrecv2(2) = llrecv2(2) .OR. lrecv_bdyext(jbdy,2,2,ir)   ! might search point towards east bdy
+               END IF
+            END DO
+            IF( ANY(llsend2) .OR. ANY(llrecv2) ) THEN   ! if need to send/recv in at least one direction
+               CALL lbc_lnk( 'bdyice', u_ice, 'U', -1., kfillmode=jpfillnothing ,lsend=llsend2, lrecv=llrecv2 )
+            END IF
+         CASE ( 'V' )
+         IF( nn_hls > 1 .AND. ir == 1 ) CYCLE   ! at least 2 halos will be corrected -> no need to correct rim 1 before rim 0
+         IF( nn_hls == 1 ) THEN   ;   llsend3(:) = .false.   ;   llrecv3(:) = .false.   ;   END IF
+            DO jbdy = 1, nb_bdy
+               IF( cn_ice(jbdy) == 'frs' .AND. nn_ice_dta(jbdy) /= 0 ) THEN
+                  llsend3(:) = llsend3(:) .OR. lsend_bdyint(jbdy,3,:,ir)   ! possibly every direction, V points
+                  llsend3(3) = llsend3(3) .OR. lsend_bdyext(jbdy,3,3,ir)   ! neighbour might search point towards its south bdy
+                  llrecv3(:) = llrecv3(:) .OR. lrecv_bdyint(jbdy,3,:,ir)   ! possibly every direction, V points
+                  llrecv3(4) = llrecv3(4) .OR. lrecv_bdyext(jbdy,3,4,ir)   ! might search point towards north bdy
+               END IF
+            END DO
+            IF( ANY(llsend3) .OR. ANY(llrecv3) ) THEN   ! if need to send/recv in at least one direction
+               CALL lbc_lnk( 'bdyice', v_ice, 'V', -1., kfillmode=jpfillnothing ,lsend=llsend3, lrecv=llrecv3 )
+            END IF
+         END SELECT
+      END DO   ! ir
       !
       IF( ln_timing )   CALL timing_stop('bdy_ice_dyn')
       !

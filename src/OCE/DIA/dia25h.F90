@@ -33,12 +33,12 @@ MODULE dia25h
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: dia25h.F90 10499 2019-01-10 15:12:24Z deazer $
+   !! $Id: dia25h.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE dia_25h_init 
+   SUBROUTINE dia_25h_init( Kbb )
       !!---------------------------------------------------------------------------
       !!                  ***  ROUTINE dia_25h_init  ***
       !!     
@@ -46,18 +46,18 @@ CONTAINS
       !!        
       !! ** Method : Read namelist
       !!---------------------------------------------------------------------------
+      INTEGER, INTENT(in) :: Kbb       ! Time level index
+      !
       INTEGER ::   ios                 ! Local integer output status for namelist read
       INTEGER ::   ierror              ! Local integer for memory allocation
       !
       NAMELIST/nam_dia25h/ ln_dia25h
       !!----------------------------------------------------------------------
       !
-      REWIND ( numnam_ref )              ! Read Namelist nam_dia25h in reference namelist : 25hour mean diagnostics
       READ   ( numnam_ref, nam_dia25h, IOSTAT=ios, ERR= 901 )
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'nam_dia25h in reference namelist', lwp )
-      REWIND( numnam_cfg )              ! Namelist nam_dia25h in configuration namelist  25hour diagnostics
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'nam_dia25h in reference namelist' )
       READ  ( numnam_cfg, nam_dia25h, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'nam_dia25h in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'nam_dia25h in configuration namelist' )
       IF(lwm) WRITE ( numond, nam_dia25h )
 
       IF(lwp) THEN                   ! Control print
@@ -94,12 +94,11 @@ CONTAINS
       ! 2 - Assign Initial Values !
       ! ------------------------- !
       cnt_25h = 1  ! sets the first value of sum at timestep 1 (note - should strictly be at timestep zero so before values used where possible) 
-      tn_25h  (:,:,:) = tsb (:,:,:,jp_tem)
-      sn_25h  (:,:,:) = tsb (:,:,:,jp_sal)
-      sshn_25h(:,:)   = sshb(:,:)
-      un_25h  (:,:,:) = ub  (:,:,:)
-      vn_25h  (:,:,:) = vb  (:,:,:)
-      wn_25h  (:,:,:) = wn  (:,:,:)
+      tn_25h  (:,:,:) = ts (:,:,:,jp_tem,Kbb)
+      sn_25h  (:,:,:) = ts (:,:,:,jp_sal,Kbb)
+      sshn_25h(:,:)   = ssh(:,:,Kbb)
+      un_25h  (:,:,:) = uu  (:,:,:,Kbb)
+      vn_25h  (:,:,:) = vv  (:,:,:,Kbb)
       avt_25h (:,:,:) = avt (:,:,:)
       avm_25h (:,:,:) = avm (:,:,:)
       IF( ln_zdftke ) THEN
@@ -116,7 +115,7 @@ CONTAINS
    END SUBROUTINE dia_25h_init
 
 
-   SUBROUTINE dia_25h( kt )  
+   SUBROUTINE dia_25h( kt, Kmm )  
       !!----------------------------------------------------------------------
       !!                 ***  ROUTINE dia_25h  ***
       !!         
@@ -125,6 +124,7 @@ CONTAINS
       !! ** Method  :   25hr mean outputs for shelf seas
       !!----------------------------------------------------------------------
       INTEGER, INTENT(in) ::   kt   ! ocean time-step index
+      INTEGER, INTENT(in) ::   Kmm  ! ocean time level index
       !!
       INTEGER ::   ji, jj, jk
       INTEGER                          ::   iyear0, nimonth0,iday0            ! start year,imonth,day
@@ -139,14 +139,19 @@ CONTAINS
       ! 0. Initialisation
       ! -----------------
       ! Define frequency of summing to create 25 h mean
-      IF( MOD( 3600,NINT(rdt) ) == 0 ) THEN
-         i_steps = 3600/NINT(rdt)
+      IF( MOD( 3600,NINT(rn_Dt) ) == 0 ) THEN
+         i_steps = 3600/NINT(rn_Dt)
       ELSE
-         CALL ctl_stop('STOP', 'dia_wri_tide: timestep must give MOD(3600,rdt) = 0 otherwise no hourly values are possible')
+         CALL ctl_stop('STOP', 'dia_wri_tide: timestep must give MOD(3600,rn_Dt) = 0 otherwise no hourly values are possible')
       ENDIF
 
       ! local variable for debugging
       ll_print = ll_print .AND. lwp
+
+      ! wn_25h could not be initialised in dia_25h_init, so we do it here instead
+      IF( kt == nn_it000 ) THEN
+         wn_25h(:,:,:) = ww(:,:,:)
+      ENDIF
 
       ! Sum of 25 hourly instantaneous values to give a 25h mean from 24hours every day
       IF( MOD( kt, i_steps ) == 0  .AND. kt /= nn_it000 ) THEN
@@ -156,12 +161,12 @@ CONTAINS
               WRITE(numout,*) '~~~~~~~~~~~~ '
          ENDIF
 
-         tn_25h  (:,:,:)     = tn_25h  (:,:,:) + tsn (:,:,:,jp_tem)
-         sn_25h  (:,:,:)     = sn_25h  (:,:,:) + tsn (:,:,:,jp_sal)
-         sshn_25h(:,:)       = sshn_25h(:,:)   + sshn(:,:)
-         un_25h  (:,:,:)     = un_25h  (:,:,:) + un  (:,:,:)
-         vn_25h  (:,:,:)     = vn_25h  (:,:,:) + vn  (:,:,:)
-         wn_25h  (:,:,:)     = wn_25h  (:,:,:) + wn  (:,:,:)
+         tn_25h  (:,:,:)     = tn_25h  (:,:,:) + ts (:,:,:,jp_tem,Kmm)
+         sn_25h  (:,:,:)     = sn_25h  (:,:,:) + ts (:,:,:,jp_sal,Kmm)
+         sshn_25h(:,:)       = sshn_25h(:,:)   + ssh(:,:,Kmm)
+         un_25h  (:,:,:)     = un_25h  (:,:,:) + uu  (:,:,:,Kmm)
+         vn_25h  (:,:,:)     = vn_25h  (:,:,:) + vv  (:,:,:,Kmm)
+         wn_25h  (:,:,:)     = wn_25h  (:,:,:) + ww  (:,:,:)
          avt_25h (:,:,:)     = avt_25h (:,:,:) + avt (:,:,:)
          avm_25h (:,:,:)     = avm_25h (:,:,:) + avm (:,:,:)
          IF( ln_zdftke ) THEN
@@ -222,7 +227,7 @@ CONTAINS
          zw3d(:,:,:) = vn_25h(:,:,:)*vmask(:,:,:) + zmdi*(1.0-vmask(:,:,:))
          CALL iom_put("vomecrty25h", zw3d  )   ! j-current
          zw3d(:,:,:) = wn_25h(:,:,:)*wmask(:,:,:) + zmdi*(1.0-tmask(:,:,:))
-         CALL iom_put("vomecrtz25h", zw3d )   ! k-current
+         CALL iom_put("vovecrtz25h", zw3d )   ! k-current
          ! Write vertical physics
          zw3d(:,:,:) = avt_25h(:,:,:)*wmask(:,:,:) + zmdi*(1.0-tmask(:,:,:))
          CALL iom_put("avt25h", zw3d )   ! diffusivity
@@ -240,12 +245,12 @@ CONTAINS
          ENDIF
          !
          ! After the write reset the values to cnt=1 and sum values equal current value 
-         tn_25h  (:,:,:) = tsn (:,:,:,jp_tem)
-         sn_25h  (:,:,:) = tsn (:,:,:,jp_sal)
-         sshn_25h(:,:)   = sshn(:,:)
-         un_25h  (:,:,:) = un  (:,:,:)
-         vn_25h  (:,:,:) = vn  (:,:,:)
-         wn_25h  (:,:,:) = wn  (:,:,:)
+         tn_25h  (:,:,:) = ts (:,:,:,jp_tem,Kmm)
+         sn_25h  (:,:,:) = ts (:,:,:,jp_sal,Kmm)
+         sshn_25h(:,:)   = ssh(:,:,Kmm)
+         un_25h  (:,:,:) = uu  (:,:,:,Kmm)
+         vn_25h  (:,:,:) = vv  (:,:,:,Kmm)
+         wn_25h  (:,:,:) = ww  (:,:,:)
          avt_25h (:,:,:) = avt (:,:,:)
          avm_25h (:,:,:) = avm (:,:,:)
          IF( ln_zdftke ) THEN

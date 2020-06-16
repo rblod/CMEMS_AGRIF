@@ -40,7 +40,7 @@ MODULE mppini
    
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: mppini.F90 10560 2019-01-23 14:37:31Z smasson $ 
+   !! $Id: mppini.F90 13026 2020-06-03 14:30:02Z rblod $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -83,7 +83,9 @@ CONTAINS
       nbondi = 2
       nbondj = 2
       nidom  = FLIO_DOM_NONE
-      npolj = jperio
+      npolj = 0
+      IF( jperio == 3 .OR. jperio == 4 )   npolj = 3
+      IF( jperio == 5 .OR. jperio == 6 )   npolj = 5
       l_Iperio = jpni == 1 .AND. (jperio == 1 .OR. jperio == 4 .OR. jperio == 6 .OR. jperio == 7)
       l_Jperio = jpnj == 1 .AND. (jperio == 2 .OR. jperio == 7)
       !
@@ -154,7 +156,9 @@ CONTAINS
       INTEGER ::   iarea0                     !   -       -
       INTEGER ::   ierr, ios                  ! 
       INTEGER ::   inbi, inbj, iimax,  ijmax, icnt1, icnt2
-      LOGICAL ::   llbest
+      LOGICAL ::   llbest, llauto
+      LOGICAL ::   llwrtlay
+      LOGICAL ::   ln_listonly
       INTEGER, ALLOCATABLE, DIMENSION(:)     ::   iin, ii_nono, ii_noea          ! 1D workspace
       INTEGER, ALLOCATABLE, DIMENSION(:)     ::   ijn, ii_noso, ii_nowe          !  -     -
       INTEGER, ALLOCATABLE, DIMENSION(:,:) ::   iimppt, ilci, ibondi, ipproc   ! 2D workspace
@@ -167,41 +171,88 @@ CONTAINS
            &             cn_dyn3d, nn_dyn3d_dta, cn_tra, nn_tra_dta,             &  
            &             ln_tra_dmp, ln_dyn3d_dmp, rn_time_dmp, rn_time_dmp_out, &
            &             cn_ice, nn_ice_dta,                                     &
-           &             rn_ice_tem, rn_ice_sal, rn_ice_age,                     &
-           &             ln_vol, nn_volctl, nn_rimwidth, nb_jpk_bdy
+           &             ln_vol, nn_volctl, nn_rimwidth
+      NAMELIST/nammpp/ jpni, jpnj, ln_nnogather, ln_listonly
       !!----------------------------------------------------------------------
+      !
+      llwrtlay = lwm .OR. sn_cfctl%l_layout
+      !
+      !  0. read namelists parameters
+      ! -----------------------------------
+      !
+      READ  ( numnam_ref, nammpp, IOSTAT = ios, ERR = 901 )
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'nammpp in reference namelist' )
+      READ  ( numnam_cfg, nammpp, IOSTAT = ios, ERR = 902 )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'nammpp in configuration namelist' )   
+      !
+      IF(lwp) THEN
+            WRITE(numout,*) '   Namelist nammpp'
+         IF( jpni < 1 .OR. jpnj < 1  ) THEN
+            WRITE(numout,*) '      jpni and jpnj will be calculated automatically'
+         ELSE
+            WRITE(numout,*) '      processor grid extent in i                            jpni = ', jpni
+            WRITE(numout,*) '      processor grid extent in j                            jpnj = ', jpnj
+         ENDIF
+            WRITE(numout,*) '      avoid use of mpi_allgather at the north fold  ln_nnogather = ', ln_nnogather
+      ENDIF
+      !
+      IF(lwm)   WRITE( numond, nammpp )
 
       ! do we need to take into account bdy_msk?
-      REWIND( numnam_ref )              ! Namelist nambdy in reference namelist : BDY
       READ  ( numnam_ref, nambdy, IOSTAT = ios, ERR = 903)
-903   IF( ios /= 0 )   CALL ctl_nam ( ios , 'nambdy in reference namelist (mppini)', lwp )
-      REWIND( numnam_cfg )              ! Namelist nambdy in configuration namelist : BDY
+903   IF( ios /= 0 )   CALL ctl_nam ( ios , 'nambdy in reference namelist (mppini)' )
       READ  ( numnam_cfg, nambdy, IOSTAT = ios, ERR = 904 )
-904   IF( ios >  0 )   CALL ctl_nam ( ios , 'nambdy in configuration namelist (mppini)', lwp )
+904   IF( ios >  0 )   CALL ctl_nam ( ios , 'nambdy in configuration namelist (mppini)' )
       !
       IF(               ln_read_cfg ) CALL iom_open( cn_domcfg,    numbot )
       IF( ln_bdy .AND. ln_mask_file ) CALL iom_open( cn_mask_file, numbdy )
+      !
+      IF( ln_listonly )   CALL mpp_init_bestpartition( MAX(mppsize,jpni*jpnj), ldlist = .TRUE. )   ! must be done by all core
       !
       !  1. Dimension arrays for subdomains
       ! -----------------------------------
       !
       ! If dimensions of processor grid weren't specified in the namelist file
       ! then we calculate them here now that we have our communicator size
+      IF(lwp) THEN
+         WRITE(numout,*) 'mpp_init:'
+         WRITE(numout,*) '~~~~~~~~ '
+         WRITE(numout,*)
+      ENDIF
       IF( jpni < 1 .OR. jpnj < 1 ) THEN
-         CALL mpp_init_bestpartition( mppsize, jpni, jpnj )
+         CALL mpp_init_bestpartition( mppsize, jpni, jpnj )           ! best mpi decomposition for mppsize mpi processes
+         llauto = .TRUE.
          llbest = .TRUE.
       ELSE
-         CALL mpp_init_bestpartition( mppsize, inbi, inbj, icnt2 )
+         llauto = .FALSE.
+         CALL mpp_init_bestpartition( mppsize, inbi, inbj, icnt2 )    ! best mpi decomposition for mppsize mpi processes
+         ! largest subdomain size for mpi decoposition jpni*jpnj given in the namelist
          CALL mpp_basic_decomposition( jpni, jpnj, jpimax, jpjmax )
+         ! largest subdomain size for mpi decoposition inbi*inbj given by mpp_init_bestpartition
          CALL mpp_basic_decomposition( inbi, inbj,  iimax,  ijmax )
-         IF( iimax*ijmax < jpimax*jpjmax ) THEN
+         icnt1 = jpni*jpnj - mppsize   ! number of land subdomains that should be removed to use mppsize mpi processes
+         IF(lwp) THEN
+            WRITE(numout,9000) '   The chosen domain decomposition ', jpni, ' x ', jpnj, ' with ', icnt1, ' land subdomains'
+            WRITE(numout,9002) '      - uses a total of ',  mppsize,' mpi process'
+            WRITE(numout,9000) '      - has mpi subdomains with a maximum size of (jpi = ', jpimax, ', jpj = ', jpjmax,   &
+               &                                                                ', jpi*jpj = ', jpimax*jpjmax, ')'
+            WRITE(numout,9000) '   The best domain decompostion ', inbi, ' x ', inbj, ' with ', icnt2, ' land subdomains'
+            WRITE(numout,9002) '      - uses a total of ',  inbi*inbj-icnt2,' mpi process'
+            WRITE(numout,9000) '      - has mpi subdomains with a maximum size of (jpi = ',  iimax, ', jpj = ',  ijmax,   &
+               &                                                             ', jpi*jpj = ',  iimax* ijmax, ')'
+         ENDIF
+         IF( iimax*ijmax < jpimax*jpjmax ) THEN   ! chosen subdomain size is larger that the best subdomain size
             llbest = .FALSE.
-            icnt1 = jpni*jpnj - mppsize
-            WRITE(ctmp1,9000) '   The chosen domain decomposition ', jpni, ' x ', jpnj, ' with ', icnt1, ' land sub-domains'
-            WRITE(ctmp2,9000) '   has larger MPI subdomains (jpi = ', jpimax, ', jpj = ', jpjmax, ', jpi*jpj = ', jpimax*jpjmax, ')'
-            WRITE(ctmp3,9000) '   than the following domain decompostion ', inbi, ' x ', inbj, ' with ', icnt2, ' land sub-domains'
-            WRITE(ctmp4,9000) '   which MPI subdomains size is jpi = ', iimax, ', jpj = ', ijmax, ', jpi*jpj = ', iimax*ijmax, ' '
-            CALL ctl_warn( 'mpp_init:', '~~~~~~~~ ', ctmp1, ctmp2, ctmp3, ctmp4, ' ', '    --- YOU ARE WASTING CPU... ---', ' ' )
+            IF ( inbi*inbj-icnt2 < mppsize ) THEN
+               WRITE(ctmp1,*) '   ==> You could therefore have smaller mpi subdomains with less mpi processes'
+            ELSE
+               WRITE(ctmp1,*) '   ==> You could therefore have smaller mpi subdomains with the same number of mpi processes'
+            ENDIF
+            CALL ctl_warn( ' ', ctmp1, ' ', '    ---   YOU ARE WASTING CPU...   ---', ' ' )
+         ELSE IF ( iimax*ijmax == jpimax*jpjmax .AND. (inbi*inbj-icnt2) <  mppsize) THEN
+            llbest = .FALSE.
+            WRITE(ctmp1,*) '   ==> You could therefore have the same mpi subdomains size with less mpi processes'
+            CALL ctl_warn( ' ', ctmp1, ' ', '    ---   YOU ARE WASTING CPU...   ---', ' ' )
          ELSE
             llbest = .TRUE.
          ENDIF
@@ -212,24 +263,37 @@ CONTAINS
       CALL mpp_init_isoce( jpni, jpnj, llisoce )
       inijmin = COUNT( llisoce )   ! number of oce subdomains
 
-      IF( mppsize < inijmin ) THEN
+      IF( mppsize < inijmin ) THEN   ! too many oce subdomains: can happen only if jpni and jpnj are prescribed...
          WRITE(ctmp1,9001) '   With this specified domain decomposition: jpni = ', jpni, ' jpnj = ', jpnj
          WRITE(ctmp2,9002) '   we can eliminate only ', jpni*jpnj - inijmin, ' land mpi subdomains therefore '
          WRITE(ctmp3,9001) '   the number of ocean mpi subdomains (', inijmin,') exceed the number of MPI processes:', mppsize
          WRITE(ctmp4,*) '   ==>>> There is the list of best domain decompositions you should use: '
-         CALL ctl_stop( 'mpp_init:', '~~~~~~~~ ', ctmp1, ctmp2, ctmp3, ctmp4 )
+         CALL ctl_stop( ctmp1, ctmp2, ctmp3, ' ', ctmp4, ' ' )
          CALL mpp_init_bestpartition( mppsize, ldlist = .TRUE. )   ! must be done by all core
-         CALL ctl_stop( 'STOP' )
       ENDIF
 
-      IF( mppsize > jpni*jpnj ) THEN
-         WRITE(ctmp1,9003) '   The number of mpi processes: ', mppsize
-         WRITE(ctmp2,9003) '   exceeds the maximum number of subdomains (ocean+land) = ', jpni*jpnj
-         WRITE(ctmp3,9001) '   defined by the following domain decomposition: jpni = ', jpni, ' jpnj = ', jpnj
-         WRITE(ctmp4,*) '   ==>>> There is the list of best domain decompositions you should use: '
-         CALL ctl_stop( 'mpp_init:', '~~~~~~~~ ', ctmp1, ctmp2, ctmp3, ctmp4 )
+      IF( mppsize > jpni*jpnj ) THEN   ! not enough mpi subdomains for the total number of mpi processes
+         IF(lwp) THEN
+            WRITE(numout,9003) '   The number of mpi processes: ', mppsize
+            WRITE(numout,9003) '   exceeds the maximum number of subdomains (ocean+land) = ', jpni*jpnj
+            WRITE(numout,9001) '   defined by the following domain decomposition: jpni = ', jpni, ' jpnj = ', jpnj
+            WRITE(numout,   *) '   You should: '
+           IF( llauto ) THEN
+               WRITE(numout,*) '     - either prescribe your domain decomposition with the namelist variables'
+               WRITE(numout,*) '       jpni and jpnj to match the number of mpi process you want to use, '
+               WRITE(numout,*) '       even IF it not the best choice...'
+               WRITE(numout,*) '     - or keep the automatic and optimal domain decomposition by picking up one'
+               WRITE(numout,*) '       of the number of mpi process proposed in the list bellow'
+            ELSE
+               WRITE(numout,*) '     - either properly prescribe your domain decomposition with jpni and jpnj'
+               WRITE(numout,*) '       in order to be consistent with the number of mpi process you want to use'
+               WRITE(numout,*) '       even IF it not the best choice...'
+               WRITE(numout,*) '     - or use the automatic and optimal domain decomposition and pick up one of'
+               WRITE(numout,*) '       the domain decomposition proposed in the list bellow'
+            ENDIF
+            WRITE(numout,*)
+         ENDIF
          CALL mpp_init_bestpartition( mppsize, ldlist = .TRUE. )   ! must be done by all core
-         CALL ctl_stop( 'STOP' )
       ENDIF
 
       jpnij = mppsize   ! force jpnij definition <-- remove as much land subdomains as needed to reach this condition
@@ -238,11 +302,11 @@ CONTAINS
          WRITE(ctmp2,9003) '   exceeds the maximum number of ocean subdomains = ', inijmin
          WRITE(ctmp3,9002) '   we suppressed ', jpni*jpnj - mppsize, ' land subdomains '
          WRITE(ctmp4,9002) '   BUT we had to keep ', mppsize - inijmin, ' land subdomains that are useless...'
-         CALL ctl_warn( 'mpp_init:', '~~~~~~~~ ', ctmp1, ctmp2, ctmp3, ctmp4, ' ', '    --- YOU ARE WASTING CPU... ---', ' ' )
+         CALL ctl_warn( ctmp1, ctmp2, ctmp3, ctmp4, ' ', '    --- YOU ARE WASTING CPU... ---', ' ' )
       ELSE   ! mppsize = inijmin
          IF(lwp) THEN
-            IF(llbest) WRITE(numout,*) 'mpp_init: You use an optimal domain decomposition'
-            WRITE(numout,*) '~~~~~~~~ '
+            IF(llbest) WRITE(numout,*) '   ==> you use the best mpi decomposition'
+            WRITE(numout,*)
             WRITE(numout,9003) '   Number of mpi processes: ', mppsize
             WRITE(numout,9003) '   Number of ocean subdomains = ', inijmin
             WRITE(numout,9003) '   Number of suppressed land subdomains = ', jpni*jpnj - inijmin
@@ -272,14 +336,8 @@ CONTAINS
       IF( ierr /= 0 )   CALL ctl_stop( 'STOP', 'mpp_init: unable to allocate standard ocean arrays' )
       
 #if defined key_agrif
-
       IF( .NOT. Agrif_Root() ) THEN       ! AGRIF children: specific setting (cf. agrif_user.F90)
          CALL agrif_nemo_init()
-         IF( jpiglo /= nbcellsx + 2 + 2*nbghostcells_x )   &
-            CALL ctl_stop( 'STOP', 'mpp_init: Agrif children requires jpiglo == nbcellsx + 2 + 2*nbghostcells_x' )
-         IF( jpjglo /= nbcellsy + 2 + nbghostcells_y_s + nbghostcells_y_n )   &
-            CALL ctl_stop( 'STOP', 'mpp_init: Agrif children requires jpjglo == nbcellsy + 2 + nbghostcells_y_s + nbghostcells_y_n' )
-         IF( ln_use_jattr )   CALL ctl_stop( 'STOP', 'mpp_init:Agrif children requires ln_use_jattr = .false. ' )
       ENDIF
 #endif
       !
@@ -476,7 +534,7 @@ CONTAINS
  9403    FORMAT('           *     ',20('         *   ',a3)    )
  9401    FORMAT('              '   ,20('   ',i3,'          ') )
  9402    FORMAT('       ',i3,' *  ',20(i3,'  x',i3,'   *   ') )
- 9404    FORMAT('           *  '   ,20('      ',i3,'   *   ') )
+ 9404    FORMAT('           *  '   ,20('     ' ,i4,'   *   ') )
       ENDIF
          
       ! just to save nono etc for all proc
@@ -560,7 +618,7 @@ CONTAINS
       END DO
 
       ! Save processor layout in ascii file
-      IF (lwp) THEN
+      IF (llwrtlay) THEN
          CALL ctl_opn( inum, 'layout.dat', 'REPLACE', 'FORMATTED', 'SEQUENTIAL', -1, numout, .FALSE., narea )
          WRITE(inum,'(a)') '   jpnij   jpimax  jpjmax    jpk  jpiglo  jpjglo'//&
    &           ' ( local:    narea     jpi     jpj )'
@@ -621,6 +679,8 @@ CONTAINS
             WRITE(numout,*)
             WRITE(numout,*) '   ==>>>   North fold boundary prepared for jpni >1'
             ! additional prints in layout.dat
+         ENDIF
+         IF (llwrtlay) THEN
             WRITE(inum,*)
             WRITE(inum,*)
             WRITE(inum,*) 'number of subdomains located along the north fold : ', ndim_rank_north
@@ -632,10 +692,10 @@ CONTAINS
       ENDIF
       !
       CALL mpp_init_ioipsl       ! Prepare NetCDF output file (if necessary)
-      !
-      IF( ln_nnogather ) THEN
+      !      
+      IF (( jperio >= 3 .AND. jperio <= 6 .AND. jpni > 1 ).AND.( ln_nnogather )) THEN
          CALL mpp_init_nfdcom     ! northfold neighbour lists
-         IF (lwp) THEN
+         IF (llwrtlay) THEN
             WRITE(inum,*)
             WRITE(inum,*)
             WRITE(inum,*) 'north fold exchanges with explicit point-to-point messaging :'
@@ -646,7 +706,7 @@ CONTAINS
          ENDIF
       ENDIF
       !
-      IF (lwp) CLOSE(inum)   
+      IF (llwrtlay) CLOSE(inum)   
       !
       DEALLOCATE(iin, ijn, ii_nono, ii_noea, ii_noso, ii_nowe,    &
          &       iimppt, ijmppt, ibondi, ibondj, ipproc, ipolj,   &
@@ -779,7 +839,7 @@ CONTAINS
       INTEGER :: iszitst, iszjtst
       INTEGER :: isziref, iszjref
       INTEGER :: inbij, iszij
-      INTEGER :: inbimax, inbjmax, inbijmax
+      INTEGER :: inbimax, inbjmax, inbijmax, inbijold
       INTEGER :: isz0, isz1
       INTEGER, DIMENSION(  :), ALLOCATABLE :: indexok
       INTEGER, DIMENSION(  :), ALLOCATABLE :: inbi0, inbj0, inbij0   ! number of subdomains along i,j
@@ -904,27 +964,39 @@ CONTAINS
       END DO
       DEALLOCATE( indexok, inbi1, inbj1, iszi1, iszj1 )
 
-      IF( llist ) THEN  ! we print about 21 best partitions
+      IF( llist ) THEN
          IF(lwp) THEN
             WRITE(numout,*)
-            WRITE(numout,         *) '                  For your information:'
-            WRITE(numout,'(a,i5,a)') '  list of the best partitions around ',   knbij, ' mpi processes'
-            WRITE(numout,         *) '  --------------------------------------', '-----', '--------------'
+            WRITE(numout,*) '                  For your information:'
+            WRITE(numout,*) '  list of the best partitions including land supression'
+            WRITE(numout,*) '  -----------------------------------------------------'
             WRITE(numout,*)
          END IF
-         iitarget = MINLOC( inbi0(:)*inbj0(:), mask = inbi0(:)*inbj0(:) >= knbij, dim = 1 )
-         DO ji = MAX(1,iitarget-10), MIN(isz0,iitarget+10)
+         ji = isz0   ! initialization with the largest value
+         ALLOCATE( llisoce(inbi0(ji), inbj0(ji)) )
+         CALL mpp_init_isoce( inbi0(ji), inbj0(ji), llisoce ) ! Warning: must be call by all cores (call mpp_sum)
+         inbijold = COUNT(llisoce)
+         DEALLOCATE( llisoce )
+         DO ji =isz0-1,1,-1
             ALLOCATE( llisoce(inbi0(ji), inbj0(ji)) )
             CALL mpp_init_isoce( inbi0(ji), inbj0(ji), llisoce ) ! Warning: must be call by all cores (call mpp_sum)
             inbij = COUNT(llisoce)
             DEALLOCATE( llisoce )
-            IF(lwp) WRITE(numout,'(a, i5, a, i5, a, i4, a, i4, a, i9, a, i5, a, i5, a)')    &
-               &     'nb_cores ' , inbij,' oce + ', inbi0(ji)*inbj0(ji) - inbij             &
-               &                                , ' land ( ', inbi0(ji),' x ', inbj0(ji),   &
-               & ' ), nb_points ', iszi0(ji)*iszj0(ji),' ( ', iszi0(ji),' x ', iszj0(ji),' )'
+            IF(lwp .AND. inbij < inbijold) THEN
+               WRITE(numout,'(a, i6, a, i6, a, f4.1, a, i9, a, i6, a, i6, a)')                                 &
+                  &   'nb_cores oce: ', inbij, ', land domains excluded: ', inbi0(ji)*inbj0(ji) - inbij,       &
+                  &   ' (', REAL(inbi0(ji)*inbj0(ji) - inbij,wp) / REAL(inbi0(ji)*inbj0(ji),wp) *100.,         &
+                  &   '%), largest oce domain: ', iszi0(ji)*iszj0(ji), ' ( ', iszi0(ji),' x ', iszj0(ji), ' )'
+               inbijold = inbij
+            END IF
          END DO
          DEALLOCATE( inbi0, inbj0, iszi0, iszj0 )
-         RETURN
+         IF(lwp) THEN
+            WRITE(numout,*)
+            WRITE(numout,*)  '  -----------------------------------------------------------'
+         ENDIF
+         CALL mppsync
+         CALL mppstop( ld_abort = .TRUE. )
       ENDIF
       
       DEALLOCATE( iszi0, iszj0 )

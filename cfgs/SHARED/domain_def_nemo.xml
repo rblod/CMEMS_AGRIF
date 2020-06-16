@@ -9,9 +9,11 @@
        <zoom_domain ibegin="1" jbegin="1" ni="2" nj="3"/>
      </domain>
 
-     <domain id="1point" domain_ref="grid_T" >
-       <zoom_domain ibegin="1" jbegin="1" ni="1" nj="1"/>
-     </domain>
+      <domain id="1point" domain_ref="grid_T" >
+         <zoom_domain ibegin="139" jbegin="119" ni="1" nj="1"/>
+      </domain>
+
+
      <!--   Eq section -->
      <domain id="EqT" domain_ref="grid_T" > <zoom_domain id="EqT"/> </domain>
      <!--   TAO : see example above   -->
@@ -178,11 +180,13 @@
      <!--   Eq section   -->
      <domain id="EqW" domain_ref="grid_W" > <zoom_domain id="EqW"/> </domain>
 
-     
-     <!--   zonal mean grid   -->
-     <domain id="gznl" long_name="gznl"/>
-     <domain id="znl_T" domain_ref="gznl" > <zoom_domain id="znl_T"/> </domain>
-     <domain id="znl_W" domain_ref="gznl" > <zoom_domain id="znl_W"/> </domain>
+	           <!--   zonal mean grid   -->
+     <domain_group id="gznl">
+        <domain id="gznl" long_name="gznl"/>
+        <domain id="ptr" domain_ref="gznl" > 
+            <zoom_domain id="ptr" ibegin="0000" jbegin="0" ni="1" nj="0000" /> 
+        </domain>
+      </domain_group>
 
      
      <!--   other grids   -->

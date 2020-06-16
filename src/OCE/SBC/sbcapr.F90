@@ -25,23 +25,23 @@ MODULE sbcapr
    PUBLIC   sbc_apr       ! routine called in sbcmod
    PUBLIC   sbc_apr_init  ! routine called in sbcmod
    
-   !                                !!* namsbc_apr namelist (Atmospheric PRessure) *
-   LOGICAL, PUBLIC ::   ln_apr_obc   !: inverse barometer added to OBC ssh data 
-   LOGICAL, PUBLIC ::   ln_ref_apr   !: ref. pressure: global mean Patm (F) or a constant (F)
-   REAL(wp)        ::   rn_pref      !  reference atmospheric pressure   [N/m2]
+   !                                          !!* namsbc_apr namelist (Atmospheric PRessure) *
+   LOGICAL, PUBLIC ::   ln_apr_obc = .false.   !: inverse barometer added to OBC ssh data 
+   LOGICAL, PUBLIC ::   ln_ref_apr             !: ref. pressure: global mean Patm (F) or a constant (F)
+   REAL(wp)        ::   rn_pref                !  reference atmospheric pressure   [N/m2]
 
    REAL(wp), ALLOCATABLE, SAVE, PUBLIC, DIMENSION(:,:) ::   ssh_ib    ! Inverse barometer now    sea surface height   [m]
    REAL(wp), ALLOCATABLE, SAVE, PUBLIC, DIMENSION(:,:) ::   ssh_ibb   ! Inverse barometer before sea surface height   [m]
    REAL(wp), ALLOCATABLE, SAVE, PUBLIC, DIMENSION(:,:) ::   apr       ! atmospheric pressure at kt                 [N/m2]
    
    REAL(wp) ::   tarea                ! whole domain mean masked ocean surface
-   REAL(wp) ::   r1_grau              ! = 1.e0 / (grav * rau0)
+   REAL(wp) ::   r1_grau              ! = 1.e0 / (grav * rho0)
    
    TYPE(FLD), ALLOCATABLE, DIMENSION(:) ::   sf_apr   ! structure of input fields (file informations, fields read)
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: sbcapr.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: sbcapr.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -68,13 +68,11 @@ CONTAINS
       !!
       NAMELIST/namsbc_apr/ cn_dir, sn_apr, ln_ref_apr, rn_pref, ln_apr_obc
       !!----------------------------------------------------------------------
-      REWIND( numnam_ref )              ! Namelist namsbc_apr in reference namelist : File for atmospheric pressure forcing
       READ  ( numnam_ref, namsbc_apr, IOSTAT = ios, ERR = 901)
-901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namsbc_apr in reference namelist', lwp )
+901   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namsbc_apr in reference namelist' )
 
-      REWIND( numnam_cfg )              ! Namelist namsbc_apr in configuration namelist : File for atmospheric pressure forcing
       READ  ( numnam_cfg, namsbc_apr, IOSTAT = ios, ERR = 902 )
-902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namsbc_apr in configuration namelist', lwp )
+902   IF( ios >  0 )   CALL ctl_nam ( ios , 'namsbc_apr in configuration namelist' )
       IF(lwm) WRITE ( numond, namsbc_apr )
       !
       ALLOCATE( sf_apr(1), STAT=ierror )           !* allocate and fill sf_sst (forcing structure) with sn_sst
@@ -99,10 +97,10 @@ CONTAINS
          IF(lwp) WRITE(numout,*) '         Reference Patm used : ', rn_pref, ' N/m2'
       ENDIF
       !
-      r1_grau = 1.e0 / (grav * rau0)               !* constant for optimization
+      r1_grau = 1.e0 / (grav * rho0)               !* constant for optimization
       !
       !                                            !* control check
-      IF ( ln_apr_obc  ) THEN
+      IF( ln_apr_obc  ) THEN
          IF(lwp) WRITE(numout,*) '         Inverse barometer added to OBC ssh data'
       ENDIF
 !jc: stop below should rather be a warning 

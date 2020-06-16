@@ -22,6 +22,8 @@ MODULE sedchem
    INTEGER, PARAMETER :: jp_maxniter_atgen    = 20
    REAL(wp), PARAMETER :: pp_rdel_ah_target = 1.E-4_wp
 
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !! * Module variables
    REAL(wp) :: &
       calcon = 1.03E-2        ! mean calcite concentration [Ca2+] in sea water [mole/kg solution] 
@@ -100,7 +102,7 @@ MODULE sedchem
    REAL(wp) :: devk59  = 0.0714e-3
    REAL(wp) :: devk510  = 0.0
 
-   !! $Id: sedchem.F90 10356 2018-11-22 11:39:19Z cetlod $
+   !! $Id: sedchem.F90 12839 2020-05-01 08:39:32Z cetlod $
 CONTAINS
 
    SUBROUTINE sed_chem( kt )
@@ -135,28 +137,26 @@ CONTAINS
       IF (ln_sediment_offline) THEN
          CALL sed_chem_cst
       ELSE
-         DO jj = 1,jpj
-            DO ji = 1, jpi
-               ikt = mbkt(ji,jj) 
-               IF ( tmask(ji,jj,ikt) == 1 ) THEN
-                  zchem_data(ji,jj,1) = ak13  (ji,jj,ikt)
-                  zchem_data(ji,jj,2) = ak23  (ji,jj,ikt)
-                  zchem_data(ji,jj,3) = akb3  (ji,jj,ikt)
-                  zchem_data(ji,jj,4) = akw3  (ji,jj,ikt)
-                  zchem_data(ji,jj,5) = aksp  (ji,jj,ikt)
-                  zchem_data(ji,jj,6) = borat (ji,jj,ikt)
-                  zchem_data(ji,jj,7) = ak1p3 (ji,jj,ikt)
-                  zchem_data(ji,jj,8) = ak2p3 (ji,jj,ikt)
-                  zchem_data(ji,jj,9) = ak3p3 (ji,jj,ikt)
-                  zchem_data(ji,jj,10)= aksi3 (ji,jj,ikt)
-                  zchem_data(ji,jj,11)= sio3eq(ji,jj,ikt)
-                  zchem_data(ji,jj,12)= aks3  (ji,jj,ikt)
-                  zchem_data(ji,jj,13)= akf3  (ji,jj,ikt)
-                  zchem_data(ji,jj,14)= sulfat(ji,jj,ikt)
-                  zchem_data(ji,jj,15)= fluorid(ji,jj,ikt)
-               ENDIF
-            ENDDO
-         ENDDO
+         DO_2D_11_11
+            ikt = mbkt(ji,jj) 
+            IF ( tmask(ji,jj,ikt) == 1 ) THEN
+               zchem_data(ji,jj,1) = ak13  (ji,jj,ikt)
+               zchem_data(ji,jj,2) = ak23  (ji,jj,ikt)
+               zchem_data(ji,jj,3) = akb3  (ji,jj,ikt)
+               zchem_data(ji,jj,4) = akw3  (ji,jj,ikt)
+               zchem_data(ji,jj,5) = aksp  (ji,jj,ikt)
+               zchem_data(ji,jj,6) = borat (ji,jj,ikt)
+               zchem_data(ji,jj,7) = ak1p3 (ji,jj,ikt)
+               zchem_data(ji,jj,8) = ak2p3 (ji,jj,ikt)
+               zchem_data(ji,jj,9) = ak3p3 (ji,jj,ikt)
+               zchem_data(ji,jj,10)= aksi3 (ji,jj,ikt)
+               zchem_data(ji,jj,11)= sio3eq(ji,jj,ikt)
+               zchem_data(ji,jj,12)= aks3  (ji,jj,ikt)
+               zchem_data(ji,jj,13)= akf3  (ji,jj,ikt)
+               zchem_data(ji,jj,14)= sulfat(ji,jj,ikt)
+               zchem_data(ji,jj,15)= fluorid(ji,jj,ikt)
+            ENDIF
+         END_2D
 
          CALL pack_arr ( jpoce, ak1s  (1:jpoce), zchem_data(1:jpi,1:jpj,1) , iarroce(1:jpoce) )
          CALL pack_arr ( jpoce, ak2s  (1:jpoce), zchem_data(1:jpi,1:jpj,2) , iarroce(1:jpoce) )
@@ -576,7 +576,7 @@ CONTAINS
       IF (neos == -1) THEN
          saltprac(:) = salt(:) * 35.0 / 35.16504
       ELSE
-         saltprac(:) = temp(:)
+         saltprac(:) = salt(:)
       ENDIF
 
       !

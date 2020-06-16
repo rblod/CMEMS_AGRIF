@@ -28,11 +28,11 @@ MODULE usrdef_zgr
 
    PUBLIC   usr_def_zgr   ! called by domzgr.F90
 
-  !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: usrdef_zgr.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: usrdef_zgr.F90 12740 2020-04-12 09:03:06Z smasson $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS             
@@ -95,10 +95,10 @@ CONTAINS
       CALL lbc_lnk( 'usrdef_zgr', zhu, 'U', 1. )     ! boundary condition: this mask the surrouding grid-points
       !                                ! ==>>>  set by hand non-zero value on first/last columns & rows 
       DO ji = mi0(1), mi1(1)              ! first row of global domain only
-         zhu(ji,2) = zht(1,2)
+         zhu(ji,2) = zht(ji,2)
       END DO
-       DO ji = mi0(jpi), mi1(jpi)         ! last  row of global domain only
-         zhu(ji,2) = zht(jpi,2)
+       DO ji = mi0(jpiglo), mi1(jpiglo)   ! last  row of global domain only
+         zhu(ji,2) = zht(ji,2)
       END DO
       zhu(:,1) = zhu(:,2)
       zhu(:,3) = zhu(:,2)
@@ -183,18 +183,16 @@ CONTAINS
             pe3uw(:,:,jk) = pe3w_1d (jk)
             pe3vw(:,:,jk) = pe3w_1d (jk)
          END DO
-         DO jj = 1, jpj                      ! bottom scale factors and depth at T- and W-points
-            DO ji = 1, jpi
-               ik = k_bot(ji,jj)
-                  pdepw(ji,jj,ik+1) = MIN( zht(ji,jj) , pdepw_1d(ik+1) )
-                  pe3t (ji,jj,ik  ) = pdepw(ji,jj,ik+1) - pdepw(ji,jj,ik)
-                  pe3t (ji,jj,ik+1) = pe3t (ji,jj,ik  ) 
-                  !
-                  pdept(ji,jj,ik  ) = pdepw(ji,jj,ik  ) + pe3t (ji,jj,ik  ) * 0.5_wp
-                  pdept(ji,jj,ik+1) = pdepw(ji,jj,ik+1) + pe3t (ji,jj,ik+1) * 0.5_wp
-                  pe3w (ji,jj,ik+1) = pdept(ji,jj,ik+1) - pdept(ji,jj,ik)              ! = pe3t (ji,jj,ik  )
-            END DO
-         END DO         
+         DO_2D_11_11
+            ik = k_bot(ji,jj)
+            pdepw(ji,jj,ik+1) = MIN( zht(ji,jj) , pdepw_1d(ik+1) )
+            pe3t (ji,jj,ik  ) = pdepw(ji,jj,ik+1) - pdepw(ji,jj,ik)
+            pe3t (ji,jj,ik+1) = pe3t (ji,jj,ik  ) 
+            !
+            pdept(ji,jj,ik  ) = pdepw(ji,jj,ik  ) + pe3t (ji,jj,ik  ) * 0.5_wp
+            pdept(ji,jj,ik+1) = pdepw(ji,jj,ik+1) + pe3t (ji,jj,ik+1) * 0.5_wp
+            pe3w (ji,jj,ik+1) = pdept(ji,jj,ik+1) - pdept(ji,jj,ik)              ! = pe3t (ji,jj,ik  )
+         END_2D         
          !                                   ! bottom scale factors and depth at  U-, V-, UW and VW-points
          !                                   ! usually Computed as the minimum of neighbooring scale factors
          pe3u (:,:,:) = pe3t(:,:,:)          ! HERE OVERFLOW configuration : 

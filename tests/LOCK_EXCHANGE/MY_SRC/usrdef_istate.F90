@@ -26,7 +26,7 @@ MODULE usrdef_istate
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: usrdef_istate.F90 10074 2018-08-28 16:15:49Z nicolasmartin $ 
+   !! $Id: usrdef_istate.F90 12489 2020-02-28 15:55:11Z davestorkey $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -59,7 +59,7 @@ CONTAINS
       IF(lwp) WRITE(numout,*) '                 (i.e. a temperature difference of 25 degrees with rn_a0 = 0.2'
       !
       !  rn_a0 =  0.2   !  thermal expension coefficient (nn_eos= 1)
-      !  rho = rau0 - rn_a0 * (T-10) 
+      !  rho = rho0 - rn_a0 * (T-10) 
       !  delta_T = 25 degrees  ==>>  delta_rho = 25 * rn_a0 = 5 kg/m3
       !
       pu  (:,:,:) = 0._wp        ! ocean at rest

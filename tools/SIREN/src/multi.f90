@@ -2,11 +2,9 @@
 ! NEMO system team, System and Interface for oceanic RElocable Nesting
 !----------------------------------------------------------------------
 !
-! MODULE: multi
-!
 ! DESCRIPTION:
 !> This module manage multi file structure.
-!
+!>
 !> @details
 !>    define type TMULTI:<br/>
 !> @code
@@ -56,16 +54,17 @@
 !>
 !> @author
 !>  J.Paul
-! REVISION HISTORY:
+!>
 !> @date November, 2013 - Initial Version
 !> @date October, 2014
 !> - use mpp file structure instead of file
 !> @date November, 2014 
 !> - Fix memory leaks bug
-!
-!> @note Software governed by the CeCILL licence     (./LICENSE)
+!>
+!> @note Software governed by the CeCILL licence     (NEMOGCM/NEMO_CeCILL.txt)
 !----------------------------------------------------------------------
 MODULE multi
+
    USE kind                            ! F90 kind parameter
    USE logger                          ! log file manager
    USE fct                             ! basic useful function
@@ -88,8 +87,9 @@ MODULE multi
    PUBLIC :: multi_clean       !< clean multi strcuture
    PUBLIC :: multi_print       !< print information about milti structure
 
-   PUBLIC :: multi__add_mpp    !< add file strucutre to multi file structure
+   PRIVATE :: multi__add_mpp   !< add file strucutre to multi file structure
    PRIVATE :: multi__copy_unit !< copy multi file structure
+   PRIVATE :: multi__get_perio !< read periodicity from namelist
 
    TYPE TMULTI !< multi file structure
       ! general 
@@ -103,6 +103,9 @@ MODULE multi
    END INTERFACE   
 
 CONTAINS
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION multi__copy_unit(td_multi) &
+         & RESULT (tf_multi)
    !-------------------------------------------------------------------
    !> @brief
    !> This function copy multi mpp structure in another one
@@ -125,12 +128,14 @@ CONTAINS
    !> @param[in] td_multi    mpp structure
    !> @return copy of input multi structure
    !-------------------------------------------------------------------
-   FUNCTION multi__copy_unit( td_multi )
+
       IMPLICIT NONE
+
       ! Argument
       TYPE(TMULTI), INTENT(IN)  :: td_multi
+
       ! function
-      TYPE(TMULTI) :: multi__copy_unit
+      TYPE(TMULTI)              :: tf_multi
 
       ! local variable
       TYPE(TMPP) :: tl_mpp
@@ -139,31 +144,36 @@ CONTAINS
       INTEGER(i4) :: ji
       !----------------------------------------------------------------
 
-      multi__copy_unit%i_nmpp = td_multi%i_nmpp
-      multi__copy_unit%i_nvar = td_multi%i_nvar
+      tf_multi%i_nmpp = td_multi%i_nmpp
+      tf_multi%i_nvar = td_multi%i_nvar
 
       ! copy variable structure
-      IF( ASSOCIATED(multi__copy_unit%t_mpp) )THEN
-         CALL mpp_clean(multi__copy_unit%t_mpp(:))
-         DEALLOCATE(multi__copy_unit%t_mpp)
+      IF( ASSOCIATED(tf_multi%t_mpp) )THEN
+         CALL mpp_clean(tf_multi%t_mpp(:))
+         DEALLOCATE(tf_multi%t_mpp)
       ENDIF
-      IF( ASSOCIATED(td_multi%t_mpp) .AND. multi__copy_unit%i_nmpp > 0 )THEN
-         ALLOCATE( multi__copy_unit%t_mpp(multi__copy_unit%i_nmpp) )
-         DO ji=1,multi__copy_unit%i_nmpp
+      IF( ASSOCIATED(td_multi%t_mpp) .AND. tf_multi%i_nmpp > 0 )THEN
+         ALLOCATE( tf_multi%t_mpp(tf_multi%i_nmpp) )
+         DO ji=1,tf_multi%i_nmpp
             tl_mpp = mpp_copy(td_multi%t_mpp(ji))
-            multi__copy_unit%t_mpp(ji) = mpp_copy(tl_mpp)
+            tf_multi%t_mpp(ji) = mpp_copy(tl_mpp)
          ENDDO
          ! clean
          CALL mpp_clean(tl_mpp)
       ENDIF
 
    END FUNCTION multi__copy_unit
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   FUNCTION multi_init(cd_varfile) &
+         & RESULT (tf_multi)
    !-------------------------------------------------------------------
    !> @brief This subroutine initialize multi file structure.
    !>
    !> @details
    !> if variable name is 'all', add all the variable of the file in mutli file
    !> structure.
+   !> Optionnaly, periodicity could be read behind filename.
+   !>
    !> @note if first character of filename is numeric, assume matrix is given as
    !> input.<br/>
    !> create pseudo file named 'data-*', with matrix read as variable value.
@@ -174,67 +184,208 @@ CONTAINS
    !> - check if variable to be read is in file
    !> @date January, 2016
    !> - read variable dimensions
+   !> @date July, 2016
+   !> - get variable to be read and associated file first
+   !> @date August, 2017
+   !> - get perio from namelist 
+   !> @date January, 2019
+   !> - create and clean file structure to avoid memory leaks
+   !> - fill value read from array of variable structure
+   !> @date May, 2019
+   !> - compare each elt of cl_tabfile to cl_file
+   !> @date August, 2019
+   !> - use periodicity read from namelist, and store in multi structure
    !>
    !> @param[in] cd_varfile   variable location information (from namelist) 
    !> @return multi file structure
    !-------------------------------------------------------------------
-   FUNCTION multi_init(cd_varfile)
+
       IMPLICIT NONE
 
       ! Argument
       CHARACTER(LEN=*), DIMENSION(:), INTENT(IN) :: cd_varfile
 
       ! function
-      TYPE(TMULTI) :: multi_init
+      TYPE(TMULTI)                               :: tf_multi
+
+      ! parameters
+      INTEGER(i4)   , PARAMETER        :: ip_nmaxfiles = 50
+      INTEGER(i4)   , PARAMETER        :: ip_nmaxvars = 100
 
       ! local variable
-      CHARACTER(LEN=lc)                :: cl_name
-      CHARACTER(LEN=lc)                :: cl_lower
-      CHARACTER(LEN=lc)                :: cl_file
-      CHARACTER(LEN=lc)                :: cl_matrix
+      INTEGER(i4)                                             :: il_nvar
+      INTEGER(i4)                                             :: il_nvarin
+      INTEGER(i4)                                             :: il_nfiles
+      INTEGER(i4)                                             :: il_varid
+      INTEGER(i4)                                             :: il_perio
 
-      INTEGER(i4)                      :: il_nvar
-      INTEGER(i4)                      :: il_varid
+      REAL(dp)                                                :: dl_fill
+      CHARACTER(LEN=lc)                                       :: cl_name
+      CHARACTER(LEN=lc)                                       :: cl_varname
+      CHARACTER(LEN=lc)                                       :: cl_lower
+      CHARACTER(LEN=lc)                                       :: cl_file
+      CHARACTER(LEN=lc)                                       :: cl_matrix
 
-      LOGICAL                          :: ll_dim
+      CHARACTER(LEN=lc), DIMENSION(ip_nmaxfiles)              :: cl_tabfile
+      CHARACTER(LEN=lc), DIMENSION(ip_nmaxfiles, ip_nmaxvars) :: cl_tabvar
 
-      TYPE(TDIM), DIMENSION(ip_maxdim) :: tl_dim
+      LOGICAL                                                 :: ll_dim
 
-      TYPE(TVAR)                       :: tl_var
+      TYPE(TDIM), DIMENSION(ip_maxdim)                        :: tl_dim
 
-      TYPE(TMPP)                       :: tl_mpp
+      TYPE(TVAR)                                              :: tl_var
+      TYPE(TVAR) , DIMENSION(:), ALLOCATABLE                  :: tl_varin
+
+      TYPE(TMPP)                                              :: tl_mpp
+
+      TYPE(TFILE)                                             :: tl_file
 
       ! loop indices
       INTEGER(i4) :: ji
       INTEGER(i4) :: jj
       INTEGER(i4) :: jk
+      INTEGER(i4) :: jl
+      INTEGER(i4) :: jf
+      INTEGER(i4) , DIMENSION(ip_nmaxvars) :: jv
       !----------------------------------------------------------------
 
       ji=1
+      jf=0
+      jv(:)=0
+      cl_tabfile(:)=''
       DO WHILE( TRIM(cd_varfile(ji)) /= '' )
 
-         il_nvar=0
          cl_name=fct_split(cd_varfile(ji),1,':')
-         cl_lower=fct_lower(cl_name)
-         cl_file=fct_split(cd_varfile(ji),2,':')
+         IF( TRIM(cl_name) == '' )THEN
+            CALL logger_error("MULTI INIT: variable name "//&
+            &                 "is empty. check namelist.")
+         ENDIF
 
-         IF( LEN(TRIM(cl_file)) == lc )THEN
+         cl_file=fct_split(cd_varfile(ji),2,':')
+         IF( TRIM(cl_file) == '' )THEN
+            CALL logger_error("MULTI INIT: file name matching variable "//&
+            &                 TRIM(cl_name)//" is empty. check namelist.")
+         ENDIF
+         IF( LEN(TRIM(cl_file)) >= lc )THEN
             CALL logger_fatal("MULTI INIT: file name too long (>"//&
             &          TRIM(fct_str(lc))//"). check namelist.")
          ENDIF
+         
+         IF( TRIM(cl_file) /= '' )THEN
+            jk=0
+            DO jj=1,jf
+               IF( TRIM(cl_file) == TRIM(cl_tabfile(jj)) )THEN            
+                  jk=jj
+                  EXIT
+               ENDIF
+            ENDDO
+            IF ( jk /= 0 )then
+               jv(jk)=jv(jk)+1
+               cl_tabvar(jk,jv(jk))=TRIM(cl_name)
+            ELSE ! jk == 0
+               jf=jf+1
+               IF( jf > ip_nmaxfiles )THEN
+                  CALL logger_fatal("MULTI INIT: too much files in "//&
+                  &  "varfile (>"//TRIM(fct_str(ip_nmaxfiles))//&
+                  &  "). check namelist.")
+               ENDIF
+               cl_tabfile(jf)=TRIM(cl_file)
+               jv(jf)=jv(jf)+1
+               cl_tabvar(jf,jv(jf))=TRIM(cl_name)
+            ENDIF
+         ENDIF
 
-         IF( TRIM(cl_lower) /= '' )THEN
-            IF( TRIM(cl_file) /= '' )THEN
-               cl_matrix=''
-               IF( fct_is_num(cl_file(1:1)) )THEN
-                  cl_matrix=TRIM(cl_file)
-                  WRITE(cl_file,'(a,i2.2)')'data-',ji
+         ji=ji+1
+      ENDDO
 
-                  tl_var=var_init(TRIM(cl_name))
-                  CALL var_read_matrix(tl_var, cl_matrix)
+!print *,'============'
+!print *,jf,' files ','============'
+!DO ji=1,jf
+!   print *,'file ',trim(cl_tabfile(ji))
+!   print *,jv(ji),' vars '
+!   DO jj=1,jv(ji)
+!      print *,'var ',trim(cl_tabvar(ji,jj))
+!   ENDDO
+!ENDDO
+!print *,'============'
 
+
+      il_nfiles=jf
+      il_nvar=0
+      DO ji=1,il_nfiles
+         cl_file=TRIM(cl_tabfile(ji))
+
+         cl_matrix=''
+         IF( fct_is_num(cl_file(1:1)) )THEN
+            cl_matrix=TRIM(cl_file)
+            WRITE(cl_file,'(a,i2.2)')'data-',ji
+
+            DO jj=1,jv(ji)
+               cl_name=TRIM(cl_tabvar(ji,jv(ji)))
+               cl_lower=TRIM(fct_lower(cl_name))
+
+               tl_var=var_init(TRIM(cl_name))
+               CALL var_read_matrix(tl_var, cl_matrix)
+
+               IF( jj == 1 )THEN
                   ! create mpp structure
                   tl_mpp=mpp_init(TRIM(cl_file), tl_var)
+               ENDIF
+
+               ! add variable
+               CALL mpp_add_var(tl_mpp,tl_var)
+               ! number of variable
+               il_nvar=il_nvar+1
+
+            ENDDO
+
+         ELSE
+            CALL multi__get_perio(cl_file, il_perio)
+
+            tl_file=file_init(TRIM(cl_file), id_perio=il_perio)
+            tl_mpp=mpp_init( tl_file, id_perio=il_perio )
+            ! clean
+            CALL file_clean(tl_file)
+
+            il_nvarin=tl_mpp%t_proc(1)%i_nvar
+            ALLOCATE(tl_varin(il_nvarin))
+            DO jj=1,il_nvarin
+               tl_varin(jj)=var_copy(tl_mpp%t_proc(1)%t_var(jj))
+               DO jl=1,ip_maxdim
+                  IF( tl_varin(jj)%t_dim(jl)%l_use )THEN
+                     tl_varin(jj)%t_dim(jl)=dim_copy(tl_mpp%t_dim(jl))
+                  ENDIF
+               ENDDO
+            ENDDO
+
+            ! clean all varible
+            CALL mpp_del_var(tl_mpp)
+
+            DO jj=1,jv(ji)
+               cl_name=TRIM(cl_tabvar(ji,jj))
+               cl_lower=TRIM(fct_lower(cl_name))
+               ! define variable
+               IF( TRIM(fct_lower(cl_lower)) /= 'all' )THEN
+
+                  ! check if variable is in file
+                  il_varid=var_get_index(tl_varin(:),cl_lower)
+                  IF( il_varid == 0 )THEN
+                     CALL logger_fatal("MULTI INIT: variable "//&
+                        & TRIM(cl_name)//" not in file "//&
+                        & TRIM(cl_file) )
+                  ENDIF
+
+                  ! get (global) variable dimension
+                  tl_dim(jp_I)=dim_copy(tl_varin(il_varid)%t_dim(jp_I))
+                  tl_dim(jp_J)=dim_copy(tl_varin(il_varid)%t_dim(jp_J))
+                  tl_dim(jp_K)=dim_copy(tl_varin(il_varid)%t_dim(jp_K))
+                  tl_dim(jp_L)=dim_copy(tl_varin(il_varid)%t_dim(jp_L))
+
+                  cl_varname=tl_varin(il_varid)%c_name
+                  dl_fill=tl_varin(il_varid)%d_fill
+
+                  tl_var=var_init(TRIM(cl_varname), td_dim=tl_dim(:), &
+                     &            dd_fill=dl_fill)
 
                   ! add variable
                   CALL mpp_add_var(tl_mpp,tl_var)
@@ -242,106 +393,73 @@ CONTAINS
                   ! number of variable
                   il_nvar=il_nvar+1
 
-               ELSE
+                  ! clean structure
+                  CALL var_clean(tl_var)
 
-                  ! 
-                  tl_mpp=mpp_init( file_init(TRIM(cl_file)) )
-                  ! define variable
-                  IF( TRIM(fct_lower(cl_lower)) /= 'all' )THEN
+               ELSE ! cl_lower == 'all'
 
-                     ! check if variable is in file
-                     il_varid=var_get_index(tl_mpp%t_proc(1)%t_var(:),cl_lower)
-                     IF( il_varid == 0 )THEN
-                        CALL logger_fatal("MULTI INIT: variable "//&
-                           & TRIM(cl_name)//" not in file "//&
-                           & TRIM(cl_file) )
+                  DO jk=il_nvarin,1,-1
+
+                     ! check if variable is dimension
+                     ll_dim=.FALSE.
+                     DO jl=1,ip_maxdim
+                        IF( TRIM(tl_mpp%t_proc(1)%t_dim(jl)%c_name) == &
+                        &   TRIM(tl_varin(jk)%c_name) )THEN
+                           ll_dim=.TRUE.
+                           CALL logger_trace("MULTI INIT: "//&
+                           &  TRIM(tl_varin(jk)%c_name)//&
+                           &  ' is var dimension')
+                           EXIT
+                        ENDIF
+                     ENDDO
+                     ! do not use variable dimension
+                     IF( ll_dim )THEN
+                        tl_var=var_init( TRIM(tl_varin(jk)%c_name) )
+                        ! delete variable
+                        CALL mpp_del_var(tl_mpp,tl_var)
+                        ! clean structure
+                        CALL var_clean(tl_var)
+                     ELSE
+                        ! add variable
+                        CALL mpp_add_var(tl_mpp, tl_varin(jk))
+                        ! number of variable
+                        il_nvar=il_nvar+1
                      ENDIF
 
-                     ! get (global) variable dimension
-                     tl_dim(jp_I)=dim_copy(tl_mpp%t_dim(jp_I))
-                     tl_dim(jp_J)=dim_copy(tl_mpp%t_dim(jp_J))
-                     tl_dim(jp_K)=dim_copy(tl_mpp%t_proc(1)%t_var(il_varid)%t_dim(jp_K))
-                     tl_dim(jp_L)=dim_copy(tl_mpp%t_proc(1)%t_var(il_varid)%t_dim(jp_L))
-
-                     ! clean all varible
-                     CALL mpp_del_var(tl_mpp)
-
-                     tl_var=var_init(TRIM(cl_lower), td_dim=tl_dim(:))
-
-                     ! add variable
-                     CALL mpp_add_var(tl_mpp,tl_var)
-
-                     ! number of variable
-                     il_nvar=il_nvar+1
-
-                     ! clean structure
-                     CALL var_clean(tl_var)
-
-                  ELSE ! cl_lower == 'all'
-
-                     DO jk=tl_mpp%t_proc(1)%i_nvar,1,-1
-
-                        ! check if variable is dimension
-                        ll_dim=.FALSE.
-                        DO jj=1,ip_maxdim
-                           IF( TRIM(tl_mpp%t_proc(1)%t_dim(jj)%c_name) == &
-                           &   TRIM(tl_mpp%t_proc(1)%t_var(jk)%c_name) )THEN
-                              ll_dim=.TRUE.
-                              CALL logger_trace("MULTI INIT: "//&
-                              &  TRIM(tl_mpp%t_proc(1)%t_var(jk)%c_name)//&
-                              &  ' is var dimension')
-                              EXIT
-                           ENDIF
-                        ENDDO
-                        ! do not use variable dimension
-                        IF( ll_dim )THEN
-                           tl_var=var_init( &
-                           &  TRIM(tl_mpp%t_proc(1)%t_var(jk)%c_name) )
-                           ! delete variable
-                           CALL mpp_del_var(tl_mpp,tl_var)
-                           ! clean structure
-                           CALL var_clean(tl_var)
-                        ELSE
-                           ! number of variable
-                           il_nvar=il_nvar+1
-                        ENDIF
-
-                     ENDDO
-
-                  ENDIF
+                  ENDDO
 
                ENDIF
+            ENDDO
+            ! clean structure
+            CALL var_clean(tl_varin)
+            DEALLOCATE(tl_varin)
 
-               CALL multi__add_mpp(multi_init, tl_mpp) 
-
-               ! update total number of variable
-               multi_init%i_nvar=multi_init%i_nvar+il_nvar
-
-               ! clean
-               CALL mpp_clean(tl_mpp)
-
-            ELSE
-               CALL logger_error("MULTI INIT: file name matching variable "//&
-               &                 TRIM(cl_name)//" is empty. check namelist.")
-            ENDIF
-         ELSE
-            CALL logger_error("MULTI INIT: variable name "//&
-            &                 "is empty. check namelist.")
          ENDIF
 
-         ji=ji+1
+         CALL multi__add_mpp(tf_multi, tl_mpp)
+
+         ! update total number of variable
+         tf_multi%i_nvar=tf_multi%i_nvar+tl_mpp%t_proc(1)%i_nvar
+
+         ! clean
+         CALL mpp_clean(tl_mpp)
+
       ENDDO
 
    END FUNCTION multi_init
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE multi_clean(td_multi)
    !-------------------------------------------------------------------
    !> @brief This subroutine clean multi file strucutre.
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !> @date January, 2019
+   !> - nullify mpp structure in multi file structure
+   !>
    !> @param[in] td_multi  multi file structure
    !-------------------------------------------------------------------
-   SUBROUTINE multi_clean(td_multi)
+
       IMPLICIT NONE
 
       ! Argument      
@@ -358,21 +476,28 @@ CONTAINS
       IF( ASSOCIATED( td_multi%t_mpp ) )THEN
          CALL mpp_clean(td_multi%t_mpp(:))
          DEALLOCATE(td_multi%t_mpp)
+         NULLIFY(td_multi%t_mpp)
       ENDIF
 
       ! replace by empty structure
       td_multi=multi_copy(tl_multi)
 
    END SUBROUTINE multi_clean
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE multi_print(td_multi)
    !-------------------------------------------------------------------
    !> @brief This subroutine print some information about mpp strucutre.
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
-   !
+   !> @date January, 2019
+   !> - print periodicity
+   !> @date May, 2019
+   !> - specify format output
+   !>
    !> @param[in] td_multi multi file structure
    !-------------------------------------------------------------------
-   SUBROUTINE multi_print(td_multi)
+
       IMPLICIT NONE
 
       ! Argument      
@@ -398,29 +523,35 @@ CONTAINS
                IF( ASSOCIATED(td_multi%t_mpp(ji)%t_proc(1)%t_var) )THEN
                   WRITE(*,'(6x,a)') &
                   &  TRIM(td_multi%t_mpp(ji)%t_proc(1)%t_var(jj)%c_name)
+                  !WRITE(*,'(6x,a,i0)') 'perio ',td_multi%t_mpp(ji)%t_proc(1)%i_perio
                ENDIF
             ENDDO
          ENDDO
       ENDIF
 
    END SUBROUTINE multi_print
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE multi__add_mpp(td_multi, td_mpp)
    !-------------------------------------------------------------------
    !> @brief
    !>    This subroutine add file to multi file structure.
    !>
    !> @detail
-   !
+   !>
    !> @author J.Paul
    !> @date November, 2013 - Initial Version
    !> @date October, 2014
    !> - use mpp file structure instead of file
-   !
+   !> @date January, 2019
+   !> - deallocate mpp structure whatever happens
+   !>
    !> @param[inout] td_multi  multi mpp file strcuture
    !> @param[in]    td_mpp    mpp file strcuture
    !> @return mpp file id in multi mpp file structure
    !-------------------------------------------------------------------
-   SUBROUTINE multi__add_mpp( td_multi, td_mpp )
+      
       IMPLICIT NONE
+
       ! Argument
       TYPE(TMULTI), INTENT(INOUT) :: td_multi
       TYPE(TMPP)  , INTENT(IN)    :: td_mpp
@@ -483,8 +614,8 @@ CONTAINS
 
                ! clean
                CALL mpp_clean(tl_mpp(:))
-               DEALLOCATE(tl_mpp)
             ENDIF
+            DEALLOCATE(tl_mpp)
 
          ELSE
             ! no file in multi file structure
@@ -508,6 +639,81 @@ CONTAINS
          td_multi%t_mpp(td_multi%i_nmpp)=mpp_copy(td_mpp)
 
       ENDIF
+
    END SUBROUTINE multi__add_mpp
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   SUBROUTINE multi__get_perio(cd_file, id_perio)
+   !-------------------------------------------------------------------
+   !> @brief
+   !> This subroutine check if variable file, read in namelist, contains 
+   !> periodicity value and return it if true. 
+   !> 
+   !> @details
+   !> periodicity value is assume to follow string "perio ="
+   !>
+   !> @author J.Paul
+   !> @date January, 2019 - Initial Version
+   !> @date August, 209
+   !> - rewrite function to subroutine
+   !> - output filename string contains only filename (no more periodicity if
+   !> given)
+   !>
+   !> @param[inout] cd_file    file name
+   !> @param[  out] id_perio   NEMO periodicity 
+   !-------------------------------------------------------------------
+
+      IMPLICIT NONE
+
+      ! Argument
+      CHARACTER(LEN=*), INTENT(INOUT) :: cd_file
+      INTEGER(i4)     , INTENT(  OUT) :: id_perio
+
+      ! local variable
+      CHARACTER(LEN=lc) :: cl_tmp
+      CHARACTER(LEN=lc) :: cl_perio
+ 
+      INTEGER(i4)       :: il_ind
+
+      ! loop indices
+      INTEGER(i4) :: ji
+      INTEGER(i4) :: jj
+      !----------------------------------------------------------------
+
+      ! init
+      cl_perio=''
+      id_perio=-1
+
+      ji=1
+      cl_tmp=fct_split(cd_file,ji,';')
+      DO WHILE( TRIM(cl_tmp) /= '' )
+         il_ind=INDEX(TRIM(cl_tmp),'perio')
+         IF( il_ind /= 0 )THEN
+            ! check character just after
+            jj=il_ind+LEN('perio')
+            IF(  TRIM(cl_tmp(jj:jj)) == ' ' .OR. &
+            &    TRIM(cl_tmp(jj:jj)) == '=' )THEN
+               cl_perio=fct_split(cl_tmp,2,'=')
+               EXIT
+            ENDIF
+         ENDIF
+         ji=ji+1
+         cl_tmp=fct_split(cd_file,ji,';')         
+      ENDDO
+      cd_file=fct_split(cd_file,1,';')
+
+      IF( TRIM(cl_perio) /= '' )THEN
+         IF( fct_is_num(cl_perio) )THEN
+            READ(cl_perio,*) id_perio
+            CALL logger_debug("MULTI GET PERIO: will use periodicity value of "//&
+            &  TRIM(fct_str(id_perio))//" for file "//TRIM(cd_file) )
+         ELSE
+            CALL logger_error("MULTI GET PERIO: invalid periodicity value ("//&
+               & TRIM(cl_perio)//") for file "//TRIM(cd_file)//&
+               & ". check namelist." )
+         ENDIF
+      ENDIF
+
+   END SUBROUTINE multi__get_perio
+   !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 END MODULE multi
 

@@ -26,7 +26,7 @@ MODULE trcice
 
    !!----------------------------------------------------------------------
    !! NEMO/TOP 4.0 , NEMO Consortium (2018)
-   !! $Id: trcice.F90 10069 2018-08-28 14:12:24Z nicolasmartin $ 
+   !! $Id: trcice.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -84,12 +84,10 @@ CONTAINS
          WRITE(numout,*) '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
       ENDIF
       !
-      REWIND( numnat_ref )              ! Namelist namtrc_ice in reference namelist : Passive tracer input data
       READ  ( numnat_ref, namtrc_ice, IOSTAT = ios, ERR = 901)
- 901  IF( ios /= 0 )   CALL ctl_nam ( ios , ' namtrc_ice in reference namelist ', lwp )
-      REWIND( numnat_cfg )              ! Namelist namtrc_ice in configuration namelist : Pisces external sources of nutrients
+ 901  IF( ios /= 0 )   CALL ctl_nam ( ios , ' namtrc_ice in reference namelist ' )
       READ  ( numnat_cfg, namtrc_ice, IOSTAT = ios, ERR = 902 )
- 902  IF( ios >  0 )   CALL ctl_nam ( ios , 'namtrc_ice in configuration namelist', lwp )
+ 902  IF( ios >  0 )   CALL ctl_nam ( ios , 'namtrc_ice in configuration namelist' )
 
       IF( lwp ) THEN
          WRITE(numout,*) ' '

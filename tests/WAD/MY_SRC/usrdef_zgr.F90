@@ -29,10 +29,10 @@ MODULE usrdef_zgr
    PUBLIC   usr_def_zgr        ! called by domzgr.F90
 
    !! * Substitutions
-#  include "vectopt_loop_substitute.h90"
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: usrdef_zgr.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: usrdef_zgr.F90 12740 2020-04-12 09:03:06Z smasson $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS             
@@ -243,9 +243,9 @@ CONTAINS
       END DO
       ! at v-point: averaging zht
       zhv = 0._wp
-      DO jj = 1, jpjm1
-         zhv(:,jj) = 0.5_wp * ( zht(:,jj) + zht(:,jj+1) )
-      END DO
+      DO_2D_00_00
+         zhv(ji,jj) = 0.5_wp * ( zht(ji,jj) + zht(ji,jj+1) )
+      END_2D
       CALL lbc_lnk( 'usrdef_zgr', zhv, 'V', 1. )     ! boundary condition: this mask the surrounding grid-points
       DO jj = mj0(1), mj1(1)   ! first  row of global domain only
          zhv(:,jj) = zht(:,jj)
@@ -280,36 +280,32 @@ CONTAINS
          !
          ht_0 = zht
          k_bot(:,:) = jpkm1 * k_top(:,:)  !* bottom ocean = jpk-1 (here use k_top as a land mask)
-         DO jj = 1, jpj
-            DO ji = 1, jpi
-              IF( zht(ji,jj) <= -(rn_wdld - rn_wdmin2)) THEN
-                k_bot(ji,jj) = 0
-                k_top(ji,jj) = 0
-              ENDIF
-           END DO
-         END DO
+         DO_2D_11_11
+            IF( zht(ji,jj) <= -(rn_wdld - rn_wdmin2)) THEN
+               k_bot(ji,jj) = 0
+               k_top(ji,jj) = 0
+            ENDIF
+         END_2D
          !
          !                                !* terrain-following coordinate with e3.(k)=cst)
          !                                !  OVERFLOW case : identical with j-index (T=V, U=F)
-         DO jj = 1, jpjm1
-            DO ji = 1, jpim1
-              z1_jpkm1 = 1._wp / REAL( k_bot(ji,jj) - k_top(ji,jj) + 1 , wp)
-              DO jk = 1, jpk
-                  zwet = MAX( zht(ji,jj), rn_wdmin1 )
-                  pdept(ji,jj,jk) = zwet * z1_jpkm1 * ( REAL( jk   , wp ) - 0.5_wp )
-                  pdepw(ji,jj,jk) = zwet * z1_jpkm1 * ( REAL( jk-1 , wp )          )
-                  pe3t (ji,jj,jk) = zwet * z1_jpkm1
-                  pe3w (ji,jj,jk) = zwet * z1_jpkm1
-                  zwet = MAX( zhu(ji,jj), rn_wdmin1 )
-                  pe3u (ji,jj,jk) = zwet * z1_jpkm1
-                  pe3uw(ji,jj,jk) = zwet * z1_jpkm1
-                  pe3f (ji,jj,jk) = zwet * z1_jpkm1
-                  zwet = MAX( zhv(ji,jj), rn_wdmin1 )
-                  pe3v (ji,jj,jk) = zwet * z1_jpkm1
-                  pe3vw(ji,jj,jk) = zwet * z1_jpkm1
-              END DO      
-           END DO      
-         END DO      
+         DO_2D_00_00
+            z1_jpkm1 = 1._wp / REAL( k_bot(ji,jj) - k_top(ji,jj) + 1 , wp)
+            DO jk = 1, jpk
+               zwet = MAX( zht(ji,jj), rn_wdmin1 )
+               pdept(ji,jj,jk) = zwet * z1_jpkm1 * ( REAL( jk   , wp ) - 0.5_wp )
+               pdepw(ji,jj,jk) = zwet * z1_jpkm1 * ( REAL( jk-1 , wp )          )
+               pe3t (ji,jj,jk) = zwet * z1_jpkm1
+               pe3w (ji,jj,jk) = zwet * z1_jpkm1
+               zwet = MAX( zhu(ji,jj), rn_wdmin1 )
+               pe3u (ji,jj,jk) = zwet * z1_jpkm1
+               pe3uw(ji,jj,jk) = zwet * z1_jpkm1
+               pe3f (ji,jj,jk) = zwet * z1_jpkm1
+               zwet = MAX( zhv(ji,jj), rn_wdmin1 )
+               pe3v (ji,jj,jk) = zwet * z1_jpkm1
+               pe3vw(ji,jj,jk) = zwet * z1_jpkm1
+            END DO
+         END_2D     
          CALL lbc_lnk( 'usrdef_zgr', pdept, 'T', 1. )
          CALL lbc_lnk( 'usrdef_zgr', pdepw, 'T', 1. )
          CALL lbc_lnk( 'usrdef_zgr', pe3t , 'T', 1. )

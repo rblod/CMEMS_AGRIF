@@ -34,12 +34,12 @@ MODULE usrdef_nam
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: usrdef_nam.F90 10074 2018-08-28 16:15:49Z nicolasmartin $ 
+   !! $Id: usrdef_nam.F90 12377 2020-02-12 14:39:06Z acc $ 
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
 
-   SUBROUTINE usr_def_nam( ldtxt, ldnam, cd_cfg, kk_cfg, kpi, kpj, kpk, kperio )
+   SUBROUTINE usr_def_nam( cd_cfg, kk_cfg, kpi, kpj, kpk, kperio )
       !!----------------------------------------------------------------------
       !!                     ***  ROUTINE dom_nam  ***
       !!                    
@@ -51,23 +51,19 @@ CONTAINS
       !!
       !! ** input   : - namusr_def namelist found in namelist_cfg
       !!----------------------------------------------------------------------
-      CHARACTER(len=*), DIMENSION(:), INTENT(out) ::   ldtxt, ldnam    ! stored print information
       CHARACTER(len=*)              , INTENT(out) ::   cd_cfg          ! configuration name
       INTEGER                       , INTENT(out) ::   kk_cfg          ! configuration resolution
       INTEGER                       , INTENT(out) ::   kpi, kpj, kpk   ! global domain sizes 
       INTEGER                       , INTENT(out) ::   kperio          ! lateral global domain b.c. 
       !
-      INTEGER ::   ios, ii      ! Local integer
+      INTEGER ::   ios          ! Local integer
       REAL(wp)::   zlx, zly, zh ! Local scalars
       !!
       NAMELIST/namusr_def/  rn_dx, rn_dy, rn_dz, rn_ppgphi0
       !!----------------------------------------------------------------------
       !
-      ii = 1
-      !
-      REWIND( numnam_cfg )          ! Namelist namusr_def (exist in namelist_cfg only)
       READ  ( numnam_cfg, namusr_def, IOSTAT = ios, ERR = 902 )
-902   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namusr_def in configuration namelist', .TRUE. )
+902   IF( ios /= 0 )   CALL ctl_nam ( ios , 'namusr_def in configuration namelist' )
       !
 #if defined key_agrif 
       ! Domain parameters are taken from parent:
@@ -79,45 +75,43 @@ CONTAINS
       ENDIF
 #endif
       !
-      WRITE( ldnam(:), namusr_def )
+      IF(lwm)   WRITE( numond, namusr_def )
       !
       cd_cfg = 'VORTEX'             ! name & resolution (not used)
-      kk_cfg = INT( rn_dx )
+      kk_cfg = nINT( rn_dx )
       !
-      ! Global Domain size:  VORTEX global domain is  1800 km x 1800 Km x 5000 m
-      kpi = INT( 1800.e3  / rn_dx ) + 3  
-      kpj = INT( 1800.e3  / rn_dy ) + 3 
-      kpk = INT( 5000._wp / rn_dz ) + 1
-#if defined key_agrif
-      IF( .NOT. Agrif_Root() ) THEN
+      IF( Agrif_Root() ) THEN       ! Global Domain size:  VORTEX global domain is  1800 km x 1800 Km x 5000 m
+         kpi = NINT( 1800.e3  / rn_dx ) + 3  
+         kpj = NINT( 1800.e3  / rn_dy ) + 3 
+      ELSE
          kpi  = nbcellsx + 2 + 2*nbghostcells
          kpj  = nbcellsy + 2 + 2*nbghostcells
       ENDIF
-#endif
+      kpk = NINT( 5000._wp / rn_dz ) + 1
       !
       zlx = (kpi-2)*rn_dx*1.e-3
       zly = (kpj-2)*rn_dy*1.e-3
       zh  = (kpk-1)*rn_dz
-      !                             ! control print
-      WRITE(ldtxt(ii),*) '   '                                                                          ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) 'usr_def_nam  : read the user defined namelist (namusr_def) in namelist_cfg'   ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '~~~~~~~~~~~ '                                                                 ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '   Namelist namusr_def : VORTEX test case'                                    ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '      horizontal resolution             rn_dx  = ', rn_dx, ' m'               ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '      horizontal resolution             rn_dy  = ', rn_dy, ' m'               ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '      vertical resolution               rn_dz  = ', rn_dz, ' m'               ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '      VORTEX domain: '                                                        ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '         LX [km]: ', zlx                                                      ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '         LY [km]: ', zly                                                      ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '          H [m] : ', zh                                                       ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '      Reference latitude            rn_ppgphi0 = ', rn_ppgphi0                ;   ii = ii + 1
-      !
       !                             ! Set the lateral boundary condition of the global domain
       kperio = 0                    ! VORTEX configuration : closed basin
-      !
-      WRITE(ldtxt(ii),*) '   '                                                                          ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '   Lateral boundary condition of the global domain'                           ;   ii = ii + 1
-      WRITE(ldtxt(ii),*) '      VORTEX : closed basin            jperio = ', kperio                     ;   ii = ii + 1
+      !                             ! control print
+      IF(lwp) THEN
+         WRITE(numout,*) '   '
+         WRITE(numout,*) 'usr_def_nam  : read the user defined namelist (namusr_def) in namelist_cfg'
+         WRITE(numout,*) '~~~~~~~~~~~ '
+         WRITE(numout,*) '   Namelist namusr_def : VORTEX test case'
+         WRITE(numout,*) '      horizontal resolution             rn_dx  = ', rn_dx, ' m'
+         WRITE(numout,*) '      horizontal resolution             rn_dy  = ', rn_dy, ' m'
+         WRITE(numout,*) '      vertical resolution               rn_dz  = ', rn_dz, ' m'
+         WRITE(numout,*) '      VORTEX domain: '
+         WRITE(numout,*) '         LX [km]: ', zlx
+         WRITE(numout,*) '         LY [km]: ', zly
+         WRITE(numout,*) '          H [m] : ', zh
+         WRITE(numout,*) '      Reference latitude            rn_ppgphi0 = ', rn_ppgphi0
+         WRITE(numout,*) '   '
+         WRITE(numout,*) '   Lateral boundary condition of the global domain'
+         WRITE(numout,*) '      VORTEX : closed basin            jperio = ', kperio
+      ENDIF
       !
    END SUBROUTINE usr_def_nam
 

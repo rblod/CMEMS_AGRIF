@@ -28,7 +28,7 @@ MODULE obs_read_altbias
       & e2t,   &
       & gphit
    USE oce, ONLY : &           ! Model variables
-      & sshn
+      & ssh
    USE obs_inter_h2d
    USE obs_utils               ! Various observation tools
    USE obs_inter_sup
@@ -42,7 +42,7 @@ MODULE obs_read_altbias
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: obs_read_altbias.F90 10068 2018-08-28 14:09:04Z nicolasmartin $
+   !! $Id: obs_read_altbias.F90 12377 2020-02-12 14:39:06Z acc $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 

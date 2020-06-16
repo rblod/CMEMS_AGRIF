@@ -11,13 +11,14 @@ from netCDF4 import Dataset
 #
 
 # Directory with domccfg target file
-DOMCFG_DIR="/Users/rblod/201906_CMEMS/CMEMS_AGRIF/tools/DOMAINcfg"
+DOMCFG_DIR="../DOMAINcfg"
 # Suffix of domcfg files
-RAD='zps_domcfg_agrif.nc'
+RAD='domain_cfg.nc'
 # Directory with original forcing on native grid
-FORCING_DIR='/Users/rblod/DATA/NEMO_v4/ORCA2_ICE'
+FORCING_DIR='/Users/rblod/DATA/NEMO/NEMO_v4/ORCA2_ICE_v4.0/'
 # Forcing file names, interpolation method (default bilin), and weigth file name (optional), lon(optional), lat(optional)  
 FILES=[
+['chlorophyll.nc'  ,'bilin','','',''],
 ['geothermal_heating.nc'  ,'bilin','','',''],
 ['eddy_viscosity_3D.nc'   ,'bilin','','',''],
 ['resto.nc'               ,'bilin','','',''],
@@ -29,7 +30,7 @@ FILES=[
 #
 # END USER MODIFICATIONS
 #
-mycmd="ls "+DOMCFG_DIR+"/?_*_"+RAD
+mycmd="ls "+DOMCFG_DIR+"/?_"+RAD
 returned_output = subprocess.check_output(mycmd, shell=True)
 listcfg = (returned_output.decode("utf-8")).split()
 

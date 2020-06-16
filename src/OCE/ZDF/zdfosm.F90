@@ -41,7 +41,7 @@ MODULE zdfosm
    !!   dyn_osm       : compute and add to u & v trensd the non-local flux
    !!----------------------------------------------------------------------
    USE oce            ! ocean dynamics and active tracers
-                      ! uses wn from previous time step (which is now wb) to calculate hbl
+                      ! uses ww from previous time step (which is now wb) to calculate hbl
    USE dom_oce        ! ocean space and time domain
    USE zdf_oce        ! ocean vertical physics
    USE sbc_oce        ! surface boundary condition: ocean
@@ -102,9 +102,11 @@ MODULE zdfosm
 
    INTEGER :: idebug = 236
    INTEGER :: jdebug = 228
+   !! * Substitutions
+#  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: zdfosm.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: zdfosm.F90 12489 2020-02-28 15:55:11Z davestorkey $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -121,7 +123,7 @@ CONTAINS
    END FUNCTION zdf_osm_alloc
 
 
-   SUBROUTINE zdf_osm( kt, p_avm, p_avt )
+   SUBROUTINE zdf_osm( kt, Kbb, Kmm, Krhs, p_avm, p_avt )
       !!----------------------------------------------------------------------
       !!                   ***  ROUTINE zdf_osm  ***
       !!
@@ -156,7 +158,8 @@ CONTAINS
       !!         Comments in the code refer to this paper, particularly
       !!         the equation number. (LMD94, here after)
       !!----------------------------------------------------------------------
-      INTEGER                   , INTENT(in   ) ::   kt            ! ocean time step
+      INTEGER                   , INTENT(in   ) ::  kt             ! ocean time step
+      INTEGER                   , INTENT(in   ) ::  Kbb, Kmm, Krhs ! ocean time level indices
       REAL(wp), DIMENSION(:,:,:), INTENT(inout) ::  p_avm, p_avt   ! momentum and tracer Kz (w-points)
       !!
       INTEGER ::   ji, jj, jk                   ! dummy loop indices
@@ -294,369 +297,373 @@ CONTAINS
       ! Assume two-band radiation model for depth of OSBL
      zz0 =       rn_abs       ! surface equi-partition in 2-bands
      zz1 =  1. - rn_abs
-     DO jj = 2, jpjm1
-        DO ji = 2, jpim1
-           ! Surface downward irradiance (so always +ve)
-           zrad0(ji,jj) = qsr(ji,jj) * r1_rau0_rcp
-           ! Downwards irradiance at base of boundary layer
-           zradh(ji,jj) = zrad0(ji,jj) * ( zz0 * EXP( -hbl(ji,jj)/rn_si0 ) + zz1 * EXP( -hbl(ji,jj)/rn_si1) )
-           ! Downwards irradiance averaged over depth of the OSBL
-           zradav(ji,jj) = zrad0(ji,jj) * ( zz0 * ( 1.0 - EXP( -hbl(ji,jj)/rn_si0 ) )*rn_si0 &
-                 &                         + zz1 * ( 1.0 - EXP( -hbl(ji,jj)/rn_si1 ) )*rn_si1 ) / hbl(ji,jj)
-        END DO
-     END DO
+     DO_2D_00_00
+        ! Surface downward irradiance (so always +ve)
+        zrad0(ji,jj) = qsr(ji,jj) * r1_rho0_rcp
+        ! Downwards irradiance at base of boundary layer
+        zradh(ji,jj) = zrad0(ji,jj) * ( zz0 * EXP( -hbl(ji,jj)/rn_si0 ) + zz1 * EXP( -hbl(ji,jj)/rn_si1) )
+        ! Downwards irradiance averaged over depth of the OSBL
+        zradav(ji,jj) = zrad0(ji,jj) * ( zz0 * ( 1.0 - EXP( -hbl(ji,jj)/rn_si0 ) )*rn_si0 &
+              &                         + zz1 * ( 1.0 - EXP( -hbl(ji,jj)/rn_si1 ) )*rn_si1 ) / hbl(ji,jj)
+     END_2D
      ! Turbulent surface fluxes and fluxes averaged over depth of the OSBL
-     DO jj = 2, jpjm1
-        DO ji = 2, jpim1
-           zthermal = rab_n(ji,jj,1,jp_tem)
-           zbeta    = rab_n(ji,jj,1,jp_sal)
-           ! Upwards surface Temperature flux for non-local term
-           zwth0(ji,jj) = - qns(ji,jj) * r1_rau0_rcp * tmask(ji,jj,1)
-           ! Upwards surface salinity flux for non-local term
-           zws0(ji,jj) = - ( ( emp(ji,jj)-rnf(ji,jj) ) * tsn(ji,jj,1,jp_sal)  + sfx(ji,jj) ) * r1_rau0 * tmask(ji,jj,1)
-           ! Non radiative upwards surface buoyancy flux
-           zwb0(ji,jj) = grav * zthermal * zwth0(ji,jj) -  grav * zbeta * zws0(ji,jj)
-           ! turbulent heat flux averaged over depth of OSBL
-           zwthav(ji,jj) = 0.5 * zwth0(ji,jj) - ( 0.5*( zrad0(ji,jj) + zradh(ji,jj) ) - zradav(ji,jj) )
-           ! turbulent salinity flux averaged over depth of the OBSL
-           zwsav(ji,jj) = 0.5 * zws0(ji,jj)
-           ! turbulent buoyancy flux averaged over the depth of the OBSBL
-           zwbav(ji,jj) = grav  * zthermal * zwthav(ji,jj) - grav  * zbeta * zwsav(ji,jj)
-           ! Surface upward velocity fluxes
-           zuw0(ji,jj) = -utau(ji,jj) * r1_rau0 * tmask(ji,jj,1)
-           zvw0(ji,jj) = -vtau(ji,jj) * r1_rau0 * tmask(ji,jj,1)
-           ! Friction velocity (zustar), at T-point : LMD94 eq. 2
-           zustar(ji,jj) = MAX( SQRT( SQRT( zuw0(ji,jj) * zuw0(ji,jj) + zvw0(ji,jj) * zvw0(ji,jj) ) ), 1.0e-8 )
-           zcos_wind(ji,jj) = -zuw0(ji,jj) / ( zustar(ji,jj) * zustar(ji,jj) )
-           zsin_wind(ji,jj) = -zvw0(ji,jj) / ( zustar(ji,jj) * zustar(ji,jj) )
-        END DO
-     END DO
+     DO_2D_00_00
+        zthermal = rab_n(ji,jj,1,jp_tem)
+        zbeta    = rab_n(ji,jj,1,jp_sal)
+        ! Upwards surface Temperature flux for non-local term
+        zwth0(ji,jj) = - qns(ji,jj) * r1_rho0_rcp * tmask(ji,jj,1)
+        ! Upwards surface salinity flux for non-local term
+        zws0(ji,jj) = - ( ( emp(ji,jj)-rnf(ji,jj) ) * ts(ji,jj,1,jp_sal,Kmm)  + sfx(ji,jj) ) * r1_rho0 * tmask(ji,jj,1)
+        ! Non radiative upwards surface buoyancy flux
+        zwb0(ji,jj) = grav * zthermal * zwth0(ji,jj) -  grav * zbeta * zws0(ji,jj)
+        ! turbulent heat flux averaged over depth of OSBL
+        zwthav(ji,jj) = 0.5 * zwth0(ji,jj) - ( 0.5*( zrad0(ji,jj) + zradh(ji,jj) ) - zradav(ji,jj) )
+        ! turbulent salinity flux averaged over depth of the OBSL
+        zwsav(ji,jj) = 0.5 * zws0(ji,jj)
+        ! turbulent buoyancy flux averaged over the depth of the OBSBL
+        zwbav(ji,jj) = grav  * zthermal * zwthav(ji,jj) - grav  * zbeta * zwsav(ji,jj)
+        ! Surface upward velocity fluxes
+        zuw0(ji,jj) = -utau(ji,jj) * r1_rho0 * tmask(ji,jj,1)
+        zvw0(ji,jj) = -vtau(ji,jj) * r1_rho0 * tmask(ji,jj,1)
+        ! Friction velocity (zustar), at T-point : LMD94 eq. 2
+        zustar(ji,jj) = MAX( SQRT( SQRT( zuw0(ji,jj) * zuw0(ji,jj) + zvw0(ji,jj) * zvw0(ji,jj) ) ), 1.0e-8 )
+        zcos_wind(ji,jj) = -zuw0(ji,jj) / ( zustar(ji,jj) * zustar(ji,jj) )
+        zsin_wind(ji,jj) = -zvw0(ji,jj) / ( zustar(ji,jj) * zustar(ji,jj) )
+     END_2D
      ! Calculate Stokes drift in direction of wind (zustke) and Stokes penetration depth (dstokes)
      SELECT CASE (nn_osm_wave)
      ! Assume constant La#=0.3
      CASE(0)
-        DO jj = 2, jpjm1
-           DO ji = 2, jpim1
-              zus_x = zcos_wind(ji,jj) * zustar(ji,jj) / 0.3**2
-              zus_y = zsin_wind(ji,jj) * zustar(ji,jj) / 0.3**2
-              zustke(ji,jj) = MAX ( SQRT( zus_x*zus_x + zus_y*zus_y), 1.0e-8 )
-              ! dstokes(ji,jj) set to constant value rn_osm_dstokes from namelist in zdf_osm_init
-           END DO
-        END DO
+        DO_2D_00_00
+           zus_x = zcos_wind(ji,jj) * zustar(ji,jj) / 0.3**2
+           zus_y = zsin_wind(ji,jj) * zustar(ji,jj) / 0.3**2
+           zustke(ji,jj) = MAX ( SQRT( zus_x*zus_x + zus_y*zus_y), 1.0e-8 )
+           ! dstokes(ji,jj) set to constant value rn_osm_dstokes from namelist in zdf_osm_init
+        END_2D
      ! Assume Pierson-Moskovitz wind-wave spectrum
      CASE(1)
-        DO jj = 2, jpjm1
-           DO ji = 2, jpim1
-              ! Use wind speed wndm included in sbc_oce module
-              zustke(ji,jj) = MAX ( 0.016 * wndm(ji,jj), 1.0e-8 )
-              dstokes(ji,jj) = 0.12 * wndm(ji,jj)**2 / grav
-           END DO
-        END DO
+        DO_2D_00_00
+           ! Use wind speed wndm included in sbc_oce module
+           zustke(ji,jj) = MAX ( 0.016 * wndm(ji,jj), 1.0e-8 )
+           dstokes(ji,jj) = 0.12 * wndm(ji,jj)**2 / grav
+        END_2D
      ! Use ECMWF wave fields as output from SBCWAVE
      CASE(2)
         zfac =  2.0_wp * rpi / 16.0_wp
-        DO jj = 2, jpjm1
-           DO ji = 2, jpim1
-              ! The Langmur number from the ECMWF model appears to give La<0.3 for wind-driven seas.
-              !    The coefficient 0.8 gives La=0.3  in this situation.
-              ! It could represent the effects of the spread of wave directions
-              ! around the mean wind. The effect of this adjustment needs to be tested.
-              zustke(ji,jj) = MAX ( 1.0 * ( zcos_wind(ji,jj) * ut0sd(ji,jj ) + zsin_wind(ji,jj)  * vt0sd(ji,jj) ), &
-                   &                zustar(ji,jj) / ( 0.45 * 0.45 )                                                  )
-              dstokes(ji,jj) = MAX(zfac * hsw(ji,jj)*hsw(ji,jj) / ( MAX(zustke(ji,jj)*wmp(ji,jj), 1.0e-7 ) ), 5.0e-1) !rn_osm_dstokes !
-           END DO
-        END DO
+        DO_2D_00_00
+           ! The Langmur number from the ECMWF model appears to give La<0.3 for wind-driven seas.
+           !    The coefficient 0.8 gives La=0.3  in this situation.
+           ! It could represent the effects of the spread of wave directions
+           ! around the mean wind. The effect of this adjustment needs to be tested.
+           zustke(ji,jj) = MAX ( 1.0 * ( zcos_wind(ji,jj) * ut0sd(ji,jj ) + zsin_wind(ji,jj)  * vt0sd(ji,jj) ), &
+                &                zustar(ji,jj) / ( 0.45 * 0.45 )                                                  )
+           dstokes(ji,jj) = MAX(zfac * hsw(ji,jj)*hsw(ji,jj) / ( MAX(zustke(ji,jj)*wmp(ji,jj), 1.0e-7 ) ), 5.0e-1) !rn_osm_dstokes !
+        END_2D
      END SELECT
 
      ! Langmuir velocity scale (zwstrl), La # (zla)
      ! mixed scale (zvstr), convective velocity scale (zwstrc)
-     DO jj = 2, jpjm1
-        DO ji = 2, jpim1
-           ! Langmuir velocity scale (zwstrl), at T-point
-           zwstrl(ji,jj) = ( zustar(ji,jj) * zustar(ji,jj) * zustke(ji,jj) )**pthird
-           ! Modify zwstrl to allow for small and large values of dstokes/hbl.
-           ! Intended as a possible test. Doesn't affect LES results for entrainment,
-           !  but hasn't been shown to be correct as dstokes/h becomes large or small.
-           zwstrl(ji,jj) = zwstrl(ji,jj) *  &
-                & (1.12 * ( 1.0 - ( 1.0 - EXP( -hbl(ji,jj) / dstokes(ji,jj) ) ) * dstokes(ji,jj) / hbl(ji,jj) ))**pthird * &
-                & ( 1.0 - EXP( -15.0 * dstokes(ji,jj) / hbl(ji,jj) ))
-           ! define La this way so effects of Stokes penetration depth on velocity scale are included
-           zla(ji,jj) = SQRT ( zustar(ji,jj) / zwstrl(ji,jj) )**3
-           ! Velocity scale that tends to zustar for large Langmuir numbers
-           zvstr(ji,jj) = ( zwstrl(ji,jj)**3  + &
-                & ( 1.0 - EXP( -0.5 * zla(ji,jj)**2 ) ) * zustar(ji,jj) * zustar(ji,jj) * zustar(ji,jj) )**pthird
+     DO_2D_00_00
+        ! Langmuir velocity scale (zwstrl), at T-point
+        zwstrl(ji,jj) = ( zustar(ji,jj) * zustar(ji,jj) * zustke(ji,jj) )**pthird
+        ! Modify zwstrl to allow for small and large values of dstokes/hbl.
+        ! Intended as a possible test. Doesn't affect LES results for entrainment,
+        !  but hasn't been shown to be correct as dstokes/h becomes large or small.
+        zwstrl(ji,jj) = zwstrl(ji,jj) *  &
+             & (1.12 * ( 1.0 - ( 1.0 - EXP( -hbl(ji,jj) / dstokes(ji,jj) ) ) * dstokes(ji,jj) / hbl(ji,jj) ))**pthird * &
+             & ( 1.0 - EXP( -15.0 * dstokes(ji,jj) / hbl(ji,jj) ))
+        ! define La this way so effects of Stokes penetration depth on velocity scale are included
+        zla(ji,jj) = SQRT ( zustar(ji,jj) / zwstrl(ji,jj) )**3
+        ! Velocity scale that tends to zustar for large Langmuir numbers
+        zvstr(ji,jj) = ( zwstrl(ji,jj)**3  + &
+             & ( 1.0 - EXP( -0.5 * zla(ji,jj)**2 ) ) * zustar(ji,jj) * zustar(ji,jj) * zustar(ji,jj) )**pthird
 
-           ! limit maximum value of Langmuir number as approximate treatment for shear turbulence.
-           ! Note zustke and zwstrl are not amended.
-           IF ( zla(ji,jj) >= 0.45 ) zla(ji,jj) = 0.45
-           !
-           ! get convective velocity (zwstrc), stabilty scale (zhol) and logical conection flag lconv
-           IF ( zwbav(ji,jj) > 0.0) THEN
-              zwstrc(ji,jj) = ( 2.0 * zwbav(ji,jj) * 0.9 * hbl(ji,jj) )**pthird
-              zhol(ji,jj) = -0.9 * hbl(ji,jj) * 2.0 * zwbav(ji,jj) / (zvstr(ji,jj)**3 + epsln )
-              lconv(ji,jj) = .TRUE.
-           ELSE
-              zhol(ji,jj) = -hbl(ji,jj) *  2.0 * zwbav(ji,jj)/ (zvstr(ji,jj)**3  + epsln )
-              lconv(ji,jj) = .FALSE.
-           ENDIF
-        END DO
-     END DO
+        ! limit maximum value of Langmuir number as approximate treatment for shear turbulence.
+        ! Note zustke and zwstrl are not amended.
+        IF ( zla(ji,jj) >= 0.45 ) zla(ji,jj) = 0.45
+        !
+        ! get convective velocity (zwstrc), stabilty scale (zhol) and logical conection flag lconv
+        IF ( zwbav(ji,jj) > 0.0) THEN
+           zwstrc(ji,jj) = ( 2.0 * zwbav(ji,jj) * 0.9 * hbl(ji,jj) )**pthird
+           zhol(ji,jj) = -0.9 * hbl(ji,jj) * 2.0 * zwbav(ji,jj) / (zvstr(ji,jj)**3 + epsln )
+           lconv(ji,jj) = .TRUE.
+        ELSE
+           zhol(ji,jj) = -hbl(ji,jj) *  2.0 * zwbav(ji,jj)/ (zvstr(ji,jj)**3  + epsln )
+           lconv(ji,jj) = .FALSE.
+        ENDIF
+     END_2D
 
      !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
      ! Mixed-layer model - calculate averages over the boundary layer, and the change in the boundary layer depth
      !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
      ! BL must be always 2 levels deep.
-      hbl(:,:) = MAX(hbl(:,:), gdepw_n(:,:,3) )
+      hbl(:,:) = MAX(hbl(:,:), gdepw(:,:,3,Kmm) )
       ibld(:,:) = 3
-      DO jk = 4, jpkm1
-         DO jj = 2, jpjm1
-            DO ji = 2, jpim1
-               IF ( hbl(ji,jj) >= gdepw_n(ji,jj,jk) ) THEN
-                  ibld(ji,jj) = MIN(mbkt(ji,jj), jk)
-               ENDIF
+      DO_3D_00_00( 4, jpkm1 )
+         IF ( hbl(ji,jj) >= gdepw(ji,jj,jk,Kmm) ) THEN
+            ibld(ji,jj) = MIN(mbkt(ji,jj), jk)
+         ENDIF
+      END_3D
+
+      DO_2D_00_00
+            zthermal = rab_n(ji,jj,1,jp_tem) !ideally use ibld not 1??
+            zbeta    = rab_n(ji,jj,1,jp_sal)
+            zt   = 0._wp
+            zs   = 0._wp
+            zu   = 0._wp
+            zv   = 0._wp
+            ! average over depth of boundary layer
+            zthick=0._wp
+            DO jm = 2, ibld(ji,jj)
+               zthick=zthick+e3t(ji,jj,jm,Kmm)
+               zt   = zt  + e3t(ji,jj,jm,Kmm) * ts(ji,jj,jm,jp_tem,Kmm)
+               zs   = zs  + e3t(ji,jj,jm,Kmm) * ts(ji,jj,jm,jp_sal,Kmm)
+               zu   = zu  + e3t(ji,jj,jm,Kmm) &
+                  &            * ( uu(ji,jj,jm,Kbb) + uu(ji - 1,jj,jm,Kbb) ) &
+                  &            / MAX( 1. , umask(ji,jj,jm) + umask(ji - 1,jj,jm) )
+               zv   = zv  + e3t(ji,jj,jm,Kmm) &
+                  &            * ( vv(ji,jj,jm,Kbb) + vv(ji,jj - 1,jm,Kbb) ) &
+                  &            / MAX( 1. , vmask(ji,jj,jm) + vmask(ji,jj - 1,jm) )
             END DO
-         END DO
-      END DO
+            zt_bl(ji,jj) = zt / zthick
+            zs_bl(ji,jj) = zs / zthick
+            zu_bl(ji,jj) = zu / zthick
+            zv_bl(ji,jj) = zv / zthick
+            zdt_bl(ji,jj) = zt_bl(ji,jj) - ts(ji,jj,ibld(ji,jj),jp_tem,Kmm)
+            zds_bl(ji,jj) = zs_bl(ji,jj) - ts(ji,jj,ibld(ji,jj),jp_sal,Kmm)
+            zdu_bl(ji,jj) = zu_bl(ji,jj) - ( uu(ji,jj,ibld(ji,jj),Kbb) + uu(ji-1,jj,ibld(ji,jj) ,Kbb) ) &
+                  &    / MAX(1. , umask(ji,jj,ibld(ji,jj) ) + umask(ji-1,jj,ibld(ji,jj) ) )
+            zdv_bl(ji,jj) = zv_bl(ji,jj) - ( vv(ji,jj,ibld(ji,jj),Kbb) + vv(ji,jj-1,ibld(ji,jj) ,Kbb) ) &
+                  &   / MAX(1. , vmask(ji,jj,ibld(ji,jj) ) + vmask(ji,jj-1,ibld(ji,jj) ) )
+            zdb_bl(ji,jj) = grav * zthermal * zdt_bl(ji,jj) - grav * zbeta * zds_bl(ji,jj)
+            IF ( lconv(ji,jj) ) THEN    ! Convective
+                   zwb_ent(ji,jj) = -( 2.0 * 0.2 * zwbav(ji,jj) &
+                        &            + 0.135 * zla(ji,jj) * zwstrl(ji,jj)**3/hbl(ji,jj) )
 
-      DO jj = 2, jpjm1                                 !  Vertical slab
-         DO ji = 2, jpim1
-               zthermal = rab_n(ji,jj,1,jp_tem) !ideally use ibld not 1??
-               zbeta    = rab_n(ji,jj,1,jp_sal)
-               zt   = 0._wp
-               zs   = 0._wp
-               zu   = 0._wp
-               zv   = 0._wp
-               ! average over depth of boundary layer
-               zthick=0._wp
-               DO jm = 2, ibld(ji,jj)
-                  zthick=zthick+e3t_n(ji,jj,jm)
-                  zt   = zt  + e3t_n(ji,jj,jm) * tsn(ji,jj,jm,jp_tem)
-                  zs   = zs  + e3t_n(ji,jj,jm) * tsn(ji,jj,jm,jp_sal)
-                  zu   = zu  + e3t_n(ji,jj,jm) &
-                     &            * ( ub(ji,jj,jm) + ub(ji - 1,jj,jm) ) &
-                     &            / MAX( 1. , umask(ji,jj,jm) + umask(ji - 1,jj,jm) )
-                  zv   = zv  + e3t_n(ji,jj,jm) &
-                     &            * ( vb(ji,jj,jm) + vb(ji,jj - 1,jm) ) &
-                     &            / MAX( 1. , vmask(ji,jj,jm) + vmask(ji,jj - 1,jm) )
-               END DO
-               zt_bl(ji,jj) = zt / zthick
-               zs_bl(ji,jj) = zs / zthick
-               zu_bl(ji,jj) = zu / zthick
-               zv_bl(ji,jj) = zv / zthick
-               zdt_bl(ji,jj) = zt_bl(ji,jj) - tsn(ji,jj,ibld(ji,jj),jp_tem)
-               zds_bl(ji,jj) = zs_bl(ji,jj) - tsn(ji,jj,ibld(ji,jj),jp_sal)
-               zdu_bl(ji,jj) = zu_bl(ji,jj) - ( ub(ji,jj,ibld(ji,jj)) + ub(ji-1,jj,ibld(ji,jj) ) ) &
-                     &    / MAX(1. , umask(ji,jj,ibld(ji,jj) ) + umask(ji-1,jj,ibld(ji,jj) ) )
-               zdv_bl(ji,jj) = zv_bl(ji,jj) - ( vb(ji,jj,ibld(ji,jj)) + vb(ji,jj-1,ibld(ji,jj) ) ) &
-                     &   / MAX(1. , vmask(ji,jj,ibld(ji,jj) ) + vmask(ji,jj-1,ibld(ji,jj) ) )
-               zdb_bl(ji,jj) = grav * zthermal * zdt_bl(ji,jj) - grav * zbeta * zds_bl(ji,jj)
-               IF ( lconv(ji,jj) ) THEN    ! Convective
-                      zwb_ent(ji,jj) = -( 2.0 * 0.2 * zwbav(ji,jj) &
-                           &            + 0.135 * zla(ji,jj) * zwstrl(ji,jj)**3/hbl(ji,jj) )
-
-                      zvel_max =  - ( 1.0 + 1.0 * ( zwstrl(ji,jj)**3 + 0.5 * zwstrc(ji,jj)**3 )**pthird * rn_rdt / hbl(ji,jj) ) &
-                           &   * zwb_ent(ji,jj) / ( zwstrl(ji,jj)**3 + 0.5 * zwstrc(ji,jj)**3 )**pthird
+                   zvel_max =  - ( 1.0 + 1.0 * ( zwstrl(ji,jj)**3 + 0.5 * zwstrc(ji,jj)**3 )**pthird * rn_Dt / hbl(ji,jj) ) &
+                        &   * zwb_ent(ji,jj) / ( zwstrl(ji,jj)**3 + 0.5 * zwstrc(ji,jj)**3 )**pthird
 ! Entrainment including component due to shear turbulence. Modified Langmuir component, but gives same result for La=0.3 For testing uncomment.
 !                      zwb_ent(ji,jj) = -( 2.0 * 0.2 * zwbav(ji,jj) &
 !                           &            + ( 0.15 * ( 1.0 - EXP( -0.5 * zla(ji,jj) ) ) + 0.03 / zla(ji,jj)**2 ) * zustar(ji,jj)**3/hbl(ji,jj) )
 
-!                      zvel_max = - ( 1.0 + 1.0 * ( zvstr(ji,jj)**3 + 0.5 * zwstrc(ji,jj)**3 )**pthird * rn_rdt / zhbl(ji,jj) ) * zwb_ent(ji,jj) / &
+!                      zvel_max = - ( 1.0 + 1.0 * ( zvstr(ji,jj)**3 + 0.5 * zwstrc(ji,jj)**3 )**pthird * rn_Dt / zhbl(ji,jj) ) * zwb_ent(ji,jj) / &
 !                           &       ( zvstr(ji,jj)**3 + 0.5 * zwstrc(ji,jj)**3 )**pthird
-                      zzdhdt = - zwb_ent(ji,jj) / ( zvel_max + MAX(zdb_bl(ji,jj),0.0) )
-               ELSE                        ! Stable
-                      zzdhdt = 0.32 * ( hbli(ji,jj) / hbl(ji,jj) -1.0 ) * zwstrl(ji,jj)**3 / hbli(ji,jj) &
-                           &   + ( ( 0.32 / 3.0 ) * exp ( -2.5 * ( hbli(ji,jj) / hbl(ji,jj) - 1.0 ) ) &
-                           & - ( 0.32 / 3.0 - 0.135 * zla(ji,jj) ) * exp ( -12.5 * ( hbli(ji,jj) / hbl(ji,jj) ) ) ) &
-                           &  * zwstrl(ji,jj)**3 / hbli(ji,jj)
-                      zzdhdt = zzdhdt + zwbav(ji,jj)
-                      IF ( zzdhdt < 0._wp ) THEN
-                      ! For long timsteps factor in brackets slows the rapid collapse of the OSBL
-                         zpert   = 2.0 * ( 1.0 + 2.0 * zwstrl(ji,jj) * rn_rdt / hbl(ji,jj) ) * zwstrl(ji,jj)**2 / hbl(ji,jj)
-                      ELSE
-                         zpert   = 2.0 * ( 1.0 + 2.0 * zwstrl(ji,jj) * rn_rdt / hbl(ji,jj) ) * zwstrl(ji,jj)**2 / hbl(ji,jj) &
-                              &  + MAX( zdb_bl(ji,jj), 0.0 )
-                      ENDIF
-                      zzdhdt = 2.0 * zzdhdt / zpert
-               ENDIF
-               zdhdt(ji,jj) = zzdhdt
-           END DO
-      END DO
+                   zzdhdt = - zwb_ent(ji,jj) / ( zvel_max + MAX(zdb_bl(ji,jj),0.0) )
+            ELSE                        ! Stable
+                   zzdhdt = 0.32 * ( hbli(ji,jj) / hbl(ji,jj) -1.0 ) * zwstrl(ji,jj)**3 / hbli(ji,jj) &
+                        &   + ( ( 0.32 / 3.0 ) * exp ( -2.5 * ( hbli(ji,jj) / hbl(ji,jj) - 1.0 ) ) &
+                        & - ( 0.32 / 3.0 - 0.135 * zla(ji,jj) ) * exp ( -12.5 * ( hbli(ji,jj) / hbl(ji,jj) ) ) ) &
+                        &  * zwstrl(ji,jj)**3 / hbli(ji,jj)
+                   zzdhdt = zzdhdt + zwbav(ji,jj)
+                   IF ( zzdhdt < 0._wp ) THEN
+                   ! For long timsteps factor in brackets slows the rapid collapse of the OSBL
+                      zpert   = 2.0 * ( 1.0 + 2.0 * zwstrl(ji,jj) * rn_Dt / hbl(ji,jj) ) * zwstrl(ji,jj)**2 / hbl(ji,jj)
+                   ELSE
+                      zpert   = 2.0 * ( 1.0 + 2.0 * zwstrl(ji,jj) * rn_Dt / hbl(ji,jj) ) * zwstrl(ji,jj)**2 / hbl(ji,jj) &
+                           &  + MAX( zdb_bl(ji,jj), 0.0 )
+                   ENDIF
+                   zzdhdt = 2.0 * zzdhdt / zpert
+            ENDIF
+            zdhdt(ji,jj) = zzdhdt
+      END_2D
 
       ! Calculate averages over depth of boundary layer
       imld = ibld           ! use imld to hold previous blayer index
       ibld(:,:) = 3
 
-      zhbl_t(:,:) = hbl(:,:) + (zdhdt(:,:) - wn(ji,jj,ibld(ji,jj)))* rn_rdt ! certainly need wb here, so subtract it
-      zhbl_t(:,:) = MIN(zhbl_t(:,:), ht_n(:,:))
-      zdhdt(:,:) = MIN(zdhdt(:,:), (zhbl_t(:,:) - hbl(:,:))/rn_rdt + wn(ji,jj,ibld(ji,jj))) ! adjustment to represent limiting by ocean bottom
+      zhbl_t(:,:) = hbl(:,:) + (zdhdt(:,:) - ww(ji,jj,ibld(ji,jj)))* rn_Dt ! certainly need wb here, so subtract it
+      zhbl_t(:,:) = MIN(zhbl_t(:,:), ht(:,:))
+      zdhdt(:,:) = MIN(zdhdt(:,:), (zhbl_t(:,:) - hbl(:,:))/rn_Dt + ww(ji,jj,ibld(ji,jj))) ! adjustment to represent limiting by ocean bottom
 
-      DO jk = 4, jpkm1
-         DO jj = 2, jpjm1
-            DO ji = 2, jpim1
-               IF ( zhbl_t(ji,jj) >= gdepw_n(ji,jj,jk) ) THEN
-                  ibld(ji,jj) =  MIN(mbkt(ji,jj), jk)
-               ENDIF
-            END DO
-         END DO
-      END DO
+      DO_3D_00_00( 4, jpkm1 )
+         IF ( zhbl_t(ji,jj) >= gdepw(ji,jj,jk,Kmm) ) THEN
+            ibld(ji,jj) =  MIN(mbkt(ji,jj), jk)
+         ENDIF
+      END_3D
 
 !
 ! Step through model levels taking account of buoyancy change to determine the effect on dhdt
 !
-      DO jj = 2, jpjm1
-         DO ji = 2, jpim1
-            IF ( ibld(ji,jj) - imld(ji,jj) > 1 ) THEN
+      DO_2D_00_00
+         IF ( ibld(ji,jj) - imld(ji,jj) > 1 ) THEN
 !
 ! If boundary layer changes by more than one level, need to check for stable layers between initial and final depths.
 !
-               zhbl_s = hbl(ji,jj)
-               jm = imld(ji,jj)
-               zthermal = rab_n(ji,jj,1,jp_tem)
-               zbeta = rab_n(ji,jj,1,jp_sal)
-               IF ( lconv(ji,jj) ) THEN
+            zhbl_s = hbl(ji,jj)
+            jm = imld(ji,jj)
+            zthermal = rab_n(ji,jj,1,jp_tem)
+            zbeta = rab_n(ji,jj,1,jp_sal)
+            IF ( lconv(ji,jj) ) THEN
 !unstable
-                  zvel_max =  - ( 1.0 + 1.0 * ( zvstr(ji,jj)**3 + 0.5 * zwstrc(ji,jj)**3 )**pthird * rn_rdt / hbl(ji,jj) ) &
-                       &   * zwb_ent(ji,jj) / ( zvstr(ji,jj)**3 + 0.5 * zwstrc(ji,jj)**3 )**pthird
+               zvel_max =  - ( 1.0 + 1.0 * ( zvstr(ji,jj)**3 + 0.5 * zwstrc(ji,jj)**3 )**pthird * rn_Dt / hbl(ji,jj) ) &
+                    &   * zwb_ent(ji,jj) / ( zvstr(ji,jj)**3 + 0.5 * zwstrc(ji,jj)**3 )**pthird
 
-                  DO jk = imld(ji,jj), ibld(ji,jj)
-                     zdb = MAX( grav * ( zthermal * ( zt_bl(ji,jj) - tsn(ji,jj,jm,jp_tem) ) &
-                          & - zbeta * ( zs_bl(ji,jj) - tsn(ji,jj,jm,jp_sal) ) ), 0.0 ) + zvel_max
+               DO jk = imld(ji,jj), ibld(ji,jj)
+                  zdb = MAX( grav * ( zthermal * ( zt_bl(ji,jj) - ts(ji,jj,jm,jp_tem,Kmm) ) &
+                       & - zbeta * ( zs_bl(ji,jj) - ts(ji,jj,jm,jp_sal,Kmm) ) ), 0.0 ) + zvel_max
 
-                     zhbl_s = zhbl_s + MIN( - zwb_ent(ji,jj) / zdb * rn_rdt / FLOAT(ibld(ji,jj)-imld(ji,jj) ), e3w_n(ji,jj,jk) )
-                     zhbl_s = MIN(zhbl_s, ht_n(ji,jj))
+                  zhbl_s = zhbl_s + MIN( - zwb_ent(ji,jj) / zdb * rn_Dt / FLOAT(ibld(ji,jj)-imld(ji,jj) ), e3w(ji,jj,jk,Kmm) )
+                  zhbl_s = MIN(zhbl_s, ht(ji,jj))
 
-                     IF ( zhbl_s >= gdepw_n(ji,jj,jm+1) ) jm = jm + 1
-                  END DO
-                  hbl(ji,jj) = zhbl_s
-                  ibld(ji,jj) = jm
-                  hbli(ji,jj) = hbl(ji,jj)
-               ELSE
-! stable
-                  DO jk = imld(ji,jj), ibld(ji,jj)
-                     zdb = MAX( grav * ( zthermal * ( zt_bl(ji,jj) - tsn(ji,jj,jm,jp_tem) )          &
-                          &               - zbeta * ( zs_bl(ji,jj) - tsn(ji,jj,jm,jp_sal) ) ), 0.0 ) &
-                          & + 2.0 * zwstrl(ji,jj)**2 / zhbl_s
-
-                     zhbl_s = zhbl_s +  (                                                                                &
-                          &                     0.32         *                         ( hbli(ji,jj) / zhbl_s -1.0 )     &
-                          &               * zwstrl(ji,jj)**3 / hbli(ji,jj)                                               &
-                          &               + ( ( 0.32 / 3.0 )           * EXP( -  2.5 * ( hbli(ji,jj) / zhbl_s -1.0 ) )   &
-                          &               -   ( 0.32 / 3.0  - 0.0485 ) * EXP( - 12.5 * ( hbli(ji,jj) / zhbl_s      ) ) ) &
-                          &          * zwstrl(ji,jj)**3 / hbli(ji,jj) ) / zdb * e3w_n(ji,jj,jk) / zdhdt(ji,jj)  ! ALMG to investigate whether need to include wn here
-
-                     zhbl_s = MIN(zhbl_s, ht_n(ji,jj))
-                     IF ( zhbl_s >= gdepw_n(ji,jj,jm) ) jm = jm + 1
-                  END DO
-                  hbl(ji,jj) = MAX(zhbl_s, gdepw_n(ji,jj,3) )
-                  ibld(ji,jj) = MAX(jm, 3 )
-                  IF ( hbl(ji,jj) > hbli(ji,jj) ) hbli(ji,jj) = hbl(ji,jj)
-               ENDIF   ! IF ( lconv )
+                  IF ( zhbl_s >= gdepw(ji,jj,jm+1,Kmm) ) jm = jm + 1
+               END DO
+               hbl(ji,jj) = zhbl_s
+               ibld(ji,jj) = jm
+               hbli(ji,jj) = hbl(ji,jj)
             ELSE
+! stable
+               DO jk = imld(ji,jj), ibld(ji,jj)
+                  zdb = MAX( grav * ( zthermal * ( zt_bl(ji,jj) - ts(ji,jj,jm,jp_tem,Kmm) )          &
+                       &               - zbeta * ( zs_bl(ji,jj) - ts(ji,jj,jm,jp_sal,Kmm) ) ), 0.0 ) &
+                       & + 2.0 * zwstrl(ji,jj)**2 / zhbl_s
+
+                  zhbl_s = zhbl_s +  (                                                                                &
+                       &                     0.32         *                         ( hbli(ji,jj) / zhbl_s -1.0 )     &
+                       &               * zwstrl(ji,jj)**3 / hbli(ji,jj)                                               &
+                       &               + ( ( 0.32 / 3.0 )           * EXP( -  2.5 * ( hbli(ji,jj) / zhbl_s -1.0 ) )   &
+                       &               -   ( 0.32 / 3.0  - 0.0485 ) * EXP( - 12.5 * ( hbli(ji,jj) / zhbl_s      ) ) ) &
+                       &          * zwstrl(ji,jj)**3 / hbli(ji,jj) ) / zdb * e3w(ji,jj,jk,Kmm) / zdhdt(ji,jj)  ! ALMG to investigate whether need to include ww here
+
+                  zhbl_s = MIN(zhbl_s, ht(ji,jj))
+                  IF ( zhbl_s >= gdepw(ji,jj,jm,Kmm) ) jm = jm + 1
+               END DO
+               hbl(ji,jj) = MAX(zhbl_s, gdepw(ji,jj,3,Kmm) )
+               ibld(ji,jj) = MAX(jm, 3 )
+               IF ( hbl(ji,jj) > hbli(ji,jj) ) hbli(ji,jj) = hbl(ji,jj)
+            ENDIF   ! IF ( lconv )
+         ELSE
 ! change zero or one model level.
-               hbl(ji,jj) = zhbl_t(ji,jj)
-               IF ( lconv(ji,jj) ) THEN
-                  hbli(ji,jj) = hbl(ji,jj)
-               ELSE
-                  hbl(ji,jj) = MAX(hbl(ji,jj), gdepw_n(ji,jj,3) )
-                  IF ( hbl(ji,jj) > hbli(ji,jj) ) hbli(ji,jj) = hbl(ji,jj)
-               ENDIF
+            hbl(ji,jj) = zhbl_t(ji,jj)
+            IF ( lconv(ji,jj) ) THEN
+               hbli(ji,jj) = hbl(ji,jj)
+            ELSE
+               hbl(ji,jj) = MAX(hbl(ji,jj), gdepw(ji,jj,3,Kmm) )
+               IF ( hbl(ji,jj) > hbli(ji,jj) ) hbli(ji,jj) = hbl(ji,jj)
             ENDIF
-            zhbl(ji,jj) = gdepw_n(ji,jj,ibld(ji,jj))
-         END DO
-      END DO
+         ENDIF
+         zhbl(ji,jj) = gdepw(ji,jj,ibld(ji,jj),Kmm)
+      END_2D
       dstokes(:,:) = MIN ( dstokes(:,:), hbl(:,:)/3. )  !  Limit delta for shallow boundary layers for calculating flux-gradient terms.
 
 ! Recalculate averages over boundary layer after depth updated
      ! Consider later  combining this into the loop above and looking for columns
      ! where the index for base of the boundary layer have changed
-      DO jj = 2, jpjm1                                 !  Vertical slab
-         DO ji = 2, jpim1
-               zthermal = rab_n(ji,jj,1,jp_tem) !ideally use ibld not 1??
-               zbeta    = rab_n(ji,jj,1,jp_sal)
-               zt   = 0._wp
-               zs   = 0._wp
-               zu   = 0._wp
-               zv   = 0._wp
-               ! average over depth of boundary layer
-               zthick=0._wp
-               DO jm = 2, ibld(ji,jj)
-                  zthick=zthick+e3t_n(ji,jj,jm)
-                  zt   = zt  + e3t_n(ji,jj,jm) * tsn(ji,jj,jm,jp_tem)
-                  zs   = zs  + e3t_n(ji,jj,jm) * tsn(ji,jj,jm,jp_sal)
-                  zu   = zu  + e3t_n(ji,jj,jm) &
-                     &            * ( ub(ji,jj,jm) + ub(ji - 1,jj,jm) ) &
-                     &            / MAX( 1. , umask(ji,jj,jm) + umask(ji - 1,jj,jm) )
-                  zv   = zv  + e3t_n(ji,jj,jm) &
-                     &            * ( vb(ji,jj,jm) + vb(ji,jj - 1,jm) ) &
-                     &            / MAX( 1. , vmask(ji,jj,jm) + vmask(ji,jj - 1,jm) )
-               END DO
-               zt_bl(ji,jj) = zt / zthick
-               zs_bl(ji,jj) = zs / zthick
-               zu_bl(ji,jj) = zu / zthick
-               zv_bl(ji,jj) = zv / zthick
-               zdt_bl(ji,jj) = zt_bl(ji,jj) - tsn(ji,jj,ibld(ji,jj),jp_tem)
-               zds_bl(ji,jj) = zs_bl(ji,jj) - tsn(ji,jj,ibld(ji,jj),jp_sal)
-               zdu_bl(ji,jj) = zu_bl(ji,jj) - ( ub(ji,jj,ibld(ji,jj)) + ub(ji-1,jj,ibld(ji,jj) ) ) &
-                      &   / MAX(1. , umask(ji,jj,ibld(ji,jj) ) + umask(ji-1,jj,ibld(ji,jj) ) )
-               zdv_bl(ji,jj) = zv_bl(ji,jj) - ( vb(ji,jj,ibld(ji,jj)) + vb(ji,jj-1,ibld(ji,jj) ) ) &
-                      &  / MAX(1. , vmask(ji,jj,ibld(ji,jj) ) + vmask(ji,jj-1,ibld(ji,jj) ) )
-               zdb_bl(ji,jj) = grav * zthermal * zdt_bl(ji,jj) - grav * zbeta * zds_bl(ji,jj)
-               zhbl(ji,jj) = gdepw_n(ji,jj,ibld(ji,jj))
-               IF ( lconv(ji,jj) ) THEN
-                  IF ( zdb_bl(ji,jj) > 0._wp )THEN
-                     IF ( ( zwstrc(ji,jj) / zvstr(ji,jj) )**3 <= 0.5 ) THEN  ! near neutral stability
-                           zari = 4.5 * ( zvstr(ji,jj)**2 ) &
-                             & / ( zdb_bl(ji,jj) * zhbl(ji,jj) ) + 0.01
-                     ELSE                                                     ! unstable
-                           zari = 4.5 * ( zwstrc(ji,jj)**2 ) &
-                             & / ( zdb_bl(ji,jj) * zhbl(ji,jj) ) + 0.01
-                     ENDIF
-                     IF ( zari > 0.2 ) THEN                                                ! This test checks for weakly stratified pycnocline
-                        zari = 0.2
-                        zwb_ent(ji,jj) = 0._wp
-                     ENDIF
-                     inhml = MAX( INT( zari * zhbl(ji,jj) / e3t_n(ji,jj,ibld(ji,jj)) ) , 1 )
-                     imld(ji,jj) = MAX( ibld(ji,jj) - inhml, 1)
-                     zhml(ji,jj) = gdepw_n(ji,jj,imld(ji,jj))
-                     zdh(ji,jj) = zhbl(ji,jj) - zhml(ji,jj)
-                  ELSE  ! IF (zdb_bl)
-                     imld(ji,jj) = ibld(ji,jj) - 1
-                     zhml(ji,jj) = gdepw_n(ji,jj,imld(ji,jj))
-                     zdh(ji,jj) = zhbl(ji,jj) - zhml(ji,jj)
+      DO_2D_00_00
+            zthermal = rab_n(ji,jj,1,jp_tem) !ideally use ibld not 1??
+            zbeta    = rab_n(ji,jj,1,jp_sal)
+            zt   = 0._wp
+            zs   = 0._wp
+            zu   = 0._wp
+            zv   = 0._wp
+            ! average over depth of boundary layer
+            zthick=0._wp
+            DO jm = 2, ibld(ji,jj)
+               zthick=zthick+e3t(ji,jj,jm,Kmm)
+               zt   = zt  + e3t(ji,jj,jm,Kmm) * ts(ji,jj,jm,jp_tem,Kmm)
+               zs   = zs  + e3t(ji,jj,jm,Kmm) * ts(ji,jj,jm,jp_sal,Kmm)
+               zu   = zu  + e3t(ji,jj,jm,Kmm) &
+                  &            * ( uu(ji,jj,jm,Kbb) + uu(ji - 1,jj,jm,Kbb) ) &
+                  &            / MAX( 1. , umask(ji,jj,jm) + umask(ji - 1,jj,jm) )
+               zv   = zv  + e3t(ji,jj,jm,Kmm) &
+                  &            * ( vv(ji,jj,jm,Kbb) + vv(ji,jj - 1,jm,Kbb) ) &
+                  &            / MAX( 1. , vmask(ji,jj,jm) + vmask(ji,jj - 1,jm) )
+            END DO
+            zt_bl(ji,jj) = zt / zthick
+            zs_bl(ji,jj) = zs / zthick
+            zu_bl(ji,jj) = zu / zthick
+            zv_bl(ji,jj) = zv / zthick
+            zdt_bl(ji,jj) = zt_bl(ji,jj) - ts(ji,jj,ibld(ji,jj),jp_tem,Kmm)
+            zds_bl(ji,jj) = zs_bl(ji,jj) - ts(ji,jj,ibld(ji,jj),jp_sal,Kmm)
+            zdu_bl(ji,jj) = zu_bl(ji,jj) - ( uu(ji,jj,ibld(ji,jj),Kbb) + uu(ji-1,jj,ibld(ji,jj) ,Kbb) ) &
+                   &   / MAX(1. , umask(ji,jj,ibld(ji,jj) ) + umask(ji-1,jj,ibld(ji,jj) ) )
+            zdv_bl(ji,jj) = zv_bl(ji,jj) - ( vv(ji,jj,ibld(ji,jj),Kbb) + vv(ji,jj-1,ibld(ji,jj) ,Kbb) ) &
+                   &  / MAX(1. , vmask(ji,jj,ibld(ji,jj) ) + vmask(ji,jj-1,ibld(ji,jj) ) )
+            zdb_bl(ji,jj) = grav * zthermal * zdt_bl(ji,jj) - grav * zbeta * zds_bl(ji,jj)
+            zhbl(ji,jj) = gdepw(ji,jj,ibld(ji,jj),Kmm)
+            IF ( lconv(ji,jj) ) THEN
+               IF ( zdb_bl(ji,jj) > 0._wp )THEN
+                  IF ( ( zwstrc(ji,jj) / zvstr(ji,jj) )**3 <= 0.5 ) THEN  ! near neutral stability
+                        zari = 4.5 * ( zvstr(ji,jj)**2 ) &
+                          & / ( zdb_bl(ji,jj) * zhbl(ji,jj) ) + 0.01
+                  ELSE                                                     ! unstable
+                        zari = 4.5 * ( zwstrc(ji,jj)**2 ) &
+                          & / ( zdb_bl(ji,jj) * zhbl(ji,jj) ) + 0.01
                   ENDIF
-               ELSE   ! IF (lconv)
-                  IF ( zdhdt(ji,jj) >= 0.0 ) THEN    ! probably shouldn't include wm here
-                  ! boundary layer deepening
-                     IF ( zdb_bl(ji,jj) > 0._wp ) THEN
-                  ! pycnocline thickness set by stratification - use same relationship as for neutral conditions.
-                        zari = MIN( 4.5 * ( zvstr(ji,jj)**2 ) &
-                          & / ( zdb_bl(ji,jj) * zhbl(ji,jj) ) + 0.01  , 0.2 )
-                        inhml = MAX( INT( zari * zhbl(ji,jj) / e3t_n(ji,jj,ibld(ji,jj)) ) , 1 )
-                        imld(ji,jj) = MAX( ibld(ji,jj) - inhml, 1)
-                        zhml(ji,jj) = gdepw_n(ji,jj,imld(ji,jj))
-                        zdh(ji,jj) = zhbl(ji,jj) - zhml(ji,jj)
-                     ELSE
-                        imld(ji,jj) = ibld(ji,jj) - 1
-                        zhml(ji,jj) = gdepw_n(ji,jj,imld(ji,jj))
-                        zdh(ji,jj) = zhbl(ji,jj) - zhml(ji,jj)
-                     ENDIF ! IF (zdb_bl > 0.0)
-                  ELSE     ! IF(dhdt >= 0)
-                  ! boundary layer collapsing.
-                     imld(ji,jj) = ibld(ji,jj)
-                     zhml(ji,jj) = zhbl(ji,jj)
-                     zdh(ji,jj) = 0._wp
-                  ENDIF    ! IF (dhdt >= 0)
-               ENDIF       ! IF (lconv)
-         END DO
-      END DO
+                  IF ( zari > 0.2 ) THEN                                                ! This test checks for weakly stratified pycnocline
+                     zari = 0.2
+                     zwb_ent(ji,jj) = 0._wp
+                  ENDIF
+                  inhml = MAX( INT( zari * zhbl(ji,jj) / e3t(ji,jj,ibld(ji,jj),Kmm) ) , 1 )
+                  imld(ji,jj) = MAX( ibld(ji,jj) - inhml, 1)
+                  zhml(ji,jj) = gdepw(ji,jj,imld(ji,jj),Kmm)
+                  zdh(ji,jj) = zhbl(ji,jj) - zhml(ji,jj)
+               ELSE  ! IF (zdb_bl)
+                  imld(ji,jj) = ibld(ji,jj) - 1
+                  zhml(ji,jj) = gdepw(ji,jj,imld(ji,jj),Kmm)
+                  zdh(ji,jj) = zhbl(ji,jj) - zhml(ji,jj)
+               ENDIF
+            ELSE   ! IF (lconv)
+               IF ( zdhdt(ji,jj) >= 0.0 ) THEN    ! probably shouldn't include wm here
+               ! boundary layer deepening
+                  IF ( zdb_bl(ji,jj) > 0._wp ) THEN
+               ! pycnocline thickness set by stratification - use same relationship as for neutral conditions.
+                     zari = MIN( 4.5 * ( zvstr(ji,jj)**2 ) &
+                       & / ( zdb_bl(ji,jj) * zhbl(ji,jj) ) + 0.01  , 0.2 )
+                     inhml = MAX( INT( zari * zhbl(ji,jj) / e3t(ji,jj,ibld(ji,jj),Kmm) ) , 1 )
+                     imld(ji,jj) = MAX( ibld(ji,jj) - inhml, 1)
+                     zhml(ji,jj) = gdepw(ji,jj,imld(ji,jj),Kmm)
+                     zdh(ji,jj) = zhbl(ji,jj) - zhml(ji,jj)
+                  ELSE
+                     imld(ji,jj) = ibld(ji,jj) - 1
+                     zhml(ji,jj) = gdepw(ji,jj,imld(ji,jj),Kmm)
+                     zdh(ji,jj) = zhbl(ji,jj) - zhml(ji,jj)
+                  ENDIF ! IF (zdb_bl > 0.0)
+               ELSE     ! IF(dhdt >= 0)
+               ! boundary layer collapsing.
+                  imld(ji,jj) = ibld(ji,jj)
+                  zhml(ji,jj) = zhbl(ji,jj)
+                  zdh(ji,jj) = 0._wp
+               ENDIF    ! IF (dhdt >= 0)
+            ENDIF       ! IF (lconv)
+      END_2D
 
       ! Average over the depth of the mixed layer in the convective boundary layer
       ! Also calculate entrainment fluxes for temperature and salinity
-      DO jj = 2, jpjm1                                 !  Vertical slab
-         DO ji = 2, jpim1
-            zthermal = rab_n(ji,jj,1,jp_tem) !ideally use ibld not 1??
-            zbeta    = rab_n(ji,jj,1,jp_sal)
-            IF ( lconv(ji,jj) ) THEN
+      DO_2D_00_00
+         zthermal = rab_n(ji,jj,1,jp_tem) !ideally use ibld not 1??
+         zbeta    = rab_n(ji,jj,1,jp_sal)
+         IF ( lconv(ji,jj) ) THEN
+            zt   = 0._wp
+            zs   = 0._wp
+            zu   = 0._wp
+            zv   = 0._wp
+            ! average over depth of boundary layer
+            zthick=0._wp
+            DO jm = 2, imld(ji,jj)
+               zthick=zthick+e3t(ji,jj,jm,Kmm)
+               zt   = zt  + e3t(ji,jj,jm,Kmm) * ts(ji,jj,jm,jp_tem,Kmm)
+               zs   = zs  + e3t(ji,jj,jm,Kmm) * ts(ji,jj,jm,jp_sal,Kmm)
+               zu   = zu  + e3t(ji,jj,jm,Kmm) &
+                  &            * ( uu(ji,jj,jm,Kbb) + uu(ji - 1,jj,jm,Kbb) ) &
+                  &            / MAX( 1. , umask(ji,jj,jm) + umask(ji - 1,jj,jm) )
+               zv   = zv  + e3t(ji,jj,jm,Kmm) &
+                  &            * ( vv(ji,jj,jm,Kbb) + vv(ji,jj - 1,jm,Kbb) ) &
+                  &            / MAX( 1. , vmask(ji,jj,jm) + vmask(ji,jj - 1,jm) )
+            END DO
+            zt_ml(ji,jj) = zt / zthick
+            zs_ml(ji,jj) = zs / zthick
+            zu_ml(ji,jj) = zu / zthick
+            zv_ml(ji,jj) = zv / zthick
+            zdt_ml(ji,jj) = zt_ml(ji,jj) - ts(ji,jj,ibld(ji,jj),jp_tem,Kmm)
+            zds_ml(ji,jj) = zs_ml(ji,jj) - ts(ji,jj,ibld(ji,jj),jp_sal,Kmm)
+            zdu_ml(ji,jj) = zu_ml(ji,jj) - ( uu(ji,jj,ibld(ji,jj),Kbb) + uu(ji-1,jj,ibld(ji,jj) ,Kbb) ) &
+                  &    / MAX(1. , umask(ji,jj,ibld(ji,jj) ) + umask(ji-1,jj,ibld(ji,jj) ) )
+            zdv_ml(ji,jj) = zv_ml(ji,jj) - ( vv(ji,jj,ibld(ji,jj),Kbb) + vv(ji,jj-1,ibld(ji,jj) ,Kbb) ) &
+                  &    / MAX(1. , vmask(ji,jj,ibld(ji,jj) ) + vmask(ji,jj-1,ibld(ji,jj) ) )
+            zdb_ml(ji,jj) = grav * zthermal * zdt_ml(ji,jj) - grav * zbeta * zds_ml(ji,jj)
+         ELSE
+         ! stable, if entraining calulate average below interface layer.
+            IF ( zdhdt(ji,jj) >= 0._wp ) THEN
                zt   = 0._wp
                zs   = 0._wp
                zu   = 0._wp
@@ -664,186 +671,146 @@ CONTAINS
                ! average over depth of boundary layer
                zthick=0._wp
                DO jm = 2, imld(ji,jj)
-                  zthick=zthick+e3t_n(ji,jj,jm)
-                  zt   = zt  + e3t_n(ji,jj,jm) * tsn(ji,jj,jm,jp_tem)
-                  zs   = zs  + e3t_n(ji,jj,jm) * tsn(ji,jj,jm,jp_sal)
-                  zu   = zu  + e3t_n(ji,jj,jm) &
-                     &            * ( ub(ji,jj,jm) + ub(ji - 1,jj,jm) ) &
+                  zthick=zthick+e3t(ji,jj,jm,Kmm)
+                  zt   = zt  + e3t(ji,jj,jm,Kmm) * ts(ji,jj,jm,jp_tem,Kmm)
+                  zs   = zs  + e3t(ji,jj,jm,Kmm) * ts(ji,jj,jm,jp_sal,Kmm)
+                  zu   = zu  + e3t(ji,jj,jm,Kmm) &
+                     &            * ( uu(ji,jj,jm,Kbb) + uu(ji - 1,jj,jm,Kbb) ) &
                      &            / MAX( 1. , umask(ji,jj,jm) + umask(ji - 1,jj,jm) )
-                  zv   = zv  + e3t_n(ji,jj,jm) &
-                     &            * ( vb(ji,jj,jm) + vb(ji,jj - 1,jm) ) &
+                  zv   = zv  + e3t(ji,jj,jm,Kmm) &
+                     &            * ( vv(ji,jj,jm,Kbb) + vv(ji,jj - 1,jm,Kbb) ) &
                      &            / MAX( 1. , vmask(ji,jj,jm) + vmask(ji,jj - 1,jm) )
                END DO
                zt_ml(ji,jj) = zt / zthick
                zs_ml(ji,jj) = zs / zthick
                zu_ml(ji,jj) = zu / zthick
                zv_ml(ji,jj) = zv / zthick
-               zdt_ml(ji,jj) = zt_ml(ji,jj) - tsn(ji,jj,ibld(ji,jj),jp_tem)
-               zds_ml(ji,jj) = zs_ml(ji,jj) - tsn(ji,jj,ibld(ji,jj),jp_sal)
-               zdu_ml(ji,jj) = zu_ml(ji,jj) - ( ub(ji,jj,ibld(ji,jj)) + ub(ji-1,jj,ibld(ji,jj) ) ) &
+               zdt_ml(ji,jj) = zt_ml(ji,jj) - ts(ji,jj,ibld(ji,jj),jp_tem,Kmm)
+               zds_ml(ji,jj) = zs_ml(ji,jj) - ts(ji,jj,ibld(ji,jj),jp_sal,Kmm)
+               zdu_ml(ji,jj) = zu_ml(ji,jj) - ( uu(ji,jj,ibld(ji,jj),Kbb) + uu(ji-1,jj,ibld(ji,jj) ,Kbb) ) &
                      &    / MAX(1. , umask(ji,jj,ibld(ji,jj) ) + umask(ji-1,jj,ibld(ji,jj) ) )
-               zdv_ml(ji,jj) = zv_ml(ji,jj) - ( vb(ji,jj,ibld(ji,jj)) + vb(ji,jj-1,ibld(ji,jj) ) ) &
+               zdv_ml(ji,jj) = zv_ml(ji,jj) - ( vv(ji,jj,ibld(ji,jj),Kbb) + vv(ji,jj-1,ibld(ji,jj) ,Kbb) ) &
                      &    / MAX(1. , vmask(ji,jj,ibld(ji,jj) ) + vmask(ji,jj-1,ibld(ji,jj) ) )
                zdb_ml(ji,jj) = grav * zthermal * zdt_ml(ji,jj) - grav * zbeta * zds_ml(ji,jj)
-            ELSE
-            ! stable, if entraining calulate average below interface layer.
-               IF ( zdhdt(ji,jj) >= 0._wp ) THEN
-                  zt   = 0._wp
-                  zs   = 0._wp
-                  zu   = 0._wp
-                  zv   = 0._wp
-                  ! average over depth of boundary layer
-                  zthick=0._wp
-                  DO jm = 2, imld(ji,jj)
-                     zthick=zthick+e3t_n(ji,jj,jm)
-                     zt   = zt  + e3t_n(ji,jj,jm) * tsn(ji,jj,jm,jp_tem)
-                     zs   = zs  + e3t_n(ji,jj,jm) * tsn(ji,jj,jm,jp_sal)
-                     zu   = zu  + e3t_n(ji,jj,jm) &
-                        &            * ( ub(ji,jj,jm) + ub(ji - 1,jj,jm) ) &
-                        &            / MAX( 1. , umask(ji,jj,jm) + umask(ji - 1,jj,jm) )
-                     zv   = zv  + e3t_n(ji,jj,jm) &
-                        &            * ( vb(ji,jj,jm) + vb(ji,jj - 1,jm) ) &
-                        &            / MAX( 1. , vmask(ji,jj,jm) + vmask(ji,jj - 1,jm) )
-                  END DO
-                  zt_ml(ji,jj) = zt / zthick
-                  zs_ml(ji,jj) = zs / zthick
-                  zu_ml(ji,jj) = zu / zthick
-                  zv_ml(ji,jj) = zv / zthick
-                  zdt_ml(ji,jj) = zt_ml(ji,jj) - tsn(ji,jj,ibld(ji,jj),jp_tem)
-                  zds_ml(ji,jj) = zs_ml(ji,jj) - tsn(ji,jj,ibld(ji,jj),jp_sal)
-                  zdu_ml(ji,jj) = zu_ml(ji,jj) - ( ub(ji,jj,ibld(ji,jj)) + ub(ji-1,jj,ibld(ji,jj) ) ) &
-                        &    / MAX(1. , umask(ji,jj,ibld(ji,jj) ) + umask(ji-1,jj,ibld(ji,jj) ) )
-                  zdv_ml(ji,jj) = zv_ml(ji,jj) - ( vb(ji,jj,ibld(ji,jj)) + vb(ji,jj-1,ibld(ji,jj) ) ) &
-                        &    / MAX(1. , vmask(ji,jj,ibld(ji,jj) ) + vmask(ji,jj-1,ibld(ji,jj) ) )
-                  zdb_ml(ji,jj) = grav * zthermal * zdt_ml(ji,jj) - grav * zbeta * zds_ml(ji,jj)
-               ENDIF
             ENDIF
-         END DO
-      END DO
+         ENDIF
+      END_2D
     !
     ! rotate mean currents and changes onto wind align co-ordinates
     !
 
-      DO jj = 2, jpjm1
-         DO ji = 2, jpim1
-            ztemp = zu_ml(ji,jj)
-            zu_ml(ji,jj) = zu_ml(ji,jj) * zcos_wind(ji,jj) + zv_ml(ji,jj) * zsin_wind(ji,jj)
-            zv_ml(ji,jj) = zv_ml(ji,jj) * zcos_wind(ji,jj) - ztemp * zsin_wind(ji,jj)
-            ztemp = zdu_ml(ji,jj)
-            zdu_ml(ji,jj) = zdu_ml(ji,jj) * zcos_wind(ji,jj) + zdv_ml(ji,jj) * zsin_wind(ji,jj)
-            zdv_ml(ji,jj) = zdv_ml(ji,jj) * zsin_wind(ji,jj) - ztemp * zsin_wind(ji,jj)
-    !
-            ztemp = zu_bl(ji,jj)
-            zu_bl = zu_bl(ji,jj) * zcos_wind(ji,jj) + zv_bl(ji,jj) * zsin_wind(ji,jj)
-            zv_bl(ji,jj) = zv_bl(ji,jj) * zcos_wind(ji,jj) - ztemp * zsin_wind(ji,jj)
-            ztemp = zdu_bl(ji,jj)
-            zdu_bl(ji,jj) = zdu_bl(ji,jj) * zcos_wind(ji,jj) + zdv_bl(ji,jj) * zsin_wind(ji,jj)
-            zdv_bl(ji,jj) = zdv_bl(ji,jj) * zsin_wind(ji,jj) - ztemp * zsin_wind(ji,jj)
-         END DO
-      END DO
+      DO_2D_00_00
+         ztemp = zu_ml(ji,jj)
+         zu_ml(ji,jj) = zu_ml(ji,jj) * zcos_wind(ji,jj) + zv_ml(ji,jj) * zsin_wind(ji,jj)
+         zv_ml(ji,jj) = zv_ml(ji,jj) * zcos_wind(ji,jj) - ztemp * zsin_wind(ji,jj)
+         ztemp = zdu_ml(ji,jj)
+         zdu_ml(ji,jj) = zdu_ml(ji,jj) * zcos_wind(ji,jj) + zdv_ml(ji,jj) * zsin_wind(ji,jj)
+         zdv_ml(ji,jj) = zdv_ml(ji,jj) * zsin_wind(ji,jj) - ztemp * zsin_wind(ji,jj)
+ !
+         ztemp = zu_bl(ji,jj)
+         zu_bl = zu_bl(ji,jj) * zcos_wind(ji,jj) + zv_bl(ji,jj) * zsin_wind(ji,jj)
+         zv_bl(ji,jj) = zv_bl(ji,jj) * zcos_wind(ji,jj) - ztemp * zsin_wind(ji,jj)
+         ztemp = zdu_bl(ji,jj)
+         zdu_bl(ji,jj) = zdu_bl(ji,jj) * zcos_wind(ji,jj) + zdv_bl(ji,jj) * zsin_wind(ji,jj)
+         zdv_bl(ji,jj) = zdv_bl(ji,jj) * zsin_wind(ji,jj) - ztemp * zsin_wind(ji,jj)
+      END_2D
 
      zuw_bse = 0._wp
      zvw_bse = 0._wp
-     DO jj = 2, jpjm1
-        DO ji = 2, jpim1
+     DO_2D_00_00
 
-           IF ( lconv(ji,jj) ) THEN
-              IF ( zdb_bl(ji,jj) > 0._wp ) THEN
-                 zwth_ent(ji,jj) = zwb_ent(ji,jj) * zdt_ml(ji,jj) / (zdb_ml(ji,jj) + epsln)
-                 zws_ent(ji,jj) = zwb_ent(ji,jj) * zds_ml(ji,jj) / (zdb_ml(ji,jj) + epsln)
-              ENDIF
-           ELSE
-              zwth_ent(ji,jj) = -2.0 * zwthav(ji,jj) * ( (1.0 - 0.8) - ( 1.0 - 0.8)**(3.0/2.0) )
-              zws_ent(ji,jj) = -2.0 * zwsav(ji,jj) * ( (1.0 - 0.8 ) - ( 1.0 - 0.8 )**(3.0/2.0) )
+        IF ( lconv(ji,jj) ) THEN
+           IF ( zdb_bl(ji,jj) > 0._wp ) THEN
+              zwth_ent(ji,jj) = zwb_ent(ji,jj) * zdt_ml(ji,jj) / (zdb_ml(ji,jj) + epsln)
+              zws_ent(ji,jj) = zwb_ent(ji,jj) * zds_ml(ji,jj) / (zdb_ml(ji,jj) + epsln)
            ENDIF
-        END DO
-     END DO
+        ELSE
+           zwth_ent(ji,jj) = -2.0 * zwthav(ji,jj) * ( (1.0 - 0.8) - ( 1.0 - 0.8)**(3.0/2.0) )
+           zws_ent(ji,jj) = -2.0 * zwsav(ji,jj) * ( (1.0 - 0.8 ) - ( 1.0 - 0.8 )**(3.0/2.0) )
+        ENDIF
+     END_2D
 
       !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
       !  Pycnocline gradients for scalars and velocity
       !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-       DO jj = 2, jpjm1
-          DO ji = 2, jpim1
-          !
-             IF ( lconv (ji,jj) ) THEN
-             ! Unstable conditions
-                IF( zdb_bl(ji,jj) > 0._wp ) THEN
-                ! calculate pycnocline profiles, no need if zdb_bl <= 0. since profile is zero and arrays have been initialized to zero
-                   ztgrad = ( zdt_ml(ji,jj) / zdh(ji,jj) )
-                   zsgrad = ( zds_ml(ji,jj) / zdh(ji,jj) )
-                   zbgrad = ( zdb_ml(ji,jj) / zdh(ji,jj) )
-                   DO jk = 2 , ibld(ji,jj)
-                      znd = -( gdepw_n(ji,jj,jk) - zhml(ji,jj) ) / zdh(ji,jj)
-                      zdtdz_pyc(ji,jj,jk) =  ztgrad * EXP( -1.75 * ( znd + 0.75 )**2 )
-                      zdbdz_pyc(ji,jj,jk) =  zbgrad * EXP( -1.75 * ( znd + 0.75 )**2 )
-                      zdsdz_pyc(ji,jj,jk) =  zsgrad * EXP( -1.75 * ( znd + 0.75 )**2 )
-                   END DO
-                ENDIF
-             ELSE
-             ! stable conditions
-             ! if pycnocline profile only defined when depth steady of increasing.
-                IF ( zdhdt(ji,jj) >= 0.0 ) THEN        ! Depth increasing, or steady.
-                   IF ( zdb_bl(ji,jj) > 0._wp ) THEN
-                     IF ( zhol(ji,jj) >= 0.5 ) THEN      ! Very stable - 'thick' pycnocline
-                         ztgrad = zdt_bl(ji,jj) / zhbl(ji,jj)
-                         zsgrad = zds_bl(ji,jj) / zhbl(ji,jj)
-                         zbgrad = zdb_bl(ji,jj) / zhbl(ji,jj)
-                         DO jk = 2, ibld(ji,jj)
-                            znd = gdepw_n(ji,jj,jk) / zhbl(ji,jj)
-                            zdtdz_pyc(ji,jj,jk) =  ztgrad * EXP( -15.0 * ( znd - 0.9 )**2 )
-                            zdbdz_pyc(ji,jj,jk) =  zbgrad * EXP( -15.0 * ( znd - 0.9 )**2 )
-                            zdsdz_pyc(ji,jj,jk) =  zsgrad * EXP( -15.0 * ( znd - 0.9 )**2 )
-                         END DO
-                     ELSE                                   ! Slightly stable - 'thin' pycnoline - needed when stable layer begins to form.
-                         ztgrad = zdt_bl(ji,jj) / zdh(ji,jj)
-                         zsgrad = zds_bl(ji,jj) / zdh(ji,jj)
-                         zbgrad = zdb_bl(ji,jj) / zdh(ji,jj)
-                         DO jk = 2, ibld(ji,jj)
-                            znd = -( gdepw_n(ji,jj,jk) - zhml(ji,jj) ) / zdh(ji,jj)
-                            zdtdz_pyc(ji,jj,jk) =  ztgrad * EXP( -1.75 * ( znd + 0.75 )**2 )
-                            zdbdz_pyc(ji,jj,jk) =  zbgrad * EXP( -1.75 * ( znd + 0.75 )**2 )
-                            zdsdz_pyc(ji,jj,jk) =  zsgrad * EXP( -1.75 * ( znd + 0.75 )**2 )
-                         END DO
-                      ENDIF ! IF (zhol >=0.5)
-                   ENDIF    ! IF (zdb_bl> 0.)
-                ENDIF       ! IF (zdhdt >= 0) zdhdt < 0 not considered since pycnocline profile is zero, profile arrays are intialized to zero
-             ENDIF          ! IF (lconv)
-            !
-          END DO
-       END DO
-!
-       DO jj = 2, jpjm1
-          DO ji = 2, jpim1
-          !
-             IF ( lconv (ji,jj) ) THEN
-             ! Unstable conditions
-                 zugrad = ( zdu_ml(ji,jj) / zdh(ji,jj) ) + 0.275 * zustar(ji,jj)*zustar(ji,jj) / &
-               & (( zwstrl(ji,jj)**3 + 0.5 * zwstrc(ji,jj)**3 )**pthird * zhml(ji,jj) ) / zla(ji,jj)**(8.0/3.0)
-                zvgrad = ( zdv_ml(ji,jj) / zdh(ji,jj) ) + 3.5 * ff_t(ji,jj) * zustke(ji,jj) / &
-              & ( zwstrl(ji,jj)**3 + 0.5 * zwstrc(ji,jj)**3 )**pthird
-                DO jk = 2 , ibld(ji,jj)-1
-                   znd = -( gdepw_n(ji,jj,jk) - zhml(ji,jj) ) / zdh(ji,jj)
-                   zdudz_pyc(ji,jj,jk) =  zugrad * EXP( -1.75 * ( znd + 0.75 )**2 )
-                   zdvdz_pyc(ji,jj,jk) = zvgrad * EXP( -1.75 * ( znd + 0.75 )**2 )
-                END DO
-             ELSE
-             ! stable conditions
-                zugrad = 3.25 * zdu_bl(ji,jj) / zhbl(ji,jj)
-                zvgrad = 2.75 * zdv_bl(ji,jj) / zhbl(ji,jj)
-                DO jk = 2, ibld(ji,jj)
-                   znd = gdepw_n(ji,jj,jk) / zhbl(ji,jj)
-                   IF ( znd < 1.0 ) THEN
-                      zdudz_pyc(ji,jj,jk) = zugrad * EXP( -40.0 * ( znd - 1.0 )**2 )
-                   ELSE
-                      zdudz_pyc(ji,jj,jk) = zugrad * EXP( -20.0 * ( znd - 1.0 )**2 )
-                   ENDIF
-                   zdvdz_pyc(ji,jj,jk) = zvgrad * EXP( -20.0 * ( znd - 0.85 )**2 )
+       DO_2D_00_00
+       !
+          IF ( lconv (ji,jj) ) THEN
+          ! Unstable conditions
+             IF( zdb_bl(ji,jj) > 0._wp ) THEN
+             ! calculate pycnocline profiles, no need if zdb_bl <= 0. since profile is zero and arrays have been initialized to zero
+                ztgrad = ( zdt_ml(ji,jj) / zdh(ji,jj) )
+                zsgrad = ( zds_ml(ji,jj) / zdh(ji,jj) )
+                zbgrad = ( zdb_ml(ji,jj) / zdh(ji,jj) )
+                DO jk = 2 , ibld(ji,jj)
+                   znd = -( gdepw(ji,jj,jk,Kmm) - zhml(ji,jj) ) / zdh(ji,jj)
+                   zdtdz_pyc(ji,jj,jk) =  ztgrad * EXP( -1.75 * ( znd + 0.75 )**2 )
+                   zdbdz_pyc(ji,jj,jk) =  zbgrad * EXP( -1.75 * ( znd + 0.75 )**2 )
+                   zdsdz_pyc(ji,jj,jk) =  zsgrad * EXP( -1.75 * ( znd + 0.75 )**2 )
                 END DO
              ENDIF
-            !
-          END DO
-       END DO
+          ELSE
+          ! stable conditions
+          ! if pycnocline profile only defined when depth steady of increasing.
+             IF ( zdhdt(ji,jj) >= 0.0 ) THEN        ! Depth increasing, or steady.
+                IF ( zdb_bl(ji,jj) > 0._wp ) THEN
+                  IF ( zhol(ji,jj) >= 0.5 ) THEN      ! Very stable - 'thick' pycnocline
+                      ztgrad = zdt_bl(ji,jj) / zhbl(ji,jj)
+                      zsgrad = zds_bl(ji,jj) / zhbl(ji,jj)
+                      zbgrad = zdb_bl(ji,jj) / zhbl(ji,jj)
+                      DO jk = 2, ibld(ji,jj)
+                         znd = gdepw(ji,jj,jk,Kmm) / zhbl(ji,jj)
+                         zdtdz_pyc(ji,jj,jk) =  ztgrad * EXP( -15.0 * ( znd - 0.9 )**2 )
+                         zdbdz_pyc(ji,jj,jk) =  zbgrad * EXP( -15.0 * ( znd - 0.9 )**2 )
+                         zdsdz_pyc(ji,jj,jk) =  zsgrad * EXP( -15.0 * ( znd - 0.9 )**2 )
+                      END DO
+                  ELSE                                   ! Slightly stable - 'thin' pycnoline - needed when stable layer begins to form.
+                      ztgrad = zdt_bl(ji,jj) / zdh(ji,jj)
+                      zsgrad = zds_bl(ji,jj) / zdh(ji,jj)
+                      zbgrad = zdb_bl(ji,jj) / zdh(ji,jj)
+                      DO jk = 2, ibld(ji,jj)
+                         znd = -( gdepw(ji,jj,jk,Kmm) - zhml(ji,jj) ) / zdh(ji,jj)
+                         zdtdz_pyc(ji,jj,jk) =  ztgrad * EXP( -1.75 * ( znd + 0.75 )**2 )
+                         zdbdz_pyc(ji,jj,jk) =  zbgrad * EXP( -1.75 * ( znd + 0.75 )**2 )
+                         zdsdz_pyc(ji,jj,jk) =  zsgrad * EXP( -1.75 * ( znd + 0.75 )**2 )
+                      END DO
+                   ENDIF ! IF (zhol >=0.5)
+                ENDIF    ! IF (zdb_bl> 0.)
+             ENDIF       ! IF (zdhdt >= 0) zdhdt < 0 not considered since pycnocline profile is zero, profile arrays are intialized to zero
+          ENDIF          ! IF (lconv)
+         !
+       END_2D
+!
+       DO_2D_00_00
+       !
+          IF ( lconv (ji,jj) ) THEN
+          ! Unstable conditions
+              zugrad = ( zdu_ml(ji,jj) / zdh(ji,jj) ) + 0.275 * zustar(ji,jj)*zustar(ji,jj) / &
+            & (( zwstrl(ji,jj)**3 + 0.5 * zwstrc(ji,jj)**3 )**pthird * zhml(ji,jj) ) / zla(ji,jj)**(8.0/3.0)
+             zvgrad = ( zdv_ml(ji,jj) / zdh(ji,jj) ) + 3.5 * ff_t(ji,jj) * zustke(ji,jj) / &
+           & ( zwstrl(ji,jj)**3 + 0.5 * zwstrc(ji,jj)**3 )**pthird
+             DO jk = 2 , ibld(ji,jj)-1
+                znd = -( gdepw(ji,jj,jk,Kmm) - zhml(ji,jj) ) / zdh(ji,jj)
+                zdudz_pyc(ji,jj,jk) =  zugrad * EXP( -1.75 * ( znd + 0.75 )**2 )
+                zdvdz_pyc(ji,jj,jk) = zvgrad * EXP( -1.75 * ( znd + 0.75 )**2 )
+             END DO
+          ELSE
+          ! stable conditions
+             zugrad = 3.25 * zdu_bl(ji,jj) / zhbl(ji,jj)
+             zvgrad = 2.75 * zdv_bl(ji,jj) / zhbl(ji,jj)
+             DO jk = 2, ibld(ji,jj)
+                znd = gdepw(ji,jj,jk,Kmm) / zhbl(ji,jj)
+                IF ( znd < 1.0 ) THEN
+                   zdudz_pyc(ji,jj,jk) = zugrad * EXP( -40.0 * ( znd - 1.0 )**2 )
+                ELSE
+                   zdudz_pyc(ji,jj,jk) = zugrad * EXP( -20.0 * ( znd - 1.0 )**2 )
+                ENDIF
+                zdvdz_pyc(ji,jj,jk) = zvgrad * EXP( -20.0 * ( znd - 0.85 )**2 )
+             END DO
+          ENDIF
+         !
+       END_2D
        !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
        ! Eddy viscosity/diffusivity and non-gradient terms in the flux-gradient relationship
        !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -859,58 +826,54 @@ CONTAINS
       !     zdifml_sc = zwstrl * zhbl * EXP ( -( zhol / 0.183_wp )**2 )
       !     zvisml_sc = zwstrl * zhbl * EXP ( -( zhol / 0.183_wp )**2 )
       !  ENDWHERE
-       DO jj = 2, jpjm1
-          DO ji = 2, jpim1
-             IF ( lconv(ji,jj) ) THEN
-               zdifml_sc(ji,jj) = zhml(ji,jj) * ( zvstr(ji,jj)**3 + 0.5 * zwstrc(ji,jj)**3 )**pthird
-               zvisml_sc(ji,jj) = zdifml_sc(ji,jj)
-               zdifpyc_sc(ji,jj) = 0.165 * ( zvstr(ji,jj)**3 + 0.5 *zwstrc(ji,jj)**3 )**pthird * zdh(ji,jj)
-               zvispyc_sc(ji,jj) = 0.142 * ( zvstr(ji,jj)**3 + 0.5 * zwstrc(ji,jj)**3 )**pthird * zdh(ji,jj)
-               zbeta_d_sc(ji,jj) = 1.0 - (0.165 / 0.8 * zdh(ji,jj) / zhbl(ji,jj) )**p2third
-               zbeta_v_sc(ji,jj) = 1.0 -  2.0 * (0.142 /0.375) * zdh(ji,jj) / zhml(ji,jj)
-             ELSE
-               zdifml_sc(ji,jj) = zvstr(ji,jj) * zhbl(ji,jj) * EXP ( -( zhol(ji,jj) / 0.6_wp )**2 )
-               zvisml_sc(ji,jj) = zvstr(ji,jj) * zhbl(ji,jj) * EXP ( -( zhol(ji,jj) / 0.6_wp )**2 )
-            END IF
-        END DO
-    END DO
+       DO_2D_00_00
+          IF ( lconv(ji,jj) ) THEN
+            zdifml_sc(ji,jj) = zhml(ji,jj) * ( zvstr(ji,jj)**3 + 0.5 * zwstrc(ji,jj)**3 )**pthird
+            zvisml_sc(ji,jj) = zdifml_sc(ji,jj)
+            zdifpyc_sc(ji,jj) = 0.165 * ( zvstr(ji,jj)**3 + 0.5 *zwstrc(ji,jj)**3 )**pthird * zdh(ji,jj)
+            zvispyc_sc(ji,jj) = 0.142 * ( zvstr(ji,jj)**3 + 0.5 * zwstrc(ji,jj)**3 )**pthird * zdh(ji,jj)
+            zbeta_d_sc(ji,jj) = 1.0 - (0.165 / 0.8 * zdh(ji,jj) / zhbl(ji,jj) )**p2third
+            zbeta_v_sc(ji,jj) = 1.0 -  2.0 * (0.142 /0.375) * zdh(ji,jj) / zhml(ji,jj)
+          ELSE
+            zdifml_sc(ji,jj) = zvstr(ji,jj) * zhbl(ji,jj) * EXP ( -( zhol(ji,jj) / 0.6_wp )**2 )
+            zvisml_sc(ji,jj) = zvstr(ji,jj) * zhbl(ji,jj) * EXP ( -( zhol(ji,jj) / 0.6_wp )**2 )
+         END IF
+       END_2D
 !
-       DO jj = 2, jpjm1
-          DO ji = 2, jpim1
-             IF ( lconv(ji,jj) ) THEN
-                DO jk = 2, imld(ji,jj)   ! mixed layer diffusivity
-                    zznd_ml = gdepw_n(ji,jj,jk) / zhml(ji,jj)
+       DO_2D_00_00
+          IF ( lconv(ji,jj) ) THEN
+             DO jk = 2, imld(ji,jj)   ! mixed layer diffusivity
+                 zznd_ml = gdepw(ji,jj,jk,Kmm) / zhml(ji,jj)
+                 !
+                 zdiffut(ji,jj,jk) = 0.8   * zdifml_sc(ji,jj) * zznd_ml * ( 1.0 - zbeta_d_sc(ji,jj) * zznd_ml    )**1.5
+                 !
+                 zviscos(ji,jj,jk) = 0.375 * zvisml_sc(ji,jj) * zznd_ml * ( 1.0 - zbeta_v_sc(ji,jj) * zznd_ml    ) &
+                      &            *                                      ( 1.0 -               0.5 * zznd_ml**2 )
+             END DO
+             ! pycnocline - if present linear profile
+             IF ( zdh(ji,jj) > 0._wp ) THEN
+                DO jk = imld(ji,jj)+1 , ibld(ji,jj)
+                    zznd_pyc = -( gdepw(ji,jj,jk,Kmm) - zhml(ji,jj) ) / zdh(ji,jj)
                     !
-                    zdiffut(ji,jj,jk) = 0.8   * zdifml_sc(ji,jj) * zznd_ml * ( 1.0 - zbeta_d_sc(ji,jj) * zznd_ml    )**1.5
+                    zdiffut(ji,jj,jk) = zdifpyc_sc(ji,jj) * ( 1.0 + zznd_pyc )
                     !
-                    zviscos(ji,jj,jk) = 0.375 * zvisml_sc(ji,jj) * zznd_ml * ( 1.0 - zbeta_v_sc(ji,jj) * zznd_ml    ) &
-                         &            *                                      ( 1.0 -               0.5 * zznd_ml**2 )
+                    zviscos(ji,jj,jk) = zvispyc_sc(ji,jj) * ( 1.0 + zznd_pyc )
                 END DO
-                ! pycnocline - if present linear profile
-                IF ( zdh(ji,jj) > 0._wp ) THEN
-                   DO jk = imld(ji,jj)+1 , ibld(ji,jj)
-                       zznd_pyc = -( gdepw_n(ji,jj,jk) - zhml(ji,jj) ) / zdh(ji,jj)
-                       !
-                       zdiffut(ji,jj,jk) = zdifpyc_sc(ji,jj) * ( 1.0 + zznd_pyc )
-                       !
-                       zviscos(ji,jj,jk) = zvispyc_sc(ji,jj) * ( 1.0 + zznd_pyc )
-                   END DO
-                ENDIF
-                ! Temporay fix to ensure zdiffut is +ve; won't be necessary with wn taken out
-                zdiffut(ji,jj,ibld(ji,jj)) = zdhdt(ji,jj)* e3t_n(ji,jj,ibld(ji,jj))
-                ! could be taken out, take account of entrainment represents as a diffusivity
-                ! should remove w from here, represents entrainment
-             ELSE
-             ! stable conditions
-                DO jk = 2, ibld(ji,jj)
-                   zznd_ml = gdepw_n(ji,jj,jk) / zhbl(ji,jj)
-                   zdiffut(ji,jj,jk) = 0.75 * zdifml_sc(ji,jj) * zznd_ml * ( 1.0 - zznd_ml )**1.5
-                   zviscos(ji,jj,jk) = 0.375 * zvisml_sc(ji,jj) * zznd_ml * (1.0 - zznd_ml) * ( 1.0 - zznd_ml**2 )
-                END DO
-             ENDIF   ! end if ( lconv )
+             ENDIF
+             ! Temporay fix to ensure zdiffut is +ve; won't be necessary with ww taken out
+             zdiffut(ji,jj,ibld(ji,jj)) = zdhdt(ji,jj)* e3t(ji,jj,ibld(ji,jj),Kmm)
+             ! could be taken out, take account of entrainment represents as a diffusivity
+             ! should remove w from here, represents entrainment
+          ELSE
+          ! stable conditions
+             DO jk = 2, ibld(ji,jj)
+                zznd_ml = gdepw(ji,jj,jk,Kmm) / zhbl(ji,jj)
+                zdiffut(ji,jj,jk) = 0.75 * zdifml_sc(ji,jj) * zznd_ml * ( 1.0 - zznd_ml )**1.5
+                zviscos(ji,jj,jk) = 0.375 * zvisml_sc(ji,jj) * zznd_ml * (1.0 - zznd_ml) * ( 1.0 - zznd_ml**2 )
+             END DO
+          ENDIF   ! end if ( lconv )
 !
-          END DO  ! end of ji loop
-       END DO     ! end of jj loop
+       END_2D
 
        !
        ! calculate non-gradient components of the flux-gradient relationships
@@ -927,29 +890,27 @@ CONTAINS
        ENDWHERE
 
 
-       DO jj = 2, jpjm1
-          DO ji = 2, jpim1
-            IF ( lconv(ji,jj) ) THEN
-              DO jk = 2, imld(ji,jj)
-                 zznd_d = gdepw_n(ji,jj,jk) / dstokes(ji,jj)
-                 ghamt(ji,jj,jk) = ghamt(ji,jj,jk) + 1.35 * EXP ( -zznd_d ) * ( 1.0 - EXP ( -2.0 * zznd_d ) ) * zsc_wth_1(ji,jj)
-                 !
-                 ghams(ji,jj,jk) = ghams(ji,jj,jk) + 1.35 * EXP ( -zznd_d ) * ( 1.0 - EXP ( -2.0 * zznd_d ) ) *  zsc_ws_1(ji,jj)
-              END DO ! end jk loop
-            ELSE     ! else for if (lconv)
+       DO_2D_00_00
+         IF ( lconv(ji,jj) ) THEN
+           DO jk = 2, imld(ji,jj)
+              zznd_d = gdepw(ji,jj,jk,Kmm) / dstokes(ji,jj)
+              ghamt(ji,jj,jk) = ghamt(ji,jj,jk) + 1.35 * EXP ( -zznd_d ) * ( 1.0 - EXP ( -2.0 * zznd_d ) ) * zsc_wth_1(ji,jj)
+              !
+              ghams(ji,jj,jk) = ghams(ji,jj,jk) + 1.35 * EXP ( -zznd_d ) * ( 1.0 - EXP ( -2.0 * zznd_d ) ) *  zsc_ws_1(ji,jj)
+           END DO ! end jk loop
+         ELSE     ! else for if (lconv)
  ! Stable conditions
-               DO jk = 2, ibld(ji,jj)
-                  zznd_d=gdepw_n(ji,jj,jk) / dstokes(ji,jj)
-                  ghamt(ji,jj,jk) = ghamt(ji,jj,jk) + 1.5 * EXP ( -0.9 * zznd_d ) &
-                       &          *                 ( 1.0 - EXP ( -4.0 * zznd_d ) ) * zsc_wth_1(ji,jj)
-                  !
-                  ghams(ji,jj,jk) = ghams(ji,jj,jk) + 1.5 * EXP ( -0.9 * zznd_d ) &
-                       &          *                 ( 1.0 - EXP ( -4.0 * zznd_d ) ) *  zsc_ws_1(ji,jj)
-               END DO
-            ENDIF               ! endif for check on lconv
+            DO jk = 2, ibld(ji,jj)
+               zznd_d=gdepw(ji,jj,jk,Kmm) / dstokes(ji,jj)
+               ghamt(ji,jj,jk) = ghamt(ji,jj,jk) + 1.5 * EXP ( -0.9 * zznd_d ) &
+                    &          *                 ( 1.0 - EXP ( -4.0 * zznd_d ) ) * zsc_wth_1(ji,jj)
+               !
+               ghams(ji,jj,jk) = ghams(ji,jj,jk) + 1.5 * EXP ( -0.9 * zznd_d ) &
+                    &          *                 ( 1.0 - EXP ( -4.0 * zznd_d ) ) *  zsc_ws_1(ji,jj)
+            END DO
+         ENDIF               ! endif for check on lconv
 
-          END DO  ! end of ji loop
-       END DO     ! end of jj loop
+       END_2D
 
 
 ! Stokes term in flux-gradient relationship (note in zsc_uw_n don't use zvstr since term needs to go to zero as zwstrl goes to zero)
@@ -962,29 +923,27 @@ CONTAINS
           zsc_vw_1 = ff_t * zhbl * zustke**3 * zla**(8.0/3.0) / (zvstr**2 + epsln)
        ENDWHERE
 
-       DO jj = 2, jpjm1
-          DO ji = 2, jpim1
-             IF ( lconv(ji,jj) ) THEN
-                DO jk = 2, imld(ji,jj)
-                   zznd_d = gdepw_n(ji,jj,jk) / dstokes(ji,jj)
-                   ghamu(ji,jj,jk) = ghamu(ji,jj,jk) +      ( -0.05 * EXP ( -0.4 * zznd_d )   * zsc_uw_1(ji,jj)   &
-                        &          +                        0.00125 * EXP (      - zznd_d )   * zsc_uw_2(ji,jj) ) &
-                        &          *                          ( 1.0 - EXP ( -2.0 * zznd_d ) )
+       DO_2D_00_00
+          IF ( lconv(ji,jj) ) THEN
+             DO jk = 2, imld(ji,jj)
+                zznd_d = gdepw(ji,jj,jk,Kmm) / dstokes(ji,jj)
+                ghamu(ji,jj,jk) = ghamu(ji,jj,jk) +      ( -0.05 * EXP ( -0.4 * zznd_d )   * zsc_uw_1(ji,jj)   &
+                     &          +                        0.00125 * EXP (      - zznd_d )   * zsc_uw_2(ji,jj) ) &
+                     &          *                          ( 1.0 - EXP ( -2.0 * zznd_d ) )
 !
-                   ghamv(ji,jj,jk) = ghamv(ji,jj,jk) - 0.65 *  0.15 * EXP (      - zznd_d )                       &
-                        &          *                          ( 1.0 - EXP ( -2.0 * zznd_d ) ) * zsc_vw_1(ji,jj)
-                END DO   ! end jk loop
-             ELSE
+                ghamv(ji,jj,jk) = ghamv(ji,jj,jk) - 0.65 *  0.15 * EXP (      - zznd_d )                       &
+                     &          *                          ( 1.0 - EXP ( -2.0 * zznd_d ) ) * zsc_vw_1(ji,jj)
+             END DO   ! end jk loop
+          ELSE
 ! Stable conditions
-                DO jk = 2, ibld(ji,jj) ! corrected to ibld
-                   zznd_d = gdepw_n(ji,jj,jk) / dstokes(ji,jj)
-                   ghamu(ji,jj,jk) = ghamu(ji,jj,jk) - 0.75 *   1.3 * EXP ( -0.5 * zznd_d )                       &
-                        &                                   * ( 1.0 - EXP ( -4.0 * zznd_d ) ) * zsc_uw_1(ji,jj)
-                   ghamv(ji,jj,jk) = ghamv(ji,jj,jk) + 0._wp
-                END DO   ! end jk loop
-             ENDIF
-          END DO  ! ji loop
-       END DO     ! jj loo
+             DO jk = 2, ibld(ji,jj) ! corrected to ibld
+                zznd_d = gdepw(ji,jj,jk,Kmm) / dstokes(ji,jj)
+                ghamu(ji,jj,jk) = ghamu(ji,jj,jk) - 0.75 *   1.3 * EXP ( -0.5 * zznd_d )                       &
+                     &                                   * ( 1.0 - EXP ( -4.0 * zznd_d ) ) * zsc_uw_1(ji,jj)
+                ghamv(ji,jj,jk) = ghamv(ji,jj,jk) + 0._wp
+             END DO   ! end jk loop
+          ENDIF
+       END_2D
 
 ! Buoyancy term in flux-gradient relationship [note : includes ROI ratio (X0.3) and pressure (X0.5)]
 
@@ -996,29 +955,27 @@ CONTAINS
           zsc_ws_1 = 0._wp
        ENDWHERE
 
-       DO jj = 2, jpjm1
-          DO ji = 2, jpim1
-             IF (lconv(ji,jj) ) THEN
-                DO jk = 2, imld(ji,jj)
-                   zznd_ml = gdepw_n(ji,jj,jk) / zhml(ji,jj)
-                   ! calculate turbulent length scale
-                   zl_c = 0.9 * ( 1.0 - EXP ( - 7.0 * ( zznd_ml - zznd_ml**3 / 3.0 ) ) )                                           &
-                        &     * ( 1.0 - EXP ( -15.0 * (     1.1 - zznd_ml          ) ) )
-                   zl_l = 2.0 * ( 1.0 - EXP ( - 2.0 * ( zznd_ml - zznd_ml**3 / 3.0 ) ) )                                           &
-                        &     * ( 1.0 - EXP ( - 5.0 * (     1.0 - zznd_ml          ) ) ) * ( 1.0 + dstokes(ji,jj) / zhml (ji,jj) )
-                   zl_eps = zl_l + ( zl_c - zl_l ) / ( 1.0 + EXP ( 3.0 * LOG10 ( - zhol(ji,jj) ) ) ) ** (3.0/2.0)
-                   ! non-gradient buoyancy terms
-                   ghamt(ji,jj,jk) = ghamt(ji,jj,jk) + 0.3 * 0.5 * zsc_wth_1(ji,jj) * zl_eps * zhml(ji,jj) / ( 0.15 + zznd_ml )
-                   ghams(ji,jj,jk) = ghams(ji,jj,jk) + 0.3 * 0.5 *  zsc_ws_1(ji,jj) * zl_eps * zhml(ji,jj) / ( 0.15 + zznd_ml )
-                END DO
-             ELSE
-                DO jk = 2, ibld(ji,jj)
-                   ghamt(ji,jj,jk) = ghamt(ji,jj,jk) + zsc_wth_1(ji,jj)
-                   ghams(ji,jj,jk) = ghams(ji,jj,jk) +  zsc_ws_1(ji,jj)
-                END DO
-             ENDIF
-          END DO   ! ji loop
-       END DO      ! jj loop
+       DO_2D_00_00
+          IF (lconv(ji,jj) ) THEN
+             DO jk = 2, imld(ji,jj)
+                zznd_ml = gdepw(ji,jj,jk,Kmm) / zhml(ji,jj)
+                ! calculate turbulent length scale
+                zl_c = 0.9 * ( 1.0 - EXP ( - 7.0 * ( zznd_ml - zznd_ml**3 / 3.0 ) ) )                                           &
+                     &     * ( 1.0 - EXP ( -15.0 * (     1.1 - zznd_ml          ) ) )
+                zl_l = 2.0 * ( 1.0 - EXP ( - 2.0 * ( zznd_ml - zznd_ml**3 / 3.0 ) ) )                                           &
+                     &     * ( 1.0 - EXP ( - 5.0 * (     1.0 - zznd_ml          ) ) ) * ( 1.0 + dstokes(ji,jj) / zhml (ji,jj) )
+                zl_eps = zl_l + ( zl_c - zl_l ) / ( 1.0 + EXP ( 3.0 * LOG10 ( - zhol(ji,jj) ) ) ) ** (3.0/2.0)
+                ! non-gradient buoyancy terms
+                ghamt(ji,jj,jk) = ghamt(ji,jj,jk) + 0.3 * 0.5 * zsc_wth_1(ji,jj) * zl_eps * zhml(ji,jj) / ( 0.15 + zznd_ml )
+                ghams(ji,jj,jk) = ghams(ji,jj,jk) + 0.3 * 0.5 *  zsc_ws_1(ji,jj) * zl_eps * zhml(ji,jj) / ( 0.15 + zznd_ml )
+             END DO
+          ELSE
+             DO jk = 2, ibld(ji,jj)
+                ghamt(ji,jj,jk) = ghamt(ji,jj,jk) + zsc_wth_1(ji,jj)
+                ghams(ji,jj,jk) = ghams(ji,jj,jk) +  zsc_ws_1(ji,jj)
+             END DO
+          ENDIF
+       END_2D
 
 
        WHERE ( lconv )
@@ -1030,25 +987,23 @@ CONTAINS
          zsc_vw_1 = 0._wp
        ENDWHERE
 
-       DO jj = 2, jpjm1
-          DO ji = 2, jpim1
-             IF ( lconv(ji,jj) ) THEN
-                DO jk = 2 , imld(ji,jj)
-                   zznd_d = gdepw_n(ji,jj,jk) / dstokes(ji,jj)
-                   ghamu(ji,jj,jk) = ghamu(ji,jj,jk) + 0.3 * 0.5 * ( zsc_uw_1(ji,jj) +   0.125 * EXP( -0.5 * zznd_d )     &
-                        &                                                            * (   1.0 - EXP( -0.5 * zznd_d ) )   &
-                        &                                          * zsc_uw_2(ji,jj)                                    )
-                   ghamv(ji,jj,jk) = ghamv(ji,jj,jk) + zsc_vw_1(ji,jj)
-                END DO  ! jk loop
-             ELSE
-             ! stable conditions
-                DO jk = 2, ibld(ji,jj)
-                   ghamu(ji,jj,jk) = ghamu(ji,jj,jk) + zsc_uw_1(ji,jj)
-                   ghamv(ji,jj,jk) = ghamv(ji,jj,jk) + zsc_vw_1(ji,jj)
-                END DO
-             ENDIF
-          END DO        ! ji loop
-       END DO           ! jj loop
+       DO_2D_00_00
+          IF ( lconv(ji,jj) ) THEN
+             DO jk = 2 , imld(ji,jj)
+                zznd_d = gdepw(ji,jj,jk,Kmm) / dstokes(ji,jj)
+                ghamu(ji,jj,jk) = ghamu(ji,jj,jk) + 0.3 * 0.5 * ( zsc_uw_1(ji,jj) +   0.125 * EXP( -0.5 * zznd_d )     &
+                     &                                                            * (   1.0 - EXP( -0.5 * zznd_d ) )   &
+                     &                                          * zsc_uw_2(ji,jj)                                    )
+                ghamv(ji,jj,jk) = ghamv(ji,jj,jk) + zsc_vw_1(ji,jj)
+             END DO  ! jk loop
+          ELSE
+          ! stable conditions
+             DO jk = 2, ibld(ji,jj)
+                ghamu(ji,jj,jk) = ghamu(ji,jj,jk) + zsc_uw_1(ji,jj)
+                ghamv(ji,jj,jk) = ghamv(ji,jj,jk) + zsc_vw_1(ji,jj)
+             END DO
+          ENDIF
+       END_2D
 
 ! Transport term in flux-gradient relationship [note : includes ROI ratio (X0.3) ]
 
@@ -1060,33 +1015,31 @@ CONTAINS
           zsc_ws_1 = zws0
        ENDWHERE
 
-       DO jj = 2, jpjm1
-          DO ji = 2, jpim1
-            IF ( lconv(ji,jj) ) THEN
-               DO jk = 2, imld(ji,jj)
-                  zznd_ml=gdepw_n(ji,jj,jk) / zhml(ji,jj)
-                  ghamt(ji,jj,jk) = ghamt(ji,jj,jk) + 0.3 * zsc_wth_1(ji,jj)                &
-                       &          * ( -2.0 + 2.75 * (       ( 1.0 + 0.6 * zznd_ml**4 )      &
-                       &                               - EXP(     - 6.0 * zznd_ml    ) ) )  &
-                       &          * ( 1.0 - EXP( - 15.0 * (         1.0 - zznd_ml    ) ) )
-                  !
-                  ghams(ji,jj,jk) = ghams(ji,jj,jk) + 0.3 * zsc_ws_1(ji,jj)  &
-                       &          * ( -2.0 + 2.75 * (       ( 1.0 + 0.6 * zznd_ml**4 )      &
-                       &                               - EXP(     - 6.0 * zznd_ml    ) ) )  &
-                       &          * ( 1.0 - EXP ( -15.0 * (         1.0 - zznd_ml    ) ) )
-               END DO
-            ELSE
-               DO jk = 2, ibld(ji,jj)
-                  zznd_d = gdepw_n(ji,jj,jk) / dstokes(ji,jj)
-                  znd = gdepw_n(ji,jj,jk) / zhbl(ji,jj)
-                  ghamt(ji,jj,jk) = ghamt(ji,jj,jk) + 0.3 * ( -4.06 * EXP( -2.0 * zznd_d ) * (1.0 - EXP( -4.0 * zznd_d ) ) + &
-               &  7.5 * EXP ( -10.0 * ( 0.95 - znd )**2 ) * ( 1.0 - znd ) ) * zsc_wth_1(ji,jj)
-                  ghams(ji,jj,jk) = ghams(ji,jj,jk) + 0.3 * ( -4.06 * EXP( -2.0 * zznd_d ) * (1.0 - EXP( -4.0 * zznd_d ) ) + &
-               &  7.5 * EXP ( -10.0 * ( 0.95 - znd )**2 ) * ( 1.0 - znd ) ) * zsc_ws_1(ji,jj)
-               END DO
-            ENDIF
-          ENDDO    ! ji loop
-       END DO      ! jj loop
+       DO_2D_00_00
+         IF ( lconv(ji,jj) ) THEN
+            DO jk = 2, imld(ji,jj)
+               zznd_ml=gdepw(ji,jj,jk,Kmm) / zhml(ji,jj)
+               ghamt(ji,jj,jk) = ghamt(ji,jj,jk) + 0.3 * zsc_wth_1(ji,jj)                &
+                    &          * ( -2.0 + 2.75 * (       ( 1.0 + 0.6 * zznd_ml**4 )      &
+                    &                               - EXP(     - 6.0 * zznd_ml    ) ) )  &
+                    &          * ( 1.0 - EXP( - 15.0 * (         1.0 - zznd_ml    ) ) )
+               !
+               ghams(ji,jj,jk) = ghams(ji,jj,jk) + 0.3 * zsc_ws_1(ji,jj)  &
+                    &          * ( -2.0 + 2.75 * (       ( 1.0 + 0.6 * zznd_ml**4 )      &
+                    &                               - EXP(     - 6.0 * zznd_ml    ) ) )  &
+                    &          * ( 1.0 - EXP ( -15.0 * (         1.0 - zznd_ml    ) ) )
+            END DO
+         ELSE
+            DO jk = 2, ibld(ji,jj)
+               zznd_d = gdepw(ji,jj,jk,Kmm) / dstokes(ji,jj)
+               znd = gdepw(ji,jj,jk,Kmm) / zhbl(ji,jj)
+               ghamt(ji,jj,jk) = ghamt(ji,jj,jk) + 0.3 * ( -4.06 * EXP( -2.0 * zznd_d ) * (1.0 - EXP( -4.0 * zznd_d ) ) + &
+            &  7.5 * EXP ( -10.0 * ( 0.95 - znd )**2 ) * ( 1.0 - znd ) ) * zsc_wth_1(ji,jj)
+               ghams(ji,jj,jk) = ghams(ji,jj,jk) + 0.3 * ( -4.06 * EXP( -2.0 * zznd_d ) * (1.0 - EXP( -4.0 * zznd_d ) ) + &
+            &  7.5 * EXP ( -10.0 * ( 0.95 - znd )**2 ) * ( 1.0 - znd ) ) * zsc_ws_1(ji,jj)
+            END DO
+         ENDIF
+       END_2D
 
 
        WHERE ( lconv )
@@ -1099,113 +1052,105 @@ CONTAINS
           zsc_vw_2 = -0.11 * SIN( 3.14159 * ( 2.0 + 0.4 ) ) * EXP(-( 1.5 + 2.0 )**2 ) * zsc_vw_1
        ENDWHERE
 
-       DO jj = 2, jpjm1
-          DO ji = 2, jpim1
-             IF ( lconv(ji,jj) ) THEN
-               DO jk = 2, imld(ji,jj)
-                  zznd_ml = gdepw_n(ji,jj,jk) / zhml(ji,jj)
-                  zznd_d = gdepw_n(ji,jj,jk) / dstokes(ji,jj)
-                  ghamu(ji,jj,jk) = ghamu(ji,jj,jk)&
-                       & + 0.3 * ( -2.0 + 2.5 * ( 1.0 + 0.1 * zznd_ml**4 ) - EXP ( -8.0 * zznd_ml ) ) * zsc_uw_1(ji,jj)
+       DO_2D_00_00
+          IF ( lconv(ji,jj) ) THEN
+            DO jk = 2, imld(ji,jj)
+               zznd_ml = gdepw(ji,jj,jk,Kmm) / zhml(ji,jj)
+               zznd_d = gdepw(ji,jj,jk,Kmm) / dstokes(ji,jj)
+               ghamu(ji,jj,jk) = ghamu(ji,jj,jk)&
+                    & + 0.3 * ( -2.0 + 2.5 * ( 1.0 + 0.1 * zznd_ml**4 ) - EXP ( -8.0 * zznd_ml ) ) * zsc_uw_1(ji,jj)
+               !
+               ghamv(ji,jj,jk) = ghamv(ji,jj,jk)&
+                    & + 0.3 * 0.1 * ( EXP( -zznd_d ) + EXP( -5.0 * ( 1.0 - zznd_ml ) ) ) * zsc_vw_1(ji,jj)
+            END DO
+          ELSE
+            DO jk = 2, ibld(ji,jj)
+               znd = gdepw(ji,jj,jk,Kmm) / zhbl(ji,jj)
+               zznd_d = gdepw(ji,jj,jk,Kmm) / dstokes(ji,jj)
+               IF ( zznd_d <= 2.0 ) THEN
+                  ghamu(ji,jj,jk) = ghamu(ji,jj,jk) + 0.5 * 0.3 &
+                       &*  ( 2.25 - 3.0  * ( 1.0 - EXP( - 1.25 * zznd_d ) ) * ( 1.0 - EXP( -2.0 * zznd_d ) ) ) * zsc_uw_1(ji,jj)
                   !
-                  ghamv(ji,jj,jk) = ghamv(ji,jj,jk)&
-                       & + 0.3 * 0.1 * ( EXP( -zznd_d ) + EXP( -5.0 * ( 1.0 - zznd_ml ) ) ) * zsc_vw_1(ji,jj)
-               END DO
-             ELSE
-               DO jk = 2, ibld(ji,jj)
-                  znd = gdepw_n(ji,jj,jk) / zhbl(ji,jj)
-                  zznd_d = gdepw_n(ji,jj,jk) / dstokes(ji,jj)
-                  IF ( zznd_d <= 2.0 ) THEN
-                     ghamu(ji,jj,jk) = ghamu(ji,jj,jk) + 0.5 * 0.3 &
-                          &*  ( 2.25 - 3.0  * ( 1.0 - EXP( - 1.25 * zznd_d ) ) * ( 1.0 - EXP( -2.0 * zznd_d ) ) ) * zsc_uw_1(ji,jj)
-                     !
-                  ELSE
-                     ghamu(ji,jj,jk) = ghamu(ji,jj,jk)&
-                          & + 0.5 * 0.3 * ( 1.0 - EXP( -5.0 * ( 1.0 - znd ) ) ) * zsc_uw_2(ji,jj)
-                     !
-                  ENDIF
+               ELSE
+                  ghamu(ji,jj,jk) = ghamu(ji,jj,jk)&
+                       & + 0.5 * 0.3 * ( 1.0 - EXP( -5.0 * ( 1.0 - znd ) ) ) * zsc_uw_2(ji,jj)
+                  !
+               ENDIF
 
-                  ghamv(ji,jj,jk) = ghamv(ji,jj,jk)&
-                       & + 0.3 * 0.15 * SIN( 3.14159 * ( 0.65 * zznd_d ) ) * EXP( -0.25 * zznd_d**2 ) * zsc_vw_1(ji,jj)
-                  ghamv(ji,jj,jk) = ghamv(ji,jj,jk)&
-                       & + 0.3 * 0.15 * EXP( -5.0 * ( 1.0 - znd ) ) * ( 1.0 - EXP( -20.0 * ( 1.0 - znd ) ) ) * zsc_vw_2(ji,jj)
-               END DO
-             ENDIF
-          END DO
-       END DO
+               ghamv(ji,jj,jk) = ghamv(ji,jj,jk)&
+                    & + 0.3 * 0.15 * SIN( 3.14159 * ( 0.65 * zznd_d ) ) * EXP( -0.25 * zznd_d**2 ) * zsc_vw_1(ji,jj)
+               ghamv(ji,jj,jk) = ghamv(ji,jj,jk)&
+                    & + 0.3 * 0.15 * EXP( -5.0 * ( 1.0 - znd ) ) * ( 1.0 - EXP( -20.0 * ( 1.0 - znd ) ) ) * zsc_vw_2(ji,jj)
+            END DO
+          ENDIF
+       END_2D
 !
 ! Make surface forced velocity non-gradient terms go to zero at the base of the mixed layer.
 
-      DO jj = 2, jpjm1
-         DO ji = 2, jpim1
-            IF ( lconv(ji,jj) ) THEN
-               DO jk = 2, ibld(ji,jj)
-                  znd = ( gdepw_n(ji,jj,jk) - zhml(ji,jj) ) / zhml(ji,jj) !ALMG to think about
-                  IF ( znd >= 0.0 ) THEN
-                     ghamu(ji,jj,jk) = ghamu(ji,jj,jk) * ( 1.0 - EXP( -30.0 * znd**2 ) )
-                     ghamv(ji,jj,jk) = ghamv(ji,jj,jk) * ( 1.0 - EXP( -30.0 * znd**2 ) )
-                  ELSE
-                     ghamu(ji,jj,jk) = 0._wp
-                     ghamv(ji,jj,jk) = 0._wp
-                  ENDIF
-               END DO
-            ELSE
-               DO jk = 2, ibld(ji,jj)
-                  znd = ( gdepw_n(ji,jj,jk) - zhml(ji,jj) ) / zhml(ji,jj) !ALMG to think about
-                  IF ( znd >= 0.0 ) THEN
-                     ghamu(ji,jj,jk) = ghamu(ji,jj,jk) * ( 1.0 - EXP( -10.0 * znd**2 ) )
-                     ghamv(ji,jj,jk) = ghamv(ji,jj,jk) * ( 1.0 - EXP( -10.0 * znd**2 ) )
-                  ELSE
-                     ghamu(ji,jj,jk) = 0._wp
-                     ghamv(ji,jj,jk) = 0._wp
-                  ENDIF
-               END DO
-            ENDIF
-         END DO
-      END DO
+      DO_2D_00_00
+         IF ( lconv(ji,jj) ) THEN
+            DO jk = 2, ibld(ji,jj)
+               znd = ( gdepw(ji,jj,jk,Kmm) - zhml(ji,jj) ) / zhml(ji,jj) !ALMG to think about
+               IF ( znd >= 0.0 ) THEN
+                  ghamu(ji,jj,jk) = ghamu(ji,jj,jk) * ( 1.0 - EXP( -30.0 * znd**2 ) )
+                  ghamv(ji,jj,jk) = ghamv(ji,jj,jk) * ( 1.0 - EXP( -30.0 * znd**2 ) )
+               ELSE
+                  ghamu(ji,jj,jk) = 0._wp
+                  ghamv(ji,jj,jk) = 0._wp
+               ENDIF
+            END DO
+         ELSE
+            DO jk = 2, ibld(ji,jj)
+               znd = ( gdepw(ji,jj,jk,Kmm) - zhml(ji,jj) ) / zhml(ji,jj) !ALMG to think about
+               IF ( znd >= 0.0 ) THEN
+                  ghamu(ji,jj,jk) = ghamu(ji,jj,jk) * ( 1.0 - EXP( -10.0 * znd**2 ) )
+                  ghamv(ji,jj,jk) = ghamv(ji,jj,jk) * ( 1.0 - EXP( -10.0 * znd**2 ) )
+               ELSE
+                  ghamu(ji,jj,jk) = 0._wp
+                  ghamv(ji,jj,jk) = 0._wp
+               ENDIF
+            END DO
+         ENDIF
+      END_2D
 
       ! pynocline contributions
        ! Temporary fix to avoid instabilities when zdb_bl becomes very very small
        zsc_uw_1 = 0._wp ! 50.0 * zla**(8.0/3.0) * zustar**2 * zhbl / ( zdb_bl + epsln )
-       DO jj = 2, jpjm1
-          DO ji = 2, jpim1
-             DO jk= 2, ibld(ji,jj)
-                znd = gdepw_n(ji,jj,jk) / zhbl(ji,jj)
-                ghamt(ji,jj,jk) = ghamt(ji,jj,jk) + zdiffut(ji,jj,jk) * zdtdz_pyc(ji,jj,jk)
-                ghams(ji,jj,jk) = ghams(ji,jj,jk) + zdiffut(ji,jj,jk) * zdsdz_pyc(ji,jj,jk)
-                ghamu(ji,jj,jk) = ghamu(ji,jj,jk) + zviscos(ji,jj,jk) * zdudz_pyc(ji,jj,jk)
-                ghamu(ji,jj,jk) = ghamu(ji,jj,jk) + zsc_uw_1(ji,jj) * ( 1.0 - znd )**(7.0/4.0) * zdbdz_pyc(ji,jj,jk)
-                ghamv(ji,jj,jk) = ghamv(ji,jj,jk) + zviscos(ji,jj,jk) * zdvdz_pyc(ji,jj,jk)
-             END DO
-           END DO
-       END DO
+       DO_2D_00_00
+          DO jk= 2, ibld(ji,jj)
+             znd = gdepw(ji,jj,jk,Kmm) / zhbl(ji,jj)
+             ghamt(ji,jj,jk) = ghamt(ji,jj,jk) + zdiffut(ji,jj,jk) * zdtdz_pyc(ji,jj,jk)
+             ghams(ji,jj,jk) = ghams(ji,jj,jk) + zdiffut(ji,jj,jk) * zdsdz_pyc(ji,jj,jk)
+             ghamu(ji,jj,jk) = ghamu(ji,jj,jk) + zviscos(ji,jj,jk) * zdudz_pyc(ji,jj,jk)
+             ghamu(ji,jj,jk) = ghamu(ji,jj,jk) + zsc_uw_1(ji,jj) * ( 1.0 - znd )**(7.0/4.0) * zdbdz_pyc(ji,jj,jk)
+             ghamv(ji,jj,jk) = ghamv(ji,jj,jk) + zviscos(ji,jj,jk) * zdvdz_pyc(ji,jj,jk)
+          END DO
+       END_2D
 
 ! Entrainment contribution.
 
-       DO jj=2, jpjm1
-          DO ji = 2, jpim1
-             IF ( lconv(ji,jj) ) THEN
-               DO jk = 1, imld(ji,jj) - 1
-                  znd=gdepw_n(ji,jj,jk) / zhml(ji,jj)
-                  ghamt(ji,jj,jk) = ghamt(ji,jj,jk) + zwth_ent(ji,jj) * znd
-                  ghams(ji,jj,jk) = ghams(ji,jj,jk) + zws_ent(ji,jj) * znd
-                  ghamu(ji,jj,jk) = ghamu(ji,jj,jk) + zuw_bse(ji,jj) * znd
-                  ghamv(ji,jj,jk) = ghamv(ji,jj,jk) + zvw_bse(ji,jj) * znd
-               END DO
-               DO jk = imld(ji,jj), ibld(ji,jj)
-                  znd = -( gdepw_n(ji,jj,jk) - zhml(ji,jj) ) / zdh(ji,jj)
-                  ghamt(ji,jj,jk) = ghamt(ji,jj,jk) + zwth_ent(ji,jj) * ( 1.0 + znd )
-                  ghams(ji,jj,jk) = ghams(ji,jj,jk) + zws_ent(ji,jj) * ( 1.0 + znd )
-                  ghamu(ji,jj,jk) = ghamu(ji,jj,jk) + zuw_bse(ji,jj) * ( 1.0 + znd )
-                  ghamv(ji,jj,jk) = ghamv(ji,jj,jk) + zvw_bse(ji,jj) * ( 1.0 + znd )
-                END DO
-             ENDIF
-             ghamt(ji,jj,ibld(ji,jj)) = 0._wp
-             ghams(ji,jj,ibld(ji,jj)) = 0._wp
-             ghamu(ji,jj,ibld(ji,jj)) = 0._wp
-             ghamv(ji,jj,ibld(ji,jj)) = 0._wp
-          END DO       ! ji loop
-       END DO          ! jj loop
+       DO_2D_00_00
+          IF ( lconv(ji,jj) ) THEN
+            DO jk = 1, imld(ji,jj) - 1
+               znd=gdepw(ji,jj,jk,Kmm) / zhml(ji,jj)
+               ghamt(ji,jj,jk) = ghamt(ji,jj,jk) + zwth_ent(ji,jj) * znd
+               ghams(ji,jj,jk) = ghams(ji,jj,jk) + zws_ent(ji,jj) * znd
+               ghamu(ji,jj,jk) = ghamu(ji,jj,jk) + zuw_bse(ji,jj) * znd
+               ghamv(ji,jj,jk) = ghamv(ji,jj,jk) + zvw_bse(ji,jj) * znd
+            END DO
+            DO jk = imld(ji,jj), ibld(ji,jj)
+               znd = -( gdepw(ji,jj,jk,Kmm) - zhml(ji,jj) ) / zdh(ji,jj)
+               ghamt(ji,jj,jk) = ghamt(ji,jj,jk) + zwth_ent(ji,jj) * ( 1.0 + znd )
+               ghams(ji,jj,jk) = ghams(ji,jj,jk) + zws_ent(ji,jj) * ( 1.0 + znd )
+               ghamu(ji,jj,jk) = ghamu(ji,jj,jk) + zuw_bse(ji,jj) * ( 1.0 + znd )
+               ghamv(ji,jj,jk) = ghamv(ji,jj,jk) + zvw_bse(ji,jj) * ( 1.0 + znd )
+             END DO
+          ENDIF
+          ghamt(ji,jj,ibld(ji,jj)) = 0._wp
+          ghams(ji,jj,ibld(ji,jj)) = 0._wp
+          ghamu(ji,jj,ibld(ji,jj)) = 0._wp
+          ghamv(ji,jj,ibld(ji,jj)) = 0._wp
+       END_2D
 
 
        !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -1219,15 +1164,13 @@ CONTAINS
 
        ! rotate non-gradient velocity terms back to model reference frame
 
-       DO jj = 2, jpjm1
-          DO ji = 2, jpim1
-             DO jk = 2, ibld(ji,jj)
-                ztemp = ghamu(ji,jj,jk)
-                ghamu(ji,jj,jk) = ghamu(ji,jj,jk) * zcos_wind(ji,jj) - ghamv(ji,jj,jk) * zsin_wind(ji,jj)
-                ghamv(ji,jj,jk) = ghamv(ji,jj,jk) * zcos_wind(ji,jj) + ztemp * zsin_wind(ji,jj)
-             END DO
+       DO_2D_00_00
+          DO jk = 2, ibld(ji,jj)
+             ztemp = ghamu(ji,jj,jk)
+             ghamu(ji,jj,jk) = ghamu(ji,jj,jk) * zcos_wind(ji,jj) - ghamv(ji,jj,jk) * zsin_wind(ji,jj)
+             ghamv(ji,jj,jk) = ghamv(ji,jj,jk) * zcos_wind(ji,jj) + ztemp * zsin_wind(ji,jj)
           END DO
-       END DO
+       END_2D
 
        IF(ln_dia_osm) THEN
           IF ( iom_use("zdtdz_pyc") ) CALL iom_put( "zdtdz_pyc", wmask*zdtdz_pyc )
@@ -1235,54 +1178,42 @@ CONTAINS
 
 ! KPP-style Ri# mixing
        IF( ln_kpprimix) THEN
-          DO jk = 2, jpkm1           !* Shear production at uw- and vw-points (energy conserving form)
-             DO jj = 1, jpjm1
-                DO ji = 1, jpim1   ! vector opt.
-                   z3du(ji,jj,jk) = 0.5 * (  un(ji,jj,jk-1) -  un(ji  ,jj,jk) )   &
-                        &                 * (  ub(ji,jj,jk-1) -  ub(ji  ,jj,jk) ) * wumask(ji,jj,jk) &
-                        &                 / (  e3uw_n(ji,jj,jk) * e3uw_b(ji,jj,jk) )
-                   z3dv(ji,jj,jk) = 0.5 * (  vn(ji,jj,jk-1) -  vn(ji,jj  ,jk) )   &
-                        &                 * (  vb(ji,jj,jk-1) -  vb(ji,jj  ,jk) ) * wvmask(ji,jj,jk) &
-                        &                 / (  e3vw_n(ji,jj,jk) * e3vw_b(ji,jj,jk) )
-                END DO
-             END DO
-          END DO
+          DO_3D_10_10( 2, jpkm1 )
+             z3du(ji,jj,jk) = 0.5 * (  uu(ji,jj,jk-1,Kmm) -  uu(ji  ,jj,jk,Kmm) )   &
+                  &                 * (  uu(ji,jj,jk-1,Kbb) -  uu(ji  ,jj,jk,Kbb) ) * wumask(ji,jj,jk) &
+                  &                 / (  e3uw(ji,jj,jk,Kmm) * e3uw(ji,jj,jk,Kbb) )
+             z3dv(ji,jj,jk) = 0.5 * (  vv(ji,jj,jk-1,Kmm) -  vv(ji,jj  ,jk,Kmm) )   &
+                  &                 * (  vv(ji,jj,jk-1,Kbb) -  vv(ji,jj  ,jk,Kbb) ) * wvmask(ji,jj,jk) &
+                  &                 / (  e3vw(ji,jj,jk,Kmm) * e3vw(ji,jj,jk,Kbb) )
+          END_3D
       !
-         DO jk = 2, jpkm1
-            DO jj = 2, jpjm1
-               DO ji = 2, jpim1   ! vector opt.
-                  !                                          ! shear prod. at w-point weightened by mask
-                  zesh2  =  ( z3du(ji-1,jj,jk) + z3du(ji,jj,jk) ) / MAX( 1._wp , umask(ji-1,jj,jk) + umask(ji,jj,jk) )   &
-                     &    + ( z3dv(ji,jj-1,jk) + z3dv(ji,jj,jk) ) / MAX( 1._wp , vmask(ji,jj-1,jk) + vmask(ji,jj,jk) )
-                  !                                          ! local Richardson number
-                  zri   = MAX( rn2b(ji,jj,jk), 0._wp ) / MAX(zesh2, epsln)
-                  zfri =  MIN( zri / rn_riinfty , 1.0_wp )
-                  zfri  = ( 1.0_wp - zfri * zfri )
-                  zrimix(ji,jj,jk)  =  zfri * zfri  * zfri * wmask(ji, jj, jk)
-                END DO
-             END DO
-          END DO
+         DO_3D_00_00( 2, jpkm1 )
+            !                                          ! shear prod. at w-point weightened by mask
+            zesh2  =  ( z3du(ji-1,jj,jk) + z3du(ji,jj,jk) ) / MAX( 1._wp , umask(ji-1,jj,jk) + umask(ji,jj,jk) )   &
+               &    + ( z3dv(ji,jj-1,jk) + z3dv(ji,jj,jk) ) / MAX( 1._wp , vmask(ji,jj-1,jk) + vmask(ji,jj,jk) )
+            !                                          ! local Richardson number
+            zri   = MAX( rn2b(ji,jj,jk), 0._wp ) / MAX(zesh2, epsln)
+            zfri =  MIN( zri / rn_riinfty , 1.0_wp )
+            zfri  = ( 1.0_wp - zfri * zfri )
+            zrimix(ji,jj,jk)  =  zfri * zfri  * zfri * wmask(ji, jj, jk)
+         END_3D
 
-          DO jj = 2, jpjm1
-             DO ji = 2, jpim1
-                DO jk = ibld(ji,jj) + 1, jpkm1
-                   zdiffut(ji,jj,jk) = zrimix(ji,jj,jk)*rn_difri
-                   zviscos(ji,jj,jk) = zrimix(ji,jj,jk)*rn_difri
-                END DO
+          DO_2D_00_00
+             DO jk = ibld(ji,jj) + 1, jpkm1
+                zdiffut(ji,jj,jk) = zrimix(ji,jj,jk)*rn_difri
+                zviscos(ji,jj,jk) = zrimix(ji,jj,jk)*rn_difri
              END DO
-          END DO
+          END_2D
 
        END IF ! ln_kpprimix = .true.
 
 ! KPP-style set diffusivity large if unstable below BL
        IF( ln_convmix) THEN
-          DO jj = 2, jpjm1
-             DO ji = 2, jpim1
-                DO jk = ibld(ji,jj) + 1, jpkm1
-                  IF(  MIN( rn2(ji,jj,jk), rn2b(ji,jj,jk) ) <= -1.e-12 ) zdiffut(ji,jj,jk) = rn_difconv
-                END DO
+          DO_2D_00_00
+             DO jk = ibld(ji,jj) + 1, jpkm1
+               IF(  MIN( rn2(ji,jj,jk), rn2b(ji,jj,jk) ) <= -1.e-12 ) zdiffut(ji,jj,jk) = rn_difconv
              END DO
-          END DO
+          END_2D
        END IF ! ln_convmix = .true.
 
        ! Lateral boundary conditions on zvicos (sign unchanged), needed to caclulate viscosities on u and v grids
@@ -1290,31 +1221,23 @@ CONTAINS
 
        ! GN 25/8: need to change tmask --> wmask
 
-     DO jk = 2, jpkm1
-         DO jj = 2, jpjm1
-             DO ji = 2, jpim1
-                p_avt(ji,jj,jk) = MAX( zdiffut(ji,jj,jk), avtb(jk) ) * tmask(ji,jj,jk)
-                p_avm(ji,jj,jk) = MAX( zviscos(ji,jj,jk), avmb(jk) ) * tmask(ji,jj,jk)
-             END DO
-         END DO
-     END DO
+     DO_3D_00_00( 2, jpkm1 )
+          p_avt(ji,jj,jk) = MAX( zdiffut(ji,jj,jk), avtb(jk) ) * tmask(ji,jj,jk)
+          p_avm(ji,jj,jk) = MAX( zviscos(ji,jj,jk), avmb(jk) ) * tmask(ji,jj,jk)
+     END_3D
       ! Lateral boundary conditions on ghamu and ghamv, currently on W-grid  (sign unchanged), needed to caclulate gham[uv] on u and v grids
      CALL lbc_lnk_multi( 'zdfosm', p_avt, 'W', 1. , p_avm, 'W', 1.,   &
       &                  ghamu, 'W', 1. , ghamv, 'W', 1. )
-       DO jk = 2, jpkm1
-           DO jj = 2, jpjm1
-               DO ji = 2, jpim1
-                  ghamu(ji,jj,jk) = ( ghamu(ji,jj,jk) + ghamu(ji+1,jj,jk) ) &
-                     &  / MAX( 1., tmask(ji,jj,jk) + tmask (ji + 1,jj,jk) ) * umask(ji,jj,jk)
+       DO_3D_00_00( 2, jpkm1 )
+            ghamu(ji,jj,jk) = ( ghamu(ji,jj,jk) + ghamu(ji+1,jj,jk) ) &
+               &  / MAX( 1., tmask(ji,jj,jk) + tmask (ji + 1,jj,jk) ) * umask(ji,jj,jk)
 
-                  ghamv(ji,jj,jk) = ( ghamv(ji,jj,jk) + ghamv(ji,jj+1,jk) ) &
-                      &  / MAX( 1., tmask(ji,jj,jk) + tmask (ji,jj+1,jk) ) * vmask(ji,jj,jk)
+            ghamv(ji,jj,jk) = ( ghamv(ji,jj,jk) + ghamv(ji,jj+1,jk) ) &
+                &  / MAX( 1., tmask(ji,jj,jk) + tmask (ji,jj+1,jk) ) * vmask(ji,jj,jk)
 
-                  ghamt(ji,jj,jk) =  ghamt(ji,jj,jk) * tmask(ji,jj,jk)
-                  ghams(ji,jj,jk) =  ghams(ji,jj,jk) * tmask(ji,jj,jk)
-               END DO
-           END DO
-        END DO
+            ghamt(ji,jj,jk) =  ghamt(ji,jj,jk) * tmask(ji,jj,jk)
+            ghams(ji,jj,jk) =  ghams(ji,jj,jk) * tmask(ji,jj,jk)
+       END_3D
         ! Lateral boundary conditions on final outputs for gham[ts],  on W-grid  (sign unchanged)
         ! Lateral boundary conditions on final outputs for gham[uv],  on [UV]-grid  (sign unchanged)
         CALL lbc_lnk_multi( 'zdfosm', ghamt, 'W', 1. , ghams, 'W', 1.,   &
@@ -1326,12 +1249,12 @@ CONTAINS
          CASE(0:1)
             IF ( iom_use("us_x") ) CALL iom_put( "us_x", tmask(:,:,1)*zustke*zcos_wind )   ! x surface Stokes drift
             IF ( iom_use("us_y") ) CALL iom_put( "us_y", tmask(:,:,1)*zustke*zsin_wind )  ! y surface Stokes drift
-            IF ( iom_use("wind_wave_abs_power") ) CALL iom_put( "wind_wave_abs_power", 1000.*rau0*tmask(:,:,1)*zustar**2*zustke )
+            IF ( iom_use("wind_wave_abs_power") ) CALL iom_put( "wind_wave_abs_power", 1000.*rho0*tmask(:,:,1)*zustar**2*zustke )
          ! Stokes drift read in from sbcwave  (=2).
          CASE(2)
             IF ( iom_use("us_x") ) CALL iom_put( "us_x", ut0sd )               ! x surface Stokes drift
             IF ( iom_use("us_y") ) CALL iom_put( "us_y", vt0sd )               ! y surface Stokes drift
-            IF ( iom_use("wind_wave_abs_power") ) CALL iom_put( "wind_wave_abs_power", 1000.*rau0*tmask(:,:,1)*zustar**2* &
+            IF ( iom_use("wind_wave_abs_power") ) CALL iom_put( "wind_wave_abs_power", 1000.*rho0*tmask(:,:,1)*zustar**2* &
                  & SQRT(ut0sd**2 + vt0sd**2 ) )
          END SELECT
          IF ( iom_use("ghamt") ) CALL iom_put( "ghamt", tmask*ghamt )            ! <Tw_NL>
@@ -1347,8 +1270,8 @@ CONTAINS
          IF ( iom_use("zwstrc") ) CALL iom_put( "zwstrc", tmask(:,:,1)*zwstrc )         ! convective velocity scale
          IF ( iom_use("zwstrl") ) CALL iom_put( "zwstrl", tmask(:,:,1)*zwstrl )         ! Langmuir velocity scale
          IF ( iom_use("zustar") ) CALL iom_put( "zustar", tmask(:,:,1)*zustar )         ! friction velocity scale
-         IF ( iom_use("wind_power") ) CALL iom_put( "wind_power", 1000.*rau0*tmask(:,:,1)*zustar**3 ) ! BL depth internal to zdf_osm routine
-         IF ( iom_use("wind_wave_power") ) CALL iom_put( "wind_wave_power", 1000.*rau0*tmask(:,:,1)*zustar**2*zustke )
+         IF ( iom_use("wind_power") ) CALL iom_put( "wind_power", 1000.*rho0*tmask(:,:,1)*zustar**3 ) ! BL depth internal to zdf_osm routine
+         IF ( iom_use("wind_wave_power") ) CALL iom_put( "wind_wave_power", 1000.*rho0*tmask(:,:,1)*zustar**2*zustke )
          IF ( iom_use("zhbl") ) CALL iom_put( "zhbl", tmask(:,:,1)*zhbl )               ! BL depth internal to zdf_osm routine
          IF ( iom_use("zhml") ) CALL iom_put( "zhml", tmask(:,:,1)*zhml )               ! ML depth internal to zdf_osm routine
          IF ( iom_use("zdh") ) CALL iom_put( "zdh", tmask(:,:,1)*zdh )               ! ML depth internal to zdf_osm routine
@@ -1363,7 +1286,7 @@ CONTAINS
    END SUBROUTINE zdf_osm
 
 
-   SUBROUTINE zdf_osm_init
+   SUBROUTINE zdf_osm_init( Kmm ) 
      !!----------------------------------------------------------------------
      !!                  ***  ROUTINE zdf_osm_init  ***
      !!
@@ -1375,6 +1298,8 @@ CONTAINS
      !!
      !! ** input   :   Namlist namosm
      !!----------------------------------------------------------------------
+     INTEGER, INTENT(in)    :: Kmm ! time level index (middle)
+     !
      INTEGER  ::   ios            ! local integer
      INTEGER  ::   ji, jj, jk     ! dummy loop indices
      !!
@@ -1383,13 +1308,11 @@ CONTAINS
           & ,ln_kpprimix, rn_riinfty, rn_difri, ln_convmix, rn_difconv
      !!----------------------------------------------------------------------
      !
-     REWIND( numnam_ref )              ! Namelist namzdf_osm in reference namelist : Osmosis ML model
      READ  ( numnam_ref, namzdf_osm, IOSTAT = ios, ERR = 901)
-901  IF( ios /= 0 ) CALL ctl_nam ( ios , 'namzdf_osm in reference namelist', lwp )
+901  IF( ios /= 0 ) CALL ctl_nam ( ios , 'namzdf_osm in reference namelist' )
 
-     REWIND( numnam_cfg )              ! Namelist namzdf_tke in configuration namelist : Turbulent Kinetic Energy
      READ  ( numnam_cfg, namzdf_osm, IOSTAT = ios, ERR = 902 )
-902  IF( ios >  0 ) CALL ctl_nam ( ios , 'namzdf_osm in configuration namelist', lwp )
+902  IF( ios >  0 ) CALL ctl_nam ( ios , 'namzdf_osm in configuration namelist' )
      IF(lwm) WRITE ( numond, namzdf_osm )
 
      IF(lwp) THEN                    ! Control print
@@ -1422,7 +1345,7 @@ CONTAINS
      !                              ! allocate zdfosm arrays
      IF( zdf_osm_alloc() /= 0 )   CALL ctl_stop( 'STOP', 'zdf_osm_init : unable to allocate arrays' )
 
-     call osm_rst( nit000, 'READ' ) !* read or initialize hbl
+     call osm_rst( nit000, Kmm, 'READ' ) !* read or initialize hbl
 
      IF( ln_zdfddm) THEN
         IF(lwp) THEN
@@ -1458,15 +1381,11 @@ CONTAINS
         !
         etmean(:,:,:) = 0.e0
 
-        DO jk = 1, jpkm1
-           DO jj = 2, jpjm1
-              DO ji = 2, jpim1   ! vector opt.
-                 etmean(ji,jj,jk) = tmask(ji,jj,jk)                     &
-                      &  / MAX( 1.,  umask(ji-1,jj  ,jk) + umask(ji,jj,jk)   &
-                      &            + vmask(ji  ,jj-1,jk) + vmask(ji,jj,jk)  )
-              END DO
-           END DO
-        END DO
+        DO_3D_00_00( 1, jpkm1 )
+           etmean(ji,jj,jk) = tmask(ji,jj,jk)                     &
+                &  / MAX( 1.,  umask(ji-1,jj  ,jk) + umask(ji,jj,jk)   &
+                &            + vmask(ji  ,jj-1,jk) + vmask(ji,jj,jk)  )
+        END_3D
 
      CASE ( 1 )                ! horizontal average
         IF(lwp) WRITE(numout,*) '          horizontal average on avt'
@@ -1476,18 +1395,14 @@ CONTAINS
         !           ( 1/2  1  1/2 )
         etmean(:,:,:) = 0.e0
 
-        DO jk = 1, jpkm1
-           DO jj = 2, jpjm1
-              DO ji = 2, jpim1   ! vector opt.
-                 etmean(ji,jj,jk) = tmask(ji, jj,jk)                           &
-                      & / MAX( 1., 2.* tmask(ji,jj,jk)                           &
-                      &      +.5 * ( tmask(ji-1,jj+1,jk) + tmask(ji-1,jj-1,jk)   &
-                      &             +tmask(ji+1,jj+1,jk) + tmask(ji+1,jj-1,jk) ) &
-                      &      +1. * ( tmask(ji-1,jj  ,jk) + tmask(ji  ,jj+1,jk)   &
-                      &             +tmask(ji  ,jj-1,jk) + tmask(ji+1,jj  ,jk) ) )
-              END DO
-           END DO
-        END DO
+        DO_3D_00_00( 1, jpkm1 )
+           etmean(ji,jj,jk) = tmask(ji, jj,jk)                           &
+                & / MAX( 1., 2.* tmask(ji,jj,jk)                           &
+                &      +.5 * ( tmask(ji-1,jj+1,jk) + tmask(ji-1,jj-1,jk)   &
+                &             +tmask(ji+1,jj+1,jk) + tmask(ji+1,jj-1,jk) ) &
+                &      +1. * ( tmask(ji-1,jj  ,jk) + tmask(ji  ,jj+1,jk)   &
+                &             +tmask(ji  ,jj-1,jk) + tmask(ji+1,jj  ,jk) ) )
+        END_3D
 
      CASE DEFAULT
         WRITE(ctmp1,*) '          bad flag value for nn_ave = ', nn_ave
@@ -1516,7 +1431,7 @@ CONTAINS
    END SUBROUTINE zdf_osm_init
 
 
-   SUBROUTINE osm_rst( kt, cdrw )
+   SUBROUTINE osm_rst( kt, Kmm, cdrw )
      !!---------------------------------------------------------------------
      !!                   ***  ROUTINE osm_rst  ***
      !!
@@ -1526,7 +1441,8 @@ CONTAINS
      !!                required fields, they are recomputed from stratification
      !!----------------------------------------------------------------------
 
-     INTEGER, INTENT(in) :: kt
+     INTEGER         , INTENT(in) ::   kt     ! ocean time step index
+     INTEGER         , INTENT(in) ::   Kmm    ! ocean time level index (middle)
      CHARACTER(len=*), INTENT(in) ::   cdrw   ! "READ"/"WRITE" flag
 
      INTEGER ::   id1, id2   ! iom enquiry index
@@ -1544,11 +1460,11 @@ CONTAINS
      IF( TRIM(cdrw) == 'READ'.AND. ln_rstart) THEN
         id1 = iom_varid( numror, 'wn'   , ldstop = .FALSE. )
         IF( id1 > 0 ) THEN                       ! 'wn' exists; read
-           CALL iom_get( numror, jpdom_autoglo, 'wn', wn, ldxios = lrxios )
-           WRITE(numout,*) ' ===>>>> :  wn read from restart file'
+           CALL iom_get( numror, jpdom_autoglo, 'wn', ww, ldxios = lrxios )
+           WRITE(numout,*) ' ===>>>> :  ww read from restart file'
         ELSE
-           wn(:,:,:) = 0._wp
-           WRITE(numout,*) ' ===>>>> :  wn not in restart file, set to zero initially'
+           ww(:,:,:) = 0._wp
+           WRITE(numout,*) ' ===>>>> :  ww not in restart file, set to zero initially'
         END IF
         id1 = iom_varid( numror, 'hbl'   , ldstop = .FALSE. )
         id2 = iom_varid( numror, 'hbli'   , ldstop = .FALSE. )
@@ -1567,7 +1483,7 @@ CONTAINS
      !!-----------------------------------------------------------------------------
      IF( TRIM(cdrw) == 'WRITE') THEN     !* Write hbli into the restart file, then return
         IF(lwp) WRITE(numout,*) '---- osm-rst ----'
-         CALL iom_rstput( kt, nitrst, numrow, 'wn'     , wn  , ldxios = lwxios )
+         CALL iom_rstput( kt, nitrst, numrow, 'wn'     , ww  , ldxios = lwxios )
          CALL iom_rstput( kt, nitrst, numrow, 'hbl'    , hbl , ldxios = lwxios )
          CALL iom_rstput( kt, nitrst, numrow, 'hbli'   , hbli, ldxios = lwxios )
         RETURN
@@ -1579,29 +1495,23 @@ CONTAINS
      IF( lwp ) WRITE(numout,*) ' ===>>>> : calculating hbl computed from stratification'
      ALLOCATE( imld_rst(jpi,jpj) )
      ! w-level of the mixing and mixed layers
-     CALL eos_rab( tsn, rab_n )
-     CALL bn2(tsn, rab_n, rn2)
+     CALL eos_rab( ts(:,:,:,:,Kmm), rab_n, Kmm )
+     CALL bn2(ts(:,:,:,:,Kmm), rab_n, rn2, Kmm)
      imld_rst(:,:)  = nlb10         ! Initialization to the number of w ocean point
      hbl(:,:)  = 0._wp              ! here hbl used as a dummy variable, integrating vertically N^2
-     zN2_c = grav * rho_c * r1_rau0 ! convert density criteria into N^2 criteria
+     zN2_c = grav * rho_c * r1_rho0 ! convert density criteria into N^2 criteria
      !
      hbl(:,:)  = 0._wp              ! here hbl used as a dummy variable, integrating vertically N^2
-     DO jk = 1, jpkm1
-        DO jj = 1, jpj              ! Mixed layer level: w-level
-           DO ji = 1, jpi
-              ikt = mbkt(ji,jj)
-              hbl(ji,jj) = hbl(ji,jj) + MAX( rn2(ji,jj,jk) , 0._wp ) * e3w_n(ji,jj,jk)
-              IF( hbl(ji,jj) < zN2_c )   imld_rst(ji,jj) = MIN( jk , ikt ) + 1   ! Mixed layer level
-           END DO
-        END DO
-     END DO
+     DO_3D_11_11( 1, jpkm1 )
+        ikt = mbkt(ji,jj)
+        hbl(ji,jj) = hbl(ji,jj) + MAX( rn2(ji,jj,jk) , 0._wp ) * e3w(ji,jj,jk,Kmm)
+        IF( hbl(ji,jj) < zN2_c )   imld_rst(ji,jj) = MIN( jk , ikt ) + 1   ! Mixed layer level
+     END_3D
      !
-     DO jj = 1, jpj
-        DO ji = 1, jpi
-           iiki = imld_rst(ji,jj)
-           hbl (ji,jj) = gdepw_n(ji,jj,iiki  ) * ssmask(ji,jj)    ! Turbocline depth
-        END DO
-     END DO
+     DO_2D_11_11
+        iiki = imld_rst(ji,jj)
+        hbl (ji,jj) = gdepw(ji,jj,iiki  ,Kmm) * ssmask(ji,jj)    ! Turbocline depth
+     END_2D
      hbl = MAX(hbl,epsln)
      hbli(:,:) = hbl(:,:)
      DEALLOCATE( imld_rst )
@@ -1609,7 +1519,7 @@ CONTAINS
    END SUBROUTINE osm_rst
 
 
-   SUBROUTINE tra_osm( kt )
+   SUBROUTINE tra_osm( kt, Kmm, pts, Krhs )
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE tra_osm  ***
       !!
@@ -1619,7 +1529,10 @@ CONTAINS
       !!----------------------------------------------------------------------
       REAL(wp), DIMENSION(:,:,:), ALLOCATABLE ::   ztrdt, ztrds   ! 3D workspace
       !!----------------------------------------------------------------------
-      INTEGER, INTENT(in) :: kt
+      INTEGER                                  , INTENT(in)    :: kt        ! time step index
+      INTEGER                                  , INTENT(in)    :: Kmm, Krhs ! time level indices
+      REAL(wp), DIMENSION(jpi,jpj,jpk,jpts,jpt), INTENT(inout) :: pts       ! active tracers and RHS of tracer equation
+      !
       INTEGER :: ji, jj, jk
       !
       IF( kt == nit000 ) THEN
@@ -1629,38 +1542,34 @@ CONTAINS
       ENDIF
 
       IF( l_trdtra )   THEN                    !* Save ta and sa trends
-         ALLOCATE( ztrdt(jpi,jpj,jpk) )   ;    ztrdt(:,:,:) = tsa(:,:,:,jp_tem)
-         ALLOCATE( ztrds(jpi,jpj,jpk) )   ;    ztrds(:,:,:) = tsa(:,:,:,jp_sal)
+         ALLOCATE( ztrdt(jpi,jpj,jpk) )   ;    ztrdt(:,:,:) = pts(:,:,:,jp_tem,Krhs)
+         ALLOCATE( ztrds(jpi,jpj,jpk) )   ;    ztrds(:,:,:) = pts(:,:,:,jp_sal,Krhs)
       ENDIF
 
       ! add non-local temperature and salinity flux
-      DO jk = 1, jpkm1
-         DO jj = 2, jpjm1
-            DO ji = 2, jpim1
-               tsa(ji,jj,jk,jp_tem) =  tsa(ji,jj,jk,jp_tem)                      &
-                  &                 - (  ghamt(ji,jj,jk  )  &
-                  &                    - ghamt(ji,jj,jk+1) ) /e3t_n(ji,jj,jk)
-               tsa(ji,jj,jk,jp_sal) =  tsa(ji,jj,jk,jp_sal)                      &
-                  &                 - (  ghams(ji,jj,jk  )  &
-                  &                    - ghams(ji,jj,jk+1) ) / e3t_n(ji,jj,jk)
-            END DO
-         END DO
-      END DO
+      DO_3D_00_00( 1, jpkm1 )
+         pts(ji,jj,jk,jp_tem,Krhs) =  pts(ji,jj,jk,jp_tem,Krhs)                      &
+            &                 - (  ghamt(ji,jj,jk  )  &
+            &                    - ghamt(ji,jj,jk+1) ) /e3t(ji,jj,jk,Kmm)
+         pts(ji,jj,jk,jp_sal,Krhs) =  pts(ji,jj,jk,jp_sal,Krhs)                      &
+            &                 - (  ghams(ji,jj,jk  )  &
+            &                    - ghams(ji,jj,jk+1) ) / e3t(ji,jj,jk,Kmm)
+      END_3D
 
 
       ! save the non-local tracer flux trends for diagnostic
       IF( l_trdtra )   THEN
-         ztrdt(:,:,:) = tsa(:,:,:,jp_tem) - ztrdt(:,:,:)
-         ztrds(:,:,:) = tsa(:,:,:,jp_sal) - ztrds(:,:,:)
+         ztrdt(:,:,:) = pts(:,:,:,jp_tem,Krhs) - ztrdt(:,:,:)
+         ztrds(:,:,:) = pts(:,:,:,jp_sal,Krhs) - ztrds(:,:,:)
 !!bug gm jpttdzdf ==> jpttosm
-         CALL trd_tra( kt, 'TRA', jp_tem, jptra_zdf, ztrdt )
-         CALL trd_tra( kt, 'TRA', jp_sal, jptra_zdf, ztrds )
+         CALL trd_tra( kt, Kmm, Krhs, 'TRA', jp_tem, jptra_zdf, ztrdt )
+         CALL trd_tra( kt, Kmm, Krhs, 'TRA', jp_sal, jptra_zdf, ztrds )
          DEALLOCATE( ztrdt )      ;     DEALLOCATE( ztrds )
       ENDIF
 
-      IF(ln_ctl) THEN
-         CALL prt_ctl( tab3d_1=tsa(:,:,:,jp_tem), clinfo1=' osm  - Ta: ', mask1=tmask,   &
-         &             tab3d_2=tsa(:,:,:,jp_sal), clinfo2=       ' Sa: ', mask2=tmask, clinfo3='tra' )
+      IF(sn_cfctl%l_prtctl) THEN
+         CALL prt_ctl( tab3d_1=pts(:,:,:,jp_tem,Krhs), clinfo1=' osm  - Ta: ', mask1=tmask,   &
+         &             tab3d_2=pts(:,:,:,jp_sal,Krhs), clinfo2=       ' Sa: ', mask2=tmask, clinfo3='tra' )
       ENDIF
       !
    END SUBROUTINE tra_osm
@@ -1683,7 +1592,7 @@ CONTAINS
    END SUBROUTINE trc_osm
 
 
-   SUBROUTINE dyn_osm( kt )
+   SUBROUTINE dyn_osm( kt, Kmm, puu, pvv, Krhs )
       !!----------------------------------------------------------------------
       !!                  ***  ROUTINE dyn_osm  ***
       !!
@@ -1692,7 +1601,9 @@ CONTAINS
       !!
       !! ** Method  :   ???
       !!----------------------------------------------------------------------
-      INTEGER, INTENT(in) ::   kt   !
+      INTEGER                             , INTENT( in )  ::  kt          ! ocean time step index
+      INTEGER                             , INTENT( in )  ::  Kmm, Krhs   ! ocean time level indices
+      REAL(wp), DIMENSION(jpi,jpj,jpk,jpt), INTENT(inout) ::  puu, pvv    ! ocean velocities and RHS of momentum equation
       !
       INTEGER :: ji, jj, jk   ! dummy loop indices
       !!----------------------------------------------------------------------
@@ -1704,18 +1615,14 @@ CONTAINS
       ENDIF
       !code saving tracer trends removed, replace with trdmxl_oce
 
-      DO jk = 1, jpkm1           ! add non-local u and v fluxes
-         DO jj = 2, jpjm1
-            DO ji = 2, jpim1
-               ua(ji,jj,jk) =  ua(ji,jj,jk)                      &
-                  &                 - (  ghamu(ji,jj,jk  )  &
-                  &                    - ghamu(ji,jj,jk+1) ) / e3u_n(ji,jj,jk)
-               va(ji,jj,jk) =  va(ji,jj,jk)                      &
-                  &                 - (  ghamv(ji,jj,jk  )  &
-                  &                    - ghamv(ji,jj,jk+1) ) / e3v_n(ji,jj,jk)
-            END DO
-         END DO
-      END DO
+      DO_3D_00_00( 1, jpkm1 )
+         puu(ji,jj,jk,Krhs) =  puu(ji,jj,jk,Krhs)                      &
+            &                 - (  ghamu(ji,jj,jk  )  &
+            &                    - ghamu(ji,jj,jk+1) ) / e3u(ji,jj,jk,Kmm)
+         pvv(ji,jj,jk,Krhs) =  pvv(ji,jj,jk,Krhs)                      &
+            &                 - (  ghamv(ji,jj,jk  )  &
+            &                    - ghamv(ji,jj,jk+1) ) / e3v(ji,jj,jk,Kmm)
+      END_3D
       !
       ! code for saving tracer trends removed
       !

@@ -19,6 +19,7 @@ MODULE lbcnfd
    !!----------------------------------------------------------------------
    USE dom_oce        ! ocean space and time domain 
    USE in_out_manager ! I/O manager
+   USE lib_mpp        ! MPP library
 
    IMPLICIT NONE
    PRIVATE
@@ -56,7 +57,7 @@ MODULE lbcnfd
 
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: lbcnfd.F90 10425 2018-12-19 21:54:16Z smasson $
+   !! $Id: lbcnfd.F90 11536 2019-09-11 13:54:18Z smasson $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS

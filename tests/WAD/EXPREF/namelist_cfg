@@ -42,7 +42,7 @@
    ln_linssh   = .false.   !  =T  linear free surface  ==>>  model level are fixed in time
    !
    ln_meshmask = .true.    !  create (>0) a mesh file or not (=0)
-   rn_rdt      =    18.    !  time step for the dynamics 
+   rn_Dt      =    18.    !  time step for the dynamics 
 /
 !-----------------------------------------------------------------------
 &namcfg        !   parameters of the configuration                      (default: user defined GYRE)
@@ -168,9 +168,9 @@
 &nambdy_index
 !-----------------------------------------------------------------------
     ctypebdy = 'E'
-    nbdyind  = 50
+    nbdyind  = 33
     nbdybeg  = 1
-    nbdyend  = 34
+    nbdyend  = 23
     !ctypebdy = 'W'
     !nbdyind  = 2
     !nbdybeg  = 1
@@ -179,13 +179,17 @@
 !-----------------------------------------------------------------------
 &nambdy_dta    !  open boundaries - external data                       
 !-----------------------------------------------------------------------
+   ln_zinterp  = .false.      !  T if a vertical interpolation is required. Variables gdep[tuv] and e3[tuv] must exist in the file
+   !                          !  automatically defined to T if the number of vertical levels in bdy dta /= jpk
+   ln_full_vel = .false.      !  T if [uv]3d are "full" velocities and not only its baroclinic components
+   !                          !  in this case, baroclinic and barotropic velocities will be recomputed -> [uv]2d not needed
+   !
+   cn_dir  =  './'
 !              !  file name      ! frequency (hours) ! variable  ! time interp. !  clim   ! 'yearly'/ ! weights  ! rotation ! land/sea mask !
 !              !                 !  (if <0  months)  !   name    !  (logical)   !  (T/F ) ! 'monthly' ! filename ! pairing  ! filename      !
-   bn_ssh =     'bdyssh_tc7' ,         1        , 'sshbdy',     .true.     , .true.  ,  'daily'  ,    ''    ,   ''     , ''
-   bn_u2d =     'bdyuv_tc7'  ,         1        , 'ubdy'  ,     .true.     , .true.  ,  'daily'  ,    ''    ,   ''     , ''
-   bn_v2d =     'bdyuv_tc7'  ,         1        , 'vbdy'  ,     .true.     , .true.  ,  'daily'  ,    ''    ,   ''     , ''
-   cn_dir      =    './'   !  root directory for the location of the bulk files
-   ln_full_vel = .false.        !
+   bn_ssh =     'bdyssh_tc7' ,         1.       , 'sshbdy',     .true.     , .true.  ,  'daily'  ,    ''    ,   ''     , ''
+   bn_u2d =     'bdyuv_tc7'  ,         1.       , 'ubdy'  ,     .true.     , .true.  ,  'daily'  ,    ''    ,   ''     , ''
+   bn_v2d =     'bdyuv_tc7'  ,         1.       , 'vbdy'  ,     .true.     , .true.  ,  'daily'  ,    ''    ,   ''     , ''
 /
 !-----------------------------------------------------------------------
 &nambdy_tide   !  tidal forcing at open boundaries
@@ -339,7 +343,7 @@
 !-----------------------------------------------------------------------
    ln_dynspg_ts  = .true.  !  split-explicit free surface
    ln_bt_auto    = .false. ! Number of sub-step defined from:
-   nn_baro       =  12     ! =F : the number of sub-step in rn_rdt seconds
+   nn_e       =  12     ! =F : the number of sub-step in rn_Dt seconds
 /
 !-----------------------------------------------------------------------
 &namdyn_ldf    !   lateral diffusion on momentum                        (default: NO selection)
@@ -416,10 +420,8 @@
 !!   namhsb       Heat and salt budgets                                 (default: OFF)
 !!   namdiu       Cool skin and warm layer models                       (default: OFF)
 !!   namdiu       Cool skin and warm layer models                       (default: OFF)
-!!   namflo       float parameters                                      ("key_float")
-!!   nam_diaharm  Harmonic analysis of tidal constituents               ("key_diaharm")
-!!   namdct       transports through some sections                      ("key_diadct")
-!!   nam_diatmb   Top Middle Bottom Output                              (default: OFF)
+!!   namflo       float parameters                                      (default: OFF)
+!!   nam_diadct   transports through some sections                      (default: OFF)
 !!   nam_dia25h   25h Mean Output                                       (default: OFF)
 !!   namnc4       netcdf4 chunking and compression settings             ("key_netcdf4")
 !!======================================================================
@@ -438,8 +440,9 @@
    nn_trd      = 365       !  print frequency (ln_glo_trd=T) (unit=time step)
 /
 !-----------------------------------------------------------------------
-&namdct        ! transports through some sections                       ("key_diadct")
+&nam_diadct    !   transports through some sections                     (default: OFF)
 !-----------------------------------------------------------------------
+    ln_diadct  = .false.   ! Calculate transport thru sections or not
     nn_dct      = 60       !  time step frequency for transports computing
     nn_dctwri   = 60       !  time step frequency for transports writing
     nn_secdebug = 0        !      0 : no section to debug
