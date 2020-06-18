@@ -165,8 +165,8 @@ export USEBLD=bldxag_tools.cfg
 #- We look after agrif
 grep key_agrif ${COMPIL_DIR}/cpp_tools.fcm && export AGRIFUSE=1 && export USEBLD=${USEBLD/xag/}
 
-. ${COMPIL_DIR}/Fprep_agrif.sh ${NEW_CONF} ${TOOLS_DIR} || exit 3
 
+. ${COMPIL_DIR}/Fprep_agrif.sh ${NEW_CONF} ${TOOLS_DIR} arch_tools.fcm|| exit 3
 
 #-
 #_ END OF CONFIGURATION PHASE
