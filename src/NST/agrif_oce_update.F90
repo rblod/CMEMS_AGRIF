@@ -35,7 +35,7 @@ MODULE agrif_oce_update
 
    !!----------------------------------------------------------------------
    !! NEMO/NST 4.0 , NEMO Consortium (2018)
-   !! $Id: agrif_oce_update.F90 13026 2020-06-03 14:30:02Z rblod $
+   !! $Id: agrif_oce_update.F90 13131 2020-06-19 07:29:40Z jchanut $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -81,7 +81,6 @@ CONTAINS
       ! 
       IF (Agrif_Root()) RETURN
       !
-#if defined TWO_WAY
       IF (lwp.AND.lk_agrif_debug) Write(*,*) 'Update momentum from grid Number',Agrif_Fixed()
 
       Agrif_UseSpecialValueInUpdate = .FALSE.
@@ -131,7 +130,7 @@ CONTAINS
          CALL Agrif_Update_Variable(vb2b_update_id,locupdate1=(/1,-2/),locupdate2=(/0,-1/),procname = updatevb2b)
 #  endif
       END IF
-#endif
+      !
       use_sign_north = .FALSE.
       !
    END SUBROUTINE Agrif_Update_Dyn

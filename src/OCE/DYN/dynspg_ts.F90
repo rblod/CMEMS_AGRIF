@@ -88,7 +88,7 @@ MODULE dynspg_ts
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: dynspg_ts.F90 12489 2020-02-28 15:55:11Z davestorkey $
+   !! $Id: dynspg_ts.F90 13157 2020-06-25 15:31:26Z jchanut $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -512,6 +512,12 @@ CONTAINS
             ssha_e(ji,jj) = (  sshn_e(ji,jj) - rDt_e * ( zssh_frc(ji,jj) + zhdiv )  ) * ssmask(ji,jj)
          END_2D
          !
+         ! Duplicate sea level across open boundaries (this is only cosmetic if linssh=T)
+         IF( ln_bdy )   CALL bdy_ssh( ssha_e )
+#if defined key_agrif
+         IF( .NOT.Agrif_Root() )   CALL agrif_ssh_ts( jn )
+#endif
+
          CALL lbc_lnk_multi( 'dynspg_ts', ssha_e, 'T', 1._wp,  zhU, 'U', -1._wp,  zhV, 'V', -1._wp )
          !
          !                             ! Sum over sub-time-steps to compute advective velocities
@@ -524,11 +530,6 @@ CONTAINS
             zvwdav2(1:jpi  ,1:jpjm1) = zvwdav2(1:jpi  ,1:jpjm1) + za2 * zvwdmask(1:jpi  ,1:jpjm1)   ! not jpj-row
          END IF
          !
-         ! Duplicate sea level across open boundaries (this is only cosmetic if linssh=T)
-         IF( ln_bdy )   CALL bdy_ssh( ssha_e )
-#if defined key_agrif
-         IF( .NOT.Agrif_Root() )   CALL agrif_ssh_ts( jn )
-#endif
          !  
          ! Sea Surface Height at u-,v-points (vvl case only)
          IF( .NOT.ln_linssh ) THEN                                
@@ -642,11 +643,19 @@ CONTAINS
             END_2D
          ENDIF
        
-         IF( .NOT.ln_linssh ) THEN   !* Update ocean depth (variable volume case only)
+         IF( .NOT.ln_linssh ) THEN !* Update ocean depth (variable volume case only)
             hu_e (2:jpim1,2:jpjm1) = hu_0(2:jpim1,2:jpjm1) + zsshu_a(2:jpim1,2:jpjm1)
             hur_e(2:jpim1,2:jpjm1) = ssumask(2:jpim1,2:jpjm1) / ( hu_e(2:jpim1,2:jpjm1) + 1._wp - ssumask(2:jpim1,2:jpjm1) )
             hv_e (2:jpim1,2:jpjm1) = hv_0(2:jpim1,2:jpjm1) + zsshv_a(2:jpim1,2:jpjm1)
             hvr_e(2:jpim1,2:jpjm1) = ssvmask(2:jpim1,2:jpjm1) / ( hv_e(2:jpim1,2:jpjm1) + 1._wp - ssvmask(2:jpim1,2:jpjm1) )
+         ENDIF
+         !                                                 ! open boundaries
+         IF( ln_bdy )   CALL bdy_dyn2d( jn, ua_e, va_e, un_e, vn_e, hur_e, hvr_e, ssha_e )
+#if defined key_agrif                                                           
+         IF( .NOT.Agrif_Root() )  CALL agrif_dyn_ts( jn )  ! Agrif
+#endif
+         !
+         IF( .NOT.ln_linssh ) THEN   !* Update ocean depth (variable volume case only)
             CALL lbc_lnk_multi( 'dynspg_ts', ua_e , 'U', -1._wp, va_e , 'V', -1._wp  &
                  &                         , hu_e , 'U',  1._wp, hv_e , 'V',  1._wp  &
                  &                         , hur_e, 'U',  1._wp, hvr_e, 'V',  1._wp  )
@@ -654,12 +663,6 @@ CONTAINS
             CALL lbc_lnk_multi( 'dynspg_ts', ua_e , 'U', -1._wp, va_e , 'V', -1._wp  )
          ENDIF
          !
-         !
-         !                                                 ! open boundaries
-         IF( ln_bdy )   CALL bdy_dyn2d( jn, ua_e, va_e, un_e, vn_e, hur_e, hvr_e, ssha_e )
-#if defined key_agrif                                                           
-         IF( .NOT.Agrif_Root() )  CALL agrif_dyn_ts( jn )  ! Agrif
-#endif
          !                                             !* Swap
          !                                             !  ----
          ubb_e  (:,:) = ub_e  (:,:)

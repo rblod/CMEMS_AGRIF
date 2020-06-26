@@ -1,4 +1,3 @@
-#define TWO_WAY
 #undef DECAL_FEEDBACK  /* SEPARATION of INTERFACES*/
 
 MODULE agrif_ice_update
@@ -35,7 +34,7 @@ MODULE agrif_ice_update
 
    !!----------------------------------------------------------------------
    !! NEMO/NST 4.0 , NEMO Consortium (2018)
-   !! $Id: agrif_ice_update.F90 13026 2020-06-03 14:30:02Z rblod $
+   !! $Id: agrif_ice_update.F90 13131 2020-06-19 07:29:40Z jchanut $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS

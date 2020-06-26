@@ -51,7 +51,7 @@ MODULE agrif_oce_interp
 
    !!----------------------------------------------------------------------
    !! NEMO/NST 4.0 , NEMO Consortium (2018)
-   !! $Id: agrif_oce_interp.F90 13026 2020-06-03 14:30:02Z rblod $
+   !! $Id: agrif_oce_interp.F90 13141 2020-06-22 16:27:34Z jchanut $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -716,8 +716,8 @@ CONTAINS
       ! vertical interpolation:
       REAL(wp) :: zhtot
       REAL(wp), DIMENSION(k1:k2,1:jpts) :: tabin
-      REAL(wp), DIMENSION(k1:k2) :: h_in
-      REAL(wp), DIMENSION(1:jpk) :: h_out
+      REAL(wp), DIMENSION(k1:k2) :: h_in, z_in
+      REAL(wp), DIMENSION(1:jpk) :: h_out, z_out
       !!----------------------------------------------------------------------
 
       IF( before ) THEN
@@ -789,16 +789,27 @@ CONTAINS
                      zhtot = zhtot + h_in(jk)
                      tabin(jk,:) = ptab(ji,jj,jk,n1:n2-1)
                   END DO
+                  z_in(1) = 0.5_wp * h_in(1) - zhtot + ht0_parent(ji,jj)
+                  DO jk=2,N_in
+                     z_in(jk) = z_in(jk-1) + 0.5_wp * h_in(jk)
+                  ENDDO
+
                   N_out = 0
                   DO jk=1,jpk ! jpk of child grid
                      IF (tmask(ji,jj,jk) == 0._wp) EXIT 
                      N_out = N_out + 1
                      h_out(jk) = e3t(ji,jj,jk,Krhs_a)
                   ENDDO
+
+                  z_out(1) = 0.5_wp * h_out(1) - SUM(h_out(1:N_out)) + ht_0(ji,jj)
+                  DO jk=2,N_out
+                     z_out(jk) = z_out(jk-1) + 0.5_wp * h_out(jk)
+                  ENDDO
+
                   IF (N_in*N_out > 0) THEN
                      IF( l_ini_child ) THEN
-                        CALL remap_linear(tabin(1:N_in,1:jpts),h_in(1:N_in),ts(ji,jj,1:N_out,1:jpts,Krhs_a),          &
-                                      &   h_out(1:N_out),N_in,N_out,jpts)  
+                        CALL remap_linear(tabin(1:N_in,1:jpts),z_in(1:N_in),ts(ji,jj,1:N_out,1:jpts,Krhs_a),          &
+                                      &   z_out(1:N_out),N_in,N_out,jpts)  
                      ELSE 
                         CALL reconstructandremap(tabin(1:N_in,1:jpts),h_in(1:N_in),ts(ji,jj,1:N_out,1:jpts,Krhs_a),   &
                                       &   h_out(1:N_out),N_in,N_out,jpts)  
@@ -849,8 +860,8 @@ CONTAINS
       INTEGER :: ji,jj,jk
       REAL(wp) :: zrhoy, zhtot
       ! vertical interpolation:
-      REAL(wp), DIMENSION(k1:k2) :: tabin, h_in
-      REAL(wp), DIMENSION(1:jpk) :: h_out
+      REAL(wp), DIMENSION(k1:k2) :: tabin, h_in, z_in
+      REAL(wp), DIMENSION(1:jpk) :: h_out, z_out
       INTEGER  :: N_in, N_out,item
       REAL(wp) :: h_diff
       !!---------------------------------------------    
@@ -923,6 +934,10 @@ CONTAINS
                      tabin(jk) = 0.
                      ENDIF
                  ENDDO
+                 z_in(1) = 0.5_wp * h_in(1) - zhtot + hu0_parent(ji,jj) 
+                 DO jk=2,N_in
+                    z_in(jk) = z_in(jk-1) + 0.5_wp * h_in(jk)
+                 ENDDO
                      
                  N_out = 0
                  DO jk=1,jpk
@@ -930,9 +945,15 @@ CONTAINS
                     N_out = N_out + 1
                     h_out(N_out) = e3u(ji,jj,jk,Krhs_a)
                  ENDDO
+
+                 z_out(1) = 0.5_wp * h_out(1) - SUM(h_out(1:N_out)) + hu_0(ji,jj)
+                 DO jk=2,N_out
+                    z_out(jk) = z_out(jk-1) + 0.5_wp * h_out(jk) 
+                 ENDDO  
+
                  IF (N_in*N_out > 0) THEN
                      IF( l_ini_child ) THEN
-                        CALL remap_linear       (tabin(1:N_in),h_in(1:N_in),uu(ji,jj,1:N_out,Krhs_a),h_out(1:N_out),N_in,N_out,1)
+                        CALL remap_linear       (tabin(1:N_in),z_in(1:N_in),uu(ji,jj,1:N_out,Krhs_a),z_out(1:N_out),N_in,N_out,1)
                      ELSE
                         CALL reconstructandremap(tabin(1:N_in),h_in(1:N_in),uu(ji,jj,1:N_out,Krhs_a),h_out(1:N_out),N_in,N_out,1)
                      ENDIF   
@@ -963,8 +984,8 @@ CONTAINS
       INTEGER :: ji,jj,jk
       REAL(wp) :: zrhox
       ! vertical interpolation:
-      REAL(wp), DIMENSION(k1:k2) :: tabin, h_in
-      REAL(wp), DIMENSION(1:jpk) :: h_out
+      REAL(wp), DIMENSION(k1:k2) :: tabin, h_in, z_in
+      REAL(wp), DIMENSION(1:jpk) :: h_out, z_out
       INTEGER  :: N_in, N_out, item
       REAL(wp) :: h_diff, zhtot
       !!---------------------------------------------    
@@ -1028,22 +1049,33 @@ CONTAINS
                         h_in(jk) = ptab(ji,jj,jk,2)/(e1v(ji,jj)*zrhox) 
                      ENDIF
                      zhtot = zhtot + h_in(jk)
-                    IF( h_in(jk) .GT. 0. ) THEN
-                     tabin(jk) = ptab(ji,jj,jk,1)/(e1v(ji,jj)*zrhox*h_in(jk))
-                    ELSE
-                     tabin(jk)  = 0.
-                    ENDIF 
-                 ENDDO
-            
+                     IF( h_in(jk) .GT. 0. ) THEN
+                       tabin(jk) = ptab(ji,jj,jk,1)/(e1v(ji,jj)*zrhox*h_in(jk))
+                     ELSE
+                       tabin(jk)  = 0.
+                     ENDIF 
+                  ENDDO
+
+                  z_in(1) = 0.5_wp * h_in(1) - zhtot + hv0_parent(ji,jj)
+                  DO jk=2,N_in
+                     z_in(jk) = z_in(jk-1) + 0.5_wp * h_in(jk)
+                  ENDDO
+
                   N_out = 0
                   DO jk=1,jpk
-                     if (vmask(ji,jj,jk) == 0) EXIT
+                     IF (vmask(ji,jj,jk) == 0) EXIT
                      N_out = N_out + 1
                      h_out(N_out) = e3v(ji,jj,jk,Krhs_a)
-                  END DO
+                  ENDDO
+
+                  z_out(1) = 0.5_wp * h_out(1) - SUM(h_out(1:N_out)) + hv_0(ji,jj)
+                  DO jk=2,N_out
+                     z_out(jk) = z_out(jk-1) + 0.5_wp * h_out(jk)
+                  ENDDO
+ 
                   IF (N_in*N_out > 0) THEN
                      IF( l_ini_child ) THEN
-                        CALL remap_linear       (tabin(1:N_in),h_in(1:N_in),vv(ji,jj,1:N_out,Krhs_a),h_out(1:N_out),N_in,N_out,1)
+                        CALL remap_linear       (tabin(1:N_in),z_in(1:N_in),vv(ji,jj,1:N_out,Krhs_a),z_out(1:N_out),N_in,N_out,1)
                      ELSE
                         CALL reconstructandremap(tabin(1:N_in),h_in(1:N_in),vv(ji,jj,1:N_out,Krhs_a),h_out(1:N_out),N_in,N_out,1)
                      ENDIF   

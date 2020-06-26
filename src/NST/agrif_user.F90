@@ -4,7 +4,7 @@
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/NST 4.0 , NEMO Consortium (2018)
-   !! $Id: agrif_user.F90 13076 2020-06-09 13:34:15Z rblod $
+   !! $Id: agrif_user.F90 13162 2020-06-26 13:20:37Z rblod $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
    SUBROUTINE agrif_user
@@ -51,6 +51,10 @@
       INTEGER, INTENT(in)  :: Kbb, Kmm, Kaa
       INTEGER :: jn
 
+      IF(lwp) WRITE(numout,*) ' '
+      IF(lwp) WRITE(numout,*) 'AGRIF: interp child initial state from parent'
+      IF(lwp) WRITE(numout,*) ' '
+
       l_ini_child = .TRUE.
       Agrif_SpecialValue    = 0._wp
       Agrif_UseSpecialValue = .TRUE.
@@ -60,20 +64,23 @@
 
       ! Brutal fix to pas 1x1 refinment. 
   !    IF(Agrif_Irhox() == 1) THEN
-         CALL Agrif_Init_Variable(tsini_id, procname=agrif_initts)
+  !       CALL Agrif_Init_Variable(tsini_id, procname=agrif_initts)
   !    ELSE
-   !      CALL Agrif_Init_Variable(tsini_id, procname=interptsn)
+      CALL Agrif_Init_Variable(tsini_id, procname=interptsn)
 
   !    ENDIF
+! just for VORTEX because Parent velocities can actually be exactly zero
+!      Agrif_UseSpecialValue = .FALSE.
       Agrif_UseSpecialValue = ln_spc_dyn
       use_sign_north = .TRUE.
       sign_north = -1.
-  !    CALL Agrif_Init_Variable(uini_id , procname=interpun )
-  !    CALL Agrif_Init_Variable(vini_id , procname=interpvn )
-       use_sign_north = .FALSE.
+      CALL Agrif_Init_Variable(uini_id , procname=interpun )
+      CALL Agrif_Init_Variable(vini_id , procname=interpvn )
+      use_sign_north = .FALSE.
 
       Agrif_UseSpecialValue = .FALSE.            !
       l_ini_child = .FALSE.
+
       Krhs_a = Kaa ; Kmm_a = Kmm
 
       DO jn = 1, jpts
@@ -112,7 +119,7 @@
          CALL Agrif_Set_DistantCommonBorderX(.TRUE.)
       ENDIF
 
-      IF ( .NOT. ln_bry_south) THEN
+      IF ( .NOT. lk_south ) THEN
          CALL Agrif_Set_NearCommonBorderY(.TRUE.)
       ENDIF
 
@@ -225,28 +232,18 @@
       LOGICAL :: check_namelist
       CHARACTER(len=15) :: cl_check1, cl_check2, cl_check3, cl_check4 
       REAL(wp), DIMENSION(jpi,jpj) ::   zk   ! workspace
-      INTEGER :: ji, jj, jk, iminspon
+      INTEGER :: ji, jj, jk
       !!----------------------------------------------------------------------
     
      ! CALL Agrif_Declare_Var_ini
 
       IF( agrif_oce_alloc()  > 0 )   CALL ctl_warn('agrif agrif_oce_alloc: allocation of arrays failed')
 
-    !  lk_west  = ( ((nbondi == -1) .OR. (nbondi == 2) ).AND. .NOT. (jperio == 1 .OR. jperio == 4 .OR. jperio == 6))
-    !  lk_east  = ( ((nbondi ==  1) .OR. (nbondi == 2) ).AND. .NOT. (jperio == 1 .OR. jperio == 4 .OR. jperio == 6))
-    !  lk_south = ( ((nbondj == -1) .OR. (nbondj == 2) ).AND. ln_bry_south)
-    !  lk_north = ( ((nbondj ==  1) .OR. (nbondj == 2) ))
-    
-      lk_west  = ( .NOT. (jperio == 1 .OR. jperio == 4 .OR. jperio == 6) )
-      lk_east  = ( .NOT. (jperio == 1 .OR. jperio == 4 .OR. jperio == 6) )
-      lk_south = ln_bry_south
-      lk_north = .true.
+      lk_west  = .NOT. ( Agrif_Ix() == 1 )
+      lk_east  = .NOT. ( Agrif_Ix() + nbcellsx/AGRIF_Irhox() == Agrif_Parent(jpiglo) -1 )
+      lk_south = .NOT. ( Agrif_Iy() == 1 )
+      lk_north = .NOT. ( Agrif_Iy() + nbcellsy/AGRIF_Irhoy() == Agrif_Parent(jpjglo) -1 )
 
-      ! Check sponge length:
-      iminspon = MIN(FLOOR(REAL(jpiglo-4)/REAL(2*Agrif_irhox())), FLOOR(REAL(jpjglo-4)/REAL(2*Agrif_irhox())) )
-      IF (lk_mpp) iminspon = MIN(iminspon,FLOOR(REAL(jpi-2)/REAL(Agrif_irhox())), FLOOR(REAL(jpj-2)/REAL(Agrif_irhox())) )
-      IF (nn_sponge_len > iminspon)  CALL ctl_stop('agrif sponge length is too large') 
-      
       ! Build consistent parent bathymetry and number of levels
       ! on the child grid 
       Agrif_UseSpecialValue = .FALSE.
@@ -285,14 +282,15 @@
       zk(:,:) = REAL( mbkv_parent(:,:), wp )   ;   CALL lbc_lnk( 'Agrif_InitValues_cont', zk, 'V', 1. )
       mbkv_parent(:,:) = MAX( NINT( zk(:,:) ), 1 )   
 
-
-      CALL Agrif_Init_Variable(sshini_id, procname=agrif_initssh)
-      CALL lbc_lnk( 'Agrif_Init_Domain', ssh(:,:,Kbb), 'T', 1. )
-      DO jk = 1, jpk
-            e3t(:,:,jk,Kbb) =  e3t_0(:,:,jk) * ( ht_0(:,:) + ssh(:,:,Kbb)  ) &
-      &                            / ( ht_0(:,:) + 1._wp - ssmask(:,:) ) * tmask(:,:,jk)   &
-                     &              + e3t_0(:,:,jk) * ( 1._wp - tmask(:,:,jk) )
-      END DO
+      IF ( ln_init_chfrpar ) THEN 
+         CALL Agrif_Init_Variable(sshini_id, procname=agrif_initssh)
+         CALL lbc_lnk( 'Agrif_Init_Domain', ssh(:,:,Kbb), 'T', 1. )
+         DO jk = 1, jpk
+               e3t(:,:,jk,Kbb) =  e3t_0(:,:,jk) * ( ht_0(:,:) + ssh(:,:,Kbb)  ) &
+                        &             / ( ht_0(:,:) + 1._wp - ssmask(:,:) ) * tmask(:,:,jk)   &
+                        &              + e3t_0(:,:,jk) * ( 1._wp - tmask(:,:,jk) )
+         END DO
+      ENDIF
 
       ! check if masks and bathymetries match
       IF(ln_chk_bathy) THEN
@@ -854,8 +852,8 @@ SUBROUTINE Agrif_InitValues_cont_ice
       IMPLICIT NONE
       !
       INTEGER  ::   ios                 ! Local integer output status for namelist read
-      NAMELIST/namagrif/ ln_agrif_2way, rn_sponge_tra, rn_sponge_dyn, rn_trelax_tra, rn_trelax_dyn, &
-                       & ln_spc_dyn, ln_chk_bathy, ln_bry_south
+      NAMELIST/namagrif/ ln_agrif_2way, ln_init_chfrpar, rn_sponge_tra, rn_sponge_dyn, rn_trelax_tra, rn_trelax_dyn, &
+                       & ln_spc_dyn, ln_chk_bathy
       !!--------------------------------------------------------------------------------------
       !
       READ  ( numnam_ref, namagrif, IOSTAT = ios, ERR = 901)
@@ -870,13 +868,13 @@ SUBROUTINE Agrif_InitValues_cont_ice
          WRITE(numout,*) '~~~~~~~~~~~~~~~'
          WRITE(numout,*) '   Namelist namagrif : set AGRIF parameters'
          WRITE(numout,*) '      Two way nesting activated ln_agrif_2way         = ', ln_agrif_2way
-         WRITE(numout,*) '      sponge coefficient for tracers    rn_sponge_tra = ', rn_sponge_tra, ' m^2/s'
-         WRITE(numout,*) '      sponge coefficient for dynamics   rn_sponge_tra = ', rn_sponge_dyn, ' m^2/s'
-         WRITE(numout,*) '      time relaxation for tracers       rn_trelax_tra = ', rn_trelax_tra, ' ad.'
-         WRITE(numout,*) '      time relaxation for dynamics      rn_trelax_dyn = ', rn_trelax_dyn, ' ad.'
+         WRITE(numout,*) '      child initial state from parent ln_init_chfrpar = ', ln_init_chfrpar
+         WRITE(numout,*) '      ad. sponge coeft for tracers      rn_sponge_tra = ', rn_sponge_tra
+         WRITE(numout,*) '      ad. sponge coeft for dynamics     rn_sponge_tra = ', rn_sponge_dyn
+         WRITE(numout,*) '      ad. time relaxation for tracers   rn_trelax_tra = ', rn_trelax_tra
+         WRITE(numout,*) '      ad. time relaxation for dynamics  rn_trelax_dyn = ', rn_trelax_dyn
          WRITE(numout,*) '      use special values for dynamics   ln_spc_dyn    = ', ln_spc_dyn
          WRITE(numout,*) '      check bathymetry                  ln_chk_bathy  = ', ln_chk_bathy
-         WRITE(numout,*) '      south boundary                    ln_bry_south  = ', ln_bry_south
       ENDIF
       !
       ! Set the number of ghost cells according to periodicity
@@ -885,7 +883,7 @@ SUBROUTINE Agrif_InitValues_cont_ice
       nbghostcells_y_n = nbghostcells
       !
       IF ( jperio == 1 ) nbghostcells_x = 0
-      IF ( .NOT. ln_bry_south ) nbghostcells_y_s = 0
+      IF ( .NOT. lk_south ) nbghostcells_y_s = 0
 
       ! Some checks
       IF( jpiglo /= nbcellsx + 2 + 2*nbghostcells_x )   &
@@ -1149,7 +1147,7 @@ SUBROUTINE Agrif_InitValues_cont_ice
       ENDIF
    ENDIF
 
-   END function agrif_external_switch_index
+   END FUNCTION agrif_external_switch_index
 
    SUBROUTINE Correct_field(tab2d,i1,i2,j1,j2)
       !!----------------------------------------------------------------------

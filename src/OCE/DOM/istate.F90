@@ -47,7 +47,7 @@ MODULE istate
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: istate.F90 13103 2020-06-12 11:44:47Z rblod $
+   !! $Id: istate.F90 13141 2020-06-22 16:27:34Z jchanut $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -86,6 +86,19 @@ CONTAINS
       vv   (:,:,:  ,Kaa) = 0._wp   ! used in agrif_oce_sponge at initialization    
 #endif
 
+#if defined key_agrif
+      IF ( (.NOT.Agrif_root()).AND.ln_init_chfrpar ) THEN
+         numror = 0                           ! define numror = 0 -> no restart file to read
+         ln_1st_euler = .true.                ! Set time-step indicator at nit000 (euler forward)
+         CALL day_init 
+         CALL agrif_istate( Kbb, Kmm, Kaa )   ! Interp from parent
+         !
+         ts  (:,:,:,:,Kmm) = ts (:,:,:,:,Kbb) 
+         ssh (:,:,Kmm)     = ssh(:,:,Kbb)
+         uu   (:,:,:,Kmm)   = uu  (:,:,:,Kbb)
+         vv   (:,:,:,Kmm)   = vv  (:,:,:,Kbb)
+      ELSE
+#endif
       IF( ln_rstart ) THEN                    ! Restart from a file
          !                                    ! -------------------
          CALL rst_read( Kbb, Kmm )            ! Read the restart file
@@ -104,10 +117,6 @@ CONTAINS
                ssh(:,:,Kbb)   = 0._wp               ! set the ocean at rest
                uu  (:,:,:,Kbb) = 0._wp
                vv  (:,:,:,Kbb) = 0._wp  
-#if defined key_agrif
-            ELSE
-               CALL agrif_istate( Kbb, Kmm, Kaa ) 
-#endif
             ENDIF
             !
             IF( ll_wd ) THEN
@@ -156,6 +165,9 @@ CONTAINS
 !!gm 
          ! 
       ENDIF 
+#if defined key_agrif
+      ENDIF
+#endif
       ! 
       ! Initialize "now" and "before" barotropic velocities:
       ! Do it whatever the free surface method, these arrays being eventually used

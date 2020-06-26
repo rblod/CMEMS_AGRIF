@@ -34,7 +34,7 @@ MODULE agrif_oce_sponge
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/NST 4.0 , NEMO Consortium (2018)
-   !! $Id: agrif_oce_sponge.F90 13026 2020-06-03 14:30:02Z rblod $
+   !! $Id: agrif_oce_sponge.F90 13146 2020-06-23 15:08:22Z jchanut $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -355,7 +355,7 @@ CONTAINS
       !
       INTEGER  ::   ji, jj, jk, jn   ! dummy loop indices
       INTEGER  ::   iku, ikv
-      REAL(wp) :: ztsa, zabe1, zabe2, zbtr, zhtot, ztrelax
+      REAL(wp) :: ztsa, zabe1, zabe2, zbtr, zhtot
       REAL(wp), DIMENSION(i1:i2,j1:j2,jpk) :: ztu, ztv
       REAL(wp), DIMENSION(i1:i2,j1:j2,jpk,n1:n2) ::tsbdiff
       ! vertical interpolation:
@@ -459,24 +459,19 @@ CONTAINS
             ENDDO
          ENDDO
 
-         !* set relaxation time scale
-         IF( l_1st_euler .AND. lk_agrif_fstep ) THEN   ;   ztrelax =   rn_trelax_tra  / (        rn_Dt )
-         ELSE                                          ;   ztrelax =   rn_trelax_tra  / (2._wp * rn_Dt )
-         ENDIF
-
          DO jn = 1, jpts            
             DO jk = 1, jpkm1
                ztu(i1:i2,j1:j2,jk) = 0._wp
                DO jj = j1,j2
                   DO ji = i1,i2-1
-                     zabe1 = rn_sponge_tra * fspu(ji,jj) * umask(ji,jj,jk) * e2_e1u(ji,jj) * e3u(ji,jj,jk,Kmm_a)
+                     zabe1 = rn_sponge_tra * r1_Dt * fspu(ji,jj) * umask(ji,jj,jk) * e1e2u(ji,jj) * e3u(ji,jj,jk,Kmm_a)
                      ztu(ji,jj,jk) = zabe1 * ( tsbdiff(ji+1,jj  ,jk,jn) - tsbdiff(ji,jj,jk,jn) ) 
                   END DO
                END DO
                ztv(i1:i2,j1:j2,jk) = 0._wp
                DO ji = i1,i2
                   DO jj = j1,j2-1
-                     zabe2 = rn_sponge_tra * fspv(ji,jj) * vmask(ji,jj,jk) * e1_e2v(ji,jj) * e3v(ji,jj,jk,Kmm_a)
+                     zabe2 = rn_sponge_tra * r1_Dt * fspv(ji,jj) * vmask(ji,jj,jk) * e1e2v(ji,jj) * e3v(ji,jj,jk,Kmm_a)
                      ztv(ji,jj,jk) = zabe2 * ( tsbdiff(ji  ,jj+1,jk,jn) - tsbdiff(ji,jj,jk,jn) )
                   END DO
                END DO
@@ -501,7 +496,7 @@ CONTAINS
                         zbtr = r1_e1e2t(ji,jj) / e3t(ji,jj,jk,Kmm_a)
                         ! horizontal diffusive trends
                         ztsa = zbtr * (  ztu(ji,jj,jk) - ztu(ji-1,jj,jk) + ztv(ji,jj,jk) - ztv(ji,jj-1,jk)  ) &
-                             &  - ztrelax * fspt(ji,jj) * tsbdiff(ji,jj,jk,jn) 
+                             &  - rn_trelax_tra * r1_Dt * fspt(ji,jj) * tsbdiff(ji,jj,jk,jn) 
                         ! add it to the general tracer trends
                         ts(ji,jj,jk,jn,Krhs_a) = ts(ji,jj,jk,jn,Krhs_a) + ztsa
                      ENDIF
@@ -528,7 +523,7 @@ CONTAINS
       INTEGER :: ji,jj,jk,jmax
 
       ! sponge parameters 
-      REAL(wp) :: ze2u, ze1v, zua, zva, zbtr, zhtot, ztrelax
+      REAL(wp) :: ze2u, ze1v, zua, zva, zbtr, zhtot
       REAL(wp), DIMENSION(i1:i2,j1:j2,1:jpk) :: ubdiff
       REAL(wp), DIMENSION(i1:i2,j1:j2,1:jpk) :: rotdiff, hdivdiff
       ! vertical interpolation:
@@ -616,10 +611,6 @@ CONTAINS
 #else
          ubdiff(i1:i2,j1:j2,:) = (uu(i1:i2,j1:j2,:,Kbb_a) - tabres(i1:i2,j1:j2,:,1))*umask(i1:i2,j1:j2,:)
 #endif
-         !* set relaxation time scale
-         IF( l_1st_euler .AND. lk_agrif_fstep ) THEN   ;   ztrelax =   rn_trelax_dyn  / (        rn_Dt )
-         ELSE                                          ;   ztrelax =   rn_trelax_dyn  / (2._wp * rn_Dt )
-         ENDIF
          !
          DO jk = 1, jpkm1                                 ! Horizontal slab
             !                                             ! ===============
@@ -629,7 +620,7 @@ CONTAINS
             !                                             ! --------
             DO jj = j1,j2
                DO ji = i1+1,i2   ! vector opt.
-                  zbtr = r1_e1e2t(ji,jj) / e3t(ji,jj,jk,Kbb_a) * rn_sponge_dyn * fspt(ji,jj)
+                  zbtr = rn_sponge_dyn * r1_Dt * fspt(ji,jj) / e3t(ji,jj,jk,Kbb_a)
                   hdivdiff(ji,jj,jk) = (  e2u(ji  ,jj)*e3u(ji  ,jj,jk,Kbb_a) * ubdiff(ji  ,jj,jk) &
                                      &   -e2u(ji-1,jj)*e3u(ji-1,jj,jk,Kbb_a) * ubdiff(ji-1,jj,jk) ) * zbtr
                END DO
@@ -637,7 +628,7 @@ CONTAINS
 
             DO jj = j1,j2-1
                DO ji = i1,i2   ! vector opt.
-                  zbtr = r1_e1e2f(ji,jj) * e3f(ji,jj,jk) * rn_sponge_dyn * fspf(ji,jj)
+                  zbtr = rn_sponge_dyn * r1_Dt * fspf(ji,jj) * e3f(ji,jj,jk) 
                   rotdiff(ji,jj,jk) = ( -e1u(ji,jj+1) * ubdiff(ji,jj+1,jk)   &
                                     &   +e1u(ji,jj  ) * ubdiff(ji,jj  ,jk) ) * fmask(ji,jj,jk) * zbtr 
                END DO
@@ -654,7 +645,7 @@ CONTAINS
                      ! horizontal diffusive trends
                      zua = - ( ze2u - rotdiff (ji,jj-1,jk) ) / ( e2u(ji,jj) * e3u(ji,jj,jk,Kmm_a) )   &
                          & + ( hdivdiff(ji+1,jj,jk) - ze1v ) * r1_e1u(ji,jj) & 
-                         & - ztrelax  * fspu(ji,jj) * ubdiff(ji,jj,jk)
+                         & - rn_trelax_dyn * r1_Dt * fspu(ji,jj) * ubdiff(ji,jj,jk)
 
                      ! add it to the general momentum trends
                      uu(ji,jj,jk,Krhs_a) = uu(ji,jj,jk,Krhs_a) + zua                                 
@@ -706,7 +697,7 @@ CONTAINS
       INTEGER, INTENT(in) :: nb , ndir
       !
       INTEGER  ::   ji, jj, jk, imax
-      REAL(wp) ::   ze2u, ze1v, zua, zva, zbtr, zhtot, ztrelax
+      REAL(wp) ::   ze2u, ze1v, zua, zva, zbtr, zhtot
       REAL(wp), DIMENSION(i1:i2,j1:j2,1:jpk) :: vbdiff
       REAL(wp), DIMENSION(i1:i2,j1:j2,1:jpk) :: rotdiff, hdivdiff
       ! vertical interpolation:
@@ -793,10 +784,6 @@ CONTAINS
 # else
          vbdiff(i1:i2,j1:j2,:) = (vv(i1:i2,j1:j2,:,Kbb_a) - tabres(i1:i2,j1:j2,:,1))*vmask(i1:i2,j1:j2,:)
 # endif
-         !* set relaxation time scale
-         IF( l_1st_euler .AND. lk_agrif_fstep ) THEN   ;   ztrelax =   rn_trelax_dyn  / (        rn_Dt )
-         ELSE                                          ;   ztrelax =   rn_trelax_dyn  / (2._wp * rn_Dt )
-         ENDIF
          !
          DO jk = 1, jpkm1                                 ! Horizontal slab
             !                                             ! ===============
@@ -806,14 +793,14 @@ CONTAINS
             !                                             ! --------
             DO jj = j1+1,j2
                DO ji = i1,i2   ! vector opt.
-                  zbtr = r1_e1e2t(ji,jj) / e3t(ji,jj,jk,Kbb_a) * rn_sponge_dyn * fspt(ji,jj)
+                  zbtr = rn_sponge_dyn * r1_Dt * fspt(ji,jj) / e3t(ji,jj,jk,Kbb_a)
                   hdivdiff(ji,jj,jk) = ( e1v(ji,jj  ) * e3v(ji,jj  ,jk,Kbb_a) * vbdiff(ji,jj  ,jk)  &
                                      &  -e1v(ji,jj-1) * e3v(ji,jj-1,jk,Kbb_a) * vbdiff(ji,jj-1,jk)  ) * zbtr
                END DO
             END DO
             DO jj = j1,j2
                DO ji = i1,i2-1   ! vector opt.
-                  zbtr = r1_e1e2f(ji,jj) * e3f(ji,jj,jk) * rn_sponge_dyn * fspf(ji,jj)
+                  zbtr = rn_sponge_dyn * r1_Dt * fspf(ji,jj) * e3f(ji,jj,jk) 
                   rotdiff(ji,jj,jk) = ( e2v(ji+1,jj) * vbdiff(ji+1,jj,jk) & 
                                     &  -e2v(ji  ,jj) * vbdiff(ji  ,jj,jk)  ) * fmask(ji,jj,jk) * zbtr
                END DO
@@ -831,7 +818,7 @@ CONTAINS
             DO ji = i1+1, imax   ! vector opt.
                IF( .NOT. tabspongedone_u(ji,jj) ) THEN
                   DO jk = 1, jpkm1
-                     uu(ji,jj,jk,Krhs_a) = uu(ji,jj,jk,Krhs_a)                                                               &
+                     uu(ji,jj,jk,Krhs_a) = uu(ji,jj,jk,Krhs_a)                                                     &
                         & - ( rotdiff (ji  ,jj,jk) - rotdiff (ji,jj-1,jk)) / ( e2u(ji,jj) * e3u(ji,jj,jk,Kmm_a) )  &
                         & + ( hdivdiff(ji+1,jj,jk) - hdivdiff(ji,jj  ,jk)) * r1_e1u(ji,jj)
                   END DO
@@ -845,10 +832,10 @@ CONTAINS
             DO ji = i1+1, i2-1   ! vector opt.
                IF( .NOT. tabspongedone_v(ji,jj) ) THEN
                   DO jk = 1, jpkm1
-                     vv(ji,jj,jk,Krhs_a) = vv(ji,jj,jk,Krhs_a)                                                                  &
+                     vv(ji,jj,jk,Krhs_a) = vv(ji,jj,jk,Krhs_a)                                                        &
                         &  + ( rotdiff (ji,jj  ,jk) - rotdiff (ji-1,jj,jk) ) / ( e1v(ji,jj) * e3v(ji,jj,jk,Kmm_a) )   &
-                        &  + ( hdivdiff(ji,jj+1,jk) - hdivdiff(ji  ,jj,jk) ) * r1_e2v(ji,jj)                      &
-                        &  - ztrelax * fspv(ji,jj) * vbdiff(ji,jj,jk)
+                        &  + ( hdivdiff(ji,jj+1,jk) - hdivdiff(ji  ,jj,jk) ) * r1_e2v(ji,jj)                          &
+                        &  - rn_trelax_dyn * r1_Dt * fspv(ji,jj) * vbdiff(ji,jj,jk)
                   END DO
                ENDIF
             END DO

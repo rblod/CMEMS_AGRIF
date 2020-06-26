@@ -18,6 +18,7 @@ MODULE agrif_oce
    PUBLIC agrif_oce_alloc ! routine called by nemo_init in nemogcm.F90
   
    !                                              !!* Namelist namagrif: AGRIF parameters
+   LOGICAL , PUBLIC ::   ln_init_chfrpar = .FALSE. !: set child grids initial state from parent
    LOGICAL , PUBLIC ::   ln_agrif_2way = .TRUE.    !: activate two way nesting 
    LOGICAL , PUBLIC ::   ln_spc_dyn    = .FALSE.   !: use zeros (.false.) or not (.true.) in
                                                    !: bdys dynamical fields interpolation
@@ -28,7 +29,6 @@ MODULE agrif_oce
    LOGICAL , PUBLIC ::   ln_chk_bathy  = .FALSE.   !: check of parent bathymetry 
    !
    INTEGER , PUBLIC, PARAMETER ::   nn_sponge_len = 2  !: Sponge width (in number of parent grid points)
-   LOGICAL , PUBLIC ::   ln_bry_south  = .TRUE. !: Is the South boundary open ?
 
    LOGICAL , PUBLIC :: spongedoneT = .FALSE.       !: tracer   sponge layer indicator
    LOGICAL , PUBLIC :: spongedoneU = .FALSE.       !: dynamics sponge layer indicator
@@ -83,7 +83,7 @@ MODULE agrif_oce
    
    !!----------------------------------------------------------------------
    !! NEMO/NST 4.0 , NEMO Consortium (2018)
-   !! $Id: agrif_oce.F90 13026 2020-06-03 14:30:02Z rblod $
+   !! $Id: agrif_oce.F90 13162 2020-06-26 13:20:37Z rblod $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS 
