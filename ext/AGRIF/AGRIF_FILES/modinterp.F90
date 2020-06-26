@@ -1,5 +1,5 @@
 !
-! $Id: modinterp.F90 13027 2020-06-03 14:36:09Z rblod $
+! $Id: modinterp.F90 13144 2020-06-23 11:11:50Z rblod $
 !
 !     AGRIF (Adaptive Grid Refinement In Fortran)
 !
@@ -1331,10 +1331,29 @@ subroutine Agrif_Parentbounds ( type_interp, nbdim, indmin, indmax, &
                  (type_interp(i) == Agrif_weno) ) then
             indmin(i) = indmin(i) - 2
             indmax(i) = indmax(i) + 2
+
+            if (Agrif_UseSpecialValue) then
+               indmin(i) = indmin(i)-MaxSearch
+               indmax(i) = indmax(i)+MaxSearch
+            endif
+
         elseif ( (type_interp(i) /= Agrif_constant) .and.   &
                  (type_interp(i) /= Agrif_linear) ) then
             indmin(i) = indmin(i) - 1
             indmax(i) = indmax(i) + 1
+
+            if (Agrif_UseSpecialValue) then
+               indmin(i) = indmin(i)-MaxSearch
+               indmax(i) = indmax(i)+MaxSearch
+            endif
+
+        elseif ( (type_interp(i) == Agrif_constant) .or.   &
+                 (type_interp(i) == Agrif_linear) ) then
+            if (Agrif_UseSpecialValue) then
+               indmin(i) = indmin(i)-MaxSearch
+               indmax(i) = indmax(i)+MaxSearch
+            endif
+
         endif
 !
     enddo
