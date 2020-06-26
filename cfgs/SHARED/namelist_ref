@@ -637,14 +637,14 @@
 !-----------------------------------------------------------------------
 &namagrif      !  AGRIF zoom                                            ("key_agrif")
 !-----------------------------------------------------------------------
-   ln_agrif_2way = .true.  !  activate two way nesting
-   ln_spc_dyn    = .true.  !  use 0 as special value for dynamics
-   rn_sponge_tra = 2880.   !  coefficient for tracer   sponge layer [m2/s]
-   rn_sponge_dyn = 2880.   !  coefficient for dynamics sponge layer [m2/s]
-   rn_trelax_tra = 0.01    !  inverse of relaxation time (in steps) for tracers []
-   rn_trelax_dyn = 0.01    !  inverse of relaxation time (in steps) for dynamics []
-   ln_chk_bathy  = .false. !  =T  check the parent bathymetry
-   ln_bry_south  = .true.  !  =T  south boundary open
+   ln_agrif_2way   = .true.  !  activate two way nesting
+   ln_init_chfrpar = .false. !  initialize child grids from parent
+   ln_spc_dyn      = .true.  !  use 0 as special value for dynamics
+   rn_sponge_tra   = 0.002   !  coefficient for tracer   sponge layer []
+   rn_sponge_dyn   = 0.002   !  coefficient for dynamics sponge layer []
+   rn_trelax_tra   = 0.01    !  inverse of relaxation time (in steps) for tracers []
+   rn_trelax_dyn   = 0.01    !  inverse of relaxation time (in steps) for dynamics []
+   ln_chk_bathy    = .false. !  =T  check the parent bathymetry
 /
 !-----------------------------------------------------------------------
 &nam_tide      !   tide parameters                                      (default: OFF)
