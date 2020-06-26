@@ -94,10 +94,7 @@
          !!!!!!!!!                    I don't know why we must do that...                    !!!!!!!!
          l_full_nf_update = .TRUE.
 
-         ! Two lines update (slower but necessary to avoid different values ion identical grid points
-         IF ( l_full_nf_update .OR.                          &    ! if coupling fields
-              ( ncom_stp == nit000 .AND. .NOT. ln_rstart ) ) &    ! at first time step, if not restart
-            ipj_s(:) = 2
+         ipj_s(:) = 2
 
          ! Index of modifying lines in input
          DO jf = 1, ipf                      ! Loop over the number of arrays to be processed

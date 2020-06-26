@@ -407,7 +407,7 @@ CONTAINS
 
        ! Correct South and North
 #if defined key_agrif
-      IF( ln_bry_south ) THEN  
+      IF( lk_south ) THEN  
          IF( (nbondj == -1).OR.(nbondj == 2) ) THEN
            bathy(:,1)=bathy(:,2)
          ENDIF

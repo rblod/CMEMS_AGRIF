@@ -4,6 +4,7 @@ MODULE agrif_dom_update
    USE domzgr
    USE agrif_parameters
    USE agrif_profiles
+   USE lbclnk
    
    IMPLICIT none
    PRIVATE

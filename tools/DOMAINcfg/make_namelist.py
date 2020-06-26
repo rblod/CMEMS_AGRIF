@@ -106,9 +106,6 @@ for g in range(len(grid)) :
            	   line = "   jpjdta = "+str(jpjglo)+"\n"
            if line.strip().startswith('cp_cfg'):
            	   line = "   cp_cfg = 'dumb'\n"                 
-           if nbghostcells_y_s == 0 :
-               if line.strip().startswith('ln_bry_south'):
-                   line = "   ln_bry_south = .FALSE.\n"                       
            f2.write(line)
            cnt1 += 1
     f2.close()     

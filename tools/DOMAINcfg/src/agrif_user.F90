@@ -225,7 +225,7 @@
         CALL Agrif_Set_NearCommonBorderX(.TRUE.)
         CALL Agrif_Set_DistantCommonBorderX(.TRUE.)
       endif
-      if (.not.ln_bry_south) THEN
+      if (.not.lk_south) THEN
         CALL Agrif_Set_NearCommonBorderY(.TRUE.)
       endif
 
@@ -849,7 +849,7 @@
       IF( before) THEN
         ! May need to extend at south boundary
           IF (j1<1) THEN
-            IF (.NOT.agrif_child(ln_bry_south)) THEN
+            IF (.NOT.agrif_child(lk_south)) THEN
               IF ((nbondj == -1).OR.(nbondj == 2)) THEN
                 DO jj=1,j2
                   ptab(i1:i2,jj)=e1t(i1:i2,jj)
@@ -887,7 +887,7 @@
 
       IF( before) THEN
           IF (j1<1) THEN
-            IF (.NOT.agrif_child(ln_bry_south)) THEN
+            IF (.NOT.agrif_child(lk_south)) THEN
               IF ((nbondj == -1).OR.(nbondj == 2)) THEN
                 DO jj=1,j2
                   ptab(i1:i2,jj)=e1u(i1:i2,jj)
@@ -965,7 +965,7 @@
 
       IF( before) THEN
           IF (j1<1) THEN
-            IF (.NOT.agrif_child(ln_bry_south)) THEN
+            IF (.NOT.agrif_child(lk_south)) THEN
               IF ((nbondj == -1).OR.(nbondj == 2)) THEN
                 DO jj=1,j2
                   ptab(i1:i2,jj)=e2t(i1:i2,jj)
@@ -1003,7 +1003,7 @@
 
       IF( before) THEN
           IF (j1<1) THEN
-            IF (.NOT.agrif_child(ln_bry_south)) THEN
+            IF (.NOT.agrif_child(lk_south)) THEN
               IF ((nbondj == -1).OR.(nbondj == 2)) THEN
                 DO jj=1,j2
                   ptab(i1:i2,jj)=e2u(i1:i2,jj)
@@ -1075,7 +1075,7 @@
       INTEGER ::   ios
 
       NAMELIST/namagrif/ nn_cln_update,ln_spc_dyn,rn_sponge_tra,rn_sponge_dyn,ln_chk_bathy,npt_connect,   &
-      &  npt_copy, ln_bry_south
+      &  npt_copy
 
       REWIND( numnam_ref )              ! Namelist namagrif in reference namelist : nesting parameters
       READ  ( numnam_ref, namagrif, IOSTAT = ios, ERR = 901 )
@@ -1093,7 +1093,6 @@
          WRITE(numout,*) '   Namelist namagrif : set nesting parameters'
          WRITE(numout,*) '      npt_copy             = ', npt_copy
          WRITE(numout,*) '      npt_connect          = ', npt_connect
-         WRITE(numout,*) '      ln_bry_south  = ', ln_bry_south
       ENDIF
 
    ! Set the number of ghost cells according to periodicity
@@ -1102,11 +1101,16 @@
       nbghostcells_y_s = nbghostcells
       nbghostcells_y_n = nbghostcells
 
+      lk_west  = .NOT. ( Agrif_Ix() == 1 )
+      lk_east  = .NOT. ( Agrif_Ix() + nbcellsx/AGRIF_Irhox() == Agrif_Parent(jpiglo) -1 )
+      lk_south = .NOT. ( Agrif_Iy() == 1 )
+      lk_north = .NOT. ( Agrif_Iy() + nbcellsy/AGRIF_Irhoy() == Agrif_Parent(jpjglo) -1 )
+
       IF (.not.agrif_root()) THEN
         IF (jperio == 1) THEN
           nbghostcells_x = 0
         ENDIF
-        IF (.NOT.ln_bry_south) THEN
+        IF (.NOT.lk_south) THEN
           nbghostcells_y_s = 0
         ENDIF
       ENDIF

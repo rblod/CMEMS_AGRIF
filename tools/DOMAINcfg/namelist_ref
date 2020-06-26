@@ -171,7 +171,6 @@
    ln_chk_bathy  = .FALSE. !
    npt_connect   = 2
    npt_copy      = 2
-   ln_bry_south = .TRUE.
 /
 !-----------------------------------------------------------------------
 &nammpp        !   Massively Parallel Processing                        ("key_mpp_mpi")

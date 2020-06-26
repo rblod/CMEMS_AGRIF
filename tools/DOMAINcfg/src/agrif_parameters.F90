@@ -13,7 +13,6 @@ MODULE agrif_parameters
 	LOGICAL :: ln_chk_bathy
 	INTEGER :: npt_copy
 	INTEGER :: npt_connect
-	LOGICAL :: ln_bry_south = .TRUE.
 	REAL(wp), PUBLIC, ALLOCATABLE, SAVE        , DIMENSION(:,:) ::   ztabramp
 	REAL(wp), PUBLIC, ALLOCATABLE, SAVE        , DIMENSION(:,:,:) ::   e3t_interp
 

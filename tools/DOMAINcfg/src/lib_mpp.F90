@@ -1528,33 +1528,6 @@ CONTAINS
          DEALLOCATE(crname_lbc)
       ENDIF
    END SUBROUTINE mpp_report
-
-   
-   SUBROUTINE tic_tac (ld_tic, ld_global)
-
-    LOGICAL,           INTENT(IN) :: ld_tic
-    LOGICAL, OPTIONAL, INTENT(IN) :: ld_global
-    REAL(wp), DIMENSION(2), SAVE :: tic_wt
-    REAL(wp),               SAVE :: tic_ct = 0._wp
-    INTEGER :: ii
-
-    IF( ncom_stp <= nit000 ) RETURN
-    IF( ncom_stp == nitend ) RETURN
-    ii = 1
-    IF( PRESENT( ld_global ) ) THEN
-       IF( ld_global ) ii = 2
-    END IF
-    
-    IF ( ld_tic ) THEN
-       tic_wt(ii) = MPI_Wtime()                                                    ! start count tic->tac (waiting time)
-       IF ( tic_ct > 0.0_wp ) compute_time = compute_time + MPI_Wtime() - tic_ct   ! cumulate count tac->tic
-    ELSE
-       waiting_time(ii) = waiting_time(ii) + MPI_Wtime() - tic_wt(ii)              ! cumulate count tic->tac
-       tic_ct = MPI_Wtime()                                                        ! start count tac->tic (waiting time)
-    ENDIF
-    
-   END SUBROUTINE tic_tac
-
    
 #else
    !!----------------------------------------------------------------------
@@ -1840,7 +1813,6 @@ CONTAINS
                                CALL FLUSH(numout    )
       IF( numstp     /= -1 )   CALL FLUSH(numstp    )
       IF( numrun     /= -1 )   CALL FLUSH(numrun    )
-      IF( numevo_ice /= -1 )   CALL FLUSH(numevo_ice)
       !
       IF( cd1 == 'STOP' ) THEN
          WRITE(numout,*)  'huge E-R-R-O-R : immediate stop'

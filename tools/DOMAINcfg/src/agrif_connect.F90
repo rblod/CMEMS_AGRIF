@@ -200,7 +200,7 @@ CONTAINS
       ENDIF
 
       ! --- South --- !
-      IF(( (nbondj == -1) .OR. (nbondj == 2) ).AND.(ln_bry_south)) THEN
+      IF(( (nbondj == -1) .OR. (nbondj == 2) ).AND.(lk_south)) THEN
          ind1 = 1+nbghostcells + istart
          ind2 = ind1 + ispongearea 
          DO jj = ind1, ind2 
