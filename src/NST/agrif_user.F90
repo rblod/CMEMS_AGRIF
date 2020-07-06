@@ -196,7 +196,7 @@
       CALL Agrif_Set_Updatetype(e2v_id,update1 = Agrif_Update_Average, update2=Agrif_Update_Copy)
 #endif
       
-   !   CALL Agrif_Set_ExternalMapping(nemo_mapping)
+      CALL Agrif_Set_ExternalMapping(nemo_mapping)
       !
    END SUBROUTINE agrif_declare_var_ini
 
@@ -651,7 +651,7 @@ SUBROUTINE Agrif_InitValues_cont_ice
       CALL agrif_declare_variable((/1,2/)  ,(/ind2-1,ind3/)  ,(/'x','y'/)    ,(/1,1/)  ,(/nlci,nlcj/)                      ,u_ice_id  )
       CALL agrif_declare_variable((/2,1/)  ,(/ind2,ind3-1/)  ,(/'x','y'/)    ,(/1,1/)  ,(/nlci,nlcj/)                      ,v_ice_id  )
 
-      CALL agrif_declare_variable((/2,2,0/),(/ind3,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nlci,nlcj,jpl*(8+nlay_s+nlay_i)/),tra_iceini_id)
+      CALL agrif_declare_variable((/2,2,0/),(/ind2,ind3,0/),(/'x','y','N'/),(/1,1,1/),(/nlci,nlcj,jpl*(8+nlay_s+nlay_i)/),tra_iceini_id)
       CALL agrif_declare_variable((/1,2/)  ,(/ind2-1,ind3/)  ,(/'x','y'/)    ,(/1,1/)  ,(/nlci,nlcj/)                      ,u_iceini_id  )
       CALL agrif_declare_variable((/2,1/)  ,(/ind2,ind3-1/)  ,(/'x','y'/)    ,(/1,1/)  ,(/nlci,nlcj/)                      ,v_iceini_id  )
 
