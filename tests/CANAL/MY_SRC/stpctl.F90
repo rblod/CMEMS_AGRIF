@@ -36,7 +36,7 @@ MODULE stpctl
    INTEGER, DIMENSION(8)  ::   nvarid   ! netcdf variable id
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: stpctl.F90 13058 2020-06-07 18:13:59Z rblod $
+   !! $Id: stpctl.F90 13185 2020-07-01 05:42:23Z rblod $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -129,7 +129,7 @@ CONTAINS
       llmsk(:,:,:) = tmask(:,:,:) == 1._wp
       zmax(3) = MAXVAL( -ts(:,:,:,jp_sal,Kmm), mask = llmsk )                     ! minus salinity max
       zmax(4) = MAXVAL(  ts(:,:,:,jp_sal,Kmm), mask = llmsk )                     !       salinity max
-      IF( ll_colruns ) THEN     ! following variables are used only in the netcdf file
+      IF( ll_colruns .OR. jpnij == 1 ) THEN     ! following variables are used only in the netcdf file
          zmax(5) = MAXVAL( -ts(:,:,:,jp_tem,Kmm), mask = llmsk )                  ! minus temperature max
          zmax(6) = MAXVAL(  ts(:,:,:,jp_tem,Kmm), mask = llmsk )                  !       temperature max
          IF( ln_zad_Aimp ) THEN
@@ -219,14 +219,18 @@ CONTAINS
          CALL dia_wri_state( Kmm, 'output.abort' )     ! create an output.abort file
          !
          IF( ll_colruns .or. jpnij == 1 ) THEN   ! all processes synchronized -> use lwp to print in opened ocean.output files
-            IF(lwp)   CALL ctl_stop( ctmp1, ' ', ctmp2, ctmp3, ctmp4, ctmp5, ' ', ctmp6 )
+            IF(lwp) THEN   ;   CALL ctl_stop( ctmp1, ' ', ctmp2, ctmp3, ctmp4, ctmp5, ' ', ctmp6 )
+            ELSE           ;   nstop = MAX(1, nstop)   ! make sure nstop > 0 (automatically done when calling ctl_stop)
+            ENDIF
          ELSE                                    ! only mpi subdomains with errors are here -> STOP now
             CALL ctl_stop( 'STOP', ctmp1, ' ', ctmp2, ctmp3, ctmp4, ctmp5, ' ', ctmp6 )
          ENDIF
          !
-         IF( nstop == 0 )   nstop = 1 
-         ngrdstop = Agrif_Fixed()
-         !
+      ENDIF
+      !
+      IF( nstop > 0 ) THEN                                                  ! an error was detected and we did not abort yet...
+         ngrdstop = Agrif_Fixed()                                           ! store which grid got this error
+         IF( .NOT. ll_colruns .AND. jpnij > 1 )   CALL ctl_stop( 'STOP' )   ! we must abort here to avoid MPI deadlock
       ENDIF
       !
 9500  FORMAT(' it :', i8, '    |ssh|_max: ', D23.16, ' |U|_max: ', D23.16,' S_min: ', D23.16,' S_max: ', D23.16)

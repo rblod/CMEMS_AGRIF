@@ -1,6 +1,10 @@
 
 ## WARNING: TOTALLY-ALPHA-STUFF / DOCUMENT IN THE PROCESS OF BEING WRITEN!
 
+NOTE: if working with the trunk of NEMO, you are strongly advised to use the same test-case but on the `NEMO-examples` GitHub depo:
+https://github.com/NEMO-ocean/NEMO-examples/tree/master/STATION_ASF
+
+
 # *Station Air-Sea Fluxes* demonstration case
 
 ## Objectives

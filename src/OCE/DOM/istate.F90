@@ -47,7 +47,7 @@ MODULE istate
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: istate.F90 13141 2020-06-22 16:27:34Z jchanut $
+   !! $Id: istate.F90 13178 2020-06-29 17:14:26Z jchanut $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -112,12 +112,11 @@ CONTAINS
          !                                    ! Initialization of ocean to zero
          !
          IF( ln_tsd_init ) THEN               
-            IF( Agrif_root() ) THEN
-               CALL dta_tsd( nit000, ts(:,:,:,:,Kbb) )       ! read 3D T and S data at nit000
-               ssh(:,:,Kbb)   = 0._wp               ! set the ocean at rest
-               uu  (:,:,:,Kbb) = 0._wp
-               vv  (:,:,:,Kbb) = 0._wp  
-            ENDIF
+            CALL dta_tsd( nit000, ts(:,:,:,:,Kbb) )       ! read 3D T and S data at nit000
+            !
+            ssh(:,:,Kbb)   = 0._wp               ! set the ocean at rest
+            uu  (:,:,:,Kbb) = 0._wp
+            vv  (:,:,:,Kbb) = 0._wp  
             !
             IF( ll_wd ) THEN
                ssh(:,:,Kbb) =  -ssh_ref  ! Added in 30 here for bathy that adds 30 as Iterative test CEOD 

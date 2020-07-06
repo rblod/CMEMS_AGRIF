@@ -60,7 +60,7 @@ MODULE nemogcm
 
    !!----------------------------------------------------------------------
    !! NEMO/SAS 4.0 , NEMO Consortium (2018)
-   !! $Id: nemogcm.F90 13058 2020-06-07 18:13:59Z rblod $
+   !! $Id: nemogcm.F90 13182 2020-06-30 16:05:17Z rblod $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -90,13 +90,9 @@ CONTAINS
       !                            !-----------------------!
 #if defined key_agrif
       Kbb_a = Nbb; Kmm_a = Nnn; Krhs_a = Nrhs   ! agrif_oce module copies of time level indices
-      CALL Agrif_Declare_Var_dom   ! AGRIF: set the meshes for DOM
       CALL Agrif_Declare_Var       !  "      "   "   "      "  DYN/TRA 
 # if defined key_top
       CALL Agrif_Declare_Var_top   !  "      "   "   "      "  TOP
-# endif
-# if defined key_si3
-      CALL Agrif_Declare_Var_ice   !  "      "   "   "      "  Sea ice
 # endif
 #endif
       ! check that all process are still there... If some process have an error,
@@ -344,6 +340,9 @@ CONTAINS
 
       ! Initialise time level indices
       Nbb = 1; Nnn = 2; Naa = 3; Nrhs = Naa
+#if defined key_agrif
+      Kbb_a = Nbb; Kmm_a = Nnn; Krhs_a = Nrhs   ! agrif_oce module copies of time level indices
+#endif 
 
       !                             !-------------------------------!
       !                             !  NEMO general initialization  !
@@ -357,6 +356,9 @@ CONTAINS
 
                            CALL phy_cst         ! Physical constants
                            CALL eos_init        ! Equation of seawater
+#if defined key_agrif
+     CALL Agrif_Declare_Var_ini   !  "      "   "   "      "  DOM
+#endif
                            CALL dom_init( Nbb, Nnn, Naa, 'SAS') ! Domain
       IF( sn_cfctl%l_prtctl )   &
          &                 CALL prt_ctl_init        ! Print control

@@ -35,7 +35,7 @@ MODULE stpctl
    INTEGER, DIMENSION(3)  ::   nvarid   ! netcdf variable id
    !!----------------------------------------------------------------------
    !! NEMO/SAS 4.0 , NEMO Consortium (2018)
-   !! $Id: stpctl.F90 13058 2020-06-07 18:13:59Z rblod $
+   !! $Id: stpctl.F90 13185 2020-07-01 05:42:23Z rblod $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -111,9 +111,17 @@ CONTAINS
       !                                   !==            test of local extrema           ==!
       !                                   !==  done by all processes at every time step  ==!
       llmsk(:,:) = tmask(:,:,1) == 1._wp
-      zmax(1) = MAXVAL(      vt_i (:,:)            , mask = llmsk )   ! max ice thickness
-      zmax(2) = MAXVAL( ABS( u_ice(:,:) )          , mask = llmsk )   ! max ice velocity (zonal only)
-      zmax(3) = MAXVAL(     -tm_i (:,:) + 273.15_wp, mask = llmsk )   ! min ice temperature
+      IF( COUNT( llmsk(:,:) ) > 0 ) THEN   ! avoid huge values sent back for land processors...
+         zmax(1) = MAXVAL(      vt_i (:,:)            , mask = llmsk )   ! max ice thickness
+         zmax(2) = MAXVAL( ABS( u_ice(:,:) )          , mask = llmsk )   ! max ice velocity (zonal only)
+         zmax(3) = MAXVAL(     -tm_i (:,:) + 273.15_wp, mask = llmsk )   ! min ice temperature
+      ELSE
+         IF( ll_colruns ) THEN    ! default value: must not be kept when calling mpp_max -> must be as small as possible
+            zmax(1:3) = -HUGE(1._wp)
+         ELSE                     ! default value: must not give true for any of the tests bellow (-> avoid manipulating HUGE...)
+            zmax(1:3) = 0._wp
+         ENDIF
+      ENDIF
       zmax(4) = REAL( nstop, wp )                                     ! stop indicator
       !                                   !==               get global extrema             ==!
       !                                   !==  done by all processes if writting run.stat  ==!
@@ -179,14 +187,18 @@ CONTAINS
          CALL dia_wri_state( Kmm, 'output.abort' )     ! create an output.abort file
          !
          IF( ll_colruns .or. jpnij == 1 ) THEN   ! all processes synchronized -> use lwp to print in opened ocean.output files
-            IF(lwp)   CALL ctl_stop( ctmp1, ' ', ctmp2, ctmp3, ctmp4, ctmp5, ' ', ctmp6 )
+            IF(lwp) THEN   ;   CALL ctl_stop( ctmp1, ' ', ctmp2, ctmp3, ctmp4, ctmp5, ' ', ctmp6 )
+            ELSE           ;   nstop = MAX(1, nstop)   ! make sure nstop > 0 (automatically done when calling ctl_stop)
+            ENDIF
          ELSE                                    ! only mpi subdomains with errors are here -> STOP now
             CALL ctl_stop( 'STOP', ctmp1, ' ', ctmp2, ctmp3, ctmp4, ctmp5, ' ', ctmp6 )
          ENDIF
          !
-         IF( nstop == 0 )   nstop = 1 
-         ngrdstop = Agrif_Fixed()
-         !
+      ENDIF
+      !
+      IF( nstop > 0 ) THEN                                                  ! an error was detected and we did not abort yet...
+         ngrdstop = Agrif_Fixed()                                           ! store which grid got this error
+         IF( .NOT. ll_colruns .AND. jpnij > 1 )   CALL ctl_stop( 'STOP' )   ! we must abort here to avoid MPI deadlock
       ENDIF
       !
 9500  FORMAT(' it :', i8, '    vt_i_max: ', D23.16, ' |u|_max: ', D23.16,' tm_i_min: ', D23.16)

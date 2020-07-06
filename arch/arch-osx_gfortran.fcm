@@ -1,17 +1,21 @@
 # generic gfortran compiler options for OSX installed with macport, http://www.macports.org/
 #
 #   Prerequisite softwares installed with MacPorts :
-#     gcc8 @8.4.0_0 (active)
-#     hdf5 @1.10.6_0+cxx+gcc8+hl+openmpi+szip (active)
-#     mpi_select @0.0_3 (active)
-#     netcdf @4.7.3_1+cdf5+dap+gcc8+netcdf4+openmpi (active)
-#     netcdf-fortran @4.5.2_0+gcc8+openmpi (active)
-#     openmpi @4.0.1_1 (active)
-#     openmpi-default @4.0.1_1+gcc8 (active)
-#     openmpi-gcc8 @4.0.1_1+fortran+valgrind (active)
+#     sudo port install gcc9
+#     sudo port install gcc_select
+#     sudo port select --set gcc mp-gcc9
+#     sudo port install mpich-gcc9
+#     sudo port install mpi_select
+#     sudo port select --set mpi mpich-gcc9-fortran
+#     sudo port install hdf5 +gcc9 +mpich +szip
+#     sudo port install netcdf +gcc9 +mpich
+#     sudo port install netcdf-fortran +gcc9 +mpich
+#     sudo port install p5.30-uri
 #
 #     $ port select --show mpi
-#     The currently selected version for 'mpi' is 'openmpi-gcc8-fortran'.
+#     The currently selected version for 'mpi' is 'mpich-gcc9-fortran'.
+#     $ port select --show gcc
+#     The currently selected version for 'gcc' is 'mp-gcc9'.
 #
 # Note that:
 #  - unix variables "$..." are accpeted and will be evaluated before calling fcm.

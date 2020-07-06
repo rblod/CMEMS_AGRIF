@@ -110,9 +110,17 @@ CONTAINS
       !                                   !==            test of local extrema           ==!
       !                                   !==  done by all processes at every time step  ==!
       llmsk(:,:) = tmask(:,:,1) == 1._wp
-      zmax(1) = MAXVAL(     taum(:,:)   , mask = llmsk )   ! max wind stress module
-      zmax(2) = MAXVAL( ABS( qns(:,:) ) , mask = llmsk )   ! max non-solar heat flux
-      zmax(3) = MAXVAL( ABS( emp(:,:) ) , mask = llmsk )   ! max E-P
+      IF( COUNT( llmsk(:,:) ) > 0 ) THEN   ! avoid huge values sent back for land processors...
+         zmax(1) = MAXVAL(     taum(:,:)   , mask = llmsk )   ! max wind stress module
+         zmax(2) = MAXVAL( ABS( qns(:,:) ) , mask = llmsk )   ! max non-solar heat flux
+         zmax(3) = MAXVAL( ABS( emp(:,:) ) , mask = llmsk )   ! max E-P
+      ELSE
+         IF( ll_colruns ) THEN    ! default value: must not be kept when calling mpp_max -> must be as small as possible
+            zmax(1:3) = -HUGE(1._wp)
+         ELSE                     ! default value: must not give true for any of the tests bellow (-> avoid manipulating HUGE...)
+            zmax(1:3) = 0._wp
+         ENDIF
+      ENDIF
       zmax(4) = REAL( nstop, wp )                                     ! stop indicator
       !                                   !==               get global extrema             ==!
       !                                   !==  done by all processes if writting run.stat  ==!
@@ -178,14 +186,18 @@ CONTAINS
          CALL dia_wri_state( Kmm, 'output.abort' )     ! create an output.abort file
          !
          IF( ll_colruns .or. jpnij == 1 ) THEN   ! all processes synchronized -> use lwp to print in opened ocean.output files
-            IF(lwp)   CALL ctl_stop( ctmp1, ' ', ctmp2, ctmp3, ctmp4, ctmp5, ' ', ctmp6 )
+            IF(lwp) THEN   ;   CALL ctl_stop( ctmp1, ' ', ctmp2, ctmp3, ctmp4, ctmp5, ' ', ctmp6 )
+            ELSE           ;   nstop = MAX(1, nstop)   ! make sure nstop > 0 (automatically done when calling ctl_stop)
+            ENDIF
          ELSE                                    ! only mpi subdomains with errors are here -> STOP now
             CALL ctl_stop( 'STOP', ctmp1, ' ', ctmp2, ctmp3, ctmp4, ctmp5, ' ', ctmp6 )
          ENDIF
          !
-         IF( nstop == 0 )   nstop = 1 
-         ngrdstop = Agrif_Fixed()
-         !
+      ENDIF
+      !
+      IF( nstop > 0 ) THEN                                                  ! an error was detected and we did not abort yet...
+         ngrdstop = Agrif_Fixed()                                           ! store which grid got this error
+         IF( .NOT. ll_colruns .AND. jpnij > 1 )   CALL ctl_stop( 'STOP' )   ! we must abort here to avoid MPI deadlock
       ENDIF
       !
 9500  FORMAT(' it :', i8, '    tau_max: ', D23.16, ' |qns|_max: ', D23.16,' |emp|_max: ', D23.16)

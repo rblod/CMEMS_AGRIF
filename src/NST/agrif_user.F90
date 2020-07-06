@@ -4,7 +4,7 @@
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/NST 4.0 , NEMO Consortium (2018)
-   !! $Id: agrif_user.F90 13162 2020-06-26 13:20:37Z rblod $
+   !! $Id: agrif_user.F90 13202 2020-07-02 08:33:15Z rblod $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
    SUBROUTINE agrif_user
@@ -196,7 +196,7 @@
       CALL Agrif_Set_Updatetype(e2v_id,update1 = Agrif_Update_Average, update2=Agrif_Update_Copy)
 #endif
       
-      CALL Agrif_Set_ExternalMapping(nemo_mapping)
+   !   CALL Agrif_Set_ExternalMapping(nemo_mapping)
       !
    END SUBROUTINE agrif_declare_var_ini
 
@@ -238,11 +238,6 @@
      ! CALL Agrif_Declare_Var_ini
 
       IF( agrif_oce_alloc()  > 0 )   CALL ctl_warn('agrif agrif_oce_alloc: allocation of arrays failed')
-
-      lk_west  = .NOT. ( Agrif_Ix() == 1 )
-      lk_east  = .NOT. ( Agrif_Ix() + nbcellsx/AGRIF_Irhox() == Agrif_Parent(jpiglo) -1 )
-      lk_south = .NOT. ( Agrif_Iy() == 1 )
-      lk_north = .NOT. ( Agrif_Iy() + nbcellsy/AGRIF_Irhoy() == Agrif_Parent(jpjglo) -1 )
 
       ! Build consistent parent bathymetry and number of levels
       ! on the child grid 
@@ -876,6 +871,12 @@ SUBROUTINE Agrif_InitValues_cont_ice
          WRITE(numout,*) '      use special values for dynamics   ln_spc_dyn    = ', ln_spc_dyn
          WRITE(numout,*) '      check bathymetry                  ln_chk_bathy  = ', ln_chk_bathy
       ENDIF
+
+      lk_west  = .NOT. ( Agrif_Ix() == 1 )
+      lk_east  = .NOT. ( Agrif_Ix() + nbcellsx/AGRIF_Irhox() == Agrif_Parent(jpiglo) -1 )
+      lk_south = .NOT. ( Agrif_Iy() == 1 )
+      lk_north = .NOT. ( Agrif_Iy() + nbcellsy/AGRIF_Irhoy() == Agrif_Parent(jpjglo) -1 )
+
       !
       ! Set the number of ghost cells according to periodicity
       nbghostcells_x = nbghostcells

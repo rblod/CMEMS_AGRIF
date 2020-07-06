@@ -130,7 +130,7 @@ MODULE sbcblk
 #  include "do_loop_substitute.h90"
    !!----------------------------------------------------------------------
    !! NEMO/OCE 4.0 , NEMO Consortium (2018)
-   !! $Id: sbcblk.F90 12925 2020-05-14 13:46:17Z smasson $
+   !! $Id: sbcblk.F90 13185 2020-07-01 05:42:23Z rblod $
    !! Software governed by the CeCILL license (see ./LICENSE)
    !!----------------------------------------------------------------------
 CONTAINS
@@ -626,7 +626,18 @@ CONTAINS
          CALL ctl_stop( 'STOP', 'sbc_oce: non-existing bulk formula selected' )
 
       END SELECT
-
+      
+      IF( iom_use('Cd_oce') )   CALL iom_put("Cd_oce",   zcd_oce * tmask(:,:,1))
+      IF( iom_use('Ce_oce') )   CALL iom_put("Ce_oce",   zce_oce * tmask(:,:,1))
+      IF( iom_use('Ch_oce') )   CALL iom_put("Ch_oce",   zch_oce * tmask(:,:,1))
+      !! LB: mainly here for debugging purpose:
+      IF( iom_use('theta_zt') ) CALL iom_put("theta_zt", (ztpot-rt0) * tmask(:,:,1)) ! potential temperature at z=zt
+      IF( iom_use('q_zt') )     CALL iom_put("q_zt",     zqair       * tmask(:,:,1)) ! specific humidity       "
+      IF( iom_use('theta_zu') ) CALL iom_put("theta_zu", (t_zu -rt0) * tmask(:,:,1)) ! potential temperature at z=zu
+      IF( iom_use('q_zu') )     CALL iom_put("q_zu",     q_zu        * tmask(:,:,1)) ! specific humidity       "
+      IF( iom_use('ssq') )      CALL iom_put("ssq",      pssq        * tmask(:,:,1)) ! saturation specific humidity at z=0
+      IF( iom_use('wspd_blk') ) CALL iom_put("wspd_blk", zU_zu       * tmask(:,:,1)) ! bulk wind speed at z=zu
+      
       IF( ln_skin_cs .OR. ln_skin_wl ) THEN
          !! ptsk and pssq have been updated!!!
          !!
@@ -877,10 +888,11 @@ CONTAINS
          CALL Cdn10_Lupkes2015( ptsui, pslp, Cd_ice, Ch_ice )
          Ce_ice(:,:) = Ch_ice(:,:)       ! sensible and latent heat transfer coef. are considered identical
       ENDIF
-
-      !! IF ( iom_use("Cd_ice") ) CALL iom_put("Cd_ice", Cd_ice)   ! output value of pure ice-atm. transfer coef.
-      !! IF ( iom_use("Ch_ice") ) CALL iom_put("Ch_ice", Ch_ice)   ! output value of pure ice-atm. transfer coef.
-
+      
+      IF( iom_use('Cd_ice') ) CALL iom_put("Cd_ice", Cd_ice)
+      IF( iom_use('Ce_ice') ) CALL iom_put("Ce_ice", Ce_ice)
+      IF( iom_use('Ch_ice') ) CALL iom_put("Ch_ice", Ch_ice)
+      
       ! local scalars ( place there for vector optimisation purposes)
       zcd_dui(:,:) = wndm_ice(:,:) * Cd_ice(:,:)
 

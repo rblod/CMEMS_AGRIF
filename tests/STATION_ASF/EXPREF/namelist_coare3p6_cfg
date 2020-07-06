@@ -28,10 +28,12 @@
    nn_no       =       0   !  Assimilation cycle index
    cn_exp      =  'STATION_ASF-COARE3p6'  !  experience name
    nn_it000    =    1   !  first time step
-   nn_itend    =    26280   !  last  time step (std 5840)
-   nn_date0    =    20160101   !  date at nit_0000 (format yyyymmdd) used if ln_rstart=F or (ln_rstart=T and nn_rstctl=0 or 1)
+!!!   nn_itend    =    26304   !  last  time step => 3 years (including 1 leap!) at dt=3600s
+!!!   nn_date0    =    20160101   !  date at nit_0000 (format yyyymmdd) used if ln_rstart=F or (ln_rstart=T and nn_rstctl=0 or 1)
+   nn_itend    =    8760   !  last  time step => 3 years (including 1 leap!) at dt=3600s
+   nn_date0    = 20180101  !  date at nit_0000 (format yyyymmdd) used if ln_rstart=F or (ln_rstart=T and nn_rstctl=0 or 1)
    nn_time0    =       0   !  initial time of day in hhmm
-   nn_leapy    =       0   !  Leap year calendar (1) or not (0)
+   nn_leapy    =       1   !  Leap year calendar (1) or not (0)
    ln_rstart   = .false.   !  start from rest (F) or from a restart file (T)
       ln_1st_euler = .false.  !  =T force a start with forward time step (ln_rstart=T)
       nn_rstctl   = 2      !  restart control ==> activated only if ln_rstart=T
@@ -44,8 +46,12 @@
       cn_ocerst_outdir = './'         !  directory in which to write output ocean restarts
    nn_istate   =       0   !  output the initial state (1) or not (0)
    ln_rst_list = .false.   !  output restarts at list of times using nn_stocklist (T) or at set frequency with nn_stock (F)
-   nn_stock    =    26280   ! 1year @ dt=3600 s / frequency of creation of a restart file (modulo referenced to 1)
-   nn_write    =    26280   ! 1year @ dt=3600 s / frequency of write in the output file   (modulo referenced to nn_it000)
+   !!
+!!!   nn_stock    =    26304   ! 3 years (including 1 leap!) at dt=3600s / frequency of creation of a restart file (modulo referenced to 1)
+!!!   nn_write    =    26304   ! 3 years (including 1 leap!) at dt=3600s / frequency of write in the output file   (modulo referenced to nn_it000)
+   nn_stock    =    8760   ! 1 year at dt=3600s / frequency of creation of a restart file (modulo referenced to 1)
+   nn_write    =    8760   ! 1 year at dt=3600s / frequency of write in the output file   (modulo referenced to nn_it000)
+   !!
    ln_mskland  = .false.   !  mask land points in NetCDF outputs (costly: + ~15%)
    ln_cfmeta   = .false.   !  output additional data to netCDF files required for compliance with the CF metadata standard
    ln_clobber  = .true.    !  clobber (overwrite) an existing file
@@ -133,7 +139,7 @@
       ln_humi_dpt = .false. !  humidity specified below in "sn_humi" is dew-point temperature   [K]   if .true.
       ln_humi_rlh = .true.  !  humidity specified below in "sn_humi" is relative humidity       [%]   if .true.
    !
-   cn_dir      = './'      !  root directory for the bulk data location
+   cn_dir = './'  !  root directory for the bulk data location
    !___________!_________________________!___________________!___________!_____________!________!___________!______________________________________!__________!_______________!
    !           !  file name              ! frequency (hours) ! variable  ! time interp.!  clim  ! 'yearly'/ !       weights filename               ! rotation ! land/sea mask !
    !           !                         !  (if <0  months)  !   name    !   (logical) !  (T/F) ! 'monthly' !                                      ! pairing  !    filename   !
@@ -162,7 +168,7 @@
       ln_3d_uve   = .false.   !  specify whether we are supplying a 3D u,v and e3 field
       ln_read_frq = .false.   !  specify whether we must read frq or not
 
-   cn_dir      = './'      !  root directory for the ocean data location
+   cn_dir      = './'     !  root directory for the ocean data location
    !___________!_________________________!___________________!___________!_____________!________!___________!__________________!__________!_______________!
    !           !  file name              ! frequency (hours) ! variable  ! time interp.!  clim  ! 'yearly'/ ! weights filename ! rotation ! land/sea mask !
    !           !                         !  (if <0  months)  !   name    !   (logical) !  (T/F) ! 'monthly' !                  ! pairing  !    filename   !
@@ -214,7 +220,7 @@
 !-----------------------------------------------------------------------
 &nameos        !   ocean Equation Of Seawater                           (default: NO selection)
 !-----------------------------------------------------------------------
-   ln_eos80    = .true.         !  = Use EOS80
+   ln_eos80    = .true.          !  = Use EOS80
 /
 !!======================================================================
 !!                      ***  Dynamics namelists  ***                  !!
